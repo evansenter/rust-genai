@@ -11,7 +11,4 @@ edition = "2024"
 [dependencies]
 genai-client = { path = "genai-client" }
 tokio = { version = "1.44.2", features = ["full"] }
-
-[[bin]]
-name = "simple_request"
-path = "src/bin/simple_request.rs"
+futures-util = "0.3"
