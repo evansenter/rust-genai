@@ -1,6 +1,17 @@
+[workspace]
+members = [
+    "genai-client",
+]
+
 [package]
 name = "rust-genai"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+genai-client = { path = "genai-client" }
+tokio = { version = "1.44.2", features = ["full"] }
+
+[[bin]]
+name = "simple_request"
+path = "src/bin/simple_request.rs"
