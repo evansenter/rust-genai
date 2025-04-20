@@ -120,3 +120,47 @@ impl Client {
 // pub use genai_client::generate_content_stream;
 
 // You can add higher-level wrapper functions or structs here later.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // Bring internal error into scope for test construction
+    use genai_client::InternalError;
+
+    #[test]
+    fn test_internal_error_to_genai_error_conversion() {
+        // Http variant
+        // Creating a dummy reqwest::Error is tricky, so we might skip direct testing
+        // of #[from] conversions if they are standard, or use a mock error type.
+        // For now, we'll test non-#[from] variants and assume #[from] works.
+
+        // Parse variant
+        let internal_parse = InternalError::Parse("parse error".to_string());
+        let public_parse: GenaiError = internal_parse.into();
+        assert!(matches!(public_parse, GenaiError::Parse(s) if s == "parse error"));
+
+        // JSON variant (if we didn't use #[from], test like Parse)
+        // let internal_json = InternalError::Json(...);
+        // let public_json: GenaiError = internal_json.into();
+        // assert!(matches!(public_json, GenaiError::Json(...)));
+
+        // Utf8 variant (if we didn't use #[from], test like Parse)
+        // let internal_utf8 = InternalError::Utf8(...);
+        // let public_utf8: GenaiError = internal_utf8.into();
+        // assert!(matches!(public_utf8, GenaiError::Utf8(...)));
+
+        // Api variant
+        let internal_api = InternalError::Api("api error".to_string());
+        let public_api: GenaiError = internal_api.into();
+        assert!(matches!(public_api, GenaiError::Api(s) if s == "api error"));
+    }
+
+    // We could add tests for the PublicGenerateContentResponse struct here too if needed
+    #[test]
+    fn test_public_response_struct() {
+        let response = GenerateContentResponse {
+            text: "test".to_string(),
+        };
+        assert_eq!(response.text, "test");
+    }
+}

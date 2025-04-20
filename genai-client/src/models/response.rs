@@ -25,3 +25,55 @@ pub struct PartResponse {
     pub text: String,
     // Add other part types later
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json;
+
+    #[test]
+    fn test_deserialize_generate_content_response() {
+        // Example JSON mimicking a successful API response
+        let response_json = r#"
+        {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "This is the generated text."
+                  }
+                ],
+                "role": "model"
+              }
+              // "finishReason": "STOP",
+              // "safetyRatings": []
+            }
+          ]
+          // "promptFeedback": { ... }
+        }
+        "#;
+
+        let response: GenerateContentResponse =
+            serde_json::from_str(response_json).expect("Deserialization failed");
+
+        assert_eq!(response.candidates.len(), 1);
+        let candidate = &response.candidates[0];
+        assert_eq!(candidate.content.parts.len(), 1);
+        assert_eq!(candidate.content._role, "model"); // Check the renamed field
+        let part = &candidate.content.parts[0];
+        assert_eq!(part.text, "This is the generated text.");
+    }
+
+    #[test]
+    fn test_deserialize_minimal_response() {
+        // Test with absolute minimum valid fields
+        let response_json =
+            r#"{"candidates":[{"content":{"parts":[{"text":"Minimal"}],"role":"model"}}]}"#;
+        let response: GenerateContentResponse =
+            serde_json::from_str(response_json).expect("Minimal deserialization failed");
+        assert_eq!(response.candidates[0].content.parts[0].text, "Minimal");
+    }
+
+    // Add more tests here for variations: multiple candidates/parts, presence of optional fields, etc.
+}
