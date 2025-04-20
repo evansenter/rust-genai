@@ -21,17 +21,21 @@ async fn test_generate_content_integration() {
     // Use the client method
     let result = client.generate_content(model, prompt).await;
 
-    // Assert using the specific error type for better messages
     assert!(
         result.is_ok(),
         "generate_content failed: {:?}",
         result.err().unwrap()
     );
-    let text = result.unwrap();
-    assert!(!text.is_empty(), "Generated text is empty");
-    println!("test_generate_content_integration response: {}", text);
+
+    // Result is now Ok(GenerateContentResponse)
+    let response = result.unwrap();
+    assert!(!response.text.is_empty(), "Generated text is empty");
+    println!(
+        "test_generate_content_integration response: {}",
+        response.text
+    );
     assert!(
-        text.to_lowercase().contains("paris"),
+        response.text.to_lowercase().contains("paris"),
         "Response does not contain expected keyword 'paris'"
     );
 }
@@ -60,17 +64,14 @@ async fn test_generate_content_stream_integration() {
     let mut chunk_count = 0;
     while let Some(result) = stream.next().await {
         match result {
-            // We expect Ok, panic if Err, showing the GenaiError
+            // Stream yields Ok(GenerateContentResponse)
             Ok(chunk) => {
                 chunk_count += 1;
-                if let Some(candidate) = chunk.candidates.get(0) {
-                    if let Some(part) = candidate.content.parts.get(0) {
-                        collected_text.push_str(&part.text);
-                    }
-                }
+                // Access the .text field directly
+                collected_text.push_str(&chunk.text);
             }
             Err(e) => {
-                panic!("Stream returned an error: {:?}", e); // Panic shows the specific GenaiError 
+                panic!("Stream returned an error: {:?}", e);
             }
         }
     }

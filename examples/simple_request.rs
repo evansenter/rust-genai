@@ -19,9 +19,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // 3. Call the method on the client
     match client.generate_content(model, prompt).await {
-        Ok(response_text) => {
+        Ok(response) => {
             println!("--- Model Response ---");
-            println!("{}", response_text);
+            println!("{}", response.text);
             println!("--- End Response ---");
         }
         Err(e) => {
@@ -31,6 +31,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 GenaiError::Json(json_err) => eprintln!("JSON Error: {}", json_err),
                 GenaiError::Parse(p_err) => eprintln!("Parse Error: {}", p_err),
                 GenaiError::Utf8(u_err) => eprintln!("UTF8 Error: {}", u_err),
+                GenaiError::Internal(i_err) => eprintln!("Internal Error: {}", i_err),
             }
             return Err(e.into());
         }

@@ -4,6 +4,7 @@ use async_stream::try_stream;
 use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
 use std::str;
+use thiserror::Error; // Keep thiserror here too for InternalError
 
 // Declare the models module
 mod models;
@@ -16,9 +17,9 @@ use models::request::{Content, GenerateContentRequest, Part};
 pub use models::response::GenerateContentResponse;
 // pub use models::request::{Content, GenerateContentRequest, Part}; // Only if needed publicly
 
-// Define a concrete error type for better handling
-#[derive(Debug, thiserror::Error)]
-pub enum GenaiError {
+// Define an INTERNAL error type for this crate
+#[derive(Debug, Error)]
+pub enum InternalError {
     #[error("HTTP request error: {0}")]
     Http(#[from] reqwest::Error),
     #[error("SSE parsing error: {0}")]
@@ -39,8 +40,8 @@ pub async fn generate_content_internal(
     api_key: &str,
     model_name: &str,
     prompt_text: &str,
-) -> Result<String, GenaiError> {
-    // Return GenaiError
+) -> Result<String, InternalError> {
+    // Return InternalError
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
         model_name, api_key
@@ -53,21 +54,19 @@ pub async fn generate_content_internal(
         }],
     };
 
-    let response = http_client
-        .post(&url)
-        .json(&request_body)
-        .send()
-        .await?; // Automatically maps reqwest::Error to GenaiError::Http
+    let response = http_client.post(&url).json(&request_body).send().await?; // Automatically maps reqwest::Error to InternalError::Http
 
     if !response.status().is_success() {
-        let error_text = response.text().await
+        let error_text = response
+            .text()
+            .await
             // Use function directly instead of closure
-            .map_err(GenaiError::Http)?; 
-        return Err(GenaiError::Api(error_text));
+            .map_err(InternalError::Http)?;
+        return Err(InternalError::Api(error_text));
     }
-    
+
     // Use function directly instead of closure
-    let response_text = response.text().await.map_err(GenaiError::Http)?;
+    let response_text = response.text().await.map_err(InternalError::Http)?;
 
     let response_body: GenerateContentResponse = serde_json::from_str(&response_text)?;
 
@@ -77,7 +76,9 @@ pub async fn generate_content_internal(
             return Ok(part.text.clone());
         }
     }
-    Err(GenaiError::Parse("No text content found in response structure".to_string()))
+    Err(InternalError::Parse(
+        "No text content found in response structure".to_string(),
+    ))
 }
 
 // Make pub so rust-genai can call them
@@ -86,7 +87,7 @@ pub fn generate_content_stream_internal<'a>(
     api_key: &'a str,
     model_name: &'a str,
     prompt_text: &'a str,
-) -> impl Stream<Item = Result<GenerateContentResponse, GenaiError>> + Send + 'a {
+) -> impl Stream<Item = Result<GenerateContentResponse, InternalError>> + Send + 'a {
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?key={}&alt=sse",
         model_name, api_key
@@ -108,7 +109,7 @@ pub fn generate_content_stream_internal<'a>(
         let status = response.status();
         if !status.is_success() {
             let error_text = response.text().await.unwrap_or_else(|_| "Failed to read error body".to_string());
-            Err(GenaiError::Api(error_text))?;
+            Err(InternalError::Api(error_text))?;
         } else {
             let mut byte_stream = response.bytes_stream();
             let mut buffer = Vec::new();

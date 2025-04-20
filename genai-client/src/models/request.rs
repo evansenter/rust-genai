@@ -3,17 +3,20 @@ use serde::Serialize;
 #[derive(Serialize, Debug)]
 pub struct GenerateContentRequest {
     pub contents: Vec<Content>,
-    // TODO: Add generationConfig, safetySettings, etc. if needed
+    // generationConfig: Option<GenerationConfig>, // Example for future addition
+    // safetySettings: Option<Vec<SafetySetting>>, // Example for future addition
 }
 
 #[derive(Serialize, Debug)]
 pub struct Content {
     pub parts: Vec<Part>,
-    // TODO: Add role if needed, defaults to "user" usually for simple requests
+    // role: Option<String>, // Example for future addition
 }
 
 #[derive(Serialize, Debug)]
 pub struct Part {
     pub text: String,
-    // TODO: Add other part types like inline_data, function_call etc.
+    // Add other part types later e.g.:
+    // pub inline_data: Option<Blob>,
+    // pub function_call: Option<FunctionCall>,
 }

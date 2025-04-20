@@ -3,13 +3,14 @@ use serde::Deserialize;
 #[derive(Deserialize, Debug)]
 pub struct GenerateContentResponse {
     pub candidates: Vec<Candidate>,
-    // TODO: Add promptFeedback etc.
+    // pub prompt_feedback: Option<PromptFeedback>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Candidate {
     pub content: ContentResponse,
-    // TODO: Add finishReason, safetyRatings etc.
+    // pub finish_reason: Option<String>,
+    // pub safety_ratings: Option<Vec<SafetyRating>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -22,5 +23,5 @@ pub struct ContentResponse {
 #[derive(Deserialize, Debug)]
 pub struct PartResponse {
     pub text: String,
-    // TODO: Add other part types
+    // Add other part types later
 }
