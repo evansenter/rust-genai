@@ -1,0 +1,134 @@
+# Rust GenAI
+
+A Rust client library for interacting with Google's Generative AI (Gemini) API.
+
+## Features
+
+- Simple, intuitive API for making requests to Google's Generative AI models
+- Support for both single-shot and streaming text generation
+- Comprehensive error handling
+- Async/await support with Tokio
+- Well-documented code with examples
+
+## Installation
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+rust-genai = "0.1.0"
+tokio = { version = "1.0", features = ["full"] }
+```
+
+## Usage
+
+### API Key
+
+You'll need a Google API key with access to the Gemini models. You can get one from the [Google AI Studio](https://makersuite.google.com/).
+
+### Simple Request Example
+
+```rust
+use rust_genai::Client;
+use std::env;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Get API key from environment variable
+    let api_key = env::var("GEMINI_API_KEY")?;
+    
+    // Create the client
+    let client = Client::new(api_key);
+    
+    // Define model and prompt
+    let model = "gemini-1.5-flash-latest";
+    let prompt = "Write a short poem about Rust programming.";
+    
+    // Send request and get response
+    let response = client.generate_content(model, prompt).await?;
+    
+    // Print the generated text
+    println!("{}", response.text);
+    
+    Ok(())
+}
+```
+
+### Streaming Request Example
+
+```rust
+use rust_genai::Client;
+use futures_util::{pin_mut, StreamExt};
+use std::{env, io::{stdout, Write}};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api_key = env::var("GEMINI_API_KEY")?;
+    let client = Client::new(api_key);
+    
+    let model = "gemini-1.5-flash-latest";
+    let prompt = "Explain quantum computing in simple terms.";
+    
+    // Get a stream of response chunks
+    let stream = client.generate_content_stream(model, prompt);
+    pin_mut!(stream);
+    
+    // Process each chunk as it arrives
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(chunk) => {
+                print!("{}", chunk.text);
+                stdout().flush()?;
+            }
+            Err(e) => {
+                eprintln!("\nError: {}", e);
+                break;
+            }
+        }
+    }
+    
+    println!("\n");
+    Ok(())
+}
+```
+
+## Project Structure
+
+The project consists of two main components:
+
+1. **Public API Crate (`rust-genai`)**: 
+   - Provides a user-friendly interface in `src/lib.rs`
+   - Handles high-level error representation and client creation
+
+2. **Internal Client (`genai-client/`)**: 
+   - Contains the low-level implementation for API communication
+   - Defines the JSON serialization/deserialization models
+   - Handles the actual HTTP requests and response parsing
+
+## Available Models
+
+This library should work with all Google Generative AI models, including:
+
+- gemini-1.5-flash
+- gemini-1.5-pro
+- gemini-1.0-pro
+- (Check Google AI documentation for the latest models)
+
+## Error Handling
+
+The library provides the `GenaiError` enum for comprehensive error handling:
+
+- `Http`: Network-related errors
+- `Parse`: Issues parsing the response
+- `Json`: JSON deserialization errors
+- `Utf8`: Text encoding errors
+- `Api`: Errors returned by the Google API
+- `Internal`: Other internal errors
+
+## License
+
+[Add your license information here]
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. 
