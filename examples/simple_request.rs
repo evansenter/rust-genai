@@ -1,12 +1,14 @@
-use rust_genai::generate_content;
+use rust_genai::{Client, GenaiError};
 use std::env;
 use std::error::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // 1. Get API Key from environment variable
-    let api_key = env::var("GEMINI_API_KEY")
-        .map_err(|_| "Error: GEMINI_API_KEY environment variable not set.")?;
+    let api_key = env::var("GEMINI_API_KEY").map_err(|e| Box::new(e) as Box<dyn Error>)?;
+
+    // Create the client
+    let client = Client::new(api_key);
 
     // 2. Define model and prompt
     let model = "gemini-1.5-flash-latest"; // Or your preferred model
@@ -15,19 +17,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Sending request to model: {}", model);
     println!("Prompt: {}\n", prompt);
 
-    // 3. Call the generate_content function
-    match generate_content(&api_key, model, prompt).await {
+    // 3. Call the method on the client
+    match client.generate_content(model, prompt).await {
         Ok(response_text) => {
             println!("--- Model Response ---");
             println!("{}", response_text);
             println!("--- End Response ---");
         }
         Err(e) => {
-            eprintln!("Error generating content: {}", e);
-            // Return the error to indicate failure
-            return Err(e);
+            match &e {
+                GenaiError::Api(api_err_msg) => eprintln!("API Error: {}", api_err_msg),
+                GenaiError::Http(http_err) => eprintln!("HTTP Error: {}", http_err),
+                GenaiError::Json(json_err) => eprintln!("JSON Error: {}", json_err),
+                GenaiError::Parse(p_err) => eprintln!("Parse Error: {}", p_err),
+                GenaiError::Utf8(u_err) => eprintln!("UTF8 Error: {}", u_err),
+            }
+            return Err(e.into());
         }
     }
 
     Ok(())
-} 
+}

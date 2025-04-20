@@ -12,3 +12,4 @@ edition = "2024"
 genai-client = { path = "genai-client" }
 tokio = { version = "1.44.2", features = ["full"] }
 futures-util = "0.3"
+reqwest = { version = "0.12.15", features = ["json", "rustls-tls"] }
