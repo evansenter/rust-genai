@@ -124,38 +124,41 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // Bring internal error into scope for test construction
     use genai_client::InternalError;
 
     #[test]
     fn test_internal_error_to_genai_error_conversion() {
-        // Http variant
-        // Creating a dummy reqwest::Error is tricky, so we might skip direct testing
-        // of #[from] conversions if they are standard, or use a mock error type.
-        // For now, we'll test non-#[from] variants and assume #[from] works.
-
-        // Parse variant
+        // Test Parse variant
         let internal_parse = InternalError::Parse("parse error".to_string());
         let public_parse: GenaiError = internal_parse.into();
         assert!(matches!(public_parse, GenaiError::Parse(s) if s == "parse error"));
 
-        // JSON variant (if we didn't use #[from], test like Parse)
-        // let internal_json = InternalError::Json(...);
-        // let public_json: GenaiError = internal_json.into();
-        // assert!(matches!(public_json, GenaiError::Json(...)));
+        // Test Http variant - we'll skip this test since creating a reqwest::Error is complex
+        // and the #[from] attribute is well-tested in the reqwest crate itself
+        // If we need to test this in the future, we can use a mock HTTP client
 
-        // Utf8 variant (if we didn't use #[from], test like Parse)
-        // let internal_utf8 = InternalError::Utf8(...);
-        // let public_utf8: GenaiError = internal_utf8.into();
-        // assert!(matches!(public_utf8, GenaiError::Utf8(...)));
+        // Test Json variant
+        let invalid_json = "{invalid json";
+        let json_error = serde_json::from_str::<serde_json::Value>(invalid_json).unwrap_err();
+        let internal_json = InternalError::Json(json_error);
+        let public_json: GenaiError = internal_json.into();
+        assert!(matches!(public_json, GenaiError::Json(_)));
 
-        // Api variant
+        // Test Utf8 variant - using a dynamic approach to create invalid UTF-8
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice("valid".as_bytes());
+        bytes.push(0xFF); // Add an invalid byte
+        let utf8_error = std::str::from_utf8(&bytes).unwrap_err();
+        let internal_utf8 = InternalError::Utf8(utf8_error);
+        let public_utf8: GenaiError = internal_utf8.into();
+        assert!(matches!(public_utf8, GenaiError::Utf8(_)));
+
+        // Test Api variant
         let internal_api = InternalError::Api("api error".to_string());
         let public_api: GenaiError = internal_api.into();
         assert!(matches!(public_api, GenaiError::Api(s) if s == "api error"));
     }
 
-    // We could add tests for the PublicGenerateContentResponse struct here too if needed
     #[test]
     fn test_public_response_struct() {
         let response = GenerateContentResponse {

@@ -3,6 +3,8 @@ use serde::Serialize;
 #[derive(Serialize, Debug)]
 pub struct GenerateContentRequest {
     pub contents: Vec<Content>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_instruction: Option<Content>,
     // generationConfig: Option<GenerationConfig>, // Example for future addition
     // safetySettings: Option<Vec<SafetySetting>>, // Example for future addition
 }
@@ -37,6 +39,7 @@ mod tests {
             }],
             // generationConfig: None, // If config field were added
             // safetySettings: None, // If safety field were added
+            system_instruction: None,
         };
 
         let json_string = serde_json::to_string(&request).expect("Serialization failed");
