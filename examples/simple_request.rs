@@ -11,7 +11,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let client = Client::new(api_key);
 
     // 2. Define model and prompt
-    let model = "gemini-1.5-flash-latest"; // Or your preferred model
+    let model = "gemini-2.5-flash-preview-05-20"; // Or your preferred model
     let prompt = "Write a short poem about a rusty robot.";
 
     println!("Sending request to model: {}", model);

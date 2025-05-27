@@ -9,7 +9,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let api_key = env::var("GEMINI_API_KEY").map_err(|e| Box::new(e) as Box<dyn Error>)?;
 
     let client = Client::new(api_key);
-    let model = "gemini-1.5-flash-latest";
+    let model = "gemini-2.5-flash-preview-05-20";
     let prompt =
         "Write a short story about a space explorer discovering a planet made of sentient clouds.";
 
