@@ -34,27 +34,32 @@ pub enum InternalError {
 
 // --- Internal Helper Functions ---
 
-// Make pub so rust-genai can call them
+/// Sends a content generation request to the Google Generative AI API.
+///
+/// # Errors
+/// Returns an error if the HTTP request fails, the response status is not successful, the response cannot be parsed as JSON, or if no text content is found in the response structure.
 pub async fn generate_content_internal(
     http_client: &ReqwestClient,
     api_key: &str,
     model_name: &str,
     prompt_text: &str,
+    system_instruction: Option<&str>,
 ) -> Result<String, InternalError> {
-    // Return InternalError
-    let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-        model_name, api_key
-    );
+    let url = format!("https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}");
     let request_body = GenerateContentRequest {
         contents: vec![Content {
             parts: vec![Part {
                 text: prompt_text.to_string(),
             }],
         }],
+        system_instruction: system_instruction.map(|text| Content {
+            parts: vec![Part {
+                text: text.to_string(),
+            }],
+        }),
     };
 
-    let response = http_client.post(&url).json(&request_body).send().await?; // Automatically maps reqwest::Error to InternalError::Http
+    let response = http_client.post(&url).json(&request_body).send().await?;
 
     if !response.status().is_success() {
         let error_text = response
@@ -87,11 +92,9 @@ pub fn generate_content_stream_internal<'a>(
     api_key: &'a str,
     model_name: &'a str,
     prompt_text: &'a str,
+    system_instruction: Option<&'a str>,
 ) -> impl Stream<Item = Result<GenerateContentResponse, InternalError>> + Send + 'a {
-    let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?key={}&alt=sse",
-        model_name, api_key
-    );
+    let url = format!("https://generativelanguage.googleapis.com/v1beta/models/{model_name}:streamGenerateContent?key={api_key}&alt=sse");
     let prompt_text = prompt_text.to_string();
 
     try_stream! {
@@ -99,18 +102,20 @@ pub fn generate_content_stream_internal<'a>(
             contents: vec![Content {
                 parts: vec![Part { text: prompt_text }],
             }],
+            system_instruction: system_instruction.map(|text| Content {
+                parts: vec![Part {
+                    text: text.to_string(),
+                }],
+            }),
         };
-        let response = http_client // Use passed client
+        let response = http_client
             .post(&url)
             .json(&request_body)
             .send()
             .await?;
 
         let status = response.status();
-        if !status.is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Failed to read error body".to_string());
-            Err(InternalError::Api(error_text))?;
-        } else {
+        if status.is_success() {
             let mut byte_stream = response.bytes_stream();
             let mut buffer = Vec::new();
             while let Some(chunk_result) = byte_stream.next().await {
@@ -128,6 +133,9 @@ pub fn generate_content_stream_internal<'a>(
                     }
                 }
             }
+        } else {
+            let error_text = response.text().await.unwrap_or_else(|_| "Failed to read error body".to_string());
+            Err(InternalError::Api(error_text))?;
         }
     }
 }

@@ -16,8 +16,8 @@ pub struct Candidate {
 #[derive(Deserialize, Debug)]
 pub struct ContentResponse {
     pub parts: Vec<PartResponse>,
-    #[serde(rename = "role")] // Map JSON field "role" to Rust field "_role"
-    pub _role: String,
+    #[serde(rename = "role")]
+    pub role: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -60,7 +60,7 @@ mod tests {
         assert_eq!(response.candidates.len(), 1);
         let candidate = &response.candidates[0];
         assert_eq!(candidate.content.parts.len(), 1);
-        assert_eq!(candidate.content._role, "model"); // Check the renamed field
+        assert_eq!(candidate.content.role, "model"); // Check the renamed field
         let part = &candidate.content.parts[0];
         assert_eq!(part.text, "This is the generated text.");
     }

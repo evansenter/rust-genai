@@ -44,8 +44,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model = "gemini-1.5-flash-latest";
     let prompt = "Write a short poem about Rust programming.";
     
-    // Send request and get response
-    let response = client.generate_content(model, prompt).await?;
+    // Send request and get response using the builder pattern
+    let response = client
+        .with_model(model)
+        .with_prompt(prompt)
+        .generate()
+        .await?;
     
     // Print the generated text
     println!("{}", response.text);
@@ -69,8 +73,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model = "gemini-1.5-flash-latest";
     let prompt = "Explain quantum computing in simple terms.";
     
-    // Get a stream of response chunks
-    let stream = client.generate_content_stream(model, prompt);
+    // Get a stream of response chunks using the builder pattern
+    let stream = client
+        .with_model(model)
+        .with_prompt(prompt)
+        .stream();
     pin_mut!(stream);
     
     // Process each chunk as it arrives
@@ -88,6 +95,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     
     println!("\n");
+    Ok(())
+}
+```
+
+### Using System Instructions
+
+```rust
+use rust_genai::Client;
+use std::env;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api_key = env::var("GEMINI_API_KEY")?;
+    let client = Client::new(api_key);
+    
+    let model = "gemini-1.5-flash-latest";
+    let prompt = "What is the capital of France?";
+    let system_instruction = "You are a helpful geography expert.";
+    
+    // Send request with system instruction using the builder pattern
+    let response = client
+        .with_model(model)
+        .with_prompt(prompt)
+        .with_system_instruction(system_instruction)
+        .generate()
+        .await?;
+    
+    println!("{}", response.text);
     Ok(())
 }
 ```

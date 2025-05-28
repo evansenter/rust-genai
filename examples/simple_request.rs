@@ -17,8 +17,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Sending request to model: {}", model);
     println!("Prompt: {}\n", prompt);
 
-    // 3. Call the method on the client
-    match client.generate_content(model, prompt).await {
+    // 3. Call the method on the client using the builder pattern
+    match client
+        .with_model(model)
+        .with_prompt(prompt)
+        .generate()
+        .await
+    {
         Ok(response) => {
             println!("--- Model Response ---");
             println!("{}", response.text);

@@ -1,7 +1,8 @@
+use futures_util::StreamExt;
 use reqwest::Client as ReqwestClient; // Alias to avoid name clash
-use thiserror::Error;
+use thiserror::Error; // Add this import for boxed()
 
-/// Defines errors that can occur when interacting with the GenAI API.
+/// Defines errors that can occur when interacting with the `GenAI` API.
 #[derive(Debug, Error)]
 pub enum GenaiError {
     #[error("HTTP request error: {0}")]
@@ -34,9 +35,6 @@ impl From<genai_client::InternalError> for GenaiError {
     }
 }
 
-// Remove re-export of internal response type
-// pub use genai_client::GenerateContentResponse;
-
 /// Represents a successful response from a generate content request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GenerateContentResponse {
@@ -53,30 +51,55 @@ pub struct Client {
     http_client: ReqwestClient,
 }
 
-impl Client {
-    /// Creates a new GenAI client.
-    ///
-    /// # Arguments
-    ///
-    /// * `api_key` - Your Google AI API key.
-    pub fn new(api_key: String) -> Self {
-        Client {
-            api_key,
-            http_client: ReqwestClient::new(), // Create a default reqwest client
+/// Builder for generating content with optional system instructions.
+#[derive(Debug)]
+pub struct GenerateContentBuilder<'a> {
+    client: &'a Client,
+    model_name: &'a str,
+    prompt_text: Option<&'a str>,
+    system_instruction: Option<&'a str>,
+}
+
+impl<'a> GenerateContentBuilder<'a> {
+    /// Creates a new builder for generating content.
+    fn new(client: &'a Client, model_name: &'a str) -> Self {
+        Self {
+            client,
+            model_name,
+            prompt_text: None,
+            system_instruction: None,
         }
     }
 
-    /// Generates content based on a prompt.
-    pub async fn generate_content(
-        &self,
-        model_name: &str,
-        prompt_text: &str,
-    ) -> Result<GenerateContentResponse, GenaiError> {
+    /// Sets the prompt text for the request.
+    #[must_use]
+    pub fn with_prompt(mut self, prompt: &'a str) -> Self {
+        self.prompt_text = Some(prompt);
+        self
+    }
+
+    /// Sets the system instruction for the request.
+    #[must_use]
+    pub fn with_system_instruction(mut self, instruction: &'a str) -> Self {
+        self.system_instruction = Some(instruction);
+        self
+    }
+
+    /// Generates content based on the configured parameters.
+    ///
+    /// # Errors
+    /// Returns an error if the HTTP request fails, response parsing fails, or the API returns an error.
+    pub async fn generate(self) -> Result<GenerateContentResponse, GenaiError> {
+        let prompt_text = self.prompt_text.ok_or_else(|| {
+            GenaiError::Internal("Prompt text is required for content generation".to_string())
+        })?;
+
         let internal_response_text = genai_client::generate_content_internal(
-            &self.http_client,
-            &self.api_key,
-            model_name,
+            &self.client.http_client,
+            &self.client.api_key,
+            self.model_name,
             prompt_text,
+            self.system_instruction,
         )
         .await
         .map_err(Into::<GenaiError>::into)?;
@@ -86,40 +109,67 @@ impl Client {
         })
     }
 
-    /// Generates content as a stream based on a prompt.
-    pub fn generate_content_stream<'a>(
-        &'a self,
-        model_name: &'a str,
-        prompt_text: &'a str,
+    /// Generates content as a stream based on the configured parameters.
+    pub fn stream(
+        self,
     ) -> impl futures_util::Stream<Item = Result<GenerateContentResponse, GenaiError>> + Send + 'a
     {
-        use futures_util::TryStreamExt; // Only TryStreamExt is needed here
+        use futures_util::TryStreamExt;
+
+        let Some(prompt_text) = self.prompt_text else {
+            return futures_util::stream::once(async move {
+                Err(GenaiError::Internal(
+                    "Prompt text is required for content generation".to_string(),
+                ))
+            })
+            .boxed();
+        };
 
         genai_client::generate_content_stream_internal(
-            &self.http_client,
-            &self.api_key,
-            model_name,
+            &self.client.http_client,
+            &self.client.api_key,
+            self.model_name,
             prompt_text,
+            self.system_instruction,
         )
-        .map_err(Into::into) // From TryStreamExt
+        .map_err(Into::into)
         .and_then(|internal_response| async move {
-            // From TryStreamExt
             let text = internal_response
                 .candidates
                 .first()
                 .and_then(|c| c.content.parts.first())
                 .map(|p| p.text.clone())
-                .unwrap_or_default(); // Handle cases where structure might be missing
+                .unwrap_or_default();
             Ok(GenerateContentResponse { text })
         })
+        .boxed()
     }
 }
 
-// Remove old free function re-exports (will add methods to Client instead)
-// pub use genai_client::generate_content;
-// pub use genai_client::generate_content_stream;
+impl Client {
+    /// Creates a new `GenAI` client.
+    ///
+    /// # Arguments
+    ///
+    /// * `api_key` - Your Google AI API key.
+    #[must_use]
+    pub fn new(api_key: String) -> Self {
+        Client {
+            api_key,
+            http_client: ReqwestClient::new(),
+        }
+    }
 
-// You can add higher-level wrapper functions or structs here later.
+    /// Starts building a content generation request.
+    ///
+    /// # Arguments
+    ///
+    /// * `model_name` - The name of the model to use (e.g., "gemini-1.5-flash-latest")
+    #[must_use]
+    pub fn with_model<'a>(&'a self, model_name: &'a str) -> GenerateContentBuilder<'a> {
+        GenerateContentBuilder::new(self, model_name)
+    }
+}
 
 #[cfg(test)]
 mod tests {

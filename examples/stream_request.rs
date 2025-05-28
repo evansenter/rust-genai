@@ -17,7 +17,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Prompt: {}\n", prompt);
     println!("--- Model Response Stream ---");
 
-    let stream = client.generate_content_stream(model, prompt);
+    let stream = client.with_model(model).with_prompt(prompt).stream();
     pin_mut!(stream);
 
     let mut full_response_text = String::new();
