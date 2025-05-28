@@ -5,14 +5,9 @@ use std::env;
 // Non-streaming test with system instruction
 #[tokio::test]
 async fn test_generate_content_with_system_instruction() {
-    let api_key = match env::var("GEMINI_API_KEY") {
-        Ok(key) => key,
-        Err(_) => {
-            println!(
-                "Skipping test_generate_content_with_system_instruction: GEMINI_API_KEY not set."
-            );
-            return;
-        }
+    let Ok(api_key) = env::var("GEMINI_API_KEY") else {
+        println!("Skipping test_generate_content_with_system_instruction: GEMINI_API_KEY not set.");
+        return;
     };
     // Create client
     let client = Client::new(api_key);
@@ -51,14 +46,9 @@ async fn test_generate_content_with_system_instruction() {
 // Non-streaming test without system instruction
 #[tokio::test]
 async fn test_generate_content_without_system_instruction() {
-    let api_key = match env::var("GEMINI_API_KEY") {
-        Ok(key) => key,
-        Err(_) => {
-            println!(
-                "Skipping test_generate_content_without_system_instruction: GEMINI_API_KEY not set."
-            );
-            return;
-        }
+    let Ok(api_key) = env::var("GEMINI_API_KEY") else {
+        println!("Skipping test_generate_content_without_system_instruction: GEMINI_API_KEY not set.");
+        return;
     };
     // Create client
     let client = Client::new(api_key);
@@ -95,14 +85,9 @@ async fn test_generate_content_without_system_instruction() {
 // Streaming test with system instruction
 #[tokio::test]
 async fn test_generate_content_stream_with_system_instruction() {
-    let api_key = match env::var("GEMINI_API_KEY") {
-        Ok(key) => key,
-        Err(_) => {
-            println!(
-                "Skipping test_generate_content_stream_with_system_instruction: GEMINI_API_KEY not set."
-            );
-            return;
-        }
+    let Ok(api_key) = env::var("GEMINI_API_KEY") else {
+        println!("Skipping test_generate_content_stream_with_system_instruction: GEMINI_API_KEY not set.");
+        return;
     };
     // Create client
     let client = Client::new(api_key);
@@ -131,7 +116,7 @@ async fn test_generate_content_stream_with_system_instruction() {
                 collected_text.push_str(&chunk.text);
             }
             Err(e) => {
-                panic!("Stream returned an error: {:?}", e);
+                panic!("Stream returned an error: {e:?}");
             }
         }
     }
@@ -139,8 +124,7 @@ async fn test_generate_content_stream_with_system_instruction() {
     assert!(chunk_count > 0, "Stream did not yield any chunks.");
     assert!(!collected_text.is_empty(), "Collected text is empty.");
     println!(
-        "test_generate_content_stream_with_system_instruction collected text ({} chunks): {}",
-        chunk_count, collected_text
+        "test_generate_content_stream_with_system_instruction collected text ({chunk_count} chunks): {collected_text}"
     );
     assert!(
         collected_text.to_lowercase().contains("scatter"),
@@ -151,14 +135,9 @@ async fn test_generate_content_stream_with_system_instruction() {
 // Streaming test without system instruction
 #[tokio::test]
 async fn test_generate_content_stream_without_system_instruction() {
-    let api_key = match env::var("GEMINI_API_KEY") {
-        Ok(key) => key,
-        Err(_) => {
-            println!(
-                "Skipping test_generate_content_stream_without_system_instruction: GEMINI_API_KEY not set."
-            );
-            return;
-        }
+    let Ok(api_key) = env::var("GEMINI_API_KEY") else {
+        println!("Skipping test_generate_content_stream_without_system_instruction: GEMINI_API_KEY not set.");
+        return;
     };
     // Create client
     let client = Client::new(api_key);
@@ -181,7 +160,7 @@ async fn test_generate_content_stream_without_system_instruction() {
                 collected_text.push_str(&chunk.text);
             }
             Err(e) => {
-                panic!("Stream returned an error: {:?}", e);
+                panic!("Stream returned an error: {e:?}");
             }
         }
     }
@@ -189,8 +168,7 @@ async fn test_generate_content_stream_without_system_instruction() {
     assert!(chunk_count > 0, "Stream did not yield any chunks.");
     assert!(!collected_text.is_empty(), "Collected text is empty.");
     println!(
-        "test_generate_content_stream_without_system_instruction collected text ({} chunks): {}",
-        chunk_count, collected_text
+        "test_generate_content_stream_without_system_instruction collected text ({chunk_count} chunks): {collected_text}"
     );
     assert!(
         collected_text.to_lowercase().contains("scatter"),

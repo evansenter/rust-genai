@@ -23,14 +23,11 @@ pub enum GenaiError {
 impl From<genai_client::InternalError> for GenaiError {
     fn from(internal_err: genai_client::InternalError) -> Self {
         match internal_err {
-            // Directly map variants where possible
-            genai_client::InternalError::Http(e) => GenaiError::Http(e),
-            genai_client::InternalError::Parse(s) => GenaiError::Parse(s),
-            genai_client::InternalError::Json(e) => GenaiError::Json(e),
-            genai_client::InternalError::Utf8(e) => GenaiError::Utf8(e),
-            genai_client::InternalError::Api(s) => GenaiError::Api(s),
-            // Or wrap less specific internal errors if the public enum is different
-            // e.g., if InternalError had more variants than GenaiError
+            genai_client::InternalError::Http(e) => Self::Http(e),
+            genai_client::InternalError::Parse(s) => Self::Parse(s),
+            genai_client::InternalError::Json(e) => Self::Json(e),
+            genai_client::InternalError::Utf8(e) => Self::Utf8(e),
+            genai_client::InternalError::Api(s) => Self::Api(s),
         }
     }
 }
@@ -62,7 +59,7 @@ pub struct GenerateContentBuilder<'a> {
 
 impl<'a> GenerateContentBuilder<'a> {
     /// Creates a new builder for generating content.
-    fn new(client: &'a Client, model_name: &'a str) -> Self {
+    const fn new(client: &'a Client, model_name: &'a str) -> Self {
         Self {
             client,
             model_name,
@@ -73,14 +70,14 @@ impl<'a> GenerateContentBuilder<'a> {
 
     /// Sets the prompt text for the request.
     #[must_use]
-    pub fn with_prompt(mut self, prompt: &'a str) -> Self {
+    pub const fn with_prompt(mut self, prompt: &'a str) -> Self {
         self.prompt_text = Some(prompt);
         self
     }
 
     /// Sets the system instruction for the request.
     #[must_use]
-    pub fn with_system_instruction(mut self, instruction: &'a str) -> Self {
+    pub const fn with_system_instruction(mut self, instruction: &'a str) -> Self {
         self.system_instruction = Some(instruction);
         self
     }
@@ -154,7 +151,7 @@ impl Client {
     /// * `api_key` - Your Google AI API key.
     #[must_use]
     pub fn new(api_key: String) -> Self {
-        Client {
+        Self {
             api_key,
             http_client: ReqwestClient::new(),
         }
@@ -166,7 +163,7 @@ impl Client {
     ///
     /// * `model_name` - The name of the model to use (e.g., "gemini-1.5-flash-latest")
     #[must_use]
-    pub fn with_model<'a>(&'a self, model_name: &'a str) -> GenerateContentBuilder<'a> {
+    pub const fn with_model<'a>(&'a self, model_name: &'a str) -> GenerateContentBuilder<'a> {
         GenerateContentBuilder::new(self, model_name)
     }
 }
@@ -196,7 +193,7 @@ mod tests {
 
         // Test Utf8 variant - using a dynamic approach to create invalid UTF-8
         let mut bytes = Vec::new();
-        bytes.extend_from_slice("valid".as_bytes());
+        bytes.extend_from_slice(b"valid");
         bytes.push(0xFF); // Add an invalid byte
         let utf8_error = std::str::from_utf8(&bytes).unwrap_err();
         let internal_utf8 = InternalError::Utf8(utf8_error);

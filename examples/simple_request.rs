@@ -14,8 +14,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let model = "gemini-2.5-flash-preview-05-20"; // Or your preferred model
     let prompt = "Write a short poem about a rusty robot.";
 
-    println!("Sending request to model: {}", model);
-    println!("Prompt: {}\n", prompt);
+    println!("Sending request to model: {model}");
+    println!("Prompt: {prompt}\n");
 
     // 3. Call the method on the client using the builder pattern
     match client
@@ -31,12 +31,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         Err(e) => {
             match &e {
-                GenaiError::Api(api_err_msg) => eprintln!("API Error: {}", api_err_msg),
-                GenaiError::Http(http_err) => eprintln!("HTTP Error: {}", http_err),
-                GenaiError::Json(json_err) => eprintln!("JSON Error: {}", json_err),
-                GenaiError::Parse(p_err) => eprintln!("Parse Error: {}", p_err),
-                GenaiError::Utf8(u_err) => eprintln!("UTF8 Error: {}", u_err),
-                GenaiError::Internal(i_err) => eprintln!("Internal Error: {}", i_err),
+                GenaiError::Api(api_err_msg) => eprintln!("API Error: {api_err_msg}"),
+                GenaiError::Http(http_err) => eprintln!("HTTP Error: {http_err}"),
+                GenaiError::Json(json_err) => eprintln!("JSON Error: {json_err}"),
+                GenaiError::Parse(p_err) => eprintln!("Parse Error: {p_err}"),
+                GenaiError::Utf8(u_err) => eprintln!("UTF8 Error: {u_err}"),
+                GenaiError::Internal(i_err) => eprintln!("Internal Error: {i_err}"),
             }
             return Err(e.into());
         }
