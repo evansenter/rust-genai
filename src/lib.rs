@@ -1,9 +1,8 @@
-use futures_util::StreamExt;
+use futures_util::StreamExt; // For .boxed()
 use reqwest::Client as ReqwestClient; // Alias to avoid name clash
 use serde_json::Value;
-use thiserror::Error; // Add this import for boxed()
+use thiserror::Error;
 
-// Re-export ApiVersion from the client crate
 pub use genai_client::ApiVersion;
 
 /// Defines errors that can occur when interacting with the `GenAI` API.
@@ -14,9 +13,9 @@ pub enum GenaiError {
     #[error("SSE parsing error: {0}")]
     Parse(String),
     #[error("JSON deserialization error: {0}")]
-    Json(#[from] serde_json::Error), // Need serde_json dep in root crate now
+    Json(#[from] serde_json::Error),
     #[error("UTF-8 decoding error: {0}")]
-    Utf8(#[from] std::str::Utf8Error), // Need std::str::Utf8Error for this
+    Utf8(#[from] std::str::Utf8Error),
     #[error("API Error returned by Google: {0}")]
     Api(String),
     #[error("Internal client error: {0}")] // Variant to wrap internal errors
@@ -68,7 +67,7 @@ pub struct FunctionDeclaration {
 }
 
 /// The main client for interacting with the Google Generative AI API.
-#[derive(Debug, Clone)] // Add Clone if you want easy cloning
+#[derive(Debug, Clone)]
 pub struct Client {
     api_key: String,
     #[allow(clippy::struct_field_names)] // Allow to keep descriptive name
@@ -125,7 +124,7 @@ impl<'a> GenerateContentBuilder<'a> {
         }
     }
 
-    /// Helper function to convert public FunctionDeclaration to internal Tool.
+    /// Helper function to convert public `FunctionDeclaration` to internal Tool.
     fn convert_public_fn_decl_to_tool(function: FunctionDeclaration) -> genai_client::models::request::Tool {
         let schema_properties = function.parameters.get("properties").cloned().unwrap_or(Value::Null);
         let schema_type = function.parameters.get("type").and_then(Value::as_str).unwrap_or("object").to_string();
@@ -171,7 +170,7 @@ impl<'a> GenerateContentBuilder<'a> {
     pub fn with_functions(mut self, functions: Vec<FunctionDeclaration>) -> Self {
         let tools_vec = functions
             .into_iter()
-            .map(Self::convert_public_fn_decl_to_tool) // Use helper here
+            .map(Self::convert_public_fn_decl_to_tool)
             .collect::<Vec<_>>();
 
         if !tools_vec.is_empty() {
@@ -186,7 +185,6 @@ impl<'a> GenerateContentBuilder<'a> {
     /// Returns an error if the HTTP request fails, response parsing fails, or the API returns an error.
     // TODO: consider also having a generate_parts that returns 1+ Parts directly.
     pub async fn generate(self) -> Result<GenerateContentResponse, GenaiError> {
-        // model_to_use is now just self.model_name as it's required
         let prompt_text = self.prompt_text.ok_or_else(|| {
             GenaiError::Internal("Prompt text is required for content generation".to_string())
         })?;
@@ -322,11 +320,11 @@ impl<'a> GenerateContentBuilder<'a> {
                                 // TODO: Currently processes only the first candidate and first part from streamed chunks.
                                 // Future enhancements could align with unary response handling.
                                 if chunk_response.candidates.len() > 1 {
-                                    // log::warn!("Multiple candidates received in stream, processing only the first.");
+                                    log::warn!("Multiple candidates received in stream, processing only the first.");
                                 }
                                 if let Some(candidate) = chunk_response.candidates.first() {
                                     if candidate.content.parts.len() > 1 {
-                                        // log::warn!("Multiple parts received in stream, processing only the first.");
+                                        log::warn!("Multiple parts received in stream, processing only the first.");
                                     }
                                     if let Some(part) = candidate.content.parts.first() {
                                         if let Some(function_call) = &part.function_call {
@@ -395,8 +393,8 @@ impl Client {
     ///
     /// * `model_name` - The name of the model to use (e.g., "gemini-1.5-flash-latest")
     #[must_use]
-    pub const fn with_model<'a>(&'a self, model_name: &'a str) -> GenerateContentBuilder<'a> { // Renamed back to with_model
-        GenerateContentBuilder::new(self, model_name) // Pass model_name directly
+    pub const fn with_model<'a>(&'a self, model_name: &'a str) -> GenerateContentBuilder<'a> {
+        GenerateContentBuilder::new(self, model_name)
     }
 
     /// Generates content directly from a pre-constructed request body.
