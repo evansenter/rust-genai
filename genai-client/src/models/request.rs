@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Debug)]
+#[derive(Clone, Serialize, Debug)]
 pub struct GenerateContentRequest {
     pub contents: Vec<Content>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -13,14 +13,14 @@ pub struct GenerateContentRequest {
     // safetySettings: Option<Vec<SafetySetting>>, // Example for future addition
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Clone, Serialize, Debug)]
 pub struct Content {
     pub parts: Vec<Part>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Clone, Serialize, Debug)]
 pub struct Part {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
@@ -32,7 +32,7 @@ pub struct Part {
     // pub inline_data: Option<Blob>,
 }
 
-#[derive(Serialize, Debug, Default)]
+#[derive(Clone, Serialize, Debug, Default)]
 pub struct Tool {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function_declarations: Option<Vec<FunctionDeclaration>>,
@@ -40,19 +40,19 @@ pub struct Tool {
     pub code_execution: Option<CodeExecution>,
 }
 
-#[derive(Serialize, Debug, Default)]
+#[derive(Clone, Serialize, Debug, Default)]
 pub struct CodeExecution {
     // No fields, as per API documentation for the basic CodeExecution tool.
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Clone, Serialize, Debug)]
 pub struct FunctionDeclaration {
     pub name: String,
     pub description: String,
     pub parameters: FunctionParameters,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Clone, Serialize, Debug)]
 pub struct FunctionParameters {
     #[serde(rename = "type")]
     pub type_: String,
@@ -61,25 +61,25 @@ pub struct FunctionParameters {
     pub required: Vec<String>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Clone, Serialize, Debug)]
 pub struct FunctionCall {
     pub name: String,
     pub args: serde_json::Value,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct FunctionResponse {
     pub name: String,
     pub response: serde_json::Value,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Clone, Serialize, Debug)]
 pub struct ToolConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function_calling_config: Option<FunctionCallingConfig>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Clone, Serialize, Debug)]
 pub struct FunctionCallingConfig {
     #[serde(rename = "mode")]
     pub mode: FunctionCallingMode,
@@ -87,7 +87,7 @@ pub struct FunctionCallingConfig {
     pub allowed_function_names: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Clone, Serialize, Debug)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum FunctionCallingMode {
     Auto,

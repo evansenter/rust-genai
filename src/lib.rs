@@ -6,7 +6,9 @@ pub mod types;
 pub use types::{CodeExecutionResult, FunctionCall, FunctionDeclaration, GenerateContentResponse};
 
 pub mod content_api;
-pub use content_api::{user_text, model_function_call, user_tool_response, build_content_request};
+pub use content_api::{
+    build_content_request, model_function_call, model_text, user_text, user_tool_response,
+};
 
 pub mod client;
 pub use client::{Client, ClientBuilder};
@@ -15,6 +17,10 @@ pub mod request_builder;
 pub use request_builder::GenerateContentBuilder;
 
 pub(crate) mod internal;
+
+pub mod function_calling;
+// Re-export public types from function_calling module
+pub use function_calling::{CallableFunction, FunctionError};
 
 /// Defines errors that can occur when interacting with the `GenAI` API.
 #[derive(Debug, Error)]
@@ -96,7 +102,7 @@ mod tests {
 
         let fc = FunctionCall {
             name: "test_function".to_string(),
-            args: serde_json::json!({"arg": "value"}),
+            args: serde_json::json!({ "arg": "value" }),
         };
         let response = GenerateContentResponse {
             text: None,
@@ -122,7 +128,7 @@ mod tests {
                 .first()
                 .unwrap()
                 .args,
-            serde_json::json!({"arg": "value"})
+            serde_json::json!({ "arg": "value" })
         );
     }
 }

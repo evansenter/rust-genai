@@ -1,5 +1,5 @@
-use serde_json::Value;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// Represents a function call in the response.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,8 +47,16 @@ impl FunctionDeclaration {
     /// Converts this public `FunctionDeclaration` to the internal `genai_client::Tool` format.
     #[must_use]
     pub fn to_tool(self) -> genai_client::Tool {
-        let properties = self.parameters.as_ref().and_then(|p| p.get("properties")).cloned();
-        let required_from_params = self.parameters.as_ref().and_then(|p| p.get("required")).cloned();
+        let properties = self
+            .parameters
+            .as_ref()
+            .and_then(|p| p.get("properties"))
+            .cloned();
+        let required_from_params = self
+            .parameters
+            .as_ref()
+            .and_then(|p| p.get("required"))
+            .cloned();
 
         let internal_fd = genai_client::FunctionDeclaration {
             name: self.name,
@@ -57,7 +65,9 @@ impl FunctionDeclaration {
                 type_: "object".to_string(),
                 properties: properties.unwrap_or(Value::Null),
                 required: if let Some(Value::Array(arr)) = required_from_params {
-                    arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
                 } else {
                     self.required
                 },

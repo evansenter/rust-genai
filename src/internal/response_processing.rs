@@ -64,7 +64,7 @@ pub fn process_response_parts(parts: &[PartResponse]) -> ProcessedParts {
 mod tests {
     use super::*;
     use genai_client::models::response::{
-        ExecutableCodeResponse, FunctionCallResponse, CodeExecutionResultResponse
+        CodeExecutionResultResponse, ExecutableCodeResponse, FunctionCallResponse,
     };
     use serde_json::json;
 
@@ -72,7 +72,7 @@ mod tests {
     fn test_process_empty_parts() {
         let parts = vec![];
         let result = process_response_parts(&parts);
-        
+
         assert!(result.text.is_none());
         assert!(result.function_calls.is_empty());
         assert!(result.code_execution_results.is_empty());
@@ -96,7 +96,7 @@ mod tests {
                 function_response: None,
             },
         ];
-        
+
         let result = process_response_parts(&parts);
         assert_eq!(result.text, Some("Hello world!".to_string()));
     }
@@ -125,7 +125,7 @@ mod tests {
                 function_response: None,
             },
         ];
-        
+
         let result = process_response_parts(&parts);
         assert_eq!(result.function_calls.len(), 2);
         assert_eq!(result.function_calls[0].name, "func1");
@@ -156,7 +156,7 @@ mod tests {
                 function_response: None,
             },
         ];
-        
+
         let result = process_response_parts(&parts);
         assert_eq!(result.code_execution_results.len(), 1);
         assert_eq!(result.code_execution_results[0].code, "print('hello')");
@@ -166,19 +166,17 @@ mod tests {
     #[test]
     fn test_code_execution_result_without_code() {
         // This should trigger the warning log
-        let parts = vec![
-            PartResponse {
-                text: None,
-                function_call: None,
-                executable_code: None,
-                code_execution_result: Some(CodeExecutionResultResponse {
-                    outcome: "SUCCESS".to_string(),
-                    output: "orphaned output".to_string(),
-                }),
-                function_response: None,
-            },
-        ];
-        
+        let parts = vec![PartResponse {
+            text: None,
+            function_call: None,
+            executable_code: None,
+            code_execution_result: Some(CodeExecutionResultResponse {
+                outcome: "SUCCESS".to_string(),
+                output: "orphaned output".to_string(),
+            }),
+            function_response: None,
+        }];
+
         let result = process_response_parts(&parts);
         assert!(result.code_execution_results.is_empty());
     }
@@ -224,7 +222,7 @@ mod tests {
                 function_response: None,
             },
         ];
-        
+
         let result = process_response_parts(&parts);
         assert_eq!(result.text, Some("Here's the result: ".to_string()));
         assert_eq!(result.function_calls.len(), 1);

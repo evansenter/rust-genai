@@ -18,10 +18,10 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 rust-genai = "0.1.0"
-tokio = { version = "1.0", features = ["full"] }
-
-# Optional: For the procedural macro
 rust-genai-macros = "0.1.0"
+tokio = { version = "1.0", features = ["full"] }
+async-trait = "0.1"
+inventory = "0.3"
 ```
 
 ## Usage
@@ -200,6 +200,69 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 For a more complete, multi-turn function calling example that shows how to execute the function and send its result back to the model, please see `examples/function_call.rs` in the project repository.
+
+### Automatic Function Calling
+
+The library now supports automatic function discovery and execution. Functions decorated with the `#[generate_function_declaration]` macro are automatically discovered and can be executed when the model requests them:
+
+```rust
+use rust_genai::Client;
+use rust_genai_macros::generate_function_declaration;
+use std::env;
+
+/// Get the current weather in a location
+#[generate_function_declaration(
+    location(description = "The city and state, e.g. San Francisco, CA"),
+    unit(description = "The temperature unit", enum_values = ["celsius", "fahrenheit"])
+)]
+fn get_weather(location: String, unit: Option<String>) -> String {
+    format!("The weather in {} is 22 degrees {}", 
+        location, 
+        unit.as_deref().unwrap_or("celsius"))
+}
+
+/// Get city details
+#[generate_function_declaration(
+    city(description = "The city to get details for")
+)]
+async fn get_city_details(city: String) -> serde_json::Value {
+    serde_json::json!({
+        "city": city,
+        "population": 1_000_000,
+        "country": "Example Country"
+    })
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api_key = env::var("GEMINI_API_KEY")?;
+    let client = Client::builder(api_key).build();
+    
+    // Use generate_with_auto_functions() to automatically handle function calls
+    let response = client
+        .with_model("gemini-2.5-flash-preview-05-20")
+        .with_initial_user_text("What's the weather in Tokyo? Also tell me about the city.")
+        .generate_with_auto_functions()
+        .await?;
+    
+    // The library automatically:
+    // 1. Discovers all functions marked with #[generate_function_declaration]
+    // 2. Sends their declarations to the model
+    // 3. Executes requested functions when the model calls them
+    // 4. Sends results back to the model
+    // 5. Continues until the model provides a final response
+    
+    println!("{}", response.text.unwrap_or_default());
+    Ok(())
+}
+```
+
+Key features of automatic function calling:
+- Functions are discovered at compile time using the `inventory` crate
+- Both sync and async functions are supported
+- The conversation loop handles multiple function calls automatically
+- Error handling is built-in - function errors are reported back to the model
+- Maximum of 5 conversation turns to prevent infinite loops
 
 ### Using the Procedural Macro for Function Declarations
 

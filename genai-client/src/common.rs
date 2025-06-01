@@ -91,7 +91,12 @@ mod tests {
     #[test]
     fn test_construct_url_special_characters_in_model_name() {
         // Test URL encoding is handled by the HTTP client, not this function
-        let url = construct_url("model-with-special_chars.v1", "key", false, ApiVersion::V1Beta);
+        let url = construct_url(
+            "model-with-special_chars.v1",
+            "key",
+            false,
+            ApiVersion::V1Beta,
+        );
         assert!(url.contains("model-with-special_chars.v1"));
     }
 }

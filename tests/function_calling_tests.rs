@@ -10,9 +10,9 @@ async fn test_function_calling_integration() {
         println!("Skipping test_function_calling_integration: GEMINI_API_KEY not set.");
         return;
     };
-    
+
     let client = Client::builder(api_key).build();
-    
+
     // Define a simple weather function
     let weather_function = FunctionDeclaration {
         name: "get_weather".to_string(),
@@ -34,10 +34,10 @@ async fn test_function_calling_integration() {
         })),
         required: vec!["location".to_string()],
     };
-    
+
     let model = "gemini-2.5-flash-preview-05-20";
     let prompt = "What's the weather like in London?";
-    
+
     // First request - expect function call
     let response = client
         .with_model(model)
@@ -45,20 +45,36 @@ async fn test_function_calling_integration() {
         .with_function(weather_function.clone())
         .generate()
         .await;
-    
-    assert!(response.is_ok(), "First request failed: {:?}", response.err());
+
+    assert!(
+        response.is_ok(),
+        "First request failed: {:?}",
+        response.err()
+    );
     let response = response.unwrap();
-    
+
     // Should have function calls
-    assert!(response.function_calls.is_some(), "Expected function calls in response");
+    assert!(
+        response.function_calls.is_some(),
+        "Expected function calls in response"
+    );
     let function_calls = response.function_calls.unwrap();
-    assert!(!function_calls.is_empty(), "Expected at least one function call");
-    
+    assert!(
+        !function_calls.is_empty(),
+        "Expected at least one function call"
+    );
+
     // Verify the function call
     let call = &function_calls[0];
     assert_eq!(call.name, "get_weather");
     assert!(call.args["location"].is_string());
-    assert!(call.args["location"].as_str().unwrap().to_lowercase().contains("london"));
+    assert!(
+        call.args["location"]
+            .as_str()
+            .unwrap()
+            .to_lowercase()
+            .contains("london")
+    );
 }
 
 #[test]
@@ -72,7 +88,7 @@ fn test_function_declaration_edge_cases() {
     };
     let tool = func.to_tool();
     assert_eq!(tool.function_declarations.unwrap()[0].name, "");
-    
+
     // Test function with very long description
     let long_desc = "x".repeat(10000);
     let func = FunctionDeclaration {
@@ -82,8 +98,11 @@ fn test_function_declaration_edge_cases() {
         required: vec![],
     };
     let tool = func.to_tool();
-    assert_eq!(tool.function_declarations.unwrap()[0].description, long_desc);
-    
+    assert_eq!(
+        tool.function_declarations.unwrap()[0].description,
+        long_desc
+    );
+
     // Test function with nested objects in parameters
     let nested_params = json!({
         "type": "object",
@@ -101,14 +120,14 @@ fn test_function_declaration_edge_cases() {
             }
         }
     });
-    
+
     let func = FunctionDeclaration {
         name: "nested".to_string(),
         description: "Nested parameters".to_string(),
         parameters: Some(nested_params),
         required: vec![],
     };
-    
+
     let tool = func.to_tool();
     assert!(tool.function_declarations.is_some());
-} 
+}

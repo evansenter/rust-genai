@@ -15,7 +15,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Prompt: {prompt}\n");
     println!("--- Model Response Stream ---");
 
-    let stream = client.with_model(model_name).with_prompt(prompt).stream();
+    let stream_result = client
+        .with_model(model_name)
+        .with_prompt(prompt)
+        .generate_stream();
+    let stream = match stream_result {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Failed to create stream: {e:?}");
+            return Err(e.into());
+        }
+    };
     pin_mut!(stream);
 
     let mut error_occurred = false;

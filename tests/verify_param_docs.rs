@@ -3,54 +3,85 @@
 #![allow(clippy::uninlined_format_args)] // Not important in tests
 #![allow(clippy::items_after_statements)] // Test functions can be defined anywhere
 
+use rust_genai::CallableFunction;
 use rust_genai_macros::generate_function_declaration;
 
 // This test file demonstrates what works and what doesn't for parameter documentation
 
 #[test]
-fn verify_parameter_documentation_behavior() {
-    // This WORKS - descriptions via macro attribute
+fn verify_parameter_descriptions_work() {
+    // This test verifies that parameter descriptions can be added via the macro attribute
+    // Parameter doc comments don't work in Rust, so this is the only way
+
     #[generate_function_declaration(
         name(description = "The person's name"),
         age(description = "The person's age in years")
     )]
-    fn works_with_attribute(name: String, age: i32) -> String {
+    fn works_with_attribute(name: String, age: u32) -> String {
         format!("{} is {} years old", name, age)
     }
-    
-    let decl = works_with_attribute_declaration();
-    let params_json = serde_json::to_string(&decl.parameters).unwrap();
-    
-    // Verify descriptions are included
-    assert!(params_json.contains("The person's name"));
-    assert!(params_json.contains("The person's age in years"));
-    
-    // This also WORKS - function doc comments are captured
-    /// This function greets someone
+
+    let callable = WorksWithAttributeCallable;
+    let declaration = callable.declaration();
+
+    // Verify the parameters contain descriptions
+    let params = declaration.parameters.expect("Should have parameters");
+    let properties = params.get("properties").expect("Should have properties");
+
+    let name_desc = properties
+        .get("name")
+        .and_then(|p| p.get("description"))
+        .and_then(|d| d.as_str())
+        .expect("name should have description");
+    assert_eq!(name_desc, "The person's name");
+
+    let age_desc = properties
+        .get("age")
+        .and_then(|p| p.get("description"))
+        .and_then(|d| d.as_str())
+        .expect("age should have description");
+    assert_eq!(age_desc, "The person's age in years");
+}
+
+#[test]
+fn verify_function_documentation_preserved() {
+    /// This function calculates the area of a rectangle
     #[generate_function_declaration]
-    fn with_function_docs(name: String) -> String {
-        format!("Hello, {}", name)
+    fn with_function_docs(width: f64, height: f64) -> f64 {
+        width * height
     }
-    
-    let decl2 = with_function_docs_declaration();
-    assert_eq!(decl2.description, "This function greets someone");
-    
-    // Regular comments on parameters are ignored (not doc comments)
+
+    let callable = WithFunctionDocsCallable;
+    let declaration = callable.declaration();
+    assert_eq!(
+        declaration.description,
+        "This function calculates the area of a rectangle"
+    );
+}
+
+#[test]
+fn verify_comment_about_param_docs_is_accurate() {
+    // This test confirms that regular comments on parameters are ignored
     #[generate_function_declaration]
     fn regular_comments(
-        // This is just a regular comment - NOT captured
-        name: String,
-        /* This block comment is also NOT captured */ age: i32
-    ) -> String {
-        format!("{} is {} years old", name, age)
+        // This comment is ignored
+        x: i32,
+        /* This too */ y: i32,
+    ) -> i32 {
+        x + y
     }
-    
-    let decl3 = regular_comments_declaration();
-    let params_json3 = serde_json::to_string(&decl3.parameters).unwrap();
-    
-    // Verify no descriptions are captured from regular comments
-    assert!(!params_json3.contains("regular comment"));
-    assert!(!params_json3.contains("block comment"));
+
+    let callable = RegularCommentsCallable;
+    let declaration = callable.declaration();
+    let params = declaration.parameters.expect("Should have parameters");
+    let properties = params.get("properties").expect("Should have properties");
+
+    // Neither parameter should have a description
+    let x_param = properties.get("x").expect("Should have x parameter");
+    assert!(x_param.get("description").is_none());
+
+    let y_param = properties.get("y").expect("Should have y parameter");
+    assert!(y_param.get("description").is_none());
 }
 
 // This test would fail to compile if uncommented, proving Rust doesn't allow doc comments on parameters

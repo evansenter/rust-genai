@@ -1,5 +1,7 @@
+use genai_client::models::request::{
+    FunctionCall, FunctionResponse, GenerateContentRequest as InternalGenerateContentRequest,
+};
 use genai_client::{Content, Part, Tool};
-use genai_client::models::request::{FunctionCall, FunctionResponse, GenerateContentRequest as InternalGenerateContentRequest};
 use serde_json::Value;
 
 /// Creates a user content block from a text string.
@@ -15,6 +17,19 @@ pub fn user_text(text: String) -> Content {
     }
 }
 
+/// Creates a model content block from a text string.
+#[must_use]
+pub fn model_text(text: String) -> Content {
+    Content {
+        parts: vec![Part {
+            text: Some(text),
+            function_call: None,
+            function_response: None,
+        }],
+        role: Some("model".to_string()),
+    }
+}
+
 /// Creates a model content block representing a function call.
 #[must_use]
 pub fn model_function_call(name: String, args: Value) -> Content {
@@ -24,6 +39,23 @@ pub fn model_function_call(name: String, args: Value) -> Content {
             function_call: Some(FunctionCall { name, args }),
             function_response: None,
         }],
+        role: Some("model".to_string()),
+    }
+}
+
+/// Creates a model content block representing a list of function call requests from the model.
+/// This is typically used to record the model's request in the conversation history.
+#[must_use]
+pub fn model_function_calls_request(calls: Vec<FunctionCall>) -> Content {
+    Content {
+        parts: calls
+            .into_iter()
+            .map(|fc| Part {
+                text: None,
+                function_call: Some(fc),
+                function_response: None,
+            })
+            .collect(),
         role: Some("model".to_string()),
     }
 }

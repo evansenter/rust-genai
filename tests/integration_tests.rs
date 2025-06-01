@@ -113,11 +113,16 @@ async fn test_generate_content_stream_with_system_instruction() {
     let prompt = "Why is grass green?";
     let system_instruction = "Explain simply.";
 
-    let stream = client
+    let stream_result = client
         .with_model(model_name)
         .with_prompt(prompt)
         .with_system_instruction(system_instruction)
-        .stream();
+        .generate_stream();
+
+    let stream = match stream_result {
+        Ok(s) => s,
+        Err(e) => panic!("Failed to create stream: {e:?}"),
+    };
     pin_mut!(stream);
     let mut collected_text = String::new();
     let mut chunk_count = 0;
@@ -157,7 +162,14 @@ async fn test_generate_content_stream_without_system_instruction() {
     let model_name = "gemini-2.5-flash-preview-05-20";
     let prompt = "Tell a short joke.";
 
-    let stream = client.with_model(model_name).with_prompt(prompt).stream();
+    let stream_result = client
+        .with_model(model_name)
+        .with_prompt(prompt)
+        .generate_stream();
+    let stream = match stream_result {
+        Ok(s) => s,
+        Err(e) => panic!("Failed to create stream: {e:?}"),
+    };
     pin_mut!(stream);
     let mut collected_text = String::new();
     let mut chunk_count = 0;
