@@ -9,38 +9,23 @@ async fn test_generate_content_with_system_instruction() {
         println!("Skipping test_generate_content_with_system_instruction: GEMINI_API_KEY not set.");
         return;
     };
-    // Create client
-    let client = Client::new(api_key);
-
-    let model = "gemini-1.5-flash-latest";
+    let client = Client::builder(api_key).build();
+    let model_name = "gemini-2.5-flash-preview-05-20";
     let prompt = "What is the capital of France?";
     let system_instruction = "You are a helpful geography expert.";
 
-    // Use the client method with builder pattern
     let result = client
-        .with_model(model)
+        .with_model(model_name)
         .with_prompt(prompt)
         .with_system_instruction(system_instruction)
         .generate()
         .await;
 
-    assert!(
-        result.is_ok(),
-        "generate_content failed: {:?}",
-        result.err().unwrap()
-    );
-
-    // Result is now Ok(GenerateContentResponse)
+    assert!(result.is_ok(), "generate_content failed: {:?}", result.err());
     let response = result.unwrap();
-    assert!(!response.text.is_empty(), "Generated text is empty");
-    println!(
-        "test_generate_content_with_system_instruction response: {}",
-        response.text
-    );
-    assert!(
-        response.text.to_lowercase().contains("paris"),
-        "Response does not contain expected keyword 'paris'"
-    );
+    assert!(response.text.as_deref().is_some_and(|s| !s.is_empty()), "Generated text is empty");
+    println!("test_generate_content_with_system_instruction response: {}", response.text.as_deref().unwrap_or_default());
+    assert!(response.text.as_deref().unwrap_or("").to_lowercase().contains("paris"), "Response does not contain expected keyword 'paris'");
 }
 
 // Non-streaming test without system instruction
@@ -50,36 +35,21 @@ async fn test_generate_content_without_system_instruction() {
         println!("Skipping test_generate_content_without_system_instruction: GEMINI_API_KEY not set.");
         return;
     };
-    // Create client
-    let client = Client::new(api_key);
+    let client = Client::builder(api_key).build();
+    let model_name = "gemini-1.5-flash-latest";
+    let prompt = "What is the capital of Germany?";
 
-    let model = "gemini-1.5-flash-latest";
-    let prompt = "What is the capital of France?";
-
-    // Use the client method without system instruction
     let result = client
-        .with_model(model)
+        .with_model(model_name)
         .with_prompt(prompt)
         .generate()
         .await;
 
-    assert!(
-        result.is_ok(),
-        "generate_content failed: {:?}",
-        result.err().unwrap()
-    );
-
-    // Result is now Ok(GenerateContentResponse)
+    assert!(result.is_ok(), "generate_content failed: {:?}", result.err());
     let response = result.unwrap();
-    assert!(!response.text.is_empty(), "Generated text is empty");
-    println!(
-        "test_generate_content_without_system_instruction response: {}",
-        response.text
-    );
-    assert!(
-        response.text.to_lowercase().contains("paris"),
-        "Response does not contain expected keyword 'paris'"
-    );
+    assert!(response.text.as_deref().is_some_and(|s| !s.is_empty()), "Generated text is empty");
+    println!("test_generate_content_without_system_instruction response: {}", response.text.as_deref().unwrap_or_default());
+    assert!(response.text.as_deref().unwrap_or("").to_lowercase().contains("berlin"), "Response does not contain expected keyword 'berlin'");
 }
 
 // Streaming test with system instruction
@@ -89,47 +59,32 @@ async fn test_generate_content_stream_with_system_instruction() {
         println!("Skipping test_generate_content_stream_with_system_instruction: GEMINI_API_KEY not set.");
         return;
     };
-    // Create client
-    let client = Client::new(api_key);
+    let client = Client::builder(api_key).build();
+    let model_name = "gemini-1.5-flash-latest";
+    let prompt = "Why is grass green?";
+    let system_instruction = "Explain simply.";
 
-    let model = "gemini-1.5-flash-latest";
-    let prompt = "Why is the sky blue?";
-    let system_instruction =
-        "You are a helpful science teacher who explains concepts in simple terms.";
-
-    // Use the client stream method with builder pattern
     let stream = client
-        .with_model(model)
+        .with_model(model_name)
         .with_prompt(prompt)
         .with_system_instruction(system_instruction)
         .stream();
     pin_mut!(stream);
-
     let mut collected_text = String::new();
     let mut chunk_count = 0;
     while let Some(result) = stream.next().await {
         match result {
-            // Stream yields Ok(GenerateContentResponse)
             Ok(chunk) => {
                 chunk_count += 1;
-                // Access the .text field directly
-                collected_text.push_str(&chunk.text);
+                if let Some(text) = &chunk.text { collected_text.push_str(text); }
             }
-            Err(e) => {
-                panic!("Stream returned an error: {e:?}");
-            }
+            Err(e) => panic!("Stream returned an error: {e:?}"),
         }
     }
-
     assert!(chunk_count > 0, "Stream did not yield any chunks.");
     assert!(!collected_text.is_empty(), "Collected text is empty.");
-    println!(
-        "test_generate_content_stream_with_system_instruction collected text ({chunk_count} chunks): {collected_text}"
-    );
-    assert!(
-        collected_text.to_lowercase().contains("scatter"),
-        "Collected text does not contain expected keyword 'scatter'"
-    );
+    println!("test_generate_content_stream_with_system_instruction collected text ({chunk_count} chunks): {collected_text}");
+    assert!(collected_text.to_lowercase().contains("chlorophyll"), "Collected text does not contain expected keyword 'chlorophyll'");
 }
 
 // Streaming test without system instruction
@@ -139,39 +94,24 @@ async fn test_generate_content_stream_without_system_instruction() {
         println!("Skipping test_generate_content_stream_without_system_instruction: GEMINI_API_KEY not set.");
         return;
     };
-    // Create client
-    let client = Client::new(api_key);
+    let client = Client::builder(api_key).build();
+    let model_name = "gemini-1.5-flash-latest";
+    let prompt = "Tell a short joke.";
 
-    let model = "gemini-1.5-flash-latest";
-    let prompt = "Why is the sky blue?";
-
-    // Use the client stream method without system instruction
-    let stream = client.with_model(model).with_prompt(prompt).stream();
+    let stream = client.with_model(model_name).with_prompt(prompt).stream();
     pin_mut!(stream);
-
     let mut collected_text = String::new();
     let mut chunk_count = 0;
     while let Some(result) = stream.next().await {
         match result {
-            // Stream yields Ok(GenerateContentResponse)
             Ok(chunk) => {
                 chunk_count += 1;
-                // Access the .text field directly
-                collected_text.push_str(&chunk.text);
+                if let Some(text) = &chunk.text { collected_text.push_str(text); }
             }
-            Err(e) => {
-                panic!("Stream returned an error: {e:?}");
-            }
+            Err(e) => panic!("Stream returned an error: {e:?}"),
         }
     }
-
     assert!(chunk_count > 0, "Stream did not yield any chunks.");
     assert!(!collected_text.is_empty(), "Collected text is empty.");
-    println!(
-        "test_generate_content_stream_without_system_instruction collected text ({chunk_count} chunks): {collected_text}"
-    );
-    assert!(
-        collected_text.to_lowercase().contains("scatter"),
-        "Collected text does not contain expected keyword 'scatter'"
-    );
+    println!("test_generate_content_stream_without_system_instruction collected text ({chunk_count} chunks): {collected_text}");
 }

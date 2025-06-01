@@ -5,28 +5,28 @@ use std::error::Error;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // 1. Get API Key from environment variable
-    let api_key = env::var("GEMINI_API_KEY").map_err(|e| Box::new(e) as Box<dyn Error>)?;
+    let api_key = env::var("GEMINI_API_KEY")?;
 
     // Create the client
-    let client = Client::new(api_key);
+    let client = Client::builder(api_key).build();
 
     // 2. Define model and prompt
-    let model = "gemini-2.5-flash-preview-05-20"; // Or your preferred model
+    let model_name = "gemini-2.5-flash-preview-05-20"; // Specify the model directly
     let prompt = "Write a short poem about a rusty robot.";
 
-    println!("Sending request to model: {model}");
+    println!("Sending request to model: {model_name}");
     println!("Prompt: {prompt}\n");
 
     // 3. Call the method on the client using the builder pattern
     match client
-        .with_model(model)
+        .with_model(model_name) // Use with_model
         .with_prompt(prompt)
         .generate()
         .await
     {
         Ok(response) => {
             println!("--- Model Response ---");
-            println!("{}", response.text);
+            println!("{}", response.text.unwrap_or_default());
             println!("--- End Response ---");
         }
         Err(e) => {

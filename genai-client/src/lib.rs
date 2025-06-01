@@ -7,15 +7,42 @@ use std::str;
 use thiserror::Error; // Keep thiserror here too for InternalError
 
 // Declare the models module
-mod models;
+pub mod models;
 
-// Import the necessary structs from the models module
-use models::request::{Content, GenerateContentRequest, Part};
-// use models::response::GenerateContentResponse; // REMOVED - Re-exported below instead
+// Import and selectively re-export the necessary structs from the models module
+pub use models::request::Content;
+pub use models::request::FunctionCall;
+pub use models::request::FunctionCallingConfig;
+pub use models::request::FunctionCallingMode;
+pub use models::request::FunctionDeclaration;
+pub use models::request::FunctionParameters;
+pub use models::request::FunctionResponse;
+pub use models::request::GenerateContentRequest;
+pub use models::request::Part;
+pub use models::request::Tool;
+pub use models::request::ToolConfig;
 
-// Make model structs publicly accessible if needed by the main crate
+pub use models::response::Candidate;
+pub use models::response::ContentResponse;
+pub use models::response::FunctionCallResponse;
 pub use models::response::GenerateContentResponse;
-// pub use models::request::{Content, GenerateContentRequest, Part}; // Only if needed publicly
+pub use models::response::PartResponse;
+
+/// Represents the API version to target.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApiVersion {
+    V1Alpha,
+    V1Beta,
+}
+
+impl ApiVersion {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::V1Alpha => "v1alpha",
+            Self::V1Beta => "v1beta",
+        }
+    }
+}
 
 // Define an INTERNAL error type for this crate
 #[derive(Debug, Error)]
@@ -32,6 +59,19 @@ pub enum InternalError {
     Api(String),
 }
 
+// --- URL Construction ---
+const BASE_URL_PREFIX: &str = "https://generativelanguage.googleapis.com";
+
+#[must_use]
+pub fn construct_url(model_name: &str, api_key: &str, stream: bool, version: ApiVersion) -> String {
+    let action = if stream { "streamGenerateContent" } else { "generateContent" };
+    let sse_param = if stream { "&alt=sse" } else { "" };
+    format!(
+        "{BASE_URL_PREFIX}/{version_str}/models/{model_name}:{action}?key={api_key}{sse_param}",
+        version_str = version.as_str()
+    )
+}
+
 // --- Internal Helper Functions ---
 
 /// Sends a content generation request to the Google Generative AI API.
@@ -44,19 +84,27 @@ pub async fn generate_content_internal(
     model_name: &str,
     prompt_text: &str,
     system_instruction: Option<&str>,
+    version: ApiVersion,
 ) -> Result<String, InternalError> {
-    let url = format!("https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}");
+    let url = construct_url(model_name, api_key, false, version);
     let request_body = GenerateContentRequest {
         contents: vec![Content {
             parts: vec![Part {
-                text: prompt_text.to_string(),
+                text: Some(prompt_text.to_string()),
+                function_call: None,
+                function_response: None,
             }],
+            role: None,
         }],
         system_instruction: system_instruction.map(|text| Content {
             parts: vec![Part {
-                text: text.to_string(),
+                text: Some(text.to_string()),
+                function_call: None,
+                function_response: None,
             }],
+            role: None,
         }),
+        tools: None,
     };
 
     let response = http_client.post(&url).json(&request_body).send().await?;
@@ -78,7 +126,9 @@ pub async fn generate_content_internal(
     // Use .first() instead of .get(0)
     if let Some(candidate) = response_body.candidates.first() {
         if let Some(part) = candidate.content.parts.first() {
-            return Ok(part.text.clone());
+            if let Some(text) = &part.text {
+                return Ok(text.clone());
+            }
         }
     }
     Err(InternalError::Parse(
@@ -93,20 +143,30 @@ pub fn generate_content_stream_internal<'a>(
     model_name: &'a str,
     prompt_text: &'a str,
     system_instruction: Option<&'a str>,
+    version: ApiVersion,
 ) -> impl Stream<Item = Result<GenerateContentResponse, InternalError>> + Send + 'a {
-    let url = format!("https://generativelanguage.googleapis.com/v1beta/models/{model_name}:streamGenerateContent?key={api_key}&alt=sse");
+    let url = construct_url(model_name, api_key, true, version);
     let prompt_text = prompt_text.to_string();
 
     try_stream! {
         let request_body = GenerateContentRequest {
             contents: vec![Content {
-                parts: vec![Part { text: prompt_text }],
+                parts: vec![Part {
+                    text: Some(prompt_text.to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+                role: None,
             }],
             system_instruction: system_instruction.map(|text| Content {
                 parts: vec![Part {
-                    text: text.to_string(),
+                    text: Some(text.to_string()),
+                    function_call: None,
+                    function_response: None,
                 }],
+                role: None,
             }),
+            tools: None,
         };
         let response = http_client
             .post(&url)

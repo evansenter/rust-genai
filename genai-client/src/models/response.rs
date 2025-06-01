@@ -22,8 +22,19 @@ pub struct ContentResponse {
 
 #[derive(Deserialize, Debug)]
 pub struct PartResponse {
-    pub text: String,
-    // Add other part types later
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(rename = "functionCall")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function_call: Option<FunctionCallResponse>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function_response: Option<super::request::FunctionResponse>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct FunctionCallResponse {
+    pub name: String,
+    pub args: serde_json::Value,
 }
 
 #[cfg(test)]
@@ -46,11 +57,8 @@ mod tests {
                 ],
                 "role": "model"
               }
-              // "finishReason": "STOP",
-              // "safetyRatings": []
             }
           ]
-          // "promptFeedback": { ... }
         }
         "#;
 
@@ -60,20 +68,64 @@ mod tests {
         assert_eq!(response.candidates.len(), 1);
         let candidate = &response.candidates[0];
         assert_eq!(candidate.content.parts.len(), 1);
-        assert_eq!(candidate.content.role, "model"); // Check the renamed field
+        assert_eq!(candidate.content.role, "model");
         let part = &candidate.content.parts[0];
-        assert_eq!(part.text, "This is the generated text.");
+        assert_eq!(part.text.as_deref(), Some("This is the generated text."));
+    }
+
+    #[test]
+    fn test_deserialize_function_call_response() {
+        let response_json = r#"
+        {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "functionCall": {
+                      "name": "get_weather",
+                      "args": {
+                        "location": "San Francisco, CA",
+                        "unit": "celsius"
+                      }
+                    }
+                  }
+                ],
+                "role": "model"
+              }
+            }
+          ]
+        }
+        "#;
+
+        let response: GenerateContentResponse =
+            serde_json::from_str(response_json).expect("Deserialization failed");
+
+        assert_eq!(response.candidates.len(), 1);
+        let candidate = &response.candidates[0];
+        assert_eq!(candidate.content.parts.len(), 1);
+        let part = &candidate.content.parts[0];
+        assert!(part.text.is_none());
+        let function_call = part.function_call.as_ref().expect("Expected function call");
+        assert_eq!(function_call.name, "get_weather");
+        assert_eq!(
+            function_call.args,
+            serde_json::json!({
+                "location": "San Francisco, CA",
+                "unit": "celsius"
+            })
+        );
     }
 
     #[test]
     fn test_deserialize_minimal_response() {
-        // Test with absolute minimum valid fields
         let response_json =
             r#"{"candidates":[{"content":{"parts":[{"text":"Minimal"}],"role":"model"}}]}"#;
         let response: GenerateContentResponse =
             serde_json::from_str(response_json).expect("Minimal deserialization failed");
-        assert_eq!(response.candidates[0].content.parts[0].text, "Minimal");
+        assert_eq!(
+            response.candidates[0].content.parts[0].text.as_deref(),
+            Some("Minimal")
+        );
     }
-
-    // Add more tests here for variations: multiple candidates/parts, presence of optional fields, etc.
 }
