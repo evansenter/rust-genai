@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "genai-client",
+    "genai-client", "rust_genai_macros",
 ]
 
 [package]
