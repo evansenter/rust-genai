@@ -135,9 +135,6 @@ cargo test --test client_tests
 # Run ignored integration tests (requires API key)
 GEMINI_API_KEY=your_key cargo test --all -- --ignored
 
-# Run integration tests with delays to avoid rate limits
-./tests/run_integration_tests.sh
-
 # Run tests with output
 cargo test --all -- --nocapture
 
