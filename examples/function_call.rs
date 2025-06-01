@@ -1,9 +1,4 @@
-use genai_client::models::request::{
-    Content, FunctionDeclaration as InternalFunctionDeclaration,
-    FunctionParameters as InternalFunctionParameters, FunctionResponse,
-    GenerateContentRequest as InternalGenerateContentRequest, Part, Tool,
-};
-use rust_genai::{Client, FunctionDeclaration};
+use rust_genai::{Client, FunctionDeclaration, model_function_call, user_text, user_tool_response, build_content_request};
 use serde_json::json;
 use std::env;
 use std::error::Error;
@@ -93,78 +88,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                 println!("\nConstructing conversation history for second API call...");
 
-                // 1. User's initial prompt
-                let user_content = Content {
-                    parts: vec![Part {
-                        text: Some(initial_prompt_text.to_string()),
-                        function_call: None,
-                        function_response: None,
-                    }],
-                    role: Some("user".to_string()),
-                };
+                let user_content = user_text(initial_prompt_text.to_string());
 
-                // 2. Model's first response (the function call)
-                let model_function_call_part = Part {
-                    text: None,
-                    function_call: Some(genai_client::models::request::FunctionCall {
-                        // Use internal FunctionCall
-                        name: first_function_call.name.clone(),
-                        args: first_function_call.args.clone(),
-                    }),
-                    function_response: None,
-                };
-                let model_content = Content {
-                    parts: vec![model_function_call_part],
-                    role: Some("model".to_string()),
-                };
+                let model_content = model_function_call(
+                    first_function_call.name.clone(),
+                    first_function_call.args.clone(),
+                );
 
-                // 3. Tool's response (our client's function execution)
-                let tool_function_response_part = Part {
-                    text: None,
-                    function_call: None,
-                    function_response: Some(FunctionResponse {
-                        // This is genai_client::models::request::FunctionResponse
-                        name: "get_weather".to_string(), // Should match the original function call name
-                        response: json!({ "weather": weather_report }),
-                    }),
-                };
-                let tool_content = Content {
-                    parts: vec![tool_function_response_part],
-                    role: Some("tool".to_string()), // Role for function responses is "tool"
-                };
+                let tool_content = user_tool_response(
+                    "get_weather".to_string(),
+                    json!({ "weather": weather_report }),
+                );
 
                 let conversation_history = vec![user_content, model_content, tool_content];
 
-                // We also need to convert the public FunctionDeclaration to the internal Tool format
-                // for the request_body.tools field.
-                let internal_tool = Tool {
-                    function_declarations: Some(vec![InternalFunctionDeclaration {
-                        name: weather_function_public_decl.name.clone(),
-                        description: weather_function_public_decl.description.clone(),
-                        parameters: InternalFunctionParameters {
-                            type_: weather_function_public_decl
-                                .parameters
-                                .get("type")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("object")
-                                .to_string(),
-                            properties: weather_function_public_decl
-                                .parameters
-                                .get("properties")
-                                .cloned()
-                                .unwrap_or_else(|| json!({})),
-                            required: weather_function_public_decl.required.clone(),
-                        },
-                    }]),
-                    code_execution: None,
-                };
+                let internal_tool = weather_function_public_decl.to_tool();
 
-                let request_body_for_second_call = InternalGenerateContentRequest {
-                    contents: conversation_history,
-                    tools: Some(vec![internal_tool]),
-                    system_instruction: None,
-                    tool_config: None,
-                };
+                let request_body_for_second_call = build_content_request(
+                    conversation_history,
+                    Some(vec![internal_tool]),
+                );
 
                 println!("\nSending constructed multi-turn request back to the model...");
                 // --- Second API Call using generate_from_request ---

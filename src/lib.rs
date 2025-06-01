@@ -5,6 +5,9 @@ pub use genai_client::ApiVersion;
 pub mod types;
 pub use types::{CodeExecutionResult, FunctionCall, FunctionDeclaration, GenerateContentResponse};
 
+pub mod content_api;
+pub use content_api::{user_text, model_function_call, user_tool_response, build_content_request};
+
 pub mod client;
 pub use client::{Client, ClientBuilder};
 
