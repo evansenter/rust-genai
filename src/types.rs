@@ -12,13 +12,24 @@ pub struct FunctionCall {
     pub args: Value,
 }
 
+/// Represents the result of a code execution, including the executed code and its output.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct CodeExecutionResult {
+    /// The code that was executed.
+    pub code: String,
+    /// The output from the code execution.
+    pub output: String,
+}
+
 /// Represents a successful response from a generate content request.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct GenerateContentResponse {
     /// The generated text content, if any.
     pub text: Option<String>,
-    /// The function call, if any.
-    pub function_call: Option<FunctionCall>,
+    /// Function calls, if any, requested by the model.
+    pub function_calls: Option<Vec<FunctionCall>>,
+    /// The results of any code executions performed by the model.
+    pub code_execution_results: Option<Vec<CodeExecutionResult>>,
 }
 
 /// Represents a function declaration that can be used by the model.

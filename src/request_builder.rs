@@ -1,11 +1,11 @@
 use crate::GenaiError;
 use crate::client::Client;
-use crate::types::{FunctionCall, FunctionDeclaration, GenerateContentResponse};
+use crate::types::{FunctionDeclaration, GenerateContentResponse};
+
 use futures_util::StreamExt;
-use genai_client::{self, models};
+use genai_client::{self};
 use serde_json::Value;
 
-use async_stream::try_stream;
 use futures_util::stream;
 use std::str;
 
@@ -90,12 +90,12 @@ impl<'a> GenerateContentBuilder<'a> {
     /// Enables the code execution tool for the model.
     #[must_use]
     pub fn with_code_execution(mut self) -> Self {
-        self.tools.get_or_insert_with(Vec::new).push(
-            genai_client::models::request::Tool {
+        self.tools
+            .get_or_insert_with(Vec::new)
+            .push(genai_client::models::request::Tool {
                 function_declarations: None,
                 code_execution: Some(genai_client::models::request::CodeExecution::default()),
-            }
-        );
+            });
         self
     }
 
@@ -152,64 +152,9 @@ impl<'a> GenerateContentBuilder<'a> {
             tool_config: self.tool_config,
         };
 
-        let url = genai_client::construct_url(
-            self.model_name,
-            &self.client.api_key,
-            false,
-            self.client.api_version,
-        );
-
-        let response = self
-            .client
-            .http_client
-            .post(&url)
-            .json(&request_body)
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            let error_text = response.text().await?;
-            return Err(GenaiError::Api(error_text));
-        }
-
-        let response_text = response.text().await?;
-        let response_body: models::response::GenerateContentResponse = // Using models directly here
-            serde_json::from_str(&response_text)?;
-
-        // TODO: Currently processes only the first candidate and first part.
-        // Future enhancements could allow selecting a candidate or handling multiple parts if the API supports it.
-        if response_body.candidates.len() > 1 {
-            log::warn!("Multiple candidates received, processing only the first.");
-        }
-
-        if let Some(candidate) = response_body.candidates.first() {
-            if candidate.content.parts.len() > 1 {
-                log::warn!("Multiple parts received, processing only the first.");
-            }
-            if let Some(part) = candidate.content.parts.first() {
-                if let Some(function_call) = &part.function_call {
-                    return Ok(GenerateContentResponse {
-                        // This is crate::types::GenerateContentResponse
-                        text: None,
-                        function_call: Some(FunctionCall {
-                            // This is crate::types::FunctionCall
-                            name: function_call.name.clone(),
-                            args: function_call.args.clone(),
-                        }),
-                    });
-                } else if let Some(text) = &part.text {
-                    return Ok(GenerateContentResponse {
-                        // This is crate::types::GenerateContentResponse
-                        text: Some(text.clone()),
-                        function_call: None,
-                    });
-                }
-            }
-        }
-
-        Err(GenaiError::Parse(
-            "No text content or function call found in response structure".to_string(),
-        ))
+        self.client
+            .generate_from_request(self.model_name, request_body)
+            .await
     }
 
     /// Generates content as a stream based on the configured parameters.
@@ -248,70 +193,8 @@ impl<'a> GenerateContentBuilder<'a> {
             tool_config: self.tool_config,
         };
 
-        let url = genai_client::construct_url(
-            self.model_name,
-            &self.client.api_key,
-            true,
-            self.client.api_version,
-        );
-
-        let stream_val = try_stream! { // Renamed to stream_val to avoid conflict with futures_util::stream
-            let response = self.client.http_client.post(&url).json(&request_body).send().await?;
-
-            let status = response.status();
-            if status.is_success() {
-                let mut byte_stream = response.bytes_stream();
-                let mut buffer = Vec::new();
-
-                while let Some(chunk_result) = byte_stream.next().await {
-                    let chunk = chunk_result?; // Assuming chunk_result is Result<Bytes, Error>
-                    buffer.extend_from_slice(&chunk);
-
-                    while let Some(newline_pos) = buffer.iter().position(|&b| b == b'\n') {
-                        let line_bytes = buffer.drain(..=newline_pos).collect::<Vec<u8>>();
-                        let line = str::from_utf8(&line_bytes)?.trim_end_matches(|c| c == '\n' || c == '\r');
-
-                        if line.starts_with("data:") {
-                            let json_data = line.strip_prefix("data:").unwrap_or("").trim_start();
-                            if !json_data.is_empty() {
-                                let chunk_response: models::response::GenerateContentResponse = // Using models directly
-                                    serde_json::from_str(json_data)?;
-
-                                // TODO: Currently processes only the first candidate and first part from streamed chunks.
-                                // Future enhancements could align with unary response handling.
-                                if chunk_response.candidates.len() > 1 {
-                                    // log::warn!("Multiple candidates received in stream, processing only the first.");
-                                }
-                                if let Some(candidate) = chunk_response.candidates.first() {
-                                    if candidate.content.parts.len() > 1 {
-                                        // log::warn!("Multiple parts received in stream, processing only the first.");
-                                    }
-                                    if let Some(part) = candidate.content.parts.first() {
-                                        if let Some(function_call) = &part.function_call {
-                                            yield GenerateContentResponse { // This is crate::types::GenerateContentResponse
-                                                text: None,
-                                                function_call: Some(FunctionCall { // This is crate::types::FunctionCall
-                                                    name: function_call.name.clone(),
-                                                    args: function_call.args.clone(),
-                                                }),
-                                            };
-                                        } else if let Some(text) = &part.text {
-                                            yield GenerateContentResponse { // This is crate_types::GenerateContentResponse
-                                                text: Some(text.clone()),
-                                                function_call: None,
-                                            };
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                let error_text = response.text().await?;
-                Err(GenaiError::Api(error_text))?;
-            }
-        };
-        stream_val.boxed()
+        self.client
+            .stream_from_request(self.model_name, request_body)
+            .boxed() // Ensure the return type matches Client::stream_from_request
     }
 }

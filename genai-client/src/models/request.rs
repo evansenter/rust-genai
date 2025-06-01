@@ -9,7 +9,6 @@ pub struct GenerateContentRequest {
     pub tools: Option<Vec<Tool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_config: Option<ToolConfig>,
-    // pub tool_config: Option<ToolConfig>, // Example for future addition
     // generationConfig: Option<GenerationConfig>, // Example for future addition
     // safetySettings: Option<Vec<SafetySetting>>, // Example for future addition
 }
@@ -42,7 +41,7 @@ pub struct Tool {
 }
 
 #[derive(Serialize, Debug, Default)]
-pub struct CodeExecution { 
+pub struct CodeExecution {
     // No fields, as per API documentation for the basic CodeExecution tool.
 }
 

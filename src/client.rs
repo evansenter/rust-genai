@@ -1,6 +1,6 @@
 use crate::GenaiError;
-use crate::request_builder::GenerateContentBuilder;
-use crate::types::{FunctionCall, GenerateContentResponse};
+use crate::internal::response_processing::process_response_parts;
+use crate::types::GenerateContentResponse;
 use async_stream::try_stream;
 use futures_util::StreamExt;
 use genai_client::ApiVersion;
@@ -16,6 +16,7 @@ pub struct Client {
     #[allow(clippy::struct_field_names)]
     pub(crate) http_client: ReqwestClient,
     pub(crate) api_version: ApiVersion,
+    pub(crate) debug: bool,
 }
 
 /// Builder for `Client` instances.
@@ -23,6 +24,7 @@ pub struct Client {
 pub struct ClientBuilder {
     api_key: String,
     api_version: Option<ApiVersion>,
+    debug: bool,
 }
 
 impl ClientBuilder {
@@ -34,6 +36,14 @@ impl ClientBuilder {
         self
     }
 
+    /// Enables debug mode for the client.
+    /// If not called, defaults to `false`.
+    #[must_use]
+    pub const fn debug(mut self) -> Self {
+        self.debug = true;
+        self
+    }
+
     /// Builds the `Client`.
     #[must_use]
     pub fn build(self) -> Client {
@@ -41,6 +51,7 @@ impl ClientBuilder {
             api_key: self.api_key,
             http_client: ReqwestClient::new(),
             api_version: self.api_version.unwrap_or(ApiVersion::V1Alpha),
+            debug: self.debug,
         }
     }
 }
@@ -56,11 +67,12 @@ impl Client {
         ClientBuilder {
             api_key,
             api_version: None,
+            debug: false,
         }
     }
 
     /// Creates a new `GenAI` client with specified or default API version.
-    /// This method is kept for direct instantiation if preferred over the builder.
+    /// Debug mode is disabled by default. Use the builder to enable it.
     ///
     /// # Arguments
     ///
@@ -72,6 +84,7 @@ impl Client {
             api_key,
             http_client: ReqwestClient::new(),
             api_version: api_version.unwrap_or(ApiVersion::V1Alpha),
+            debug: false,
         }
     }
 
@@ -81,8 +94,11 @@ impl Client {
     ///
     /// * `model_name` - The name of the model to use (e.g., "gemini-1.5-flash-latest")
     #[must_use]
-    pub const fn with_model<'a>(&'a self, model_name: &'a str) -> GenerateContentBuilder<'a> {
-        GenerateContentBuilder::new(self, model_name)
+    pub const fn with_model<'a>(
+        &'a self,
+        model_name: &'a str,
+    ) -> crate::request_builder::GenerateContentBuilder<'a> {
+        crate::request_builder::GenerateContentBuilder::new(self, model_name)
     }
 
     /// Generates content directly from a pre-constructed request body.
@@ -104,6 +120,11 @@ impl Client {
     ) -> Result<GenerateContentResponse, GenaiError> {
         let url = construct_url(model_name, &self.api_key, false, self.api_version);
 
+        if self.debug {
+            println!("[DEBUG] Request URL: {url}");
+            println!("[DEBUG] Request Body: {request_body:#?}");
+        }
+
         let response = self
             .http_client
             .post(&url)
@@ -113,33 +134,43 @@ impl Client {
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
+            if self.debug {
+                println!("[DEBUG] Response Text: {error_text}");
+            }
             return Err(GenaiError::Api(error_text));
         }
 
         let response_text = response.text().await?;
+        if self.debug {
+            println!("[DEBUG] Response Text: {response_text}");
+        }
         let response_body: genai_client::models::response::GenerateContentResponse =
             serde_json::from_str(&response_text)?;
 
         if let Some(candidate) = response_body.candidates.first() {
-            if let Some(part) = candidate.content.parts.first() {
-                if let Some(function_call) = &part.function_call {
-                    return Ok(GenerateContentResponse {
-                        text: None,
-                        function_call: Some(FunctionCall {
-                            name: function_call.name.clone(),
-                            args: function_call.args.clone(),
-                        }),
-                    });
-                } else if let Some(text) = &part.text {
-                    return Ok(GenerateContentResponse {
-                        text: Some(text.clone()),
-                        function_call: None,
-                    });
-                }
+            let processed_parts = process_response_parts(&candidate.content.parts);
+
+            if !processed_parts.function_calls.is_empty()
+                || !processed_parts.code_execution_results.is_empty()
+                || processed_parts.text.is_some()
+            {
+                return Ok(GenerateContentResponse {
+                    text: processed_parts.text,
+                    function_calls: if processed_parts.function_calls.is_empty() {
+                        None
+                    } else {
+                        Some(processed_parts.function_calls)
+                    },
+                    code_execution_results: if processed_parts.code_execution_results.is_empty() {
+                        None
+                    } else {
+                        Some(processed_parts.code_execution_results)
+                    },
+                });
             }
         }
         Err(GenaiError::Parse(
-            "No text content or function call found in response structure".to_string(),
+            "No text, function calls, or actionable tool code results found in response structure (from client::generate_from_request)".to_string(),
         ))
     }
 
@@ -160,6 +191,11 @@ impl Client {
     {
         let url = construct_url(model_name, &self.api_key, true, self.api_version);
 
+        if self.debug {
+            println!("[DEBUG] Streaming Request URL: {url}");
+            println!("[DEBUG] Streaming Request Body: {request_body:#?}");
+        }
+
         let stream_val = try_stream! {
             let response = self.http_client.post(&url).json(&request_body).send().await?;
             let status = response.status();
@@ -169,35 +205,32 @@ impl Client {
                 let mut buffer = Vec::new();
 
                 while let Some(chunk_result) = byte_stream.next().await {
-                    let chunk = chunk_result?; // Assuming Bytes
+                    let chunk = chunk_result?;
                     buffer.extend_from_slice(&chunk);
 
                     while let Some(newline_pos) = buffer.iter().position(|&b| b == b'\n') {
                         let line_bytes = buffer.drain(..=newline_pos).collect::<Vec<u8>>();
                         let line = str::from_utf8(&line_bytes)?.trim_end_matches(|c| c == '\n' || c == '\r');
 
+                        if self.debug {
+                            println!("[DEBUG] Raw Stream Line: {line}");
+                        }
+
                         if line.starts_with("data:") {
                             let json_data = line.strip_prefix("data:").unwrap_or("").trim_start();
                             if !json_data.is_empty() {
-                                let chunk_response: genai_client::models::response::GenerateContentResponse =
+                                let chunk_response_internal: genai_client::models::response::GenerateContentResponse =
                                     serde_json::from_str(json_data)?;
 
-                                if let Some(candidate) = chunk_response.candidates.first() {
-                                    if let Some(part) = candidate.content.parts.first() {
-                                        if let Some(function_call) = &part.function_call {
-                                            yield GenerateContentResponse {
-                                                text: None,
-                                                function_call: Some(FunctionCall {
-                                                    name: function_call.name.clone(),
-                                                    args: function_call.args.clone(),
-                                                }),
-                                            };
-                                        } else if let Some(text) = &part.text {
-                                            yield GenerateContentResponse {
-                                                text: Some(text.clone()),
-                                                function_call: None,
-                                            };
-                                        }
+                                if let Some(candidate) = chunk_response_internal.candidates.first() {
+                                    let processed_parts = process_response_parts(&candidate.content.parts);
+
+                                    if processed_parts.text.is_some() || !processed_parts.function_calls.is_empty() || !processed_parts.code_execution_results.is_empty() {
+                                        yield GenerateContentResponse {
+                                            text: processed_parts.text,
+                                            function_calls: if processed_parts.function_calls.is_empty() { None } else { Some(processed_parts.function_calls) },
+                                            code_execution_results: if processed_parts.code_execution_results.is_empty() { None } else { Some(processed_parts.code_execution_results) },
+                                        };
                                     }
                                 }
                             }
@@ -206,6 +239,9 @@ impl Client {
                 }
             } else {
                 let error_text = response.text().await?;
+                if self.debug {
+                    println!("[DEBUG] Streaming Error: {error_text}");
+                }
                 Err(GenaiError::Api(error_text))?;
             }
         };

@@ -3,13 +3,15 @@ use thiserror::Error;
 pub use genai_client::ApiVersion;
 
 pub mod types;
-pub use types::{FunctionCall, FunctionDeclaration, GenerateContentResponse};
+pub use types::{CodeExecutionResult, FunctionCall, FunctionDeclaration, GenerateContentResponse};
 
 pub mod client;
 pub use client::{Client, ClientBuilder};
 
 pub mod request_builder;
 pub use request_builder::GenerateContentBuilder;
+
+pub(crate) mod internal;
 
 /// Defines errors that can occur when interacting with the `GenAI` API.
 #[derive(Debug, Error)]
@@ -83,25 +85,40 @@ mod tests {
     fn test_public_response_struct() {
         let response = GenerateContentResponse {
             text: Some("test".to_string()),
-            function_call: None,
+            function_calls: None,
+            code_execution_results: None,
         };
         assert_eq!(response.text.as_deref(), Some("test"));
-        assert!(response.function_call.is_none());
+        assert!(response.function_calls.is_none());
 
+        let fc = FunctionCall {
+            name: "test_function".to_string(),
+            args: serde_json::json!({"arg": "value"}),
+        };
         let response = GenerateContentResponse {
             text: None,
-            function_call: Some(FunctionCall {
-                name: "test_function".to_string(),
-                args: serde_json::json!({"arg": "value"}),
-            }),
+            function_calls: Some(vec![fc]),
+            code_execution_results: None,
         };
         assert!(response.text.is_none());
         assert_eq!(
-            response.function_call.as_ref().unwrap().name,
+            response
+                .function_calls
+                .as_ref()
+                .unwrap()
+                .first()
+                .unwrap()
+                .name,
             "test_function"
         );
         assert_eq!(
-            response.function_call.as_ref().unwrap().args,
+            response
+                .function_calls
+                .as_ref()
+                .unwrap()
+                .first()
+                .unwrap()
+                .args,
             serde_json::json!({"arg": "value"})
         );
     }

@@ -24,17 +24,37 @@ pub struct ContentResponse {
 pub struct PartResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
-    #[serde(rename = "functionCall")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "functionCall", skip_serializing_if = "Option::is_none")]
     pub function_call: Option<FunctionCallResponse>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function_response: Option<super::request::FunctionResponse>,
+    #[serde(rename = "executableCode", skip_serializing_if = "Option::is_none")]
+    pub executable_code: Option<ExecutableCodeResponse>,
+    #[serde(
+        rename = "codeExecutionResult",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub code_execution_result: Option<CodeExecutionResultResponse>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct FunctionCallResponse {
     pub name: String,
     pub args: serde_json::Value,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutableCodeResponse {
+    pub language: String,
+    pub code: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeExecutionResultResponse {
+    pub outcome: String,
+    pub output: String,
 }
 
 #[cfg(test)]

@@ -41,6 +41,7 @@ pub async fn generate_content_internal(
             role: None,
         }),
         tools: None,
+        tool_config: None,
     };
 
     let response = http_client.post(&url).json(&request_body).send().await?;
@@ -97,6 +98,7 @@ pub fn generate_content_stream_internal<'a>(
                 role: None,
             }),
             tools: None,
+            tool_config: None,
         };
         let response = http_client
             .post(&url)
