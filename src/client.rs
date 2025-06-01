@@ -92,7 +92,7 @@ impl Client {
     ///
     /// # Arguments
     ///
-    /// * `model_name` - The name of the model to use (e.g., "gemini-1.5-flash-latest")
+    /// * `model_name` - The name of the model to use (e.g., "gemini-2.5-flash-preview-05-20")
     #[must_use]
     pub const fn with_model<'a>(
         &'a self,
