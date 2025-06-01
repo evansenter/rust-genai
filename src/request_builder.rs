@@ -200,3 +200,208 @@ impl<'a> GenerateContentBuilder<'a> {
             .boxed() // Ensure the return type matches Client::stream_from_request
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // Mock client for testing
+    fn create_test_client() -> Client {
+        Client::new("test-key".to_string(), None)
+    }
+
+    #[test]
+    fn test_builder_initialization() {
+        let client = create_test_client();
+        let builder = GenerateContentBuilder::new(&client, "test-model");
+        
+        assert_eq!(builder.model_name, "test-model");
+        assert!(builder.prompt_text.is_none());
+        assert!(builder.system_instruction.is_none());
+        assert!(builder.tools.is_none());
+        assert!(builder.tool_config.is_none());
+    }
+
+    #[test]
+    fn test_builder_with_prompt() {
+        let client = create_test_client();
+        let builder = GenerateContentBuilder::new(&client, "test-model")
+            .with_prompt("Hello world");
+        
+        assert_eq!(builder.prompt_text, Some("Hello world"));
+    }
+
+    #[test]
+    fn test_builder_with_system_instruction() {
+        let client = create_test_client();
+        let builder = GenerateContentBuilder::new(&client, "test-model")
+            .with_system_instruction("Be helpful");
+        
+        assert_eq!(builder.system_instruction, Some("Be helpful"));
+    }
+
+    #[test]
+    fn test_convert_function_declaration_basic() {
+        let func_decl = FunctionDeclaration {
+            name: "test_func".to_string(),
+            description: "Test function".to_string(),
+            parameters: Some(json!({
+                "type": "object",
+                "properties": {
+                    "param1": {"type": "string"}
+                }
+            })),
+            required: vec!["param1".to_string()],
+        };
+        
+        let tool = GenerateContentBuilder::convert_public_fn_decl_to_tool(func_decl);
+        
+        assert!(tool.function_declarations.is_some());
+        let func_decls = tool.function_declarations.unwrap();
+        assert_eq!(func_decls.len(), 1);
+        
+        let internal_func = &func_decls[0];
+        assert_eq!(internal_func.name, "test_func");
+        assert_eq!(internal_func.description, "Test function");
+        assert_eq!(internal_func.parameters.type_, "object");
+        assert_eq!(internal_func.parameters.required, vec!["param1"]);
+    }
+
+    #[test]
+    fn test_convert_function_declaration_no_parameters() {
+        let func_decl = FunctionDeclaration {
+            name: "no_params".to_string(),
+            description: "No parameters".to_string(),
+            parameters: None,
+            required: vec![],
+        };
+        
+        let tool = GenerateContentBuilder::convert_public_fn_decl_to_tool(func_decl);
+        
+        let func_decls = tool.function_declarations.unwrap();
+        let internal_func = &func_decls[0];
+        
+        assert_eq!(internal_func.parameters.type_, "object");
+        assert!(internal_func.parameters.properties.is_null());
+        assert!(internal_func.parameters.required.is_empty());
+    }
+
+    #[test]
+    fn test_convert_function_declaration_missing_type() {
+        let func_decl = FunctionDeclaration {
+            name: "test".to_string(),
+            description: "Test".to_string(),
+            parameters: Some(json!({
+                "properties": {
+                    "param1": {"type": "string"}
+                }
+            })),
+            required: vec![],
+        };
+        
+        let tool = GenerateContentBuilder::convert_public_fn_decl_to_tool(func_decl);
+        let internal_func = &tool.function_declarations.unwrap()[0];
+        
+        // Should default to "object" when type is missing
+        assert_eq!(internal_func.parameters.type_, "object");
+    }
+
+    #[test]
+    fn test_with_function() {
+        let client = create_test_client();
+        let func = FunctionDeclaration {
+            name: "test".to_string(),
+            description: "Test".to_string(),
+            parameters: None,
+            required: vec![],
+        };
+        
+        let builder = GenerateContentBuilder::new(&client, "test-model")
+            .with_function(func);
+        
+        assert!(builder.tools.is_some());
+        assert_eq!(builder.tools.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_with_multiple_functions() {
+        let client = create_test_client();
+        let func1 = FunctionDeclaration {
+            name: "func1".to_string(),
+            description: "Function 1".to_string(),
+            parameters: None,
+            required: vec![],
+        };
+        let func2 = FunctionDeclaration {
+            name: "func2".to_string(),
+            description: "Function 2".to_string(),
+            parameters: None,
+            required: vec![],
+        };
+        
+        let builder = GenerateContentBuilder::new(&client, "test-model")
+            .with_function(func1)
+            .with_function(func2);
+        
+        assert_eq!(builder.tools.as_ref().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_with_functions_vector() {
+        let client = create_test_client();
+        let functions = vec![
+            FunctionDeclaration {
+                name: "func1".to_string(),
+                description: "Function 1".to_string(),
+                parameters: None,
+                required: vec![],
+            },
+            FunctionDeclaration {
+                name: "func2".to_string(),
+                description: "Function 2".to_string(),
+                parameters: None,
+                required: vec![],
+            },
+        ];
+        
+        let builder = GenerateContentBuilder::new(&client, "test-model")
+            .with_functions(functions);
+        
+        assert_eq!(builder.tools.as_ref().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_with_code_execution() {
+        let client = create_test_client();
+        let builder = GenerateContentBuilder::new(&client, "test-model")
+            .with_code_execution();
+        
+        assert!(builder.tools.is_some());
+        let tools = builder.tools.as_ref().unwrap();
+        assert_eq!(tools.len(), 1);
+        assert!(tools[0].code_execution.is_some());
+        assert!(tools[0].function_declarations.is_none());
+    }
+
+    #[test]
+    fn test_builder_chaining() {
+        let client = create_test_client();
+        let func = FunctionDeclaration {
+            name: "test".to_string(),
+            description: "Test".to_string(),
+            parameters: None,
+            required: vec![],
+        };
+        
+        let builder = GenerateContentBuilder::new(&client, "test-model")
+            .with_prompt("Hello")
+            .with_system_instruction("Be helpful")
+            .with_function(func)
+            .with_code_execution();
+        
+        assert_eq!(builder.prompt_text, Some("Hello"));
+        assert_eq!(builder.system_instruction, Some("Be helpful"));
+        assert_eq!(builder.tools.as_ref().unwrap().len(), 2); // 1 function + 1 code execution
+    }
+}

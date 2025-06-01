@@ -20,7 +20,7 @@ fn get_weather(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let api_key = env::var("GEMINI_API_KEY")?;
+    let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
     let client = Client::builder(api_key).debug().build();
 
     // Get the function declaration from the macro-generated function
@@ -29,12 +29,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let model_name = "gemini-2.5-flash-preview-05-20";
     let initial_prompt = "What is the weather like in San Francisco in Fahrenheit? Please use the get_weather tool to find out, and then tell me what I should pack.";
 
-    let response1 = client
+    let response1_result = client
         .with_model(model_name)
         .with_prompt(initial_prompt)
         .with_function(weather_function_decl.clone())
         .generate()
-        .await?;
+        .await;
+
+    let response1 = match response1_result {
+        Ok(res) => res,
+        Err(e) => {
+            match &e {
+                GenaiError::Api(api_err_msg) => eprintln!("API Error: {api_err_msg}"),
+                GenaiError::Http(http_err) => eprintln!("HTTP Error: {http_err}"),
+                GenaiError::Json(json_err) => eprintln!("JSON Error: {json_err}"),
+                GenaiError::Parse(p_err) => eprintln!("Parse Error: {p_err}"),
+                GenaiError::Utf8(u_err) => eprintln!("UTF8 Error: {u_err}"),
+                GenaiError::Internal(i_err) => eprintln!("Internal Error: {i_err}"),
+            }
+            return Err(e.into());
+        }
+    };
 
     if let Some(text) = &response1.text {
         println!("Text: {text}");
@@ -60,12 +75,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     user_tool_response("get_weather".to_string(), json!({ "result": result })),
                 ];
 
-                let response2 = client
+                let response2_result = client
                     .generate_from_request(
                         model_name,
                         build_content_request(conversation, Some(vec![weather_function_decl.to_tool()]))
                     )
-                    .await?;
+                    .await;
+
+                let response2 = match response2_result {
+                    Ok(res) => res,
+                    Err(e) => {
+                        match &e {
+                            GenaiError::Api(api_err_msg) => eprintln!("API Error: {api_err_msg}"),
+                            GenaiError::Http(http_err) => eprintln!("HTTP Error: {http_err}"),
+                            GenaiError::Json(json_err) => eprintln!("JSON Error: {json_err}"),
+                            GenaiError::Parse(p_err) => eprintln!("Parse Error: {p_err}"),
+                            GenaiError::Utf8(u_err) => eprintln!("UTF8 Error: {u_err}"),
+                            GenaiError::Internal(i_err) => eprintln!("Internal Error: {i_err}"),
+                        }
+                        return Err(e.into());
+                    }
+                };
 
                 if let Some(text) = response2.text {
                     println!("\nFinal response: {text}");

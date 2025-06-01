@@ -6,8 +6,8 @@ use std::io::{Write, stdout};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let api_key = env::var("GEMINI_API_KEY")?;
-    let client = Client::builder(api_key).build();
+    let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
+    let client = Client::builder(api_key).debug().build();
     let model_name = "gemini-2.5-flash-preview-05-20";
     let prompt = "Write a long, detailed story about a futuristic city powered by dreams.";
 

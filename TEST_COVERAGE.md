@@ -5,9 +5,11 @@ This document provides an overview of the test coverage for the rust-genai libra
 ## Test Files Overview
 
 ### Unit Tests
-- **src/lib.rs** - Tests for error conversion and public response struct
-- **src/internal/response_processing.rs** - Tests for response part processing logic (NEW)
-- **genai-client** - Internal client tests for request/response serialization
+- **src/lib.rs** - Tests for error conversion and public response struct (2 tests)
+- **src/internal/response_processing.rs** - Tests for response part processing logic (6 tests)
+- **src/request_builder.rs** - Tests for request builder and function declaration conversion (11 tests)
+- **genai-client/src/common.rs** - Tests for URL construction and API versions (5 tests)  
+- **genai-client/src/models/** - Internal serialization/deserialization tests (5 tests)
 
 ### Integration Tests
 
@@ -120,8 +122,8 @@ cargo test --all -- --nocapture
 ```
 
 ## Test Statistics
-- Total test files: 11
-- Total test functions: ~65+
-- Unit tests: 13 (7 in lib.rs + 6 in response_processing.rs)
+- Total test files: 11 integration + unit test modules
+- Total test functions: ~80+
+- Unit tests: 29
 - Integration tests: 50+
 - Macro tests: 10+ 

@@ -5,10 +5,10 @@ use std::error::Error;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // 1. Get API Key from environment variable
-    let api_key = env::var("GEMINI_API_KEY")?;
+    let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
 
     // Create the client
-    let client = Client::builder(api_key).build();
+    let client = Client::builder(api_key).debug().build();
 
     // 2. Define model and prompt
     let model_name = "gemini-2.5-flash-preview-05-20"; // Specify the model directly

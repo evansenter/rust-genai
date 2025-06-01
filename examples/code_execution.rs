@@ -53,11 +53,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Err(e) => {
-            eprintln!("Error: {e}");
-            if let GenaiError::Api(api_error_body) = e {
-                eprintln!("--- API Error Body ---");
-                eprintln!("{api_error_body}");
+            match &e {
+                GenaiError::Api(api_err_msg) => eprintln!("API Error: {api_err_msg}"),
+                GenaiError::Http(http_err) => eprintln!("HTTP Error: {http_err}"),
+                GenaiError::Json(json_err) => eprintln!("JSON Error: {json_err}"),
+                GenaiError::Parse(p_err) => eprintln!("Parse Error: {p_err}"),
+                GenaiError::Utf8(u_err) => eprintln!("UTF8 Error: {u_err}"),
+                GenaiError::Internal(i_err) => eprintln!("Internal Error: {i_err}"),
             }
+            // It's often useful to return the original error for further handling if needed
+            // For an example, just printing and exiting might be okay, but for a library, you'd return it.
+            // return Err(e.into()); // Uncomment if you want to propagate the error
         }
     }
 
