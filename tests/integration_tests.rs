@@ -2,8 +2,15 @@ use futures_util::{StreamExt, pin_mut};
 use rust_genai::Client;
 use std::env;
 
+// Note: These integration tests make real API calls and may hit rate limits
+// on free tier API keys (10 requests per minute). To run these tests:
+// 1. Use a paid API key with higher rate limits, or
+// 2. Run tests individually with delays between them, or
+// 3. Run with: cargo test --test integration_tests -- --ignored
+
 // Non-streaming test with system instruction
 #[tokio::test]
+#[ignore = "Makes real API calls - may hit rate limits"]
 async fn test_generate_content_with_system_instruction() {
     let Ok(api_key) = env::var("GEMINI_API_KEY") else {
         println!("Skipping test_generate_content_with_system_instruction: GEMINI_API_KEY not set.");
@@ -48,6 +55,7 @@ async fn test_generate_content_with_system_instruction() {
 
 // Non-streaming test without system instruction
 #[tokio::test]
+#[ignore = "Makes real API calls - may hit rate limits"]
 async fn test_generate_content_without_system_instruction() {
     let Ok(api_key) = env::var("GEMINI_API_KEY") else {
         println!(
@@ -56,7 +64,7 @@ async fn test_generate_content_without_system_instruction() {
         return;
     };
     let client = Client::builder(api_key).build();
-    let model_name = "gemini-1.5-flash-latest";
+    let model_name = "gemini-2.5-flash-preview-05-20";
     let prompt = "What is the capital of Germany?";
 
     let result = client
@@ -92,6 +100,7 @@ async fn test_generate_content_without_system_instruction() {
 
 // Streaming test with system instruction
 #[tokio::test]
+#[ignore = "Makes real API calls - may hit rate limits"]
 async fn test_generate_content_stream_with_system_instruction() {
     let Ok(api_key) = env::var("GEMINI_API_KEY") else {
         println!(
@@ -100,7 +109,7 @@ async fn test_generate_content_stream_with_system_instruction() {
         return;
     };
     let client = Client::builder(api_key).build();
-    let model_name = "gemini-1.5-flash-latest";
+    let model_name = "gemini-2.5-flash-preview-05-20";
     let prompt = "Why is grass green?";
     let system_instruction = "Explain simply.";
 
@@ -136,6 +145,7 @@ async fn test_generate_content_stream_with_system_instruction() {
 
 // Streaming test without system instruction
 #[tokio::test]
+#[ignore = "Makes real API calls - may hit rate limits"]
 async fn test_generate_content_stream_without_system_instruction() {
     let Ok(api_key) = env::var("GEMINI_API_KEY") else {
         println!(
@@ -144,7 +154,7 @@ async fn test_generate_content_stream_without_system_instruction() {
         return;
     };
     let client = Client::builder(api_key).build();
-    let model_name = "gemini-1.5-flash-latest";
+    let model_name = "gemini-2.5-flash-preview-05-20";
     let prompt = "Tell a short joke.";
 
     let stream = client.with_model(model_name).with_prompt(prompt).stream();

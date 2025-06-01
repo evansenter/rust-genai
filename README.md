@@ -19,6 +19,9 @@ Add this to your `Cargo.toml`:
 [dependencies]
 rust-genai = "0.1.0"
 tokio = { version = "1.0", features = ["full"] }
+
+# Optional: For the procedural macro
+rust-genai-macros = "0.1.0"
 ```
 
 ## Usage
@@ -182,8 +185,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(text) = response.text {
         println!("Text response: {text}");
     }
-    if let Some(function_call) = response.function_call {
-        println!("Function call: {} with args: {}", function_call.name, function_call.args);
+    if let Some(function_calls) = response.function_calls {
+        for call in function_calls {
+            println!("Function call: {} with args: {}", call.name, call.args);
+        }
         // Next steps would typically involve: 
         // 1. Executing this function with the provided arguments.
         // 2. Sending the function's output back to the model in a new request
@@ -194,7 +199,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-For a more complete, multi-turn function calling example that shows how to execute the function and send its result back to the model, please see `examples/function_calling.rs` in the project repository.
+For a more complete, multi-turn function calling example that shows how to execute the function and send its result back to the model, please see `examples/function_call.rs` in the project repository.
+
+### Using the Procedural Macro for Function Declarations
+
+For a more ergonomic way to create function declarations, you can use the provided procedural macro:
+
+```rust
+use rust_genai_macros::generate_function_declaration;
+
+/// Function to get the weather in a given location
+#[generate_function_declaration(
+    location(description = "The city and state, e.g. San Francisco, CA"),
+    unit(description = "The temperature unit to use", enum_values = ["celsius", "fahrenheit"])
+)]
+fn get_weather(location: String, unit: Option<String>) -> String {
+    // Your implementation here
+    format!("Weather for {}", location)
+}
+
+// The macro generates a function called `get_weather_declaration()` 
+// that returns a FunctionDeclaration
+let weather_function = get_weather_declaration();
+
+// Use it with the client
+let response = client
+    .with_model(model)
+    .with_prompt("What's the weather in Paris?")
+    .with_function(weather_function)
+    .generate()
+    .await?;
+```
+
+The macro supports:
+- Automatic extraction of function doc comments as descriptions
+- Parameter descriptions via the macro attribute
+- Enum constraints for parameters with fixed values
+- Proper handling of optional parameters (Option<T>)
+- Type mapping for common Rust types (String, i32, i64, f32, f64, bool, Vec<T>, serde_json::Value)
 
 ## Project Structure
 

@@ -39,12 +39,14 @@ impl<'a> GenerateContentBuilder<'a> {
     ) -> genai_client::models::request::Tool {
         let schema_properties = function
             .parameters
-            .get("properties")
+            .as_ref()
+            .and_then(|p| p.get("properties"))
             .cloned()
             .unwrap_or(Value::Null);
         let schema_type = function
             .parameters
-            .get("type")
+            .as_ref()
+            .and_then(|p| p.get("type"))
             .and_then(Value::as_str)
             .unwrap_or("object")
             .to_string();

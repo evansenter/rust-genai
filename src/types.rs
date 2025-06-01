@@ -1,4 +1,5 @@
 use serde_json::Value;
+use serde::{Deserialize, Serialize};
 
 /// Represents a function call in the response.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,14 +31,14 @@ pub struct GenerateContentResponse {
 }
 
 /// Represents a function declaration that can be used by the model.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionDeclaration {
     /// The name of the function.
     pub name: String,
     /// A description of what the function does.
     pub description: String,
     /// The JSON Schema for the function's parameters.
-    pub parameters: Value,
+    pub parameters: Option<Value>,
     /// The names of required parameters.
     pub required: Vec<String>,
 }
@@ -45,26 +46,25 @@ pub struct FunctionDeclaration {
 impl FunctionDeclaration {
     /// Converts this public `FunctionDeclaration` to the internal `genai_client::Tool` format.
     #[must_use]
-    pub fn to_tool(&self) -> genai_client::Tool {
-        genai_client::Tool {
-            function_declarations: Some(vec![genai_client::models::request::FunctionDeclaration {
-                name: self.name.clone(),
-                description: self.description.clone(),
-                parameters: genai_client::models::request::FunctionParameters {
-                    type_: self
-                        .parameters
-                        .get("type")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("object")
-                        .to_string(),
-                    properties: self
-                        .parameters
-                        .get("properties")
-                        .cloned()
-                        .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::new())),
-                    required: self.required.clone(),
+    pub fn to_tool(self) -> genai_client::Tool {
+        let properties = self.parameters.as_ref().and_then(|p| p.get("properties")).cloned();
+        let required_from_params = self.parameters.as_ref().and_then(|p| p.get("required")).cloned();
+
+        let internal_fd = genai_client::FunctionDeclaration {
+            name: self.name,
+            description: self.description,
+            parameters: genai_client::FunctionParameters {
+                type_: "object".to_string(),
+                properties: properties.unwrap_or(Value::Null),
+                required: if let Some(Value::Array(arr)) = required_from_params {
+                    arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+                } else {
+                    self.required
                 },
-            }]),
+            },
+        };
+        genai_client::Tool {
+            function_declarations: Some(vec![internal_fd]),
             code_execution: None,
         }
     }

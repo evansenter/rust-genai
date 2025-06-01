@@ -59,3 +59,175 @@ pub fn process_response_parts(parts: &[PartResponse]) -> ProcessedParts {
         code_execution_results: collected_code_execution_results,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use genai_client::models::response::{
+        ExecutableCodeResponse, FunctionCallResponse, CodeExecutionResultResponse
+    };
+    use serde_json::json;
+
+    #[test]
+    fn test_process_empty_parts() {
+        let parts = vec![];
+        let result = process_response_parts(&parts);
+        
+        assert!(result.text.is_none());
+        assert!(result.function_calls.is_empty());
+        assert!(result.code_execution_results.is_empty());
+    }
+
+    #[test]
+    fn test_process_text_parts() {
+        let parts = vec![
+            PartResponse {
+                text: Some("Hello ".to_string()),
+                function_call: None,
+                executable_code: None,
+                code_execution_result: None,
+                function_response: None,
+            },
+            PartResponse {
+                text: Some("world!".to_string()),
+                function_call: None,
+                executable_code: None,
+                code_execution_result: None,
+                function_response: None,
+            },
+        ];
+        
+        let result = process_response_parts(&parts);
+        assert_eq!(result.text, Some("Hello world!".to_string()));
+    }
+
+    #[test]
+    fn test_process_function_calls() {
+        let parts = vec![
+            PartResponse {
+                text: None,
+                function_call: Some(FunctionCallResponse {
+                    name: "func1".to_string(),
+                    args: json!({"arg": "value1"}),
+                }),
+                executable_code: None,
+                code_execution_result: None,
+                function_response: None,
+            },
+            PartResponse {
+                text: None,
+                function_call: Some(FunctionCallResponse {
+                    name: "func2".to_string(),
+                    args: json!({"arg": "value2"}),
+                }),
+                executable_code: None,
+                code_execution_result: None,
+                function_response: None,
+            },
+        ];
+        
+        let result = process_response_parts(&parts);
+        assert_eq!(result.function_calls.len(), 2);
+        assert_eq!(result.function_calls[0].name, "func1");
+        assert_eq!(result.function_calls[1].name, "func2");
+    }
+
+    #[test]
+    fn test_process_code_execution() {
+        let parts = vec![
+            PartResponse {
+                text: None,
+                function_call: None,
+                executable_code: Some(ExecutableCodeResponse {
+                    language: "python".to_string(),
+                    code: "print('hello')".to_string(),
+                }),
+                code_execution_result: None,
+                function_response: None,
+            },
+            PartResponse {
+                text: None,
+                function_call: None,
+                executable_code: None,
+                code_execution_result: Some(CodeExecutionResultResponse {
+                    outcome: "SUCCESS".to_string(),
+                    output: "hello".to_string(),
+                }),
+                function_response: None,
+            },
+        ];
+        
+        let result = process_response_parts(&parts);
+        assert_eq!(result.code_execution_results.len(), 1);
+        assert_eq!(result.code_execution_results[0].code, "print('hello')");
+        assert_eq!(result.code_execution_results[0].output, "hello");
+    }
+
+    #[test]
+    fn test_code_execution_result_without_code() {
+        // This should trigger the warning log
+        let parts = vec![
+            PartResponse {
+                text: None,
+                function_call: None,
+                executable_code: None,
+                code_execution_result: Some(CodeExecutionResultResponse {
+                    outcome: "SUCCESS".to_string(),
+                    output: "orphaned output".to_string(),
+                }),
+                function_response: None,
+            },
+        ];
+        
+        let result = process_response_parts(&parts);
+        assert!(result.code_execution_results.is_empty());
+    }
+
+    #[test]
+    fn test_mixed_response_parts() {
+        let parts = vec![
+            PartResponse {
+                text: Some("Here's the result: ".to_string()),
+                function_call: None,
+                executable_code: None,
+                code_execution_result: None,
+                function_response: None,
+            },
+            PartResponse {
+                text: None,
+                function_call: Some(FunctionCallResponse {
+                    name: "calculate".to_string(),
+                    args: json!({"x": 5, "y": 3}),
+                }),
+                executable_code: None,
+                code_execution_result: None,
+                function_response: None,
+            },
+            PartResponse {
+                text: None,
+                function_call: None,
+                executable_code: Some(ExecutableCodeResponse {
+                    language: "python".to_string(),
+                    code: "5 + 3".to_string(),
+                }),
+                code_execution_result: None,
+                function_response: None,
+            },
+            PartResponse {
+                text: None,
+                function_call: None,
+                executable_code: None,
+                code_execution_result: Some(CodeExecutionResultResponse {
+                    outcome: "SUCCESS".to_string(),
+                    output: "8".to_string(),
+                }),
+                function_response: None,
+            },
+        ];
+        
+        let result = process_response_parts(&parts);
+        assert_eq!(result.text, Some("Here's the result: ".to_string()));
+        assert_eq!(result.function_calls.len(), 1);
+        assert_eq!(result.code_execution_results.len(), 1);
+    }
+}

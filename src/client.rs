@@ -92,7 +92,7 @@ impl Client {
     ///
     /// # Arguments
     ///
-    /// * `model_name` - The name of the model to use (e.g., "gemini-1.5-flash-latest")
+    /// * `model_name` - The name of the model to use (e.g., "gemini-2.5-flash-preview-05-20")
     #[must_use]
     pub const fn with_model<'a>(
         &'a self,
@@ -122,7 +122,10 @@ impl Client {
 
         if self.debug {
             println!("[DEBUG] Request URL: {url}");
-            println!("[DEBUG] Request Body: {request_body:#?}");
+            match serde_json::to_string_pretty(&request_body) {
+                Ok(json) => println!("[DEBUG] Request Body (JSON):\n{json}"),
+                Err(_) => println!("[DEBUG] Request Body: {request_body:#?}"),
+            }
         }
 
         let response = self
@@ -193,7 +196,10 @@ impl Client {
 
         if self.debug {
             println!("[DEBUG] Streaming Request URL: {url}");
-            println!("[DEBUG] Streaming Request Body: {request_body:#?}");
+            match serde_json::to_string_pretty(&request_body) {
+                Ok(json) => println!("[DEBUG] Streaming Request Body (JSON):\n{json}"),
+                Err(_) => println!("[DEBUG] Streaming Request Body: {request_body:#?}"),
+            }
         }
 
         let stream_val = try_stream! {
