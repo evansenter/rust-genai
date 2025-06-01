@@ -122,7 +122,10 @@ impl Client {
 
         if self.debug {
             println!("[DEBUG] Request URL: {url}");
-            println!("[DEBUG] Request Body: {request_body:#?}");
+            match serde_json::to_string_pretty(&request_body) {
+                Ok(json) => println!("[DEBUG] Request Body (JSON):\n{json}"),
+                Err(_) => println!("[DEBUG] Request Body: {request_body:#?}"),
+            }
         }
 
         let response = self
@@ -193,7 +196,10 @@ impl Client {
 
         if self.debug {
             println!("[DEBUG] Streaming Request URL: {url}");
-            println!("[DEBUG] Streaming Request Body: {request_body:#?}");
+            match serde_json::to_string_pretty(&request_body) {
+                Ok(json) => println!("[DEBUG] Streaming Request Body (JSON):\n{json}"),
+                Err(_) => println!("[DEBUG] Streaming Request Body: {request_body:#?}"),
+            }
         }
 
         let stream_val = try_stream! {
