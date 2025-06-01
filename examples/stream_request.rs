@@ -9,17 +9,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let api_key = env::var("GEMINI_API_KEY")?;
     let client = Client::builder(api_key).build();
     let model_name = "gemini-2.5-flash-preview-05-20";
-    let prompt =
-        "Write a long, detailed story about a futuristic city powered by dreams.";
+    let prompt = "Write a long, detailed story about a futuristic city powered by dreams.";
 
     println!("Sending streaming request to model: {model_name}");
     println!("Prompt: {prompt}\n");
     println!("--- Model Response Stream ---");
 
-    let stream = client
-        .with_model(model_name)
-        .with_prompt(prompt)
-        .stream();
+    let stream = client.with_model(model_name).with_prompt(prompt).stream();
     pin_mut!(stream);
 
     let mut error_occurred = false;
@@ -33,12 +29,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
             Err(e) => {
                 match &e {
-                    GenaiError::Api(api_err_msg) => eprintln!("\nAPI Error during stream: {api_err_msg}"),
-                    GenaiError::Http(http_err) => eprintln!("\nHTTP Error during stream: {http_err}"),
-                    GenaiError::Json(json_err) => eprintln!("\nJSON Error during stream: {json_err}"),
-                    GenaiError::Parse(p_err) => eprintln!("\nParse Error during stream: {p_err}"),
-                    GenaiError::Utf8(u_err) => eprintln!("\nUTF8 Error during stream: {u_err}"),
-                    GenaiError::Internal(i_err) => eprintln!("\nInternal Error during stream: {i_err}"),
+                    GenaiError::Api(api_err_msg) => {
+                        eprintln!("\nAPI Error during stream: {api_err_msg}");
+                    }
+                    GenaiError::Http(http_err) => {
+                        eprintln!("\nHTTP Error during stream: {http_err}");
+                    }
+                    GenaiError::Json(json_err) => {
+                        eprintln!("\nJSON Error during stream: {json_err}");
+                    }
+                    GenaiError::Parse(p_err) => {
+                        eprintln!("\nParse Error during stream: {p_err}");
+                    }
+                    GenaiError::Utf8(u_err) => {
+                        eprintln!("\nUTF8 Error during stream: {u_err}");
+                    }
+                    GenaiError::Internal(i_err) => {
+                        eprintln!("\nInternal Error during stream: {i_err}");
+                    }
                 }
                 error_occurred = true;
                 break;

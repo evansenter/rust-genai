@@ -13,4 +13,4 @@ pub enum InternalError {
     Utf8(#[from] std::str::Utf8Error),
     #[error("API Error: {0}")]
     Api(String),
-} 
+}

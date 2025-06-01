@@ -1,4 +1,4 @@
-use crate::common::{construct_url, ApiVersion};
+use crate::common::{ApiVersion, construct_url};
 use crate::errors::InternalError;
 use crate::models::request::{Content, GenerateContentRequest, Part};
 use crate::models::response::GenerateContentResponse;
@@ -46,10 +46,7 @@ pub async fn generate_content_internal(
     let response = http_client.post(&url).json(&request_body).send().await?;
 
     if !response.status().is_success() {
-        let error_text = response
-            .text()
-            .await
-            .map_err(InternalError::Http)?;
+        let error_text = response.text().await.map_err(InternalError::Http)?;
         return Err(InternalError::Api(error_text));
     }
 
@@ -131,4 +128,4 @@ pub fn generate_content_stream_internal<'a>(
             Err(InternalError::Api(error_text))?;
         }
     }
-} 
+}

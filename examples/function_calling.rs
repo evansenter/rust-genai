@@ -1,8 +1,9 @@
-use rust_genai::{Client, FunctionDeclaration};
 use genai_client::models::request::{
-    Content, GenerateContentRequest as InternalGenerateContentRequest, Part, FunctionResponse, Tool,
-    FunctionDeclaration as InternalFunctionDeclaration, FunctionParameters as InternalFunctionParameters,
+    Content, FunctionDeclaration as InternalFunctionDeclaration,
+    FunctionParameters as InternalFunctionParameters, FunctionResponse,
+    GenerateContentRequest as InternalGenerateContentRequest, Part, Tool,
 };
+use rust_genai::{Client, FunctionDeclaration};
 use serde_json::json;
 use std::env;
 use std::error::Error;
@@ -10,9 +11,7 @@ use std::error::Error;
 // Mock function to simulate getting weather information
 fn get_mock_weather_report(location: &str, unit: Option<&str>) -> String {
     let unit_str = unit.unwrap_or("celsius");
-    format!(
-        "The weather in {location} is currently 22 degrees {unit_str} and sunny."
-    )
+    format!("The weather in {location} is currently 22 degrees {unit_str} and sunny.")
 }
 
 #[tokio::main]
@@ -50,7 +49,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let model_name = "gemini-2.5-flash-preview-05-20";
     let initial_prompt_text = "What is the weather like in San Francisco? Please use the get_weather tool to find out, and then tell me what I should pack.";
 
-
     println!("Sending initial request to model: {model_name}");
     println!("Prompt: {initial_prompt_text}\n");
 
@@ -74,8 +72,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         if received_function_call.name == "get_weather" {
             println!("\nExecuting 'get_weather' function client-side...");
-            let location = received_function_call.args.get("location").and_then(|v| v.as_str()).unwrap_or("unknown location");
-            let unit = received_function_call.args.get("unit").and_then(|v| v.as_str());
+            let location = received_function_call
+                .args
+                .get("location")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown location");
+            let unit = received_function_call
+                .args
+                .get("unit")
+                .and_then(|v| v.as_str());
 
             let weather_report = get_mock_weather_report(location, unit);
             println!("  Mock weather report: {weather_report}");
@@ -95,7 +100,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             // 2. Model's first response (the function call)
             let model_function_call_part = Part {
                 text: None,
-                function_call: Some(genai_client::models::request::FunctionCall { // Use internal FunctionCall
+                function_call: Some(genai_client::models::request::FunctionCall {
+                    // Use internal FunctionCall
                     name: received_function_call.name.clone(),
                     args: received_function_call.args.clone(),
                 }),
@@ -110,7 +116,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let tool_function_response_part = Part {
                 text: None,
                 function_call: None,
-                function_response: Some(FunctionResponse { // This is genai_client::models::request::FunctionResponse
+                function_response: Some(FunctionResponse {
+                    // This is genai_client::models::request::FunctionResponse
                     name: "get_weather".to_string(), // Should match the original function call name
                     response: json!({ "weather": weather_report }),
                 }),
@@ -129,8 +136,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     name: weather_function_public_decl.name.clone(),
                     description: weather_function_public_decl.description.clone(),
                     parameters: InternalFunctionParameters {
-                        type_: weather_function_public_decl.parameters.get("type").and_then(|v| v.as_str()).unwrap_or("object").to_string(),
-                        properties: weather_function_public_decl.parameters.get("properties").cloned().unwrap_or_else(|| json!({})),
+                        type_: weather_function_public_decl
+                            .parameters
+                            .get("type")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("object")
+                            .to_string(),
+                        properties: weather_function_public_decl
+                            .parameters
+                            .get("properties")
+                            .cloned()
+                            .unwrap_or_else(|| json!({})),
                         required: weather_function_public_decl.required.clone(),
                     },
                 }],
@@ -140,25 +156,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 contents: conversation_history,
                 tools: Some(vec![internal_tool]),
                 system_instruction: None, // Or carry over if set
-                // tool_config, generation_config etc. could also be set here if needed
+                                          // tool_config, generation_config etc. could also be set here if needed
             };
-            
+
             println!("\nSending constructed multi-turn request back to the model...");
             // --- Second API Call using generate_from_request ---
             let response2 = client
                 .generate_from_request(model_name, request_body_for_second_call)
                 .await?;
-            
+
             println!("\n--- Second Model Response (after function execution) ---");
             if let Some(text) = response2.text {
                 println!("Final text response: {text}");
             }
             if let Some(fc) = response2.function_call {
-                 println!("\nUnexpected second function call:");
-                 println!("  Name: {}", fc.name);
-                 println!("  Args: {}", fc.args);
+                println!("\nUnexpected second function call:");
+                println!("  Name: {}", fc.name);
+                println!("  Args: {}", fc.args);
             }
-
         }
     } else if response1.text.is_none() {
         println!("Model did not return text and did not request a function call.");

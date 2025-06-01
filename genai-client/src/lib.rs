@@ -1,8 +1,8 @@
 // Declare the models, errors, common, and core modules
-pub mod models;
-pub mod errors;
 pub mod common;
 pub mod core;
+pub mod errors;
+pub mod models;
 
 // Import and selectively re-export the necessary structs from the models module
 pub use models::request::Content;
