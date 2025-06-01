@@ -17,6 +17,7 @@ pub struct GenerateContentBuilder<'a> {
     pub(crate) prompt_text: Option<&'a str>,
     pub(crate) system_instruction: Option<&'a str>,
     pub(crate) tools: Option<Vec<genai_client::models::request::Tool>>,
+    pub(crate) tool_config: Option<genai_client::models::request::ToolConfig>,
 }
 
 impl<'a> GenerateContentBuilder<'a> {
@@ -28,6 +29,7 @@ impl<'a> GenerateContentBuilder<'a> {
             prompt_text: None,
             system_instruction: None,
             tools: None,
+            tool_config: None,
         }
     }
 
@@ -54,11 +56,12 @@ impl<'a> GenerateContentBuilder<'a> {
         };
 
         genai_client::models::request::Tool {
-            function_declarations: vec![genai_client::models::request::FunctionDeclaration {
+            function_declarations: Some(vec![genai_client::models::request::FunctionDeclaration {
                 name: function.name,
                 description: function.description,
                 parameters: internal_function_parameters,
-            }],
+            }]),
+            code_execution: None,
         }
     }
 
@@ -84,6 +87,18 @@ impl<'a> GenerateContentBuilder<'a> {
         self
     }
 
+    /// Enables the code execution tool for the model.
+    #[must_use]
+    pub fn with_code_execution(mut self) -> Self {
+        self.tools.get_or_insert_with(Vec::new).push(
+            genai_client::models::request::Tool {
+                function_declarations: None,
+                code_execution: Some(genai_client::models::request::CodeExecution::default()),
+            }
+        );
+        self
+    }
+
     #[must_use]
     pub fn with_functions(mut self, functions: Vec<FunctionDeclaration>) -> Self {
         let tools_vec = functions
@@ -94,6 +109,13 @@ impl<'a> GenerateContentBuilder<'a> {
         if !tools_vec.is_empty() {
             self.tools.get_or_insert_with(Vec::new).extend(tools_vec);
         }
+        self
+    }
+
+    /// Sets the tool configuration for the request.
+    #[must_use]
+    pub fn with_tool_config(mut self, config: genai_client::models::request::ToolConfig) -> Self {
+        self.tool_config = Some(config);
         self
     }
 
@@ -127,6 +149,7 @@ impl<'a> GenerateContentBuilder<'a> {
                 }
             }),
             tools: self.tools,
+            tool_config: self.tool_config,
         };
 
         let url = genai_client::construct_url(
@@ -222,6 +245,7 @@ impl<'a> GenerateContentBuilder<'a> {
                 }
             }),
             tools: self.tools,
+            tool_config: self.tool_config,
         };
 
         let url = genai_client::construct_url(

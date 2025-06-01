@@ -7,6 +7,8 @@ pub struct GenerateContentRequest {
     pub system_instruction: Option<Content>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<Tool>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_config: Option<ToolConfig>,
     // pub tool_config: Option<ToolConfig>, // Example for future addition
     // generationConfig: Option<GenerationConfig>, // Example for future addition
     // safetySettings: Option<Vec<SafetySetting>>, // Example for future addition
@@ -31,9 +33,17 @@ pub struct Part {
     // pub inline_data: Option<Blob>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Default)]
 pub struct Tool {
-    pub function_declarations: Vec<FunctionDeclaration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function_declarations: Option<Vec<FunctionDeclaration>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code_execution: Option<CodeExecution>,
+}
+
+#[derive(Serialize, Debug, Default)]
+pub struct CodeExecution { 
+    // No fields, as per API documentation for the basic CodeExecution tool.
 }
 
 #[derive(Serialize, Debug)]
@@ -104,6 +114,7 @@ mod tests {
             }],
             system_instruction: None,
             tools: None,
+            tool_config: None,
         };
 
         let json_string = serde_json::to_string(&request).expect("Serialization failed");
