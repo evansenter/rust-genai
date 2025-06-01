@@ -38,8 +38,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get API key from environment variable
     let api_key = env::var("GEMINI_API_KEY")?;
     
-    // Create the client
-    let client = Client::new(api_key);
+    // Create the client using the builder
+    let client = Client::builder(api_key).build();
     
     // Define model and prompt
     let model = "gemini-2.5-flash-preview-05-20";
@@ -69,7 +69,8 @@ use std::{env, io::{stdout, Write}};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = env::var("GEMINI_API_KEY")?;
-    let client = Client::new(api_key);
+    // Create the client using the builder
+    let client = Client::builder(api_key).build();
     
     let model = "gemini-2.5-flash-preview-05-20";
     let prompt = "Explain quantum computing in simple terms.";
@@ -111,7 +112,8 @@ use std::env;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = env::var("GEMINI_API_KEY")?;
-    let client = Client::new(api_key);
+    // Create the client using the builder
+    let client = Client::builder(api_key).build();
     
     let model = "gemini-2.5-flash-preview-05-20";
     let prompt = "What is the capital of France?";
@@ -133,14 +135,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Function Calling Example
 
 ```rust
-use rust_genai::{Client, FunctionDeclaration, FunctionCallingMode};
+use rust_genai::{Client, FunctionDeclaration};
 use serde_json::json;
 use std::env;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = env::var("GEMINI_API_KEY")?;
-    let client = Client::new(api_key);
+    // Create the client using the builder
+    let client = Client::builder(api_key).build();
     
     // Define a function that the model can call
     let weather_function = FunctionDeclaration {
@@ -181,11 +184,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if let Some(function_call) = response.function_call {
         println!("Function call: {} with args: {}", function_call.name, function_call.args);
+        // Next steps would typically involve: 
+        // 1. Executing this function with the provided arguments.
+        // 2. Sending the function's output back to the model in a new request
+        //    along with the conversation history.
     }
     
     Ok(())
 }
 ```
+
+For a more complete, multi-turn function calling example that shows how to execute the function and send its result back to the model, please see `examples/function_calling.rs` in the project repository.
 
 ## Project Structure
 
@@ -199,6 +208,7 @@ The project consists of two main components:
    - Contains the low-level implementation for API communication
    - Defines the JSON serialization/deserialization models
    - Handles the actual HTTP requests and response parsing
+   Users of the `rust-genai` crate typically do not need to interact with `genai-client` directly, as its functionalities are exposed through the main `rust-genai` API.
 
 ## Available Models
 
