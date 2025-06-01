@@ -7,7 +7,7 @@ pub use types::{CodeExecutionResult, FunctionCall, FunctionDeclaration, Generate
 
 pub mod content_api;
 pub use content_api::{
-    build_content_request, model_function_call, model_text, user_text, user_tool_response,
+    build_content_request, model_function_call, model_function_calls_request, model_text, user_text, user_tool_response,
 };
 
 pub mod client;

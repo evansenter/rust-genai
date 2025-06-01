@@ -1,5 +1,6 @@
 use rust_genai::CallableFunction;
 use rust_genai::Client;
+use rust_genai::{model_function_calls_request, user_text, user_tool_response};
 use rust_genai_macros::generate_function_declaration;
 use serde_json::json;
 use std::env;
@@ -40,29 +41,73 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let model_name = "gemini-2.5-flash-preview-05-20"; // Or your preferred model like "gemini-pro"
 
-    // Test Case 1: Simple question that might use one tool
-    println!("\n--- Test Case 1: Weather in London ---");
+    // Test Case 1: Manual function calling (demonstrating the traditional approach)
+    println!("\n--- Test Case 1: Weather in London (Manual Function Calling) ---");
     let prompt1 = "What is the weather like in London in Fahrenheit?";
-    match client
+    
+    // Get the function declaration from the macro-generated function
+    let weather_func_decl = get_weather_declaration();
+    
+    // Initial request with function available
+    let response1 = client
         .with_model(model_name)
-        .with_initial_user_text(prompt1)
-        .generate_with_auto_functions()
-        .await
-    {
-        Ok(response) => {
-            if let Some(text) = response.text {
-                println!("Final Model Response:\n{text}");
-            } else {
-                println!("Model did not provide a final text response.");
+        .with_prompt(prompt1)
+        .with_function(weather_func_decl)
+        .generate()
+        .await?;
+    
+    // Check if the model wants to call a function
+    if let Some(function_calls) = response1.function_calls {
+        println!("Model requested function calls:");
+        for call in &function_calls {
+            println!("  Function: {} with args: {}", call.name, call.args);
+            
+            // Manually execute the function based on its name
+            if call.name == "get_weather" {
+                // Extract arguments
+                let location = call.args.get("location")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                let unit = call.args.get("unit")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                
+                // Call the function
+                let result = get_weather(location.to_string(), unit);
+                println!("Function result: {}", result);
+                
+                // Build conversation history with the function result
+                let contents = vec![
+                    user_text(prompt1.to_string()),
+                    model_function_calls_request(function_calls.clone().into_iter()
+                        .map(|fc| genai_client::models::request::FunctionCall {
+                            name: fc.name,
+                            args: fc.args,
+                        })
+                        .collect()),
+                    user_tool_response(call.name.clone(), json!({ "result": result })),
+                ];
+                
+                // Send the function result back to the model
+                let final_response = client
+                    .with_model(model_name)
+                    .with_contents(contents)
+                    .with_function(get_weather_declaration())
+                    .generate()
+                    .await?;
+                
+                if let Some(text) = final_response.text {
+                    println!("Final Model Response:\n{text}");
+                }
             }
         }
-        Err(e) => {
-            eprintln!("Error in Test Case 1: {e}");
-        }
+    } else if let Some(text) = response1.text {
+        // Model responded directly without calling functions
+        println!("Model Response:\n{text}");
     }
 
-    // Test Case 2: Question that might use multiple tools or require model to synthesize info
-    println!("\n\n--- Test Case 2: Weather and Details for Tokyo ---");
+    // Test Case 2: Automatic function calling for multiple tools
+    println!("\n\n--- Test Case 2: Weather and Details for Tokyo (Automatic) ---");
     let prompt2 = "Tell me about Tokyo: What is the weather like there in Celsius, and also give me some details about the city. Finally, suggest what I should pack if I go there tomorrow.";
     match client
         .with_model(model_name)
@@ -89,8 +134,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // Test Case 3: System prompt influencing tool use and output
-    println!("\n\n--- Test Case 3: Weather in Paris with System Prompt ---");
+    // Test Case 3: Automatic function calling with system prompt
+    println!("\n\n--- Test Case 3: Weather in Paris with System Prompt (Automatic) ---");
     let prompt3 = "How is the weather in Paris (France)?";
     let system_prompt = "You are a laconic weather bot. Only state the weather using the available tool. No extra words.";
     match client
