@@ -6,10 +6,10 @@ use serde_json::json;
 use std::env;
 use std::error::Error;
 
-/// Function to get the weather in a given location
+/// Provides the current weather conditions for a specified city and state.
 #[generate_function_declaration(
-    location(description = "The city and state, e.g. San Francisco, CA"),
-    unit(description = "The temperature unit to use", enum_values = ["celsius", "fahrenheit"])
+    location(description = "The city and state, e.g., San Francisco, CA, or a major city name like London or Paris."),
+    unit(description = "The temperature unit to use. Required if specific unit is desired.", enum_values = ["celsius", "fahrenheit"])
 )]
 #[allow(clippy::needless_pass_by_value)]
 fn get_weather(location: String, unit: Option<String>) -> String {
@@ -18,8 +18,10 @@ fn get_weather(location: String, unit: Option<String>) -> String {
     format!("The weather in {location} is currently 22 degrees {unit_str} and mostly sunny.")
 }
 
-/// Function to get the details on a given city (with simulated delay)
-#[generate_function_declaration(city(description = "The city to get details for, e.g. Tokyo"))]
+/// Retrieves general information and notable highlights about a given city, not including weather.
+#[generate_function_declaration(
+    city(description = "The name of the city for which to get details, e.g., Tokyo, Paris.")
+)]
 async fn get_city_details(city: String) -> serde_json::Value {
     // Simulate some async work, e.g., a network call
     println!("(Simulating async fetch for city: {city}...)");
@@ -65,16 +67,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
             // Manually execute the function based on its name
             if call.name == "get_weather" {
                 // Extract arguments
-                let location = call.args.get("location")
+                let location_arg_str = call.args.get("location")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
-                let unit = call.args.get("unit")
+                let unit_arg_option_string = call.args.get("unit")
                     .and_then(|v| v.as_str())
                     .map(String::from);
                 
-                // Call the function
-                let result = get_weather(location.to_string(), unit);
-                println!("Function result: {}", result);
+                // Call the function (returns String)
+                let weather_report_string = get_weather(location_arg_str.to_string(), unit_arg_option_string);
+                println!("Function result: {}", weather_report_string);
                 
                 // Build conversation history with the function result
                 let contents = vec![
@@ -85,7 +87,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             args: fc.args,
                         })
                         .collect()),
-                    user_tool_response(call.name.clone(), json!({ "result": result })),
+                    user_tool_response(call.name.clone(), json!(weather_report_string)),
                 ];
                 
                 // Send the function result back to the model

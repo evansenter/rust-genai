@@ -54,6 +54,88 @@ fn test_user_tool_response() {
 }
 
 #[test]
+fn test_user_tool_response_with_string() {
+    // Test with a primitive string value
+    let response_data = json!("The weather is sunny and 72°F");
+    
+    let content = user_tool_response("get_weather".to_string(), response_data.clone());
+    
+    // Verify the response is wrapped in an object
+    let function_response = &content.parts[0].function_response;
+    assert!(function_response.is_some());
+    let fr = function_response.as_ref().unwrap();
+    assert_eq!(fr.name, "get_weather");
+    
+    // Should be wrapped in { "result": ... }
+    let expected = json!({ "result": "The weather is sunny and 72°F" });
+    assert_eq!(fr.response, expected);
+}
+
+#[test]
+fn test_user_tool_response_with_number() {
+    // Test with a primitive number value
+    let response_data = json!(42);
+    
+    let content = user_tool_response("calculate".to_string(), response_data.clone());
+    
+    let function_response = &content.parts[0].function_response;
+    assert!(function_response.is_some());
+    let fr = function_response.as_ref().unwrap();
+    
+    // Should be wrapped in { "result": ... }
+    let expected = json!({ "result": 42 });
+    assert_eq!(fr.response, expected);
+}
+
+#[test]
+fn test_user_tool_response_with_bool() {
+    // Test with a primitive boolean value
+    let response_data = json!(true);
+    
+    let content = user_tool_response("check_status".to_string(), response_data.clone());
+    
+    let function_response = &content.parts[0].function_response;
+    assert!(function_response.is_some());
+    let fr = function_response.as_ref().unwrap();
+    
+    // Should be wrapped in { "result": ... }
+    let expected = json!({ "result": true });
+    assert_eq!(fr.response, expected);
+}
+
+#[test]
+fn test_user_tool_response_with_array() {
+    // Test with an array value
+    let response_data = json!(["item1", "item2", "item3"]);
+    
+    let content = user_tool_response("list_items".to_string(), response_data.clone());
+    
+    let function_response = &content.parts[0].function_response;
+    assert!(function_response.is_some());
+    let fr = function_response.as_ref().unwrap();
+    
+    // Arrays should also be wrapped in { "result": ... }
+    let expected = json!({ "result": ["item1", "item2", "item3"] });
+    assert_eq!(fr.response, expected);
+}
+
+#[test]
+fn test_user_tool_response_with_null() {
+    // Test with null value
+    let response_data = json!(null);
+    
+    let content = user_tool_response("check_null".to_string(), response_data.clone());
+    
+    let function_response = &content.parts[0].function_response;
+    assert!(function_response.is_some());
+    let fr = function_response.as_ref().unwrap();
+    
+    // null should be wrapped in { "result": ... }
+    let expected = json!({ "result": null });
+    assert_eq!(fr.response, expected);
+}
+
+#[test]
 fn test_build_content_request_simple() {
     let conversation = vec![user_text("What's the weather?".to_string())];
 

@@ -412,11 +412,20 @@ fn generate_declaration_function(
             async fn call(&self, args: ::serde_json::Value) -> Result<::serde_json::Value, ::rust_genai::function_calling::FunctionError> {
                 #(#arg_extraction_tokens)*
 
-                let result = #fn_call_expr;
+                let original_fn_result = #fn_call_expr;
 
-                ::serde_json::to_value(result).map_err(|e|
-                    ::rust_genai::function_calling::FunctionError::ExecutionError(Box::new(e))
-                )
+                match ::serde_json::to_value(original_fn_result) {
+                    Ok(value_from_fn_result) => {
+                        // If the value is already a JSON object, return it as is.
+                        // Otherwise, wrap it in a {"result": ...} object.
+                        if value_from_fn_result.is_object() {
+                            Ok(value_from_fn_result)
+                        } else {
+                            Ok(::serde_json::json!({ "result": value_from_fn_result }))
+                        }
+                    }
+                    Err(e) => Err(::rust_genai::function_calling::FunctionError::ExecutionError(Box::new(e)))
+                }
             }
         }
 

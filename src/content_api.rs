@@ -63,13 +63,18 @@ pub fn model_function_calls_request(calls: Vec<FunctionCall>) -> Content {
 /// Creates a user content block representing the response from a function/tool execution.
 #[must_use]
 pub fn user_tool_response(name: String, response_data: Value) -> Content {
+    let api_compliant_response_data = if response_data.is_object() {
+        response_data
+    } else {
+        serde_json::json!({ "result": response_data })
+    };
     Content {
         parts: vec![Part {
             text: None,
             function_call: None,
             function_response: Some(FunctionResponse {
                 name,
-                response: response_data,
+                response: api_compliant_response_data,
             }),
         }],
         role: Some("user".to_string()),
