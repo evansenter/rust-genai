@@ -82,7 +82,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let contents = vec![
                     user_text(prompt1.to_string()),
                     model_function_calls_request(function_calls.clone().into_iter()
-                        .map(|fc| genai_client::models::request::FunctionCall {
+                        .map(|fc| genai_client::FunctionCall {
                             name: fc.name,
                             args: fc.args,
                         })
