@@ -141,7 +141,7 @@ pub async fn delete_interaction(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::interactions::{InteractionInput, InteractionStatus};
+    use crate::models::interactions::{InteractionContent, InteractionInput, InteractionStatus};
 
     #[test]
     fn test_endpoint_url_construction() {
@@ -189,8 +189,8 @@ mod tests {
         let response_json = r#"{
             "id": "test_interaction_123",
             "model": "gemini-3-flash-preview",
-            "input": [{"parts": [{"text": "Hello"}], "role": "user"}],
-            "outputs": [{"parts": [{"text": "Hi there!"}], "role": "model"}],
+            "input": [{"type": "text", "text": "Hello"}],
+            "outputs": [{"type": "text", "text": "Hi there!"}],
             "status": "completed"
         }"#;
 
@@ -200,5 +200,13 @@ mod tests {
         assert_eq!(response.id, "test_interaction_123");
         assert_eq!(response.status, InteractionStatus::Completed);
         assert_eq!(response.outputs.len(), 1);
+
+        // Verify we can access the text content
+        match &response.outputs[0] {
+            InteractionContent::Text { text } => {
+                assert_eq!(text.as_ref().unwrap(), "Hi there!")
+            }
+            _ => panic!("Expected Text content"),
+        }
     }
 }

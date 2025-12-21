@@ -51,12 +51,11 @@ async fn test_create_simple_interaction() {
     assert!(!response.outputs.is_empty(), "Outputs are empty");
 
     // Verify output contains expected answer
-    let has_four = response.outputs.iter().any(|output| {
-        output.parts.iter().any(|part| {
-            part.text
-                .as_ref()
-                .map_or(false, |text| text.contains('4'))
-        })
+    let has_four = response.outputs.iter().any(|output| match output {
+        rust_genai::InteractionContent::Text { text } => {
+            text.as_ref().map_or(false, |t| t.contains('4'))
+        }
+        _ => false,
     });
 
     assert!(has_four, "Response does not contain expected answer '4'");
@@ -128,12 +127,12 @@ async fn test_stateful_interaction_with_previous_id() {
     );
 
     // Verify the model remembers the color
-    let mentions_blue = second_response.outputs.iter().any(|output| {
-        output.parts.iter().any(|part| {
-            part.text
-                .as_ref()
-                .map_or(false, |text| text.to_lowercase().contains("blue"))
-        })
+    let mentions_blue = second_response.outputs.iter().any(|output| match output {
+        rust_genai::InteractionContent::Text { text } => {
+            text.as_ref()
+                .map_or(false, |t| t.to_lowercase().contains("blue"))
+        }
+        _ => false,
     });
 
     assert!(

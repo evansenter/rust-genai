@@ -7,8 +7,8 @@ pub use types::{CodeExecutionResult, FunctionCall, FunctionDeclaration, Generate
 
 // Re-export Interactions API types for convenient access
 pub use genai_client::{
-    CreateInteractionRequest, GenerationConfig, InteractionInput, InteractionResponse,
-    InteractionStatus, UsageMetadata,
+    CreateInteractionRequest, GenerationConfig, InteractionContent, InteractionInput,
+    InteractionResponse, InteractionStatus, UsageMetadata,
 };
 
 pub mod content_api;

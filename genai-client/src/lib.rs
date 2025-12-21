@@ -32,6 +32,7 @@ pub use models::response::PartResponse;
 // Interactions API types
 pub use models::interactions::CreateInteractionRequest;
 pub use models::interactions::GenerationConfig;
+pub use models::interactions::InteractionContent;
 pub use models::interactions::InteractionInput;
 pub use models::interactions::InteractionResponse;
 pub use models::interactions::InteractionStatus;
