@@ -41,7 +41,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
     let client = Client::builder(api_key).debug().build();
 
-    let model_name = "gemini-2.5-flash-preview-05-20"; // Or your preferred model like "gemini-pro"
+    let model_name = "gemini-3-flash-preview"; // Or your preferred model like "gemini-pro"
 
     // Test Case 1: Manual function calling (demonstrating the traditional approach)
     println!("\n--- Test Case 1: Weather in London (Manual Function Calling) ---");

@@ -5,7 +5,7 @@ use std::env;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not set");
     let client = Client::builder(api_key).debug().build();
-    let model_name = "gemini-2.5-flash-preview-05-20";
+    let model_name = "gemini-3-flash-preview";
     let prompt_text = "What is 7 + 5? Use code execution if you want.";
 
     println!("Sending request to model: {model_name}");

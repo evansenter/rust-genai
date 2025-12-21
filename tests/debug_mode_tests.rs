@@ -18,7 +18,7 @@ async fn test_debug_mode_output() {
 
     // Make a simple request
     let result = client
-        .with_model("gemini-2.5-flash-preview-05-20")
+        .with_model("gemini-3-flash-preview")
         .with_prompt("Say hello")
         .generate()
         .await;
@@ -48,7 +48,7 @@ async fn test_debug_mode_streaming() {
 
     // Make a streaming request
     let stream_result = client
-        .with_model("gemini-2.5-flash-preview-05-20")
+        .with_model("gemini-3-flash-preview")
         .with_prompt("Count to 3")
         .generate_stream();
 

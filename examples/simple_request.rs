@@ -11,7 +11,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let client = Client::builder(api_key).debug().build();
 
     // 2. Define model and prompt
-    let model_name = "gemini-2.5-flash-preview-05-20"; // Specify the model directly
+    let model_name = "gemini-3-flash-preview"; // Specify the model directly
     let prompt = "Write a short poem about a rusty robot.";
 
     println!("Sending request to model: {model_name}");

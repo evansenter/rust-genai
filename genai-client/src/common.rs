@@ -141,7 +141,7 @@ mod tests {
         let models = vec![
             "gemini-pro",
             "gemini-1.5-flash",
-            "gemini-2.5-flash-preview-05-20",
+            "gemini-3-flash-preview",
             "test-model-123",
         ];
 
