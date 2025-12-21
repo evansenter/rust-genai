@@ -1,7 +1,8 @@
-// Declare the models, errors, common, and core modules
+// Declare the models, errors, common, core, and interactions modules
 pub mod common;
 pub mod core;
 pub mod errors;
+pub mod interactions;
 pub mod models;
 
 // Import and selectively re-export the necessary structs from the models module
@@ -48,3 +49,9 @@ pub use common::construct_endpoint_url;
 // Re-export internal helper functions from the core module
 pub use core::generate_content_internal;
 pub use core::generate_content_stream_internal;
+
+// Re-export Interactions API functions from the interactions module
+pub use interactions::create_interaction;
+pub use interactions::create_interaction_stream;
+pub use interactions::delete_interaction;
+pub use interactions::get_interaction;
