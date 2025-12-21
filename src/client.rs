@@ -29,7 +29,7 @@ pub struct ClientBuilder {
 
 impl ClientBuilder {
     /// Sets the API version for the client.
-    /// If not called, defaults to `ApiVersion::V1Alpha`.
+    /// If not called, defaults to `ApiVersion::V1Beta`.
     #[must_use]
     pub const fn api_version(mut self, version: ApiVersion) -> Self {
         self.api_version = Some(version);
@@ -50,7 +50,7 @@ impl ClientBuilder {
         Client {
             api_key: self.api_key,
             http_client: ReqwestClient::new(),
-            api_version: self.api_version.unwrap_or(ApiVersion::V1Alpha),
+            api_version: self.api_version.unwrap_or(ApiVersion::V1Beta),
             debug: self.debug,
         }
     }
@@ -77,13 +77,13 @@ impl Client {
     /// # Arguments
     ///
     /// * `api_key` - Your Google AI API key.
-    /// * `api_version` - Optional API version to use. Defaults to `V1Alpha`.
+    /// * `api_version` - Optional API version to use. Defaults to `V1Beta`.
     #[must_use]
     pub fn new(api_key: String, api_version: Option<ApiVersion>) -> Self {
         Self {
             api_key,
             http_client: ReqwestClient::new(),
-            api_version: api_version.unwrap_or(ApiVersion::V1Alpha),
+            api_version: api_version.unwrap_or(ApiVersion::V1Beta),
             debug: false,
         }
     }
