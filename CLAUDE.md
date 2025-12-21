@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`rust-genai` is a Rust client library for Google's Generative AI (Gemini) API. The project is structured as a Cargo workspace with three crates:
+`rust-genai` is a Rust client library for Google's Generative AI (Gemini) API. The project supports both the **GenerateContent API** (legacy) and the **Interactions API** (unified interface for models and agents).
+
+The project is structured as a Cargo workspace with three crates:
 
 - **`rust-genai`** (root): Public API crate that provides the user-facing interface
 - **`genai-client/`**: Internal low-level client that handles HTTP communication, JSON serialization/deserialization, and raw API interactions
@@ -43,11 +45,15 @@ cargo test -- --nocapture
 All examples require the `GEMINI_API_KEY` environment variable:
 
 ```bash
-# Run examples
+# GenerateContent API examples
 cargo run --example simple_request
 cargo run --example stream_request
 cargo run --example function_call
 cargo run --example code_execution
+
+# Interactions API examples
+cargo run --example simple_interaction
+cargo run --example stateful_interaction
 ```
 
 ### Linting and Formatting
@@ -84,9 +90,13 @@ The codebase follows a layered architecture where each layer has distinct respon
 
 3. **HTTP Client Layer** (`genai-client/`):
    - Raw HTTP requests to Google's Generative AI API
-   - JSON models for request/response serialization (models/request.rs, models/response.rs)
+   - JSON models for request/response serialization:
+     - `models/request.rs` & `models/response.rs`: GenerateContent API
+     - `models/interactions.rs`: Interactions API (flat content structure with type tags)
+     - `models/shared.rs`: Shared types used by both APIs
    - Error handling for network and API errors
    - SSE (Server-Sent Events) streaming support
+   - Endpoint abstraction in `common.rs` for flexible URL construction
 
 4. **Macro Layer** (`rust-genai-macros/`):
    - Procedural macro `#[generate_function_declaration]` for automatic function discovery
@@ -135,6 +145,31 @@ The `content_api` module (`src/content_api.rs`) provides builder functions for c
 
 These are essential for implementing multi-turn conversations with function calling.
 
+### Interactions API Implementation
+
+The Interactions API provides a unified interface for both models and agents. Key implementation details:
+
+**Client Methods** (`src/client.rs`):
+- `create_interaction()`: Non-streaming interaction creation
+- `create_interaction_stream()`: Streaming with SSE for real-time updates
+- `get_interaction()`: Retrieve interaction by ID
+- `delete_interaction()`: Remove interaction from server
+
+**Core Functions** (`genai-client/src/interactions.rs`):
+- HTTP client functions that handle the underlying API requests
+- Use the `Endpoint` abstraction for URL construction
+- Support for stateful conversations via `previous_interaction_id`
+
+**Content Structure** (`genai-client/src/models/interactions.rs`):
+- Uses flat `InteractionContent` enum with type-tagged variants (Text, Thought, Image, Audio, Video, FunctionCall, FunctionResponse)
+- Different from GenerateContent API which uses nested `Content` with `parts` arrays
+- Fields are often optional as API doesn't always return all data
+
+**Stateful Conversations**:
+- Pass `previous_interaction_id` to reference earlier interactions
+- Server maintains conversation context automatically
+- Enables implicit caching for improved performance and reduced costs
+
 ### Workspace Member Relationships
 
 - The root crate (`rust-genai`) depends on both `genai-client` and `rust-genai-macros`
@@ -147,7 +182,8 @@ These are essential for implementing multi-turn conversations with function call
 Tests are organized into two categories:
 - **Unit tests**: Inline with source code (e.g., `src/lib.rs:55-134`)
 - **Integration tests**: In `tests/` directory, each file tests a specific feature:
-  - `integration_tests.rs`: Full API workflow tests (requires API key)
+  - `integration_tests.rs`: GenerateContent API workflow tests (requires API key)
+  - `interactions_tests.rs`: Interactions API tests (requires API key)
   - `macro_tests.rs`: Procedural macro functionality
   - `function_calling_tests.rs`: Function execution system
   - `content_api_tests.rs`: Conversation helper functions
