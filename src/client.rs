@@ -253,4 +253,163 @@ impl Client {
         };
         stream_val.boxed()
     }
+
+    // --- Interactions API methods ---
+
+    /// Creates a new interaction using the Gemini Interactions API.
+    ///
+    /// The Interactions API provides a unified interface for working with models and agents,
+    /// with built-in support for stateful conversations, function calling, and long-running tasks.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The interaction request with model/agent, input, and optional configuration.
+    ///
+    /// # Errors
+    /// Returns an error if the HTTP request fails, response parsing fails, or the API returns an error.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, ApiVersion};
+    /// use genai_client::{CreateInteractionRequest, InteractionInput};
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("your-api-key".to_string(), Some(ApiVersion::V1Beta));
+    ///
+    /// let request = CreateInteractionRequest {
+    ///     model: Some("gemini-3-flash-preview".to_string()),
+    ///     agent: None,
+    ///     input: InteractionInput::Text("Hello, world!".to_string()),
+    ///     previous_interaction_id: None,
+    ///     tools: None,
+    ///     response_modalities: None,
+    ///     response_format: None,
+    ///     generation_config: None,
+    ///     stream: None,
+    ///     background: None,
+    ///     store: None,
+    ///     system_instruction: None,
+    /// };
+    ///
+    /// let response = client.create_interaction(request).await?;
+    /// println!("Interaction ID: {}", response.id);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn create_interaction(
+        &self,
+        request: genai_client::CreateInteractionRequest,
+    ) -> Result<genai_client::InteractionResponse, GenaiError> {
+        if self.debug {
+            println!("[DEBUG] Creating interaction");
+            match serde_json::to_string_pretty(&request) {
+                Ok(json) => println!("[DEBUG] Request Body (JSON):\n{json}"),
+                Err(_) => println!("[DEBUG] Request Body: {request:#?}"),
+            }
+        }
+
+        let response = genai_client::create_interaction(&self.http_client, &self.api_key, request).await?;
+
+        if self.debug {
+            println!("[DEBUG] Interaction created: ID={}", response.id);
+        }
+
+        Ok(response)
+    }
+
+    /// Creates a new interaction with streaming responses.
+    ///
+    /// Returns a stream of `InteractionResponse` updates as they arrive from the server.
+    /// Useful for long-running interactions or agents where you want incremental updates.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The interaction request with streaming enabled.
+    ///
+    /// # Returns
+    /// A boxed stream that yields `InteractionResponse` items.
+    pub fn create_interaction_stream(
+        &self,
+        request: genai_client::CreateInteractionRequest,
+    ) -> futures_util::stream::BoxStream<'_, Result<genai_client::InteractionResponse, GenaiError>> {
+        use futures_util::StreamExt;
+
+        let debug = self.debug;
+
+        if debug {
+            println!("[DEBUG] Creating streaming interaction");
+            match serde_json::to_string_pretty(&request) {
+                Ok(json) => println!("[DEBUG] Request Body (JSON):\n{json}"),
+                Err(_) => println!("[DEBUG] Request Body: {request:#?}"),
+            }
+        }
+
+        let stream = genai_client::create_interaction_stream(&self.http_client, &self.api_key, request);
+
+        stream
+            .map(move |result| {
+                result.map(|response| {
+                    if debug {
+                        println!("[DEBUG] Received interaction update: status={:?}", response.status);
+                    }
+                    response
+                })
+                .map_err(GenaiError::from)
+            })
+            .boxed()
+    }
+
+    /// Retrieves an existing interaction by its ID.
+    ///
+    /// Useful for checking the status of long-running interactions or agents,
+    /// or for retrieving the full conversation history.
+    ///
+    /// # Arguments
+    ///
+    /// * `interaction_id` - The unique identifier of the interaction to retrieve.
+    ///
+    /// # Errors
+    /// Returns an error if the HTTP request fails, response parsing fails, or the API returns an error.
+    pub async fn get_interaction(
+        &self,
+        interaction_id: &str,
+    ) -> Result<genai_client::InteractionResponse, GenaiError> {
+        if self.debug {
+            println!("[DEBUG] Getting interaction: ID={interaction_id}");
+        }
+
+        let response = genai_client::get_interaction(&self.http_client, &self.api_key, interaction_id).await?;
+
+        if self.debug {
+            println!("[DEBUG] Retrieved interaction: status={:?}", response.status);
+        }
+
+        Ok(response)
+    }
+
+    /// Deletes an interaction by its ID.
+    ///
+    /// Removes the interaction from the server, freeing up storage and making it
+    /// unavailable for future reference via `previous_interaction_id`.
+    ///
+    /// # Arguments
+    ///
+    /// * `interaction_id` - The unique identifier of the interaction to delete.
+    ///
+    /// # Errors
+    /// Returns an error if the HTTP request fails or the API returns an error.
+    pub async fn delete_interaction(&self, interaction_id: &str) -> Result<(), GenaiError> {
+        if self.debug {
+            println!("[DEBUG] Deleting interaction: ID={interaction_id}");
+        }
+
+        genai_client::delete_interaction(&self.http_client, &self.api_key, interaction_id).await?;
+
+        if self.debug {
+            println!("[DEBUG] Interaction deleted successfully");
+        }
+
+        Ok(())
+    }
 }

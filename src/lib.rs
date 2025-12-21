@@ -5,6 +5,12 @@ pub use genai_client::ApiVersion;
 pub mod types;
 pub use types::{CodeExecutionResult, FunctionCall, FunctionDeclaration, GenerateContentResponse};
 
+// Re-export Interactions API types for convenient access
+pub use genai_client::{
+    CreateInteractionRequest, GenerationConfig, InteractionInput, InteractionResponse,
+    InteractionStatus, UsageMetadata,
+};
+
 pub mod content_api;
 pub use content_api::{
     build_content_request, model_function_call, model_function_calls_request, model_text, user_text, user_tool_response,
