@@ -31,9 +31,11 @@ pub use models::response::PartResponse;
 // Re-export InternalError from the errors module
 pub use errors::InternalError;
 
-// Re-export ApiVersion and construct_url from the common module
+// Re-export ApiVersion, Endpoint, and URL construction functions from the common module
 pub use common::ApiVersion;
 pub use common::construct_url;
+pub use common::Endpoint;
+pub use common::construct_endpoint_url;
 
 // Re-export internal helper functions from the core module
 pub use core::generate_content_internal;

@@ -20,7 +20,7 @@ pub struct GenerateContentRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::shared::{FunctionDeclaration, FunctionParameters};
+    use super::super::shared::{Content, FunctionDeclaration, FunctionParameters, Part};
     use serde_json;
 
     #[test]
