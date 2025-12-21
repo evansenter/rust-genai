@@ -27,7 +27,7 @@ pub struct PartResponse {
     #[serde(rename = "functionCall", skip_serializing_if = "Option::is_none")]
     pub function_call: Option<FunctionCallResponse>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_response: Option<super::request::FunctionResponse>,
+    pub function_response: Option<super::shared::FunctionResponse>,
     #[serde(rename = "executableCode", skip_serializing_if = "Option::is_none")]
     pub executable_code: Option<ExecutableCodeResponse>,
     #[serde(

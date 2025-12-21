@@ -1,7 +1,8 @@
 use crate::common::{ApiVersion, construct_url};
 use crate::errors::InternalError;
-use crate::models::request::{Content, GenerateContentRequest, Part};
+use crate::models::request::GenerateContentRequest;
 use crate::models::response::GenerateContentResponse;
+use crate::models::shared::{Content, Part};
 use async_stream::try_stream;
 use bytes::Bytes;
 use futures_util::{Stream, StreamExt};

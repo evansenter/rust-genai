@@ -5,17 +5,22 @@ pub mod errors;
 pub mod models;
 
 // Import and selectively re-export the necessary structs from the models module
-pub use models::request::Content;
-pub use models::request::FunctionCall;
-pub use models::request::FunctionCallingConfig;
-pub use models::request::FunctionCallingMode;
-pub use models::request::FunctionDeclaration;
-pub use models::request::FunctionParameters;
-pub use models::request::FunctionResponse;
+
+// Shared types (used by multiple APIs)
+pub use models::shared::CodeExecution;
+pub use models::shared::Content;
+pub use models::shared::FunctionCall;
+pub use models::shared::FunctionCallingConfig;
+pub use models::shared::FunctionCallingMode;
+pub use models::shared::FunctionDeclaration;
+pub use models::shared::FunctionParameters;
+pub use models::shared::FunctionResponse;
+pub use models::shared::Part;
+pub use models::shared::Tool;
+pub use models::shared::ToolConfig;
+
+// generateContent-specific types
 pub use models::request::GenerateContentRequest;
-pub use models::request::Part;
-pub use models::request::Tool;
-pub use models::request::ToolConfig;
 
 pub use models::response::Candidate;
 pub use models::response::ContentResponse;

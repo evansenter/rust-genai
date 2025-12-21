@@ -8,11 +8,13 @@ use crate::types::{
 
 use futures_util::StreamExt;
 use genai_client::{
-    self, models::request::Content as InternalContent,
-    models::request::FunctionCall as InternalFunctionCall,
+    self,
     models::request::GenerateContentRequest as InternalGenerateContentRequest,
-    models::request::Part as InternalPart, models::request::Tool as InternalTool,
-    models::request::ToolConfig as InternalToolConfig,
+    Content as InternalContent,
+    FunctionCall as InternalFunctionCall,
+    Part as InternalPart,
+    Tool as InternalTool,
+    ToolConfig as InternalToolConfig,
 };
 use serde_json::{Value, json};
 
@@ -72,14 +74,14 @@ impl<'a> GenerateContentBuilder<'a> {
             .unwrap_or("object")
             .to_string();
 
-        let internal_function_parameters = genai_client::models::request::FunctionParameters {
+        let internal_function_parameters = genai_client::FunctionParameters {
             type_: schema_type,
             properties: schema_properties,
             required: function.required,
         };
 
         InternalTool {
-            function_declarations: Some(vec![genai_client::models::request::FunctionDeclaration {
+            function_declarations: Some(vec![genai_client::FunctionDeclaration {
                 name: function.name,
                 description: function.description,
                 parameters: internal_function_parameters,
@@ -134,7 +136,7 @@ impl<'a> GenerateContentBuilder<'a> {
     pub fn with_code_execution(mut self) -> Self {
         self.tools.get_or_insert_with(Vec::new).push(InternalTool {
             function_declarations: None,
-            code_execution: Some(genai_client::models::request::CodeExecution::default()),
+            code_execution: Some(genai_client::CodeExecution::default()),
         });
         self
     }
