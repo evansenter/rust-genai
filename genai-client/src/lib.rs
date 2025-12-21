@@ -28,6 +28,14 @@ pub use models::response::FunctionCallResponse;
 pub use models::response::GenerateContentResponse;
 pub use models::response::PartResponse;
 
+// Interactions API types
+pub use models::interactions::CreateInteractionRequest;
+pub use models::interactions::GenerationConfig;
+pub use models::interactions::InteractionInput;
+pub use models::interactions::InteractionResponse;
+pub use models::interactions::InteractionStatus;
+pub use models::interactions::UsageMetadata;
+
 // Re-export InternalError from the errors module
 pub use errors::InternalError;
 
