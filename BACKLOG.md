@@ -2,6 +2,18 @@
 
 This document tracks future improvements, refactoring opportunities, and feature ideas for rust-genai.
 
+## Market Context (2025)
+
+The agentic AI landscape is rapidly evolving:
+
+- **Market Growth**: The AI agent market reached $3.7B in 2023 and is expected to double by end of 2025, with ~85% of businesses adopting agents ([sources](https://www.shakudo.io/blog/top-9-ai-agent-frameworks))
+- **Industry Shift**: Moving from experimental prototypes to production-ready infrastructure for autonomous, multimodal systems ([IBM](https://www.ibm.com/think/insights/ai-agents-2025-expectations-vs-reality))
+- **Open Standards**: Model Context Protocol (MCP) emerging as the dominant standard, with support from Anthropic, OpenAI, Microsoft, Google, AWS, Bloomberg ([Anthropic](https://www.anthropic.com/news/donating-the-model-context-protocol-and-establishing-of-the-agentic-ai-foundation))
+- **Technology Stack**: Python + LangChain + OpenAI dominate (73.6%), but Rust adoption growing due to performance/scalability needs ([Red Hat](https://developers.redhat.com/articles/2025/09/15/why-some-agentic-ai-developers-are-moving-code-python-rust))
+- **Pattern Convergence**: ReAct (Reasoning + Acting) and multi-agent orchestration becoming standard patterns ([Google Cloud](https://cloud.google.com/architecture/choose-design-pattern-agentic-ai-system))
+
+**Opportunity**: Rust-genai is well-positioned to become the leading Rust library for production agentic AI, especially as systems scale beyond Python's GIL limitations.
+
 ## High Priority
 
 ### Interactions API Builder Pattern
@@ -104,6 +116,158 @@ let response = handle_api_error(response).await?;
 - `genai-client/src/core.rs`
 - `genai-client/src/interactions.rs`
 - `src/client.rs` (create_interaction, get_interaction, delete_interaction)
+
+---
+
+## Strategic Initiatives (2025+)
+
+These items represent major industry trends and standards that could position rust-genai as a leading Rust library for agentic AI development.
+
+### Model Context Protocol (MCP) Support
+**Impact:** Very High | **Effort:** ~2-3 weeks | **Type:** Feature | **Priority:** High
+
+Implement support for [Model Context Protocol](https://modelcontextprotocol.io/specification/2025-11-25), the open standard for LLM-tool integration donated by Anthropic to the [Agentic AI Foundation](https://www.anthropic.com/news/donating-the-model-context-protocol-and-establishing-of-the-agentic-ai-foundation) (co-founded with OpenAI, with support from Google, Microsoft, AWS, Cloudflare, Bloomberg).
+
+**Why This Matters:**
+- MCP is being adopted across the industry (OpenAI, Microsoft, Google, AWS)
+- It's the "LSP for LLMs" - standardized tool/data integration
+- Would make rust-genai interoperable with the entire MCP ecosystem
+- Users could plug in any MCP server (databases, APIs, filesystems) transparently
+
+**What It Enables:**
+```rust
+// Connect to MCP servers
+let mcp_client = client.mcp()
+    .add_server("filesystem", "npx @modelcontextprotocol/server-filesystem")
+    .add_server("github", "mcp-server-github")
+    .build();
+
+// Use MCP tools in interactions
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_mcp_tools(&mcp_client)
+    .with_input("List files in /tmp and create a GitHub issue")
+    .create()
+    .await?;
+```
+
+**Technical Requirements:**
+- JSON-RPC 2.0 client implementation
+- stdio and HTTP+SSE transport support
+- Tool discovery and schema validation
+- Asynchronous operation handling (per 2025-11-25 spec)
+- Server identity management
+
+**References:**
+- [MCP Specification](https://modelcontextprotocol.io/specification/2025-11-25)
+- [MCP GitHub](https://github.com/modelcontextprotocol)
+- [Building AI Agents with MCP in Rust](https://composio.dev/blog/how-to-build-your-first-ai-agent-with-mcp-in-rust)
+
+---
+
+### ReAct Pattern Implementation
+**Impact:** High | **Effort:** ~1-2 weeks | **Type:** Feature
+
+Implement the [ReAct (Reasoning + Acting) pattern](https://www.dailydoseofds.com/ai-agents-crash-course-part-10-with-implementation/), the dominant agentic AI pattern in 2025. This enables agents to alternate between reasoning and taking actions based on observations.
+
+**Current State:** Tool calling exists, but no structured reasoning loop
+
+**Proposed API:**
+```rust
+let agent = client.react_agent()
+    .with_model("gemini-3-flash-preview")
+    .with_tools(vec![weather_tool, calculator_tool])
+    .with_max_iterations(10)
+    .build();
+
+// Agent will loop: think → act → observe → think → act...
+let result = agent.run("What's the weather in Tokyo and what's 25°C in Fahrenheit?").await?;
+
+// Access the reasoning trace
+for step in result.trace {
+    match step {
+        ReActStep::Thought(text) => println!("💭 {text}"),
+        ReActStep::Action(call) => println!("🔧 {call.name}({call.args:?})"),
+        ReActStep::Observation(output) => println!("👁 {output}"),
+    }
+}
+```
+
+**Components:**
+- Thought/Action/Observation loop (~150 lines)
+- Prompt engineering for ReAct format (~50 lines)
+- Trace/history management (~100 lines)
+- Exit condition detection (~50 lines)
+
+**References:**
+- [Google Cloud: Choose a design pattern for agentic AI](https://cloud.google.com/architecture/choose-design-pattern-agentic-ai-system)
+- [ReAct Pattern Implementation Guide](https://www.dailydoseofds.com/ai-agents-crash-course-part-10-with-implementation/)
+
+---
+
+### Multi-Agent Orchestration
+**Impact:** High | **Effort:** ~3-4 weeks | **Type:** Feature
+
+Implement [multi-agent orchestration patterns](https://research.aimultiple.com/agentic-orchestration/) that mirror enterprise teams - multiple specialized agents coordinated by an orchestrator.
+
+**Patterns to Support:**
+1. **Sequential**: Agent A → Agent B → Agent C
+2. **Concurrent**: Parallel agent execution with result aggregation
+3. **Dynamic Handoff**: Agents decide who handles next step
+4. **Hierarchical**: Manager agent delegates to specialist agents
+
+**Proposed API:**
+```rust
+// Define specialized agents
+let researcher = Agent::new("researcher", research_tools);
+let writer = Agent::new("writer", writing_tools);
+let reviewer = Agent::new("reviewer", review_tools);
+
+// Sequential orchestration
+let pipeline = Orchestrator::sequential()
+    .add(researcher)
+    .add(writer)
+    .add(reviewer)
+    .build();
+
+// Or hierarchical with manager
+let team = Orchestrator::hierarchical()
+    .manager(manager_agent)
+    .workers(vec![researcher, writer, reviewer])
+    .build();
+
+let result = team.execute("Research and write a blog post about Rust async").await?;
+```
+
+**Challenges:**
+- State sharing between agents
+- Partial failure handling
+- Cost tracking across agent calls
+- Trace/observability for debugging
+
+**References:**
+- [Azure: Agent Factory Design Patterns](https://azure.microsoft.com/en-us/blog/agent-factory-the-new-era-of-agentic-ai-common-use-cases-and-design-patterns/)
+- [Top Agentic Orchestration Frameworks](https://research.aimultiple.com/agentic-orchestration/)
+
+---
+
+### Study Rust Agent Frameworks
+**Impact:** Medium | **Effort:** ~1 week research | **Type:** Research
+
+Evaluate existing Rust agentic frameworks to identify best practices and potential collaboration opportunities.
+
+**Frameworks to Study:**
+- **[Kowalski](https://dev.to/yarenty/kowalski-the-rust-native-agentic-ai-framework-53k4)** - Multi-agent orchestration, federation support
+- **[AutoAgents](https://github.com/liquidos-ai/AutoAgents)** - WASM compilation, edge deployment
+- **[Rig](https://rig.rs/)** - Modular LLM applications
+- **[AgentAI](https://docs.rs/agentai)** - Simplified agent creation
+- **[Anda](https://github.com/ldclabs/anda)** - ICP blockchain + TEE support
+
+**Goals:**
+- Identify common abstractions we should adopt
+- Learn from their API designs
+- Discover integration opportunities
+- Understand why developers are [moving from Python to Rust](https://developers.redhat.com/articles/2025/09/15/why-some-agentic-ai-developers-are-moving-code-python-rust) for agentic AI
 
 ---
 
