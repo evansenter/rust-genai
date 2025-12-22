@@ -27,7 +27,7 @@ All crates use **Rust Edition 2024**.
 | `futures-util` | 0.3.31 | ✅ Current |
 | `log` | 0.4.29 | ✅ Current |
 | `inventory` | 0.3.21 | ✅ Current |
-| `bytes` | 1.10.1 | ✅ Current |
+| `bytes` | 1.11.0 | ✅ Current |
 
 ### Dependencies Analysis
 
