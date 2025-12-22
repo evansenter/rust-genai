@@ -19,9 +19,9 @@ fn get_weather(location: String, unit: Option<String>) -> String {
 }
 
 /// Retrieves general information and notable highlights about a given city, not including weather.
-#[generate_function_declaration(
-    city(description = "The name of the city for which to get details, e.g., Tokyo, Paris.")
-)]
+#[generate_function_declaration(city(
+    description = "The name of the city for which to get details, e.g., Tokyo, Paris."
+))]
 async fn get_city_details(city: String) -> serde_json::Value {
     // Simulate some async work, e.g., a network call
     println!("(Simulating async fetch for city: {city}...)");
@@ -41,15 +41,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
     let client = Client::builder(api_key).debug().build();
 
-    let model_name = "gemini-2.5-flash-preview-05-20"; // Or your preferred model like "gemini-pro"
+    let model_name = "gemini-3-flash-preview"; // Or your preferred model like "gemini-pro"
 
     // Test Case 1: Manual function calling (demonstrating the traditional approach)
     println!("\n--- Test Case 1: Weather in London (Manual Function Calling) ---");
     let prompt1 = "What is the weather like in London in Fahrenheit?";
-    
+
     // Get the function declaration from the macro-generated function
     let weather_func_decl = get_weather_declaration();
-    
+
     // Initial request with function available
     let response1 = client
         .with_model(model_name)
@@ -57,39 +57,48 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_function(weather_func_decl)
         .generate()
         .await?;
-    
+
     // Check if the model wants to call a function
     if let Some(function_calls) = response1.function_calls {
         println!("Model requested function calls:");
         for call in &function_calls {
             println!("  Function: {} with args: {}", call.name, call.args);
-            
+
             // Manually execute the function based on its name
             if call.name == "get_weather" {
                 // Extract arguments
-                let location_arg_str = call.args.get("location")
+                let location_arg_str = call
+                    .args
+                    .get("location")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
-                let unit_arg_option_string = call.args.get("unit")
+                let unit_arg_option_string = call
+                    .args
+                    .get("unit")
                     .and_then(|v| v.as_str())
                     .map(String::from);
-                
+
                 // Call the function (returns String)
-                let weather_report_string = get_weather(location_arg_str.to_string(), unit_arg_option_string);
+                let weather_report_string =
+                    get_weather(location_arg_str.to_string(), unit_arg_option_string);
                 println!("Function result: {}", weather_report_string);
-                
+
                 // Build conversation history with the function result
                 let contents = vec![
                     user_text(prompt1.to_string()),
-                    model_function_calls_request(function_calls.clone().into_iter()
-                        .map(|fc| genai_client::models::request::FunctionCall {
-                            name: fc.name,
-                            args: fc.args,
-                        })
-                        .collect()),
+                    model_function_calls_request(
+                        function_calls
+                            .clone()
+                            .into_iter()
+                            .map(|fc| genai_client::FunctionCall {
+                                name: fc.name,
+                                args: fc.args,
+                            })
+                            .collect(),
+                    ),
                     user_tool_response(call.name.clone(), json!(weather_report_string)),
                 ];
-                
+
                 // Send the function result back to the model
                 let final_response = client
                     .with_model(model_name)
@@ -97,7 +106,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     .with_function(get_weather_declaration())
                     .generate()
                     .await?;
-                
+
                 if let Some(text) = final_response.text {
                     println!("Final Model Response:\n{text}");
                 }

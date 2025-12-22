@@ -5,16 +5,23 @@ pub use genai_client::ApiVersion;
 pub mod types;
 pub use types::{CodeExecutionResult, FunctionCall, FunctionDeclaration, GenerateContentResponse};
 
+// Re-export Interactions API types for convenient access
+pub use genai_client::{
+    CreateInteractionRequest, GenerationConfig, InteractionContent, InteractionInput,
+    InteractionResponse, InteractionStatus, UsageMetadata,
+};
+
 pub mod content_api;
 pub use content_api::{
-    build_content_request, model_function_call, model_function_calls_request, model_text, user_text, user_tool_response,
+    build_content_request, model_function_call, model_function_calls_request, model_text,
+    user_text, user_tool_response,
 };
 
 pub mod client;
 pub use client::{Client, ClientBuilder};
 
 pub mod request_builder;
-pub use request_builder::GenerateContentBuilder;
+pub use request_builder::{GenerateContentBuilder, InteractionBuilder};
 
 pub(crate) mod internal;
 
@@ -37,6 +44,8 @@ pub enum GenaiError {
     Api(String),
     #[error("Internal client error: {0}")]
     Internal(String),
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
 // Implement conversion from internal error to public error

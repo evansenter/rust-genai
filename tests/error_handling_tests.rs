@@ -7,7 +7,7 @@ async fn test_invalid_api_key() {
     let client = Client::builder("invalid-api-key".to_string()).build();
 
     let result = client
-        .with_model("gemini-2.5-flash-preview-05-20")
+        .with_model("gemini-3-flash-preview")
         .with_prompt("Hello")
         .generate()
         .await;
@@ -107,7 +107,7 @@ async fn test_streaming_error_handling() {
     let client = Client::builder("invalid-api-key".to_string()).build();
 
     let stream_result = client
-        .with_model("gemini-2.5-flash-preview-05-20")
+        .with_model("gemini-3-flash-preview")
         .with_prompt("Hello")
         .generate_stream();
 

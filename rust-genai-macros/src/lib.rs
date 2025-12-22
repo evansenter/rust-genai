@@ -93,16 +93,14 @@ fn extract_doc_comments(attrs: &[Attribute]) -> String {
     attrs
         .iter()
         .filter_map(|attr| {
-            if attr.path().is_ident("doc") {
-                if let Meta::NameValue(mnv) = &attr.meta {
-                    if let Expr::Lit(ExprLit {
-                        lit: Lit::Str(lit_str),
-                        ..
-                    }) = &mnv.value
-                    {
-                        return Some(lit_str.value().trim().to_string());
-                    }
-                }
+            if attr.path().is_ident("doc")
+                && let Meta::NameValue(mnv) = &attr.meta
+                && let Expr::Lit(ExprLit {
+                    lit: Lit::Str(lit_str),
+                    ..
+                }) = &mnv.value
+            {
+                return Some(lit_str.value().trim().to_string());
             }
             None
         })
@@ -111,15 +109,13 @@ fn extract_doc_comments(attrs: &[Attribute]) -> String {
 }
 
 fn get_type_info(ty: &Type) -> (bool, Type) {
-    if let Type::Path(type_path) = ty {
-        if type_path.path.segments.len() == 1 && type_path.path.segments[0].ident == "Option" {
-            if let syn::PathArguments::AngleBracketed(args) = &type_path.path.segments[0].arguments
-            {
-                if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
-                    return (true, inner_ty.clone());
-                }
-            }
-        }
+    if let Type::Path(type_path) = ty
+        && type_path.path.segments.len() == 1
+        && type_path.path.segments[0].ident == "Option"
+        && let syn::PathArguments::AngleBracketed(args) = &type_path.path.segments[0].arguments
+        && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+    {
+        return (true, inner_ty.clone());
     }
     (false, ty.clone())
 }
@@ -173,23 +169,23 @@ pub fn generate_function_declaration(attr_input: TokenStream, item: TokenStream)
     let mut required_params_for_struct_field = Vec::new();
 
     for fn_arg in &func.sig.inputs {
-        if let syn::FnArg::Typed(pat_type) = fn_arg {
-            if let Pat::Ident(pat_ident) = &*pat_type.pat {
-                let param_name = pat_ident.ident.to_string();
+        if let syn::FnArg::Typed(pat_type) = fn_arg
+            && let Pat::Ident(pat_ident) = &*pat_type.pat
+        {
+            let param_name = pat_ident.ident.to_string();
 
-                let attr_details =
-                    match process_param_config(&param_name, config_map.get(&param_name)) {
-                        Ok(details) => details,
-                        Err(e) => return e.to_compile_error().into(),
-                    };
+            let attr_details = match process_param_config(&param_name, config_map.get(&param_name))
+            {
+                Ok(details) => details,
+                Err(e) => return e.to_compile_error().into(),
+            };
 
-                let param_schema = build_param_schema(pat_type, attr_details);
-                object_builder = object_builder.property(param_name.clone(), param_schema);
+            let param_schema = build_param_schema(pat_type, attr_details);
+            object_builder = object_builder.property(param_name.clone(), param_schema);
 
-                let (is_option, _) = get_type_info(&pat_type.ty);
-                if !is_option {
-                    required_params_for_struct_field.push(param_name.clone());
-                }
+            let (is_option, _) = get_type_info(&pat_type.ty);
+            if !is_option {
+                required_params_for_struct_field.push(param_name.clone());
             }
         }
     }
@@ -259,31 +255,25 @@ fn build_param_schema(pat_type: &syn::PatType, attr_details: ParamSchemaDetails)
     if api_type == OpenApiType::Array {
         let mut array_builder = ArrayBuilder::new();
 
-        if let Type::Path(type_path) = &inner_type {
-            if let Some(segment) = type_path.path.segments.first() {
-                if segment.ident == "Vec" {
-                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                        if let Some(syn::GenericArgument::Type(inner_ty_of_vec)) = args.args.first()
-                        {
-                            let inner_api_type = map_rust_type_to_openapi_type(inner_ty_of_vec);
-                            let items_schema =
-                                ObjectBuilder::new().schema_type(inner_api_type).build();
-                            array_builder =
-                                array_builder.items(RefOr::T(Schema::Object(items_schema)));
-                        }
-                    }
-                }
-            }
+        if let Type::Path(type_path) = &inner_type
+            && let Some(segment) = type_path.path.segments.first()
+            && segment.ident == "Vec"
+            && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+            && let Some(syn::GenericArgument::Type(inner_ty_of_vec)) = args.args.first()
+        {
+            let inner_api_type = map_rust_type_to_openapi_type(inner_ty_of_vec);
+            let items_schema = ObjectBuilder::new().schema_type(inner_api_type).build();
+            array_builder = array_builder.items(RefOr::T(Schema::Object(items_schema)));
         }
 
         RefOr::T(Schema::Array(array_builder.build()))
     } else {
         let mut individual_schema_builder = ObjectBuilder::new().schema_type(api_type);
-        if let Some(desc_val) = &attr_details.description {
-            if !desc_val.is_empty() {
-                individual_schema_builder =
-                    individual_schema_builder.description(Some(desc_val.clone()));
-            }
+        if let Some(desc_val) = &attr_details.description
+            && !desc_val.is_empty()
+        {
+            individual_schema_builder =
+                individual_schema_builder.description(Some(desc_val.clone()));
         }
         if let Some(enums) = attr_details.enum_values {
             individual_schema_builder = individual_schema_builder.enum_values(Some(enums));
@@ -332,39 +322,39 @@ fn generate_declaration_function(
     let mut arg_extraction_tokens = Vec::new();
 
     for fn_arg in &func.sig.inputs {
-        if let syn::FnArg::Typed(pat_type) = fn_arg {
-            if let Pat::Ident(pat_ident) = &*pat_type.pat {
-                let param_name_str = pat_ident.ident.to_string();
-                let param_ident = &pat_ident.ident;
-                let param_type = &pat_type.ty;
-                arg_names.push(param_ident.clone());
+        if let syn::FnArg::Typed(pat_type) = fn_arg
+            && let Pat::Ident(pat_ident) = &*pat_type.pat
+        {
+            let param_name_str = pat_ident.ident.to_string();
+            let param_ident = &pat_ident.ident;
+            let param_type = &pat_type.ty;
+            arg_names.push(param_ident.clone());
 
-                let (is_option, _inner_type) = get_type_info(param_type);
+            let (is_option, _inner_type) = get_type_info(param_type);
 
-                if is_option {
-                    arg_extraction_tokens.push(quote! {
-                        let #param_ident: #param_type = match args.get(#param_name_str) {
-                            Some(val) if !val.is_null() => {
-                                ::serde_json::from_value(val.clone()).map_err(|e| {
-                                    ::rust_genai::function_calling::FunctionError::ArgumentMismatch(
-                                        format!("Failed to deserialize optional argument '{}': {}", #param_name_str, e)
-                                    )
-                                })?
-                            }
-                            _ => None,
-                        };
-                    });
-                } else {
-                    arg_extraction_tokens.push(quote! {
-                        let #param_ident: #param_type = args.get(#param_name_str)
-                            .ok_or_else(|| ::rust_genai::function_calling::FunctionError::ArgumentMismatch(format!("Missing required argument '{}'", #param_name_str)))
-                            .and_then(|val| ::serde_json::from_value(val.clone()).map_err(|e| {
+            if is_option {
+                arg_extraction_tokens.push(quote! {
+                    let #param_ident: #param_type = match args.get(#param_name_str) {
+                        Some(val) if !val.is_null() => {
+                            ::serde_json::from_value(val.clone()).map_err(|e| {
                                 ::rust_genai::function_calling::FunctionError::ArgumentMismatch(
-                                    format!("Failed to deserialize argument '{}': {}", #param_name_str, e)
+                                    format!("Failed to deserialize optional argument '{}': {}", #param_name_str, e)
                                 )
-                            }))?;
-                    });
-                }
+                            })?
+                        }
+                        _ => None,
+                    };
+                });
+            } else {
+                arg_extraction_tokens.push(quote! {
+                    let #param_ident: #param_type = args.get(#param_name_str)
+                        .ok_or_else(|| ::rust_genai::function_calling::FunctionError::ArgumentMismatch(format!("Missing required argument '{}'", #param_name_str)))
+                        .and_then(|val| ::serde_json::from_value(val.clone()).map_err(|e| {
+                            ::rust_genai::function_calling::FunctionError::ArgumentMismatch(
+                                format!("Failed to deserialize argument '{}': {}", #param_name_str, e)
+                            )
+                        }))?;
+                });
             }
         }
     }

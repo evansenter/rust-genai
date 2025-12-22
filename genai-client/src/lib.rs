@@ -1,21 +1,28 @@
-// Declare the models, errors, common, and core modules
+// Declare the models, errors, common, core, interactions, and sse_parser modules
 pub mod common;
 pub mod core;
 pub mod errors;
+pub mod interactions;
 pub mod models;
+pub mod sse_parser;
 
 // Import and selectively re-export the necessary structs from the models module
-pub use models::request::Content;
-pub use models::request::FunctionCall;
-pub use models::request::FunctionCallingConfig;
-pub use models::request::FunctionCallingMode;
-pub use models::request::FunctionDeclaration;
-pub use models::request::FunctionParameters;
-pub use models::request::FunctionResponse;
+
+// Shared types (used by multiple APIs)
+pub use models::shared::CodeExecution;
+pub use models::shared::Content;
+pub use models::shared::FunctionCall;
+pub use models::shared::FunctionCallingConfig;
+pub use models::shared::FunctionCallingMode;
+pub use models::shared::FunctionDeclaration;
+pub use models::shared::FunctionParameters;
+pub use models::shared::FunctionResponse;
+pub use models::shared::Part;
+pub use models::shared::Tool;
+pub use models::shared::ToolConfig;
+
+// generateContent-specific types
 pub use models::request::GenerateContentRequest;
-pub use models::request::Part;
-pub use models::request::Tool;
-pub use models::request::ToolConfig;
 
 pub use models::response::Candidate;
 pub use models::response::ContentResponse;
@@ -23,13 +30,30 @@ pub use models::response::FunctionCallResponse;
 pub use models::response::GenerateContentResponse;
 pub use models::response::PartResponse;
 
+// Interactions API types
+pub use models::interactions::CreateInteractionRequest;
+pub use models::interactions::GenerationConfig;
+pub use models::interactions::InteractionContent;
+pub use models::interactions::InteractionInput;
+pub use models::interactions::InteractionResponse;
+pub use models::interactions::InteractionStatus;
+pub use models::interactions::UsageMetadata;
+
 // Re-export InternalError from the errors module
 pub use errors::InternalError;
 
-// Re-export ApiVersion and construct_url from the common module
+// Re-export ApiVersion, Endpoint, and URL construction functions from the common module
 pub use common::ApiVersion;
+pub use common::Endpoint;
+pub use common::construct_endpoint_url;
 pub use common::construct_url;
 
 // Re-export internal helper functions from the core module
 pub use core::generate_content_internal;
 pub use core::generate_content_stream_internal;
+
+// Re-export Interactions API functions from the interactions module
+pub use interactions::create_interaction;
+pub use interactions::create_interaction_stream;
+pub use interactions::delete_interaction;
+pub use interactions::get_interaction;

@@ -29,7 +29,7 @@ pub struct ClientBuilder {
 
 impl ClientBuilder {
     /// Sets the API version for the client.
-    /// If not called, defaults to `ApiVersion::V1Alpha`.
+    /// If not called, defaults to `ApiVersion::V1Beta`.
     #[must_use]
     pub const fn api_version(mut self, version: ApiVersion) -> Self {
         self.api_version = Some(version);
@@ -50,7 +50,7 @@ impl ClientBuilder {
         Client {
             api_key: self.api_key,
             http_client: ReqwestClient::new(),
-            api_version: self.api_version.unwrap_or(ApiVersion::V1Alpha),
+            api_version: self.api_version.unwrap_or(ApiVersion::V1Beta),
             debug: self.debug,
         }
     }
@@ -77,13 +77,13 @@ impl Client {
     /// # Arguments
     ///
     /// * `api_key` - Your Google AI API key.
-    /// * `api_version` - Optional API version to use. Defaults to `V1Alpha`.
+    /// * `api_version` - Optional API version to use. Defaults to `V1Beta`.
     #[must_use]
     pub fn new(api_key: String, api_version: Option<ApiVersion>) -> Self {
         Self {
             api_key,
             http_client: ReqwestClient::new(),
-            api_version: api_version.unwrap_or(ApiVersion::V1Alpha),
+            api_version: api_version.unwrap_or(ApiVersion::V1Beta),
             debug: false,
         }
     }
@@ -92,7 +92,7 @@ impl Client {
     ///
     /// # Arguments
     ///
-    /// * `model_name` - The name of the model to use (e.g., "gemini-2.5-flash-preview-05-20")
+    /// * `model_name` - The name of the model to use (e.g., "gemini-3-flash-preview")
     #[must_use]
     pub const fn with_model<'a>(
         &'a self,
@@ -207,39 +207,26 @@ impl Client {
             let status = response.status();
 
             if status.is_success() {
-                let mut byte_stream = response.bytes_stream();
-                let mut buffer = Vec::new();
+                let byte_stream = response.bytes_stream();
+                let parsed_stream = genai_client::sse_parser::parse_sse_stream::<genai_client::models::response::GenerateContentResponse>(byte_stream);
+                futures_util::pin_mut!(parsed_stream);
 
-                while let Some(chunk_result) = byte_stream.next().await {
-                    let chunk = chunk_result?;
-                    buffer.extend_from_slice(&chunk);
+                while let Some(result) = parsed_stream.next().await {
+                    let chunk_response_internal = result?;
 
-                    while let Some(newline_pos) = buffer.iter().position(|&b| b == b'\n') {
-                        let line_bytes = buffer.drain(..=newline_pos).collect::<Vec<u8>>();
-                        let line = str::from_utf8(&line_bytes)?.trim_end_matches(|c| c == '\n' || c == '\r');
+                    if self.debug {
+                        println!("[DEBUG] Stream Chunk: {chunk_response_internal:#?}");
+                    }
 
-                        if self.debug {
-                            println!("[DEBUG] Raw Stream Line: {line}");
-                        }
+                    if let Some(candidate) = chunk_response_internal.candidates.first() {
+                        let processed_parts = process_response_parts(&candidate.content.parts);
 
-                        if line.starts_with("data:") {
-                            let json_data = line.strip_prefix("data:").unwrap_or("").trim_start();
-                            if !json_data.is_empty() {
-                                let chunk_response_internal: genai_client::models::response::GenerateContentResponse =
-                                    serde_json::from_str(json_data)?;
-
-                                if let Some(candidate) = chunk_response_internal.candidates.first() {
-                                    let processed_parts = process_response_parts(&candidate.content.parts);
-
-                                    if processed_parts.text.is_some() || !processed_parts.function_calls.is_empty() || !processed_parts.code_execution_results.is_empty() {
-                                        yield GenerateContentResponse {
-                                            text: processed_parts.text,
-                                            function_calls: if processed_parts.function_calls.is_empty() { None } else { Some(processed_parts.function_calls) },
-                                            code_execution_results: if processed_parts.code_execution_results.is_empty() { None } else { Some(processed_parts.code_execution_results) },
-                                        };
-                                    }
-                                }
-                            }
+                        if processed_parts.text.is_some() || !processed_parts.function_calls.is_empty() || !processed_parts.code_execution_results.is_empty() {
+                            yield GenerateContentResponse {
+                                text: processed_parts.text,
+                                function_calls: if processed_parts.function_calls.is_empty() { None } else { Some(processed_parts.function_calls) },
+                                code_execution_results: if processed_parts.code_execution_results.is_empty() { None } else { Some(processed_parts.code_execution_results) },
+                            };
                         }
                     }
                 }
@@ -252,5 +239,210 @@ impl Client {
             }
         };
         stream_val.boxed()
+    }
+
+    // --- Interactions API methods ---
+
+    /// Creates a builder for constructing an interaction request.
+    ///
+    /// This provides a fluent interface for building interactions with models or agents.
+    /// Use this method for a more ergonomic API compared to manually constructing
+    /// `CreateInteractionRequest`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api_key".to_string()).build();
+    ///
+    /// // Simple interaction
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Hello, world!")
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // Stateful conversation
+    /// let response2 = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What did I just say?")
+    ///     .with_previous_interaction(&response.id)
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn interaction(&self) -> crate::request_builder::InteractionBuilder<'_> {
+        crate::request_builder::InteractionBuilder::new(self)
+    }
+
+    /// Creates a new interaction using the Gemini Interactions API.
+    ///
+    /// The Interactions API provides a unified interface for working with models and agents,
+    /// with built-in support for stateful conversations, function calling, and long-running tasks.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The interaction request with model/agent, input, and optional configuration.
+    ///
+    /// # Errors
+    /// Returns an error if the HTTP request fails, response parsing fails, or the API returns an error.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, ApiVersion};
+    /// use genai_client::{CreateInteractionRequest, InteractionInput};
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("your-api-key".to_string(), Some(ApiVersion::V1Beta));
+    ///
+    /// let request = CreateInteractionRequest {
+    ///     model: Some("gemini-3-flash-preview".to_string()),
+    ///     agent: None,
+    ///     input: InteractionInput::Text("Hello, world!".to_string()),
+    ///     previous_interaction_id: None,
+    ///     tools: None,
+    ///     response_modalities: None,
+    ///     response_format: None,
+    ///     generation_config: None,
+    ///     stream: None,
+    ///     background: None,
+    ///     store: None,
+    ///     system_instruction: None,
+    /// };
+    ///
+    /// let response = client.create_interaction(request).await?;
+    /// println!("Interaction ID: {}", response.id);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn create_interaction(
+        &self,
+        request: genai_client::CreateInteractionRequest,
+    ) -> Result<genai_client::InteractionResponse, GenaiError> {
+        if self.debug {
+            println!("[DEBUG] Creating interaction");
+            match serde_json::to_string_pretty(&request) {
+                Ok(json) => println!("[DEBUG] Request Body (JSON):\n{json}"),
+                Err(_) => println!("[DEBUG] Request Body: {request:#?}"),
+            }
+        }
+
+        let response =
+            genai_client::create_interaction(&self.http_client, &self.api_key, request).await?;
+
+        if self.debug {
+            println!("[DEBUG] Interaction created: ID={}", response.id);
+        }
+
+        Ok(response)
+    }
+
+    /// Creates a new interaction with streaming responses.
+    ///
+    /// Returns a stream of `InteractionResponse` updates as they arrive from the server.
+    /// Useful for long-running interactions or agents where you want incremental updates.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The interaction request with streaming enabled.
+    ///
+    /// # Returns
+    /// A boxed stream that yields `InteractionResponse` items.
+    pub fn create_interaction_stream(
+        &self,
+        request: genai_client::CreateInteractionRequest,
+    ) -> futures_util::stream::BoxStream<'_, Result<genai_client::InteractionResponse, GenaiError>>
+    {
+        use futures_util::StreamExt;
+
+        let debug = self.debug;
+
+        if debug {
+            println!("[DEBUG] Creating streaming interaction");
+            match serde_json::to_string_pretty(&request) {
+                Ok(json) => println!("[DEBUG] Request Body (JSON):\n{json}"),
+                Err(_) => println!("[DEBUG] Request Body: {request:#?}"),
+            }
+        }
+
+        let stream =
+            genai_client::create_interaction_stream(&self.http_client, &self.api_key, request);
+
+        stream
+            .map(move |result| {
+                result
+                    .inspect(|response| {
+                        if debug {
+                            println!(
+                                "[DEBUG] Received interaction update: status={:?}",
+                                response.status
+                            );
+                        }
+                    })
+                    .map_err(GenaiError::from)
+            })
+            .boxed()
+    }
+
+    /// Retrieves an existing interaction by its ID.
+    ///
+    /// Useful for checking the status of long-running interactions or agents,
+    /// or for retrieving the full conversation history.
+    ///
+    /// # Arguments
+    ///
+    /// * `interaction_id` - The unique identifier of the interaction to retrieve.
+    ///
+    /// # Errors
+    /// Returns an error if the HTTP request fails, response parsing fails, or the API returns an error.
+    pub async fn get_interaction(
+        &self,
+        interaction_id: &str,
+    ) -> Result<genai_client::InteractionResponse, GenaiError> {
+        if self.debug {
+            println!("[DEBUG] Getting interaction: ID={interaction_id}");
+        }
+
+        let response =
+            genai_client::get_interaction(&self.http_client, &self.api_key, interaction_id).await?;
+
+        if self.debug {
+            println!(
+                "[DEBUG] Retrieved interaction: status={:?}",
+                response.status
+            );
+        }
+
+        Ok(response)
+    }
+
+    /// Deletes an interaction by its ID.
+    ///
+    /// Removes the interaction from the server, freeing up storage and making it
+    /// unavailable for future reference via `previous_interaction_id`.
+    ///
+    /// # Arguments
+    ///
+    /// * `interaction_id` - The unique identifier of the interaction to delete.
+    ///
+    /// # Errors
+    /// Returns an error if the HTTP request fails or the API returns an error.
+    pub async fn delete_interaction(&self, interaction_id: &str) -> Result<(), GenaiError> {
+        if self.debug {
+            println!("[DEBUG] Deleting interaction: ID={interaction_id}");
+        }
+
+        genai_client::delete_interaction(&self.http_client, &self.api_key, interaction_id).await?;
+
+        if self.debug {
+            println!("[DEBUG] Interaction deleted successfully");
+        }
+
+        Ok(())
     }
 }

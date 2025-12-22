@@ -3,14 +3,11 @@ use serde::Deserialize;
 #[derive(Deserialize, Debug)]
 pub struct GenerateContentResponse {
     pub candidates: Vec<Candidate>,
-    // pub prompt_feedback: Option<PromptFeedback>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Candidate {
     pub content: ContentResponse,
-    // pub finish_reason: Option<String>,
-    // pub safety_ratings: Option<Vec<SafetyRating>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -27,7 +24,7 @@ pub struct PartResponse {
     #[serde(rename = "functionCall", skip_serializing_if = "Option::is_none")]
     pub function_call: Option<FunctionCallResponse>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_response: Option<super::request::FunctionResponse>,
+    pub function_response: Option<super::shared::FunctionResponse>,
     #[serde(rename = "executableCode", skip_serializing_if = "Option::is_none")]
     pub executable_code: Option<ExecutableCodeResponse>,
     #[serde(

@@ -13,7 +13,7 @@ async fn test_string_return_wrapped() {
     let callable = GetGreetingCallable;
     let args = json!({ "name": "Alice" });
     let result = callable.call(args).await.unwrap();
-    
+
     // String return should be wrapped in { "result": ... }
     assert!(result.is_object());
     assert_eq!(result, json!({ "result": "Hello, Alice!" }));
@@ -30,7 +30,7 @@ async fn test_number_return_wrapped() {
     let callable = AddNumbersCallable;
     let args = json!({ "a": 5, "b": 3 });
     let result = callable.call(args).await.unwrap();
-    
+
     // Number return should be wrapped in { "result": ... }
     assert!(result.is_object());
     assert_eq!(result, json!({ "result": 8 }));
@@ -47,7 +47,7 @@ async fn test_bool_return_wrapped() {
     let callable = IsEvenCallable;
     let args = json!({ "number": 4 });
     let result = callable.call(args).await.unwrap();
-    
+
     // Boolean return should be wrapped in { "result": ... }
     assert!(result.is_object());
     assert_eq!(result, json!({ "result": true }));
@@ -64,7 +64,7 @@ async fn test_array_return_wrapped() {
     let callable = GetItemsCallable;
     let args = json!({ "count": 3 });
     let result = callable.call(args).await.unwrap();
-    
+
     // Array return should be wrapped in { "result": ... }
     assert!(result.is_object());
     assert_eq!(result, json!({ "result": ["item0", "item1", "item2"] }));
@@ -85,14 +85,17 @@ async fn test_object_return_not_wrapped() {
     let callable = GetWeatherDataCallable;
     let args = json!({ "city": "San Francisco" });
     let result = callable.call(args).await.unwrap();
-    
+
     // Object return should NOT be wrapped
     assert!(result.is_object());
-    assert_eq!(result, json!({
-        "city": "San Francisco",
-        "temperature": 72,
-        "condition": "sunny"
-    }));
+    assert_eq!(
+        result,
+        json!({
+            "city": "San Francisco",
+            "temperature": 72,
+            "condition": "sunny"
+        })
+    );
 }
 
 #[tokio::test]
@@ -108,12 +111,12 @@ async fn test_option_some_wrapped() {
     }
 
     let callable = FindUserCallable;
-    
+
     // Test Some case
     let args = json!({ "id": 1 });
     let result = callable.call(args).await.unwrap();
     assert_eq!(result, json!({ "result": "User1" }));
-    
+
     // Test None case
     let args = json!({ "id": 0 });
     let result = callable.call(args).await.unwrap();
@@ -132,7 +135,7 @@ async fn test_unit_return_wrapped() {
     let callable = PerformActionCallable;
     let args = json!({ "action": "test" });
     let result = callable.call(args).await.unwrap();
-    
+
     // Unit return should be wrapped as null
     assert!(result.is_object());
     assert_eq!(result, json!({ "result": null }));
@@ -153,7 +156,7 @@ async fn test_float_return_wrapped() {
     let callable = CalculateAverageCallable;
     let args = json!({ "values": [1.0, 2.0, 3.0, 4.0] });
     let result = callable.call(args).await.unwrap();
-    
+
     // Float return should be wrapped in { "result": ... }
     assert!(result.is_object());
     assert_eq!(result, json!({ "result": 2.5 }));
@@ -161,14 +164,14 @@ async fn test_float_return_wrapped() {
 
 #[tokio::test]
 async fn test_custom_struct_wrapped() {
-    use serde::{Serialize, Deserialize};
-    
+    use serde::{Deserialize, Serialize};
+
     #[derive(Serialize, Deserialize)]
     struct User {
         name: String,
         age: u32,
     }
-    
+
     /// Creates a user - returns a custom struct
     #[generate_function_declaration]
     fn create_user(name: String, age: u32) -> User {
@@ -178,11 +181,14 @@ async fn test_custom_struct_wrapped() {
     let callable = CreateUserCallable;
     let args = json!({ "name": "Bob", "age": 30 });
     let result = callable.call(args).await.unwrap();
-    
+
     // Custom struct serializes to object, so should NOT be wrapped
     assert!(result.is_object());
-    assert_eq!(result, json!({
-        "name": "Bob",
-        "age": 30
-    }));
-} 
+    assert_eq!(
+        result,
+        json!({
+            "name": "Bob",
+            "age": 30
+        })
+    );
+}

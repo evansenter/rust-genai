@@ -5,7 +5,7 @@ use std::env;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not set");
     let client = Client::builder(api_key).debug().build();
-    let model_name = "gemini-2.5-flash-preview-05-20";
+    let model_name = "gemini-3-flash-preview";
     let prompt_text = "What is 7 + 5? Use code execution if you want.";
 
     println!("Sending request to model: {model_name}");
@@ -35,12 +35,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            if let Some(ref fcs) = res.function_calls {
-                if !fcs.is_empty() {
-                    println!("\nUnexpected function calls received (showing first):");
-                    println!("  Name: {}", fcs[0].name);
-                    println!("  Args: {}", fcs[0].args);
-                }
+            if let Some(ref fcs) = res.function_calls
+                && !fcs.is_empty()
+            {
+                println!("\nUnexpected function calls received (showing first):");
+                println!("  Name: {}", fcs[0].name);
+                println!("  Args: {}", fcs[0].args);
             }
 
             if res.text.is_none()
@@ -60,6 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 GenaiError::Parse(p_err) => eprintln!("Parse Error: {p_err}"),
                 GenaiError::Utf8(u_err) => eprintln!("UTF8 Error: {u_err}"),
                 GenaiError::Internal(i_err) => eprintln!("Internal Error: {i_err}"),
+                GenaiError::InvalidInput(input_err) => eprintln!("Invalid Input: {input_err}"),
             }
             // It's often useful to return the original error for further handling if needed
             // For an example, just printing and exiting might be okay, but for a library, you'd return it.

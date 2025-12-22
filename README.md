@@ -85,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::builder(api_key).build();
     
     // Define model and prompt
-    let model = "gemini-2.5-flash-preview-05-20";
+    let model = "gemini-3-flash-preview";
     let prompt = "Write a short poem about Rust programming.";
     
     // Send request and get response using the builder pattern
@@ -115,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create the client using the builder
     let client = Client::builder(api_key).build();
     
-    let model = "gemini-2.5-flash-preview-05-20";
+    let model = "gemini-3-flash-preview";
     let prompt = "Explain quantum computing in simple terms.";
     
     // Get a stream of response chunks using the builder pattern
@@ -158,7 +158,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create the client using the builder
     let client = Client::builder(api_key).build();
     
-    let model = "gemini-2.5-flash-preview-05-20";
+    let model = "gemini-3-flash-preview";
     let prompt = "What is the capital of France?";
     let system_instruction = "You are a helpful geography expert.";
     
@@ -210,7 +210,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         required: vec!["location".to_string()],
     };
     
-    let model = "gemini-2.5-flash-preview-05-20";
+    let model = "gemini-3-flash-preview";
     let prompt = "What's the weather like in London?";
     
     // Send request with function calling enabled
@@ -266,7 +266,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // First request with function available
     let response = client
-        .with_model("gemini-2.5-flash-preview-05-20")
+        .with_model("gemini-3-flash-preview")
         .with_prompt(prompt)
         .with_function(weather_func.clone())
         .generate()
@@ -291,7 +291,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 
                 // Send function result back to model
                 let final_response = client
-                    .with_model("gemini-2.5-flash-preview-05-20")
+                    .with_model("gemini-3-flash-preview")
                     .with_contents(contents)
                     .with_function(weather_func)
                     .generate()
@@ -342,7 +342,7 @@ let contents = vec![
 ];
 
 let response = client
-    .with_model("gemini-2.5-flash-preview-05-20")
+    .with_model("gemini-3-flash-preview")
     .with_contents(contents)
     .generate()
     .await?;
@@ -389,7 +389,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Use generate_with_auto_functions() to automatically handle function calls
     let response = client
-        .with_model("gemini-2.5-flash-preview-05-20")
+        .with_model("gemini-3-flash-preview")
         .with_initial_user_text("What's the weather in Tokyo? Also tell me about the city.")
         .generate_with_auto_functions()
         .await?;
@@ -464,7 +464,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::builder(api_key).build();
     
     let response = client
-        .with_model("gemini-2.5-flash-preview-05-20")
+        .with_model("gemini-3-flash-preview")
         .with_prompt("Calculate the factorial of 7 using Python")
         .with_code_execution()  // Enable code execution
         .generate()
@@ -578,7 +578,7 @@ The project consists of two main components:
 
 This library has been tested with the following Google Generative AI models:
 
-- `gemini-2.5-flash-preview-05-20`
+- `gemini-3-flash-preview`
 
 For the latest available models, check the [Google AI documentation](https://ai.google.dev/models).
 
