@@ -7,7 +7,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // 1. Get API Key from environment variable
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
 
-    // Create the client with debug mode to see the requests
+    // Create the client
     let client = Client::builder(api_key).build();
 
     let model_name = "gemini-3-flash-preview";

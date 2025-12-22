@@ -9,6 +9,14 @@ use genai_client::models::request::GenerateContentRequest as InternalGenerateCon
 use reqwest::Client as ReqwestClient;
 use std::str;
 
+/// Logs a request body at debug level, preferring JSON format when possible.
+fn log_request_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
+    match serde_json::to_string_pretty(body) {
+        Ok(json) => log::debug!("Request Body (JSON):\n{json}"),
+        Err(_) => log::debug!("Request Body: {body:#?}"),
+    }
+}
+
 /// The main client for interacting with the Google Generative AI API.
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -111,10 +119,7 @@ impl Client {
         let url = construct_url(model_name, &self.api_key, false, self.api_version);
 
         log::debug!("Request URL: {url}");
-        match serde_json::to_string_pretty(&request_body) {
-            Ok(json) => log::debug!("Request Body (JSON):\n{json}"),
-            Err(_) => log::debug!("Request Body: {request_body:#?}"),
-        }
+        log_request_body(&request_body);
 
         let response = self
             .http_client
@@ -179,10 +184,7 @@ impl Client {
         let url = construct_url(model_name, &self.api_key, true, self.api_version);
 
         log::debug!("Streaming Request URL: {url}");
-        match serde_json::to_string_pretty(&request_body) {
-            Ok(json) => log::debug!("Streaming Request Body (JSON):\n{json}"),
-            Err(_) => log::debug!("Streaming Request Body: {request_body:#?}"),
-        }
+        log_request_body(&request_body);
 
         let stream_val = try_stream! {
             let response = self.http_client.post(&url).json(&request_body).send().await?;
@@ -307,10 +309,7 @@ impl Client {
         request: genai_client::CreateInteractionRequest,
     ) -> Result<genai_client::InteractionResponse, GenaiError> {
         log::debug!("Creating interaction");
-        match serde_json::to_string_pretty(&request) {
-            Ok(json) => log::debug!("Request Body (JSON):\n{json}"),
-            Err(_) => log::debug!("Request Body: {request:#?}"),
-        }
+        log_request_body(&request);
 
         let response =
             genai_client::create_interaction(&self.http_client, &self.api_key, request).await?;
@@ -339,10 +338,7 @@ impl Client {
         use futures_util::StreamExt;
 
         log::debug!("Creating streaming interaction");
-        match serde_json::to_string_pretty(&request) {
-            Ok(json) => log::debug!("Request Body (JSON):\n{json}"),
-            Err(_) => log::debug!("Request Body: {request:#?}"),
-        }
+        log_request_body(&request);
 
         let stream =
             genai_client::create_interaction_stream(&self.http_client, &self.api_key, request);
