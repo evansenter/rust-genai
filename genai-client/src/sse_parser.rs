@@ -256,6 +256,7 @@ mod tests {
         pin_mut!(parsed_stream);
 
         let message = parsed_stream.next().await.unwrap().unwrap();
-        assert!(message.text.contains("世界") || message.text.contains("\\u"));
+        // The JSON parser should decode \u sequences to actual Unicode characters
+        assert_eq!(message.text, "Hello 世界 🌍");
     }
 }
