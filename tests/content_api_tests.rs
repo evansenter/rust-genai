@@ -150,21 +150,15 @@ fn test_build_content_request_simple() {
 
 #[test]
 fn test_build_content_request_with_tools() {
-    let function = FunctionDeclaration {
-        name: "get_weather".to_string(),
-        description: "Get weather information".to_string(),
-        parameters: Some(json!({
-            "type": "object",
-            "properties": {
-                "location": {"type": "string"}
-            }
-        })),
-        required: vec!["location".to_string()],
-    };
+    let function = FunctionDeclaration::builder("get_weather")
+        .description("Get weather information")
+        .parameter("location", json!({"type": "string"}))
+        .required(vec!["location".to_string()])
+        .build();
 
     let conversation = vec![user_text("What's the weather in Paris?".to_string())];
 
-    let tools = vec![function.to_tool()];
+    let tools = vec![function.into_tool()];
     let request = build_content_request(conversation, Some(tools));
 
     // Verify request structure

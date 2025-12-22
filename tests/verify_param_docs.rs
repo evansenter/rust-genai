@@ -25,17 +25,20 @@ fn verify_parameter_descriptions_work() {
     let declaration = callable.declaration();
 
     // Verify the parameters contain descriptions
-    let params = declaration.parameters.expect("Should have parameters");
-    let properties = params.get("properties").expect("Should have properties");
+    let schema_properties = declaration
+        .parameters()
+        .properties()
+        .get("properties")
+        .expect("Should have properties field");
 
-    let name_desc = properties
+    let name_desc = schema_properties
         .get("name")
         .and_then(|p| p.get("description"))
         .and_then(|d| d.as_str())
         .expect("name should have description");
     assert_eq!(name_desc, "The person's name");
 
-    let age_desc = properties
+    let age_desc = schema_properties
         .get("age")
         .and_then(|p| p.get("description"))
         .and_then(|d| d.as_str())
@@ -54,7 +57,7 @@ fn verify_function_documentation_preserved() {
     let callable = WithFunctionDocsCallable;
     let declaration = callable.declaration();
     assert_eq!(
-        declaration.description,
+        declaration.description(),
         "This function calculates the area of a rectangle"
     );
 }
@@ -73,14 +76,17 @@ fn verify_comment_about_param_docs_is_accurate() {
 
     let callable = RegularCommentsCallable;
     let declaration = callable.declaration();
-    let params = declaration.parameters.expect("Should have parameters");
-    let properties = params.get("properties").expect("Should have properties");
+    let schema_properties = declaration
+        .parameters()
+        .properties()
+        .get("properties")
+        .expect("Should have properties field");
 
     // Neither parameter should have a description
-    let x_param = properties.get("x").expect("Should have x parameter");
+    let x_param = schema_properties.get("x").expect("Should have x parameter");
     assert!(x_param.get("description").is_none());
 
-    let y_param = properties.get("y").expect("Should have y parameter");
+    let y_param = schema_properties.get("y").expect("Should have y parameter");
     assert!(y_param.get("description").is_none());
 }
 

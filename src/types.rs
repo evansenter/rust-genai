@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Represents a function call in the response.
@@ -30,52 +29,5 @@ pub struct GenerateContentResponse {
     pub code_execution_results: Option<Vec<CodeExecutionResult>>,
 }
 
-/// Represents a function declaration that can be used by the model.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FunctionDeclaration {
-    /// The name of the function.
-    pub name: String,
-    /// A description of what the function does.
-    pub description: String,
-    /// The JSON Schema for the function's parameters.
-    pub parameters: Option<Value>,
-    /// The names of required parameters.
-    pub required: Vec<String>,
-}
-
-impl FunctionDeclaration {
-    /// Converts this public `FunctionDeclaration` to the internal `genai_client::Tool` format.
-    #[must_use]
-    pub fn to_tool(self) -> genai_client::Tool {
-        let properties = self
-            .parameters
-            .as_ref()
-            .and_then(|p| p.get("properties"))
-            .cloned();
-        let required_from_params = self
-            .parameters
-            .as_ref()
-            .and_then(|p| p.get("required"))
-            .cloned();
-
-        let internal_fd = genai_client::FunctionDeclaration {
-            name: self.name,
-            description: self.description,
-            parameters: genai_client::FunctionParameters {
-                type_: "object".to_string(),
-                properties: properties.unwrap_or(Value::Null),
-                required: if let Some(Value::Array(arr)) = required_from_params {
-                    arr.iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect()
-                } else {
-                    self.required
-                },
-            },
-        };
-        genai_client::Tool {
-            function_declarations: Some(vec![internal_fd]),
-            code_execution: None,
-        }
-    }
-}
+// NOTE: FunctionDeclaration has been moved to genai_client and is re-exported from the root crate.
+// This provides a unified type system without duplication.

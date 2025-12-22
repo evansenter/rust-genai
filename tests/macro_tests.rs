@@ -14,9 +14,9 @@ fn test_basic_function_declaration() {
 
     let callable = TestBasicCallable;
     let decl = callable.declaration();
-    assert_eq!(decl.name, "test_basic");
-    assert_eq!(decl.description, ""); // Empty doc comments result in empty string
-    assert_eq!(decl.required, vec!["name"]);
+    assert_eq!(decl.name(), "test_basic");
+    assert_eq!(decl.description(), ""); // Empty doc comments result in empty string
+    assert_eq!(decl.parameters().required(), vec!["name"]);
 }
 
 #[test]
@@ -29,9 +29,9 @@ fn test_function_with_doc_comment() {
 
     let callable = TestWithDocsCallable;
     let decl = callable.declaration();
-    assert_eq!(decl.name, "test_with_docs");
+    assert_eq!(decl.name(), "test_with_docs");
     assert_eq!(
-        decl.description,
+        decl.description(),
         "This is a test function that does something"
     );
 }
@@ -49,12 +49,12 @@ fn test_with_param_metadata() {
 
     let callable = GreetPersonCallable;
     let decl = callable.declaration();
-    assert_eq!(decl.name, "greet_person");
-    assert_eq!(decl.description, "Function to greet someone");
-    assert_eq!(decl.required, vec!["name", "age"]);
+    assert_eq!(decl.name(), "greet_person");
+    assert_eq!(decl.description(), "Function to greet someone");
+    assert_eq!(decl.parameters().required(), vec!["name", "age"]);
 
     // Check that parameters schema contains our descriptions
-    let params_json = serde_json::to_string(&decl.parameters).unwrap();
+    let params_json = serde_json::to_string(&decl.parameters()).unwrap();
     assert!(params_json.contains("The person's name"));
     assert!(params_json.contains("The person's age"));
 }
@@ -71,7 +71,7 @@ fn test_optional_parameters() {
 
     let callable = TestOptionalCallable;
     let decl = callable.declaration();
-    assert_eq!(decl.required, vec!["name"]); // Only name should be required
+    assert_eq!(decl.parameters().required(), vec!["name"]); // Only name should be required
 }
 
 #[test]
@@ -86,11 +86,11 @@ fn test_enum_values() {
 
     let callable = ConvertTempCallable;
     let decl = callable.declaration();
-    let params_json = serde_json::to_string(&decl.parameters).unwrap();
+    let params_json = serde_json::to_string(&decl.parameters()).unwrap();
     assert!(params_json.contains("celsius"));
     assert!(params_json.contains("fahrenheit"));
     assert!(params_json.contains("kelvin"));
-    assert_eq!(decl.required, vec!["value", "unit"]);
+    assert_eq!(decl.parameters().required(), vec!["value", "unit"]);
 }
 
 #[test]
@@ -110,11 +110,11 @@ fn test_various_types() {
     let callable = TestTypesCallable;
     let decl = callable.declaration();
     assert_eq!(
-        decl.required,
+        decl.parameters().required(),
         vec!["text", "count", "amount", "flag", "items", "data"]
     );
 
-    let params_json = serde_json::to_string(&decl.parameters).unwrap();
+    let params_json = serde_json::to_string(&decl.parameters()).unwrap();
     // Check that the types are correctly mapped
     assert!(params_json.contains(r#""type":"string"#)); // for text
     assert!(params_json.contains(r#""type":"integer"#)); // for count
@@ -138,7 +138,7 @@ fn test_multiline_doc_comment() {
     let callable = TestMultilineCallable;
     let decl = callable.declaration();
     assert_eq!(
-        decl.description,
+        decl.description(),
         "This is a function that\ndoes multiple things:\n- First thing\n- Second thing"
     );
 }
@@ -158,7 +158,7 @@ fn test_param_without_metadata_no_description() {
 
     let callable = TestNoParamDescCallable;
     let decl = callable.declaration();
-    let params_json = serde_json::to_string(&decl.parameters).unwrap();
+    let params_json = serde_json::to_string(&decl.parameters()).unwrap();
     // The parameter should have no description since doc comments aren't allowed on params
     // and we didn't provide one in the macro attribute
     assert!(!params_json.contains("description") || params_json.contains(r#""description":null"#));
@@ -188,6 +188,6 @@ fn test_param_docs_not_allowed() {
 
     let callable = TestCorrectParamDescCallable;
     let decl = callable.declaration();
-    let params_json = serde_json::to_string(&decl.parameters).unwrap();
+    let params_json = serde_json::to_string(&decl.parameters()).unwrap();
     assert!(params_json.contains("This is the correct way to add param descriptions"));
 }

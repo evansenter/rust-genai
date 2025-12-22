@@ -4,7 +4,7 @@
 // Complementary to the unit tests in src/request_builder.rs
 
 use genai_client::{InteractionContent, InteractionInput};
-use rust_genai::Client;
+use rust_genai::{Client, FunctionDeclaration, WithFunctionCalling};
 
 #[test]
 fn test_interaction_builder_with_complex_content_input() {
@@ -124,17 +124,11 @@ fn test_interaction_builder_with_multiple_functions() {
 
     // Add 10 functions
     for i in 0..10 {
-        let func = FunctionDeclaration {
-            name: format!("function_{}", i),
-            description: format!("Function number {}", i),
-            parameters: Some(json!({
-                "type": "object",
-                "properties": {
-                    "param": {"type": "string"}
-                }
-            })),
-            required: vec!["param".to_string()],
-        };
+        let func = FunctionDeclaration::builder(format!("function_{}", i))
+            .description(format!("Function number {}", i))
+            .parameter("param", json!({"type": "string"}))
+            .required(vec!["param".to_string()])
+            .build();
         builder = builder.with_function(func);
     }
 
@@ -238,17 +232,11 @@ async fn test_interaction_builder_with_longer_prompt() {
 #[test]
 fn test_interaction_builder_with_all_features_combined() {
     // Test combining many features simultaneously
-    use rust_genai::FunctionDeclaration;
-    use serde_json::json;
-
     let client = Client::new("test-api-key".to_string(), None);
 
-    let func = FunctionDeclaration {
-        name: "get_weather".to_string(),
-        description: "Get weather".to_string(),
-        parameters: Some(json!({"type": "object"})),
-        required: vec![],
-    };
+    let func = FunctionDeclaration::builder("get_weather")
+        .description("Get weather")
+        .build();
 
     let config = genai_client::GenerationConfig {
         temperature: Some(0.7),

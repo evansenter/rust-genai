@@ -2,8 +2,11 @@ use thiserror::Error;
 
 pub use genai_client::ApiVersion;
 
+// Re-export unified function declaration types from genai_client
+pub use genai_client::{FunctionDeclaration, FunctionDeclarationBuilder, FunctionParameters, Tool};
+
 pub mod types;
-pub use types::{CodeExecutionResult, FunctionCall, FunctionDeclaration, GenerateContentResponse};
+pub use types::{CodeExecutionResult, FunctionCall, GenerateContentResponse};
 
 // Re-export Interactions API types for convenient access
 pub use genai_client::{
@@ -16,6 +19,18 @@ pub use content_api::{
     build_content_request, model_function_call, model_function_calls_request, model_text,
     user_text, user_tool_response,
 };
+
+// NEW: Interactions API helper functions
+pub mod interactions_api;
+pub use interactions_api::{
+    audio_data_content, audio_uri_content, build_interaction_input, function_call_content,
+    function_response_content, image_data_content, image_uri_content, text_content, text_input,
+    thought_content, video_data_content, video_uri_content,
+};
+
+// Builder traits module - provides shared builder functionality
+pub mod builder_traits;
+pub use builder_traits::WithFunctionCalling;
 
 pub mod client;
 pub use client::{Client, ClientBuilder};

@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
 
-use crate::types::FunctionDeclaration; // Assuming FunctionDeclaration is in crate::types
+use crate::FunctionDeclaration;
 
 /// Represents an error that can occur during function execution.
 #[derive(Debug)]
@@ -78,7 +78,7 @@ impl FunctionRegistry {
 
     /// Registers a function directly.
     fn register_raw(&mut self, function: Box<dyn CallableFunction>) {
-        let name = function.declaration().name;
+        let name = function.declaration().name().to_string();
         if self.functions.contains_key(&name) {
             warn!(
                 "Duplicate function name in auto-registration: function='{}'. Last registration will be used.",
@@ -121,7 +121,7 @@ pub(crate) fn get_global_function_registry() -> &'static FunctionRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::FunctionDeclaration; // Assuming FunctionDeclaration is in crate::types
+    use crate::FunctionDeclaration;
     use async_trait::async_trait;
     use serde_json::json;
 
@@ -132,15 +132,15 @@ mod tests {
     #[async_trait]
     impl CallableFunction for TestFunctionGlobal {
         fn declaration(&self) -> FunctionDeclaration {
-            FunctionDeclaration {
-                name: "test_function_global".to_string(),
-                description: "A global test function".to_string(),
-                parameters: Some(json!({
-                    "type": "object",
-                    "properties": {"param": {"type": "string"}}
-                })),
-                required: vec!["param".to_string()],
-            }
+            FunctionDeclaration::new(
+                "test_function_global".to_string(),
+                "A global test function".to_string(),
+                genai_client::FunctionParameters::new(
+                    "object".to_string(),
+                    json!({"param": {"type": "string"}}),
+                    vec!["param".to_string()],
+                ),
+            )
         }
 
         async fn call(&self, args: Value) -> Result<Value, FunctionError> {
@@ -175,7 +175,7 @@ mod tests {
             "Function 'test_function_global' should be in the global registry."
         );
         assert_eq!(
-            retrieved_func.unwrap().declaration().name,
+            retrieved_func.unwrap().declaration().name(),
             "test_function_global"
         );
     }

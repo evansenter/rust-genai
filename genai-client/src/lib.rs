@@ -16,6 +16,7 @@ pub use models::shared::FunctionCall;
 pub use models::shared::FunctionCallingConfig;
 pub use models::shared::FunctionCallingMode;
 pub use models::shared::FunctionDeclaration;
+pub use models::shared::FunctionDeclarationBuilder;
 pub use models::shared::FunctionParameters;
 pub use models::shared::FunctionResponse;
 pub use models::shared::Part;
