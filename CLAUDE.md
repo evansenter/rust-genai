@@ -189,6 +189,9 @@ Tests are organized into two categories:
   - `macro_tests.rs`: Procedural macro functionality
   - `function_calling_tests.rs`: Function execution system
   - `content_api_tests.rs`: Conversation helper functions
+  - `auto_function_tests.rs`: Auto-function execution tests (requires HTTP mocking)
+  - `content_api_edge_cases.rs`: Edge cases for content API helper functions
+  - `interaction_builder_edge_cases.rs`: InteractionBuilder edge cases and validation tests
 
 Integration tests that require a real API key use `#[ignore]` attribute and must be run with `cargo test -- --ignored`.
 

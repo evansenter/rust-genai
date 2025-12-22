@@ -42,4 +42,3 @@ inventory = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
-wiremock = "0.6"
