@@ -217,11 +217,12 @@ Hooks are automatically executed at specific points during development:
 - Checks if the project builds successfully
 - Located at: `.claude/hooks/session_init.sh`
 
-**Stop Hook (Intelligent Task Completion)**:
-- Uses AI to evaluate if all tasks are complete
-- Considers whether tests should run after code changes
-- Checks for compilation warnings or pending documentation
-- Helps ensure thorough testing before finishing
+**Stop Hook (Pre-Push Validation)**:
+- Automatically runs before considering work complete
+- Matches CI checks exactly to catch issues before pushing
+- Runs: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo check`, unit tests
+- Ensures all changes will pass CI before being pushed
+- Located at: `.claude/hooks/stop.sh`
 
 ### Skills
 
