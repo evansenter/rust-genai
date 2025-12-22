@@ -14,7 +14,7 @@ async fn test_auto_functions_missing_initial_prompt() {
     // Test that generate_with_auto_functions fails without a prompt
     let client = Client::new("test-api-key".to_string(), None);
     let result = client
-        .with_model("gemini-pro")
+        .with_model("gemini-3-flash-preview")
         // No .with_prompt() or .with_initial_user_text()
         .generate_with_auto_functions()
         .await;

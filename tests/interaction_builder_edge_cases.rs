@@ -25,7 +25,7 @@ fn test_interaction_builder_with_complex_content_input() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-pro")
+        .with_model("gemini-3-flash-preview")
         .with_input(complex_input);
 
     // Verify the builder stored the complex input correctly
@@ -54,7 +54,7 @@ fn test_interaction_builder_with_both_model_and_agent_set() {
 
     let _builder = client
         .interaction()
-        .with_model("gemini-pro")
+        .with_model("gemini-3-flash-preview")
         .with_agent("my-agent")
         .with_text("Hello");
 
@@ -71,7 +71,7 @@ fn test_interaction_builder_with_very_long_text() {
 
     let _builder = client
         .interaction()
-        .with_model("gemini-pro")
+        .with_model("gemini-3-flash-preview")
         .with_text(&long_text);
 
     // Builder accepts large text inputs without size validation
@@ -88,7 +88,7 @@ fn test_interaction_builder_with_unicode_and_emojis() {
 
     let _builder = client
         .interaction()
-        .with_model("gemini-pro")
+        .with_model("gemini-3-flash-preview")
         .with_text(unicode_text);
 
     // Builder handles Unicode and multi-byte characters correctly
@@ -100,7 +100,10 @@ fn test_interaction_builder_with_empty_text() {
     // Test with empty string input
     let client = Client::new("test-api-key".to_string(), None);
 
-    let _builder = client.interaction().with_model("gemini-pro").with_text("");
+    let _builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("");
 
     // Builder allows empty string inputs without validation
     // The API determines whether empty text is acceptable for a given request
@@ -116,7 +119,7 @@ fn test_interaction_builder_with_multiple_functions() {
 
     let mut builder = client
         .interaction()
-        .with_model("gemini-pro")
+        .with_model("gemini-3-flash-preview")
         .with_text("Test");
 
     // Add 10 functions
@@ -154,7 +157,7 @@ fn test_interaction_builder_with_complex_generation_config() {
 
     let _builder = client
         .interaction()
-        .with_model("gemini-pro")
+        .with_model("gemini-3-flash-preview")
         .with_text("Test")
         .with_generation_config(config);
 
@@ -192,7 +195,7 @@ fn test_interaction_builder_with_response_format_json_schema() {
 
     let _builder = client
         .interaction()
-        .with_model("gemini-pro")
+        .with_model("gemini-3-flash-preview")
         .with_text("Generate a person")
         .with_response_format(complex_schema);
 
@@ -261,7 +264,7 @@ fn test_interaction_builder_with_all_features_combined() {
 
     let _builder = client
         .interaction()
-        .with_model("gemini-pro")
+        .with_model("gemini-3-flash-preview")
         .with_text("Complex query")
         .with_system_instruction("Be helpful")
         .with_function(func)
@@ -281,7 +284,7 @@ fn test_interaction_builder_method_chaining() {
 
     let _builder = client
         .interaction()
-        .with_model("gemini-pro")
+        .with_model("gemini-3-flash-preview")
         .with_text("Test 1")
         .with_text("Test 2") // Overwrites previous text
         .with_system_instruction("Instruction 1")
@@ -299,7 +302,7 @@ fn test_interaction_builder_validation_missing_input() {
     // Verify that build_request fails when no input is provided
     let client = Client::new("test-api-key".to_string(), None);
 
-    let builder = client.interaction().with_model("gemini-pro");
+    let builder = client.interaction().with_model("gemini-3-flash-preview");
 
     let result = builder.build_request();
 
@@ -339,13 +342,13 @@ fn test_interaction_builder_validation_success_with_model() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-pro")
+        .with_model("gemini-3-flash-preview")
         .with_text("Hello");
 
     let result = builder.build_request();
     assert!(result.is_ok());
 
     let request = result.unwrap();
-    assert_eq!(request.model.as_deref(), Some("gemini-pro"));
+    assert_eq!(request.model.as_deref(), Some("gemini-3-flash-preview"));
     assert!(request.agent.is_none());
 }
