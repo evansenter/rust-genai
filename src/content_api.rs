@@ -1,7 +1,5 @@
-use genai_client::models::request::{
-    FunctionCall, FunctionResponse, GenerateContentRequest as InternalGenerateContentRequest,
-};
-use genai_client::{Content, Part, Tool};
+use genai_client::models::request::GenerateContentRequest as InternalGenerateContentRequest;
+use genai_client::{Content, FunctionCall, FunctionResponse, Part, Tool};
 use serde_json::Value;
 
 /// Creates a user content block from a text string.

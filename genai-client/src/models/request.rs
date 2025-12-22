@@ -1,5 +1,9 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
+// Import shared types used by multiple APIs
+use super::shared::{Content, Tool, ToolConfig};
+
+/// Request body for the generateContent API endpoint
 #[derive(Clone, Serialize, Debug)]
 pub struct GenerateContentRequest {
     pub contents: Vec<Content>,
@@ -13,90 +17,9 @@ pub struct GenerateContentRequest {
     // safetySettings: Option<Vec<SafetySetting>>, // Example for future addition
 }
 
-#[derive(Clone, Serialize, Debug)]
-pub struct Content {
-    pub parts: Vec<Part>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub role: Option<String>,
-}
-
-#[derive(Clone, Serialize, Debug)]
-pub struct Part {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub text: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_call: Option<FunctionCall>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_response: Option<FunctionResponse>,
-    // Add other part types later e.g.:
-    // pub inline_data: Option<Blob>,
-}
-
-#[derive(Clone, Serialize, Debug, Default)]
-pub struct Tool {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_declarations: Option<Vec<FunctionDeclaration>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub code_execution: Option<CodeExecution>,
-}
-
-#[derive(Clone, Serialize, Debug, Default)]
-pub struct CodeExecution {
-    // No fields, as per API documentation for the basic CodeExecution tool.
-}
-
-#[derive(Clone, Serialize, Debug)]
-pub struct FunctionDeclaration {
-    pub name: String,
-    pub description: String,
-    pub parameters: FunctionParameters,
-}
-
-#[derive(Clone, Serialize, Debug)]
-pub struct FunctionParameters {
-    #[serde(rename = "type")]
-    pub type_: String,
-    pub properties: serde_json::Value,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub required: Vec<String>,
-}
-
-#[derive(Clone, Serialize, Debug)]
-pub struct FunctionCall {
-    pub name: String,
-    pub args: serde_json::Value,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct FunctionResponse {
-    pub name: String,
-    pub response: serde_json::Value,
-}
-
-#[derive(Clone, Serialize, Debug)]
-pub struct ToolConfig {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_calling_config: Option<FunctionCallingConfig>,
-}
-
-#[derive(Clone, Serialize, Debug)]
-pub struct FunctionCallingConfig {
-    #[serde(rename = "mode")]
-    pub mode: FunctionCallingMode,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub allowed_function_names: Option<Vec<String>>,
-}
-
-#[derive(Clone, Serialize, Debug)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum FunctionCallingMode {
-    Auto,
-    Any,
-    None,
-}
-
 #[cfg(test)]
 mod tests {
+    use super::super::shared::{Content, FunctionDeclaration, FunctionParameters, Part};
     use super::*;
     use serde_json;
 

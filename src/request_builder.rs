@@ -6,13 +6,12 @@ use crate::types::{
     FunctionCall as PublicFunctionCall, FunctionDeclaration, GenerateContentResponse,
 };
 
-use futures_util::StreamExt;
+use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
-    self, models::request::Content as InternalContent,
-    models::request::FunctionCall as InternalFunctionCall,
+    self, Content as InternalContent, CreateInteractionRequest,
+    FunctionCall as InternalFunctionCall, GenerationConfig, InteractionInput, InteractionResponse,
+    Part as InternalPart, Tool as InternalTool, ToolConfig as InternalToolConfig,
     models::request::GenerateContentRequest as InternalGenerateContentRequest,
-    models::request::Part as InternalPart, models::request::Tool as InternalTool,
-    models::request::ToolConfig as InternalToolConfig,
 };
 use serde_json::{Value, json};
 
@@ -72,14 +71,14 @@ impl<'a> GenerateContentBuilder<'a> {
             .unwrap_or("object")
             .to_string();
 
-        let internal_function_parameters = genai_client::models::request::FunctionParameters {
+        let internal_function_parameters = genai_client::FunctionParameters {
             type_: schema_type,
             properties: schema_properties,
             required: function.required,
         };
 
         InternalTool {
-            function_declarations: Some(vec![genai_client::models::request::FunctionDeclaration {
+            function_declarations: Some(vec![genai_client::FunctionDeclaration {
                 name: function.name,
                 description: function.description,
                 parameters: internal_function_parameters,
@@ -134,7 +133,7 @@ impl<'a> GenerateContentBuilder<'a> {
     pub fn with_code_execution(mut self) -> Self {
         self.tools.get_or_insert_with(Vec::new).push(InternalTool {
             function_declarations: None,
-            code_execution: Some(genai_client::models::request::CodeExecution::default()),
+            code_execution: Some(genai_client::CodeExecution::default()),
         });
         self
     }
@@ -255,10 +254,10 @@ impl<'a> GenerateContentBuilder<'a> {
                 .generate_from_request(self.model_name, request_body)
                 .await?;
 
-            if let Some(text_part) = &response.text {
-                if response.function_calls.is_none() || !text_part.trim().is_empty() {
-                    conversation_history.push(model_text(text_part.clone()));
-                }
+            if let Some(text_part) = &response.text
+                && (response.function_calls.is_none() || !text_part.trim().is_empty())
+            {
+                conversation_history.push(model_text(text_part.clone()));
             }
 
             if let Some(public_function_calls) = &response.function_calls {
@@ -350,6 +349,255 @@ impl<'a> GenerateContentBuilder<'a> {
         Ok(self
             .client
             .stream_from_request(self.model_name, request_body))
+    }
+}
+
+/// Builder for creating interactions with the Gemini Interactions API.
+///
+/// Provides a fluent interface for constructing interaction requests with models or agents.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use rust_genai::Client;
+/// # use futures_util::StreamExt;
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let client = Client::builder("api_key".to_string()).build();
+///
+/// // Simple interaction with a model
+/// let response = client.interaction()
+///     .with_model("gemini-3-flash-preview")
+///     .with_text("What is the capital of France?")
+///     .create()
+///     .await?;
+///
+/// // Streaming interaction with tools
+/// let mut stream = client.interaction()
+///     .with_model("gemini-3-flash-preview")
+///     .with_text("Calculate 2 + 2")
+///     .with_tools(vec![/* tools */])
+///     .create_stream();
+///
+/// while let Some(chunk) = stream.next().await {
+///     println!("{:?}", chunk?);
+/// }
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug)]
+pub struct InteractionBuilder<'a> {
+    client: &'a Client,
+    model: Option<String>,
+    agent: Option<String>,
+    input: Option<InteractionInput>,
+    previous_interaction_id: Option<String>,
+    tools: Option<Vec<InternalTool>>,
+    response_modalities: Option<Vec<String>>,
+    response_format: Option<serde_json::Value>,
+    generation_config: Option<GenerationConfig>,
+    background: Option<bool>,
+    store: Option<bool>,
+    system_instruction: Option<InteractionInput>,
+}
+
+impl<'a> InteractionBuilder<'a> {
+    /// Creates a new interaction builder.
+    pub(crate) const fn new(client: &'a Client) -> Self {
+        Self {
+            client,
+            model: None,
+            agent: None,
+            input: None,
+            previous_interaction_id: None,
+            tools: None,
+            response_modalities: None,
+            response_format: None,
+            generation_config: None,
+            background: None,
+            store: None,
+            system_instruction: None,
+        }
+    }
+
+    /// Sets the model to use for this interaction (e.g., "gemini-3-flash-preview").
+    ///
+    /// Note: Mutually exclusive with `with_agent()`.
+    pub fn with_model(mut self, model: impl Into<String>) -> Self {
+        self.model = Some(model.into());
+        self
+    }
+
+    /// Sets the agent to use for this interaction (e.g., "deep-research-pro-preview-12-2025").
+    ///
+    /// Note: Mutually exclusive with `with_model()`.
+    pub fn with_agent(mut self, agent: impl Into<String>) -> Self {
+        self.agent = Some(agent.into());
+        self
+    }
+
+    /// Sets the input for this interaction from an `InteractionInput`.
+    ///
+    /// For simple text input, prefer `with_text()`.
+    pub fn with_input(mut self, input: InteractionInput) -> Self {
+        self.input = Some(input);
+        self
+    }
+
+    /// Sets a simple text input for this interaction.
+    ///
+    /// This is a convenience method that creates an `InteractionInput::Text`.
+    pub fn with_text(mut self, text: impl Into<String>) -> Self {
+        self.input = Some(InteractionInput::Text(text.into()));
+        self
+    }
+
+    /// References a previous interaction for stateful conversations.
+    ///
+    /// The interaction will have access to the context from the previous interaction.
+    pub fn with_previous_interaction(mut self, id: impl Into<String>) -> Self {
+        self.previous_interaction_id = Some(id.into());
+        self
+    }
+
+    /// Adds tools for function calling.
+    pub fn with_tools(mut self, tools: Vec<InternalTool>) -> Self {
+        self.tools = Some(tools);
+        self
+    }
+
+    /// Adds a single function as a tool.
+    ///
+    /// This is a convenience method for adding one function at a time.
+    pub fn with_function(mut self, func: FunctionDeclaration) -> Self {
+        let tool = GenerateContentBuilder::convert_public_fn_decl_to_tool(func);
+        match &mut self.tools {
+            Some(tools) => tools.push(tool),
+            None => self.tools = Some(vec![tool]),
+        }
+        self
+    }
+
+    /// Sets response modalities (e.g., ["IMAGE"]).
+    pub fn with_response_modalities(mut self, modalities: Vec<String>) -> Self {
+        self.response_modalities = Some(modalities);
+        self
+    }
+
+    /// Sets a JSON schema for structured output.
+    pub fn with_response_format(mut self, format: serde_json::Value) -> Self {
+        self.response_format = Some(format);
+        self
+    }
+
+    /// Sets generation configuration (temperature, max tokens, etc.).
+    pub fn with_generation_config(mut self, config: GenerationConfig) -> Self {
+        self.generation_config = Some(config);
+        self
+    }
+
+    /// Enables background execution mode (agents only).
+    pub fn with_background(mut self, background: bool) -> Self {
+        self.background = Some(background);
+        self
+    }
+
+    /// Controls whether interaction data is persisted (default: true).
+    pub fn with_store(mut self, store: bool) -> Self {
+        self.store = Some(store);
+        self
+    }
+
+    /// Sets a system instruction for the model.
+    pub fn with_system_instruction(mut self, instruction: impl Into<String>) -> Self {
+        self.system_instruction = Some(InteractionInput::Text(instruction.into()));
+        self
+    }
+
+    /// Creates the interaction and returns the response.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - No input was provided
+    /// - Neither model nor agent was specified
+    /// - The API request fails
+    pub async fn create(self) -> Result<InteractionResponse, GenaiError> {
+        let client = self.client;
+        let request = self.build_request()?;
+        client.create_interaction(request).await
+    }
+
+    /// Creates a streaming interaction that yields chunks as they arrive.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if:
+    /// - No input was provided
+    /// - Neither model nor agent was specified
+    /// - The API request fails
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # use futures_util::StreamExt;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api_key".to_string()).build();
+    ///
+    /// let mut stream = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Count to 5")
+    ///     .create_stream();
+    ///
+    /// while let Some(chunk) = stream.next().await {
+    ///     let response = chunk?;
+    ///     println!("{:?}", response);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn create_stream(self) -> BoxStream<'a, Result<InteractionResponse, GenaiError>> {
+        let client = self.client;
+        Box::pin(async_stream::try_stream! {
+            let request = self.build_request()?;
+            let mut stream = client.create_interaction_stream(request);
+
+            while let Some(result) = stream.next().await {
+                yield result?;
+            }
+        })
+    }
+
+    /// Builds the `CreateInteractionRequest` from the builder state.
+    fn build_request(self) -> Result<CreateInteractionRequest, GenaiError> {
+        // Validate that we have input
+        let input = self.input.ok_or_else(|| {
+            GenaiError::InvalidInput("Input is required for interaction".to_string())
+        })?;
+
+        // Validate that we have either model or agent
+        if self.model.is_none() && self.agent.is_none() {
+            return Err(GenaiError::InvalidInput(
+                "Either model or agent must be specified".to_string(),
+            ));
+        }
+
+        Ok(CreateInteractionRequest {
+            model: self.model,
+            agent: self.agent,
+            input,
+            previous_interaction_id: self.previous_interaction_id,
+            tools: self.tools,
+            response_modalities: self.response_modalities,
+            response_format: self.response_format,
+            generation_config: self.generation_config,
+            stream: None, // Set by create() vs create_stream()
+            background: self.background,
+            store: self.store,
+            system_instruction: self.system_instruction,
+        })
     }
 }
 
@@ -465,5 +713,193 @@ mod tests {
 
         assert!(builder.tools.is_some());
         assert_eq!(builder.tools.as_ref().unwrap().len(), 1);
+    }
+
+    // --- InteractionBuilder Tests ---
+
+    #[test]
+    fn test_interaction_builder_with_model() {
+        let client = create_test_client();
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Hello");
+
+        assert_eq!(builder.model.as_deref(), Some("gemini-3-flash-preview"));
+        assert!(builder.agent.is_none());
+        assert!(matches!(
+            builder.input,
+            Some(genai_client::InteractionInput::Text(_))
+        ));
+    }
+
+    #[test]
+    fn test_interaction_builder_with_agent() {
+        let client = create_test_client();
+        let builder = client
+            .interaction()
+            .with_agent("deep-research-pro")
+            .with_text("Research topic");
+
+        assert!(builder.model.is_none());
+        assert_eq!(builder.agent.as_deref(), Some("deep-research-pro"));
+    }
+
+    #[test]
+    fn test_interaction_builder_with_previous_interaction() {
+        let client = create_test_client();
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Follow-up question")
+            .with_previous_interaction("interaction_123");
+
+        assert_eq!(
+            builder.previous_interaction_id.as_deref(),
+            Some("interaction_123")
+        );
+    }
+
+    #[test]
+    fn test_interaction_builder_with_system_instruction() {
+        let client = create_test_client();
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Hello")
+            .with_system_instruction("You are a helpful assistant");
+
+        assert!(matches!(
+            builder.system_instruction,
+            Some(genai_client::InteractionInput::Text(_))
+        ));
+    }
+
+    #[test]
+    fn test_interaction_builder_with_generation_config() {
+        let client = create_test_client();
+        let config = genai_client::GenerationConfig {
+            temperature: Some(0.7),
+            max_output_tokens: Some(1000),
+            top_p: Some(0.9),
+            top_k: Some(40),
+            thinking_level: Some("medium".to_string()),
+        };
+
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Hello")
+            .with_generation_config(config.clone());
+
+        assert!(builder.generation_config.is_some());
+        assert_eq!(
+            builder.generation_config.as_ref().unwrap().temperature,
+            Some(0.7)
+        );
+    }
+
+    #[test]
+    fn test_interaction_builder_with_function() {
+        let client = create_test_client();
+        let func = PublicFunctionDeclaration {
+            name: "test_func".to_string(),
+            description: "Test function".to_string(),
+            parameters: None,
+            required: vec![],
+        };
+
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Call a function")
+            .with_function(func);
+
+        assert!(builder.tools.is_some());
+        assert_eq!(builder.tools.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_interaction_builder_with_background() {
+        let client = create_test_client();
+        let builder = client
+            .interaction()
+            .with_agent("deep-research-pro")
+            .with_text("Long running task")
+            .with_background(true);
+
+        assert_eq!(builder.background, Some(true));
+    }
+
+    #[test]
+    fn test_interaction_builder_with_store() {
+        let client = create_test_client();
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Temporary interaction")
+            .with_store(false);
+
+        assert_eq!(builder.store, Some(false));
+    }
+
+    #[test]
+    fn test_interaction_builder_build_request_success() {
+        let client = create_test_client();
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Hello");
+
+        let result = builder.build_request();
+        assert!(result.is_ok());
+
+        let request = result.unwrap();
+        assert_eq!(request.model.as_deref(), Some("gemini-3-flash-preview"));
+        assert!(matches!(
+            request.input,
+            genai_client::InteractionInput::Text(_)
+        ));
+    }
+
+    #[test]
+    fn test_interaction_builder_build_request_missing_input() {
+        let client = create_test_client();
+        let builder = client.interaction().with_model("gemini-3-flash-preview");
+
+        let result = builder.build_request();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            crate::GenaiError::InvalidInput(_)
+        ));
+    }
+
+    #[test]
+    fn test_interaction_builder_build_request_missing_model_and_agent() {
+        let client = create_test_client();
+        let builder = client.interaction().with_text("Hello");
+
+        let result = builder.build_request();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            crate::GenaiError::InvalidInput(_)
+        ));
+    }
+
+    #[test]
+    fn test_interaction_builder_with_response_modalities() {
+        let client = create_test_client();
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Generate an image")
+            .with_response_modalities(vec!["IMAGE".to_string()]);
+
+        assert_eq!(
+            builder.response_modalities.as_ref().unwrap(),
+            &vec!["IMAGE".to_string()]
+        );
     }
 }
