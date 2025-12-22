@@ -2,7 +2,7 @@
 // Verifies that both GenerateContentBuilder and InteractionBuilder
 // behave identically when using trait methods
 
-use rust_genai::{Client, FunctionDeclaration, FunctionParameters, WithFunctionCalling};
+use rust_genai::{Client, FunctionDeclaration, WithFunctionCalling};
 use serde_json::json;
 
 fn create_test_client() -> Client {

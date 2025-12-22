@@ -25,7 +25,7 @@
 /// # Example
 ///
 /// ```no_run
-/// use rust_genai::{Client, FunctionDeclaration};
+/// use rust_genai::{Client, FunctionDeclaration, WithFunctionCalling};
 ///
 /// let client = Client::new("api-key".to_string(), None);
 /// let func = FunctionDeclaration::builder("get_weather")
@@ -76,7 +76,7 @@ pub trait WithFunctionCalling: Sized {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::{Client, FunctionDeclaration};
+    /// use rust_genai::{Client, FunctionDeclaration, WithFunctionCalling};
     /// use serde_json::json;
     ///
     /// let client = Client::new("api-key".to_string(), None);
@@ -104,7 +104,7 @@ pub trait WithFunctionCalling: Sized {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::{Client, FunctionDeclaration};
+    /// use rust_genai::{Client, FunctionDeclaration, WithFunctionCalling};
     ///
     /// let client = Client::new("api-key".to_string(), None);
     ///

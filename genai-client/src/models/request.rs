@@ -19,7 +19,7 @@ pub struct GenerateContentRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::super::shared::{Content, FunctionDeclaration, FunctionParameters, Part};
+    use super::super::shared::{Content, FunctionDeclaration, Part};
     use super::*;
     use serde_json;
 
@@ -55,25 +55,25 @@ mod tests {
 
     #[test]
     fn test_serialize_function_declaration() {
-        let function = FunctionDeclaration {
-            name: "get_weather".to_string(),
-            description: "Get the current weather in a given location".to_string(),
-            parameters: FunctionParameters {
-                type_: "object".to_string(),
-                properties: serde_json::json!({
-                    "location": {
-                        "type": "string",
-                        "description": "The city and state, e.g. San Francisco, CA"
-                    },
-                    "unit": {
-                        "type": "string",
-                        "enum": ["celsius", "fahrenheit"],
-                        "description": "The temperature unit to use"
-                    }
+        let function = FunctionDeclaration::builder("get_weather")
+            .description("Get the current weather in a given location")
+            .parameter(
+                "location",
+                serde_json::json!({
+                    "type": "string",
+                    "description": "The city and state, e.g. San Francisco, CA"
                 }),
-                required: vec!["location".to_string()],
-            },
-        };
+            )
+            .parameter(
+                "unit",
+                serde_json::json!({
+                    "type": "string",
+                    "enum": ["celsius", "fahrenheit"],
+                    "description": "The temperature unit to use"
+                }),
+            )
+            .required(vec!["location".to_string()])
+            .build();
 
         let json_string = serde_json::to_string(&function).expect("Serialization failed");
         let expected_json = r#"{"name":"get_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"],"description":"The temperature unit to use"}},"required":["location"]}}"#;

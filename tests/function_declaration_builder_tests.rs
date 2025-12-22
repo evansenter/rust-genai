@@ -1,7 +1,7 @@
 // Comprehensive tests for FunctionDeclarationBuilder edge cases
 // These tests ensure the builder handles invalid inputs gracefully
 
-use rust_genai::{FunctionDeclaration, FunctionParameters};
+use rust_genai::FunctionDeclaration;
 use serde_json::json;
 
 #[test]
@@ -42,8 +42,7 @@ fn test_builder_parameter_overwrites_on_duplicate() {
     let location_desc = func
         .parameters()
         .properties()
-        .get("properties")
-        .and_then(|p| p.get("location"))
+        .get("location")
         .and_then(|l| l.get("description"))
         .and_then(|d| d.as_str());
 
@@ -91,13 +90,7 @@ fn test_builder_with_no_parameters() {
         .build();
 
     assert_eq!(func.parameters().type_(), "object");
-    assert!(
-        func.parameters()
-            .properties()
-            .get("properties")
-            .unwrap()
-            .is_object()
-    );
+    assert!(func.parameters().properties().is_object());
     assert!(func.parameters().required().is_empty());
 }
 
@@ -116,7 +109,7 @@ fn test_builder_with_many_parameters() {
     let func = builder.build();
 
     // Verify all parameters were added
-    let properties = func.parameters().properties().get("properties").unwrap();
+    let properties = func.parameters().properties();
 
     for i in 0..20 {
         assert!(properties.get(&format!("param_{}", i)).is_some());
@@ -171,11 +164,7 @@ fn test_builder_complex_nested_schema() {
         .build();
 
     // Verify nested structure is preserved
-    let param = func
-        .parameters()
-        .properties()
-        .get("properties")
-        .and_then(|p| p.get("complex_param"));
+    let param = func.parameters().properties().get("complex_param");
 
     assert!(param.is_some());
     assert!(param.unwrap().get("properties").is_some());
@@ -196,8 +185,7 @@ fn test_builder_with_array_parameter() {
     let param = func
         .parameters()
         .properties()
-        .get("properties")
-        .and_then(|p| p.get("items"))
+        .get("items")
         .and_then(|i| i.get("type"))
         .and_then(|t| t.as_str());
 
@@ -219,8 +207,7 @@ fn test_builder_with_enum_values() {
     let enum_values = func
         .parameters()
         .properties()
-        .get("properties")
-        .and_then(|p| p.get("unit"))
+        .get("unit")
         .and_then(|u| u.get("enum"))
         .and_then(|e| e.as_array());
 

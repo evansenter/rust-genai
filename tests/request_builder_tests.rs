@@ -1,4 +1,4 @@
-use rust_genai::{Client, FunctionDeclaration, FunctionParameters, WithFunctionCalling};
+use rust_genai::{Client, FunctionDeclaration, WithFunctionCalling};
 use serde_json::json;
 
 #[test]
@@ -25,27 +25,14 @@ fn test_request_builder_with_functions() {
     let api_key = "test-key".to_string();
     let client = Client::builder(api_key).build();
 
-    let function1 = FunctionDeclaration {
-        name: "test_func1".to_string(),
-        description: "Test function 1".to_string(),
-        parameters: FunctionParameters {
-            type_: "object".to_string(),
-            properties: json!({
-                "param1": {"type": "string"}
-            }),
-            required: vec![],
-        },
-    };
+    let function1 = FunctionDeclaration::builder("test_func1")
+        .description("Test function 1")
+        .parameter("param1", json!({"type": "string"}))
+        .build();
 
-    let function2 = FunctionDeclaration {
-        name: "test_func2".to_string(),
-        description: "Test function 2".to_string(),
-        parameters: FunctionParameters {
-            type_: "object".to_string(),
-            properties: json!({}),
-            required: vec![],
-        },
-    };
+    let function2 = FunctionDeclaration::builder("test_func2")
+        .description("Test function 2")
+        .build();
 
     // Test single function
     let _builder = client
@@ -67,29 +54,38 @@ fn test_request_builder_function_variants() {
     let client = Client::builder(api_key).build();
 
     // Test function with all parameter types
-    let complex_function = FunctionDeclaration {
-        name: "complex_func".to_string(),
-        description: "A function with various parameter types".to_string(),
-        parameters: FunctionParameters {
-            type_: "object".to_string(),
-            properties: json!({
-                "string_param": {"type": "string", "description": "A string parameter"},
-                "number_param": {"type": "number", "description": "A number parameter"},
-                "boolean_param": {"type": "boolean", "description": "A boolean parameter"},
-                "array_param": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "An array parameter"
-                },
-                "enum_param": {
-                    "type": "string",
-                    "enum": ["option1", "option2", "option3"],
-                    "description": "An enum parameter"
-                }
+    let complex_function = FunctionDeclaration::builder("complex_func")
+        .description("A function with various parameter types")
+        .parameter(
+            "string_param",
+            json!({"type": "string", "description": "A string parameter"}),
+        )
+        .parameter(
+            "number_param",
+            json!({"type": "number", "description": "A number parameter"}),
+        )
+        .parameter(
+            "boolean_param",
+            json!({"type": "boolean", "description": "A boolean parameter"}),
+        )
+        .parameter(
+            "array_param",
+            json!({
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "An array parameter"
             }),
-            required: vec!["string_param".to_string()],
-        },
-    };
+        )
+        .parameter(
+            "enum_param",
+            json!({
+                "type": "string",
+                "enum": ["option1", "option2", "option3"],
+                "description": "An enum parameter"
+            }),
+        )
+        .required(vec!["string_param".to_string()])
+        .build();
 
     let _builder = client
         .with_model("gemini-3-flash-preview")

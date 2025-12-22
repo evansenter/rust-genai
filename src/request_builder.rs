@@ -59,6 +59,10 @@ impl<'a> GenerateContentBuilder<'a> {
     ///
     /// This is the simplest way to set user input and works with all generation methods
     /// including `generate()`, `generate_stream()`, and `generate_with_auto_functions()`.
+    ///
+    /// **Note**: While `with_prompt()` works with `generate_stream()`, the streaming method
+    /// does not support automatic function execution. For function calling with streaming,
+    /// you must manually handle function calls as they arrive in the stream.
     #[must_use]
     pub const fn with_prompt(mut self, prompt: &'a str) -> Self {
         self.prompt_text = Some(prompt);
@@ -573,7 +577,7 @@ impl HasToolsField for InteractionBuilder<'_> {
 mod tests {
     use super::*;
     use crate::builder_traits::WithFunctionCalling;
-    use crate::{Client, FunctionDeclaration, FunctionParameters};
+    use crate::{Client, FunctionDeclaration};
     use serde_json::json;
 
     fn create_test_client() -> Client {

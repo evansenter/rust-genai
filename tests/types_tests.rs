@@ -1,24 +1,15 @@
-use rust_genai::{
-    CodeExecutionResult, FunctionCall, FunctionDeclaration, FunctionParameters,
-    GenerateContentResponse,
-};
+use rust_genai::{CodeExecutionResult, FunctionCall, FunctionDeclaration, GenerateContentResponse};
 use serde_json::json;
 
 #[test]
 fn test_function_declaration_to_tool() {
     // Test basic function declaration
-    let func_decl = FunctionDeclaration {
-        name: "test_function".to_string(),
-        description: "A test function".to_string(),
-        parameters: FunctionParameters {
-            type_: "object".to_string(),
-            properties: json!({
-                "param1": {"type": "string"},
-                "param2": {"type": "number"}
-            }),
-            required: vec!["param1".to_string()],
-        },
-    };
+    let func_decl = FunctionDeclaration::builder("test_function")
+        .description("A test function")
+        .parameter("param1", json!({"type": "string"}))
+        .parameter("param2", json!({"type": "number"}))
+        .required(vec!["param1".to_string()])
+        .build();
 
     let tool = func_decl.into_tool();
 
@@ -28,26 +19,20 @@ fn test_function_declaration_to_tool() {
     assert_eq!(declarations.len(), 1);
 
     let internal_decl = &declarations[0];
-    assert_eq!(internal_decl.name, "test_function");
-    assert_eq!(internal_decl.description, "A test function");
+    assert_eq!(internal_decl.name(), "test_function");
+    assert_eq!(internal_decl.description(), "A test function");
 
     // Verify parameters were properly converted
-    assert_eq!(internal_decl.parameters.type_, "object");
-    assert!(internal_decl.parameters.properties.is_object());
-    assert_eq!(internal_decl.parameters.required, vec!["param1"]);
+    assert_eq!(internal_decl.parameters().type_(), "object");
+    assert!(internal_decl.parameters().properties().is_object());
+    assert_eq!(internal_decl.parameters().required(), vec!["param1"]);
 }
 
 #[test]
 fn test_function_declaration_no_parameters() {
-    let func_decl = FunctionDeclaration {
-        name: "no_params".to_string(),
-        description: "Function with no parameters".to_string(),
-        parameters: FunctionParameters {
-            type_: "object".to_string(),
-            properties: json!({}),
-            required: vec![],
-        },
-    };
+    let func_decl = FunctionDeclaration::builder("no_params")
+        .description("Function with no parameters")
+        .build();
 
     let tool = func_decl.into_tool();
 
@@ -55,32 +40,26 @@ fn test_function_declaration_no_parameters() {
     let internal_decl = &declarations[0];
 
     // Should still have object type and empty properties
-    assert_eq!(internal_decl.parameters.type_, "object");
-    assert!(internal_decl.parameters.properties.is_object());
-    assert!(internal_decl.parameters.required.is_empty());
+    assert_eq!(internal_decl.parameters().type_(), "object");
+    assert!(internal_decl.parameters().properties().is_object());
+    assert!(internal_decl.parameters().required().is_empty());
 }
 
 #[test]
 fn test_function_declaration_with_required_params() {
     // Test function declaration with required parameters
-    let func_decl = FunctionDeclaration {
-        name: "test_func".to_string(),
-        description: "Test".to_string(),
-        parameters: FunctionParameters {
-            type_: "object".to_string(),
-            properties: json!({
-                "a": {"type": "string"},
-                "b": {"type": "string"}
-            }),
-            required: vec!["a".to_string(), "b".to_string()],
-        },
-    };
+    let func_decl = FunctionDeclaration::builder("test_func")
+        .description("Test")
+        .parameter("a", json!({"type": "string"}))
+        .parameter("b", json!({"type": "string"}))
+        .required(vec!["a".to_string(), "b".to_string()])
+        .build();
 
     let tool = func_decl.into_tool();
     let internal_decl = &tool.function_declarations.unwrap()[0];
 
     // Should preserve the required array
-    assert_eq!(internal_decl.parameters.required, vec!["a", "b"]);
+    assert_eq!(internal_decl.parameters().required(), vec!["a", "b"]);
 }
 
 #[test]
@@ -192,31 +171,28 @@ fn test_generate_content_response() {
 
 #[test]
 fn test_function_declaration_serialization() {
-    let func_decl = FunctionDeclaration {
-        name: "serialize_test".to_string(),
-        description: "Test serialization".to_string(),
-        parameters: FunctionParameters {
-            type_: "object".to_string(),
-            properties: json!({
-                "test": {"type": "string"}
-            }),
-            required: vec!["test".to_string()],
-        },
-    };
+    let func_decl = FunctionDeclaration::builder("serialize_test")
+        .description("Test serialization")
+        .parameter("test", json!({"type": "string"}))
+        .required(vec!["test".to_string()])
+        .build();
 
     // Test that it can be serialized and deserialized
     let serialized = serde_json::to_string(&func_decl).unwrap();
     let deserialized: FunctionDeclaration = serde_json::from_str(&serialized).unwrap();
 
-    assert_eq!(deserialized.name, func_decl.name);
-    assert_eq!(deserialized.description, func_decl.description);
-    assert_eq!(deserialized.parameters.type_, func_decl.parameters.type_);
+    assert_eq!(deserialized.name(), func_decl.name());
+    assert_eq!(deserialized.description(), func_decl.description());
     assert_eq!(
-        deserialized.parameters.properties,
-        func_decl.parameters.properties
+        deserialized.parameters().type_(),
+        func_decl.parameters().type_()
     );
     assert_eq!(
-        deserialized.parameters.required,
-        func_decl.parameters.required
+        deserialized.parameters().properties(),
+        func_decl.parameters().properties()
+    );
+    assert_eq!(
+        deserialized.parameters().required(),
+        func_decl.parameters().required()
     );
 }

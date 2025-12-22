@@ -1,5 +1,5 @@
 // Tests for function calling functionality
-use rust_genai::{Client, FunctionDeclaration, FunctionParameters, WithFunctionCalling};
+use rust_genai::{Client, FunctionDeclaration, WithFunctionCalling};
 use serde_json::json;
 use std::env;
 
