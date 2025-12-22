@@ -112,7 +112,7 @@ fn test_builder_with_many_parameters() {
     let properties = func.parameters().properties();
 
     for i in 0..20 {
-        assert!(properties.get(&format!("param_{}", i)).is_some());
+        assert!(properties.get(format!("param_{}", i)).is_some());
     }
 }
 

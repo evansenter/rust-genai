@@ -124,8 +124,8 @@ fn test_interaction_builder_with_multiple_functions() {
 
     // Add 10 functions
     for i in 0..10 {
-        let func = FunctionDeclaration::builder(&format!("function_{}", i))
-            .description(&format!("Function number {}", i))
+        let func = FunctionDeclaration::builder(format!("function_{}", i))
+            .description(format!("Function number {}", i))
             .parameter("param", json!({"type": "string"}))
             .required(vec!["param".to_string()])
             .build();
