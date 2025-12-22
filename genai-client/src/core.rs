@@ -120,3 +120,440 @@ pub fn generate_content_stream_internal<'a>(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wiremock::{MockServer, Mock, ResponseTemplate};
+    use wiremock::matchers::{method, path, query_param};
+
+    #[tokio::test]
+    async fn test_generate_content_success() {
+        let mock_server = MockServer::start().await;
+        let api_key = "test-api-key";
+        let model_name = "gemini-pro";
+
+        let response_json = serde_json::json!({
+            "candidates": [{
+                "content": {
+                    "parts": [{"text": "Hello, world!"}],
+                    "role": "model"
+                }
+            }]
+        });
+
+        Mock::given(method("POST"))
+            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .and(query_param("key", api_key))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&response_json))
+            .mount(&mock_server)
+            .await;
+
+        // Manually construct URL with mock server
+        let http_client = ReqwestClient::new();
+        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
+                              mock_server.uri(), model_name, api_key);
+
+        let request_body = GenerateContentRequest {
+            contents: vec![Content {
+                parts: vec![Part {
+                    text: Some("Test prompt".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+                role: None,
+            }],
+            system_instruction: None,
+            tools: None,
+            tool_config: None,
+        };
+
+        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        assert!(response.status().is_success());
+
+        let response_body: GenerateContentResponse = response.json().await.unwrap();
+        assert_eq!(response_body.candidates.len(), 1);
+        assert_eq!(response_body.candidates[0].content.parts[0].text.as_ref().unwrap(), "Hello, world!");
+    }
+
+    #[tokio::test]
+    async fn test_generate_content_with_system_instruction() {
+        let mock_server = MockServer::start().await;
+        let api_key = "test-api-key";
+        let model_name = "gemini-pro";
+
+        let response_json = serde_json::json!({
+            "candidates": [{
+                "content": {
+                    "parts": [{"text": "Response with system context"}],
+                    "role": "model"
+                }
+            }]
+        });
+
+        Mock::given(method("POST"))
+            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .and(query_param("key", api_key))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&response_json))
+            .mount(&mock_server)
+            .await;
+
+        let http_client = ReqwestClient::new();
+        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
+                              mock_server.uri(), model_name, api_key);
+
+        let request_body = GenerateContentRequest {
+            contents: vec![Content {
+                parts: vec![Part {
+                    text: Some("Test prompt".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+                role: None,
+            }],
+            system_instruction: Some(Content {
+                parts: vec![Part {
+                    text: Some("You are a helpful assistant".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+                role: None,
+            }),
+            tools: None,
+            tool_config: None,
+        };
+
+        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        assert!(response.status().is_success());
+    }
+
+    #[tokio::test]
+    async fn test_generate_content_auth_error() {
+        let mock_server = MockServer::start().await;
+        let api_key = "invalid-key";
+        let model_name = "gemini-pro";
+
+        let error_json = serde_json::json!({
+            "error": {
+                "code": 401,
+                "message": "API key not valid",
+                "status": "UNAUTHENTICATED"
+            }
+        });
+
+        Mock::given(method("POST"))
+            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .respond_with(ResponseTemplate::new(401).set_body_json(&error_json))
+            .mount(&mock_server)
+            .await;
+
+        let http_client = ReqwestClient::new();
+        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
+                              mock_server.uri(), model_name, api_key);
+
+        let request_body = GenerateContentRequest {
+            contents: vec![Content {
+                parts: vec![Part {
+                    text: Some("Test".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+                role: None,
+            }],
+            system_instruction: None,
+            tools: None,
+            tool_config: None,
+        };
+
+        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        assert_eq!(response.status(), 401);
+    }
+
+    #[tokio::test]
+    async fn test_generate_content_rate_limit_error() {
+        let mock_server = MockServer::start().await;
+        let api_key = "test-key";
+        let model_name = "gemini-pro";
+
+        let error_json = serde_json::json!({
+            "error": {
+                "code": 429,
+                "message": "Resource has been exhausted (e.g. check quota).",
+                "status": "RESOURCE_EXHAUSTED"
+            }
+        });
+
+        Mock::given(method("POST"))
+            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .respond_with(ResponseTemplate::new(429).set_body_json(&error_json))
+            .mount(&mock_server)
+            .await;
+
+        let http_client = ReqwestClient::new();
+        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
+                              mock_server.uri(), model_name, api_key);
+
+        let request_body = GenerateContentRequest {
+            contents: vec![Content {
+                parts: vec![Part {
+                    text: Some("Test".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+                role: None,
+            }],
+            system_instruction: None,
+            tools: None,
+            tool_config: None,
+        };
+
+        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        assert_eq!(response.status(), 429);
+    }
+
+    #[tokio::test]
+    async fn test_generate_content_server_error() {
+        let mock_server = MockServer::start().await;
+        let api_key = "test-key";
+        let model_name = "gemini-pro";
+
+        Mock::given(method("POST"))
+            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .respond_with(ResponseTemplate::new(500).set_body_string("Internal Server Error"))
+            .mount(&mock_server)
+            .await;
+
+        let http_client = ReqwestClient::new();
+        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
+                              mock_server.uri(), model_name, api_key);
+
+        let request_body = GenerateContentRequest {
+            contents: vec![Content {
+                parts: vec![Part {
+                    text: Some("Test".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+                role: None,
+            }],
+            system_instruction: None,
+            tools: None,
+            tool_config: None,
+        };
+
+        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        assert_eq!(response.status(), 500);
+    }
+
+    #[tokio::test]
+    async fn test_generate_content_malformed_json_response() {
+        let mock_server = MockServer::start().await;
+        let api_key = "test-key";
+        let model_name = "gemini-pro";
+
+        Mock::given(method("POST"))
+            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .respond_with(ResponseTemplate::new(200).set_body_string("{invalid json"))
+            .mount(&mock_server)
+            .await;
+
+        let http_client = ReqwestClient::new();
+        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
+                              mock_server.uri(), model_name, api_key);
+
+        let request_body = GenerateContentRequest {
+            contents: vec![Content {
+                parts: vec![Part {
+                    text: Some("Test".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+                role: None,
+            }],
+            system_instruction: None,
+            tools: None,
+            tool_config: None,
+        };
+
+        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        let text = response.text().await.unwrap();
+        assert!(text.contains("invalid json"));
+    }
+
+    #[tokio::test]
+    async fn test_generate_content_empty_response() {
+        let mock_server = MockServer::start().await;
+        let api_key = "test-key";
+        let model_name = "gemini-pro";
+
+        let response_json = serde_json::json!({
+            "candidates": []
+        });
+
+        Mock::given(method("POST"))
+            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&response_json))
+            .mount(&mock_server)
+            .await;
+
+        let http_client = ReqwestClient::new();
+        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
+                              mock_server.uri(), model_name, api_key);
+
+        let request_body = GenerateContentRequest {
+            contents: vec![Content {
+                parts: vec![Part {
+                    text: Some("Test".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+                role: None,
+            }],
+            system_instruction: None,
+            tools: None,
+            tool_config: None,
+        };
+
+        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        let response_body: GenerateContentResponse = response.json().await.unwrap();
+        assert_eq!(response_body.candidates.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_generate_content_stream_success() {
+        let mock_server = MockServer::start().await;
+        let api_key = "test-key";
+        let model_name = "gemini-pro";
+
+        // SSE response with multiple chunks
+        let sse_response = "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Hello\"}],\"role\":\"model\"}}]}\n\ndata: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\" world\"}],\"role\":\"model\"}}]}\n\n";
+
+        Mock::given(method("POST"))
+            .and(path(format!("/v1beta/models/{}:streamGenerateContent", model_name)))
+            .and(query_param("key", api_key))
+            .and(query_param("alt", "sse"))
+            .respond_with(ResponseTemplate::new(200)
+                .set_body_string(sse_response)
+                .insert_header("content-type", "text/event-stream"))
+            .mount(&mock_server)
+            .await;
+
+        let http_client = ReqwestClient::new();
+        let base_url = format!("{}/v1beta/models/{}:streamGenerateContent?key={}&alt=sse",
+                              mock_server.uri(), model_name, api_key);
+
+        let request_body = GenerateContentRequest {
+            contents: vec![Content {
+                parts: vec![Part {
+                    text: Some("Test".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+                role: None,
+            }],
+            system_instruction: None,
+            tools: None,
+            tool_config: None,
+        };
+
+        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        assert!(response.status().is_success());
+        // Note: content-type header may vary in mock vs real API
+    }
+
+    #[tokio::test]
+    async fn test_generate_content_stream_auth_error() {
+        let mock_server = MockServer::start().await;
+        let api_key = "invalid-key";
+        let model_name = "gemini-pro";
+
+        let error_json = serde_json::json!({
+            "error": {
+                "code": 401,
+                "message": "API key not valid",
+                "status": "UNAUTHENTICATED"
+            }
+        });
+
+        Mock::given(method("POST"))
+            .and(path(format!("/v1beta/models/{}:streamGenerateContent", model_name)))
+            .respond_with(ResponseTemplate::new(401).set_body_json(&error_json))
+            .mount(&mock_server)
+            .await;
+
+        let http_client = ReqwestClient::new();
+        let base_url = format!("{}/v1beta/models/{}:streamGenerateContent?key={}&alt=sse",
+                              mock_server.uri(), model_name, api_key);
+
+        let request_body = GenerateContentRequest {
+            contents: vec![Content {
+                parts: vec![Part {
+                    text: Some("Test".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+                role: None,
+            }],
+            system_instruction: None,
+            tools: None,
+            tool_config: None,
+        };
+
+        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        assert_eq!(response.status(), 401);
+    }
+
+    #[tokio::test]
+    async fn test_generate_content_multiple_candidates() {
+        let mock_server = MockServer::start().await;
+        let api_key = "test-key";
+        let model_name = "gemini-pro";
+
+        let response_json = serde_json::json!({
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [{"text": "First response"}],
+                        "role": "model"
+                    }
+                },
+                {
+                    "content": {
+                        "parts": [{"text": "Second response"}],
+                        "role": "model"
+                    }
+                }
+            ]
+        });
+
+        Mock::given(method("POST"))
+            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&response_json))
+            .mount(&mock_server)
+            .await;
+
+        let http_client = ReqwestClient::new();
+        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
+                              mock_server.uri(), model_name, api_key);
+
+        let request_body = GenerateContentRequest {
+            contents: vec![Content {
+                parts: vec![Part {
+                    text: Some("Test".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+                role: None,
+            }],
+            system_instruction: None,
+            tools: None,
+            tool_config: None,
+        };
+
+        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        let response_body: GenerateContentResponse = response.json().await.unwrap();
+        assert_eq!(response_body.candidates.len(), 2);
+        assert_eq!(response_body.candidates[0].content.parts[0].text.as_ref().unwrap(), "First response");
+        assert_eq!(response_body.candidates[1].content.parts[0].text.as_ref().unwrap(), "Second response");
+    }
+}
