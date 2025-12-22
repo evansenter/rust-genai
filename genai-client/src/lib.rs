@@ -1,9 +1,10 @@
-// Declare the models, errors, common, core, and interactions modules
+// Declare the models, errors, common, core, interactions, and sse_parser modules
 pub mod common;
 pub mod core;
 pub mod errors;
 pub mod interactions;
 pub mod models;
+pub mod sse_parser;
 
 // Import and selectively re-export the necessary structs from the models module
 

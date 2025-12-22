@@ -1,11 +1,10 @@
 use crate::common::{Endpoint, construct_endpoint_url};
 use crate::errors::InternalError;
 use crate::models::interactions::{CreateInteractionRequest, InteractionResponse};
+use crate::sse_parser::parse_sse_stream;
 use async_stream::try_stream;
-use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
 use reqwest::Client as ReqwestClient;
-use std::str;
 
 /// Creates a new interaction with the Gemini API.
 ///
@@ -57,25 +56,12 @@ pub fn create_interaction_stream<'a>(
 
         let status = response.status();
         if status.is_success() {
-            let mut byte_stream = response.bytes_stream();
-            let mut buffer = Vec::new();
+            let byte_stream = response.bytes_stream();
+            let parsed_stream = parse_sse_stream::<InteractionResponse>(byte_stream);
+            futures_util::pin_mut!(parsed_stream);
 
-            while let Some(chunk_result) = byte_stream.next().await {
-                let chunk: Bytes = chunk_result?;
-                buffer.extend_from_slice(&chunk);
-
-                while let Some(newline_pos) = buffer.iter().position(|&b| b == b'\n') {
-                    let line_bytes_with_newline = buffer.drain(..=newline_pos).collect::<Vec<u8>>();
-                    let line = str::from_utf8(&line_bytes_with_newline)?.trim_end_matches(|c| c == '\n' || c == '\r');
-
-                    if line.starts_with("data:") {
-                        let json_data = line.strip_prefix("data:").unwrap_or("").trim_start();
-                        if !json_data.is_empty() {
-                            let chunk_response: InteractionResponse = serde_json::from_str(json_data)?;
-                            yield chunk_response;
-                        }
-                    }
-                }
+            while let Some(result) = parsed_stream.next().await {
+                yield result?;
             }
         } else {
             let error_text = response.text().await.unwrap_or_else(|_| "Failed to read error body".to_string());

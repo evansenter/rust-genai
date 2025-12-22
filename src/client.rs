@@ -207,39 +207,26 @@ impl Client {
             let status = response.status();
 
             if status.is_success() {
-                let mut byte_stream = response.bytes_stream();
-                let mut buffer = Vec::new();
+                let byte_stream = response.bytes_stream();
+                let parsed_stream = genai_client::sse_parser::parse_sse_stream::<genai_client::models::response::GenerateContentResponse>(byte_stream);
+                futures_util::pin_mut!(parsed_stream);
 
-                while let Some(chunk_result) = byte_stream.next().await {
-                    let chunk = chunk_result?;
-                    buffer.extend_from_slice(&chunk);
+                while let Some(result) = parsed_stream.next().await {
+                    let chunk_response_internal = result?;
 
-                    while let Some(newline_pos) = buffer.iter().position(|&b| b == b'\n') {
-                        let line_bytes = buffer.drain(..=newline_pos).collect::<Vec<u8>>();
-                        let line = str::from_utf8(&line_bytes)?.trim_end_matches(|c| c == '\n' || c == '\r');
+                    if self.debug {
+                        println!("[DEBUG] Stream Chunk: {chunk_response_internal:#?}");
+                    }
 
-                        if self.debug {
-                            println!("[DEBUG] Raw Stream Line: {line}");
-                        }
+                    if let Some(candidate) = chunk_response_internal.candidates.first() {
+                        let processed_parts = process_response_parts(&candidate.content.parts);
 
-                        if line.starts_with("data:") {
-                            let json_data = line.strip_prefix("data:").unwrap_or("").trim_start();
-                            if !json_data.is_empty() {
-                                let chunk_response_internal: genai_client::models::response::GenerateContentResponse =
-                                    serde_json::from_str(json_data)?;
-
-                                if let Some(candidate) = chunk_response_internal.candidates.first() {
-                                    let processed_parts = process_response_parts(&candidate.content.parts);
-
-                                    if processed_parts.text.is_some() || !processed_parts.function_calls.is_empty() || !processed_parts.code_execution_results.is_empty() {
-                                        yield GenerateContentResponse {
-                                            text: processed_parts.text,
-                                            function_calls: if processed_parts.function_calls.is_empty() { None } else { Some(processed_parts.function_calls) },
-                                            code_execution_results: if processed_parts.code_execution_results.is_empty() { None } else { Some(processed_parts.code_execution_results) },
-                                        };
-                                    }
-                                }
-                            }
+                        if processed_parts.text.is_some() || !processed_parts.function_calls.is_empty() || !processed_parts.code_execution_results.is_empty() {
+                            yield GenerateContentResponse {
+                                text: processed_parts.text,
+                                function_calls: if processed_parts.function_calls.is_empty() { None } else { Some(processed_parts.function_calls) },
+                                code_execution_results: if processed_parts.code_execution_results.is_empty() { None } else { Some(processed_parts.code_execution_results) },
+                            };
                         }
                     }
                 }
