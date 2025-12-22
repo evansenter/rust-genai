@@ -132,12 +132,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             } else {
                 println!("Model did not provide a final text response.");
             }
-            if let Some(function_calls) = response.function_calls {
-                if !function_calls.is_empty() {
-                    eprintln!(
-                        "Warning: Final response still contained unhandled function calls: {function_calls:?}"
-                    );
-                }
+            if let Some(function_calls) = response.function_calls
+                && !function_calls.is_empty()
+            {
+                eprintln!(
+                    "Warning: Final response still contained unhandled function calls: {function_calls:?}"
+                );
             }
         }
         Err(e) => {

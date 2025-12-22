@@ -225,18 +225,20 @@ Hooks are automatically executed at specific points during development:
 
 ### Skills
 
-Skills provide reusable workflows via slash commands:
+Skills provide reusable workflows that are automatically invoked by Claude Code when relevant to your request:
 
-**`/test-full`**:
+**`test-full` skill** (auto-invoked when you ask to run tests):
 - Runs complete test suite: `cargo test --all -- --include-ignored --nocapture`
 - Includes integration tests that require `GEMINI_API_KEY`
 - Shows full test output for debugging
+- Example trigger: "Can you run the full test suite?"
 
-**`/review-workspace`**:
+**`review-workspace` skill** (auto-invoked when you ask for a health check):
 - Comprehensive workspace health check
 - Runs: `cargo check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, unit tests
 - Shows recent git commits and workspace summary
 - Useful before commits or when starting work
+- Example trigger: "Can you review the workspace health?"
 
 ### Configuration Files
 

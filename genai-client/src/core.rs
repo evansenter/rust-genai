@@ -124,8 +124,8 @@ pub fn generate_content_stream_internal<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiremock::{MockServer, Mock, ResponseTemplate};
     use wiremock::matchers::{method, path, query_param};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[tokio::test]
     async fn test_generate_content_success() {
@@ -143,7 +143,10 @@ mod tests {
         });
 
         Mock::given(method("POST"))
-            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .and(path(format!(
+                "/v1beta/models/{}:generateContent",
+                model_name
+            )))
             .and(query_param("key", api_key))
             .respond_with(ResponseTemplate::new(200).set_body_json(&response_json))
             .mount(&mock_server)
@@ -151,8 +154,12 @@ mod tests {
 
         // Manually construct URL with mock server
         let http_client = ReqwestClient::new();
-        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
-                              mock_server.uri(), model_name, api_key);
+        let base_url = format!(
+            "{}/v1beta/models/{}:generateContent?key={}",
+            mock_server.uri(),
+            model_name,
+            api_key
+        );
 
         let request_body = GenerateContentRequest {
             contents: vec![Content {
@@ -168,12 +175,23 @@ mod tests {
             tool_config: None,
         };
 
-        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        let response = http_client
+            .post(&base_url)
+            .json(&request_body)
+            .send()
+            .await
+            .unwrap();
         assert!(response.status().is_success());
 
         let response_body: GenerateContentResponse = response.json().await.unwrap();
         assert_eq!(response_body.candidates.len(), 1);
-        assert_eq!(response_body.candidates[0].content.parts[0].text.as_ref().unwrap(), "Hello, world!");
+        assert_eq!(
+            response_body.candidates[0].content.parts[0]
+                .text
+                .as_ref()
+                .unwrap(),
+            "Hello, world!"
+        );
     }
 
     #[tokio::test]
@@ -192,15 +210,22 @@ mod tests {
         });
 
         Mock::given(method("POST"))
-            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .and(path(format!(
+                "/v1beta/models/{}:generateContent",
+                model_name
+            )))
             .and(query_param("key", api_key))
             .respond_with(ResponseTemplate::new(200).set_body_json(&response_json))
             .mount(&mock_server)
             .await;
 
         let http_client = ReqwestClient::new();
-        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
-                              mock_server.uri(), model_name, api_key);
+        let base_url = format!(
+            "{}/v1beta/models/{}:generateContent?key={}",
+            mock_server.uri(),
+            model_name,
+            api_key
+        );
 
         let request_body = GenerateContentRequest {
             contents: vec![Content {
@@ -223,7 +248,12 @@ mod tests {
             tool_config: None,
         };
 
-        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        let response = http_client
+            .post(&base_url)
+            .json(&request_body)
+            .send()
+            .await
+            .unwrap();
         assert!(response.status().is_success());
     }
 
@@ -242,14 +272,21 @@ mod tests {
         });
 
         Mock::given(method("POST"))
-            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .and(path(format!(
+                "/v1beta/models/{}:generateContent",
+                model_name
+            )))
             .respond_with(ResponseTemplate::new(401).set_body_json(&error_json))
             .mount(&mock_server)
             .await;
 
         let http_client = ReqwestClient::new();
-        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
-                              mock_server.uri(), model_name, api_key);
+        let base_url = format!(
+            "{}/v1beta/models/{}:generateContent?key={}",
+            mock_server.uri(),
+            model_name,
+            api_key
+        );
 
         let request_body = GenerateContentRequest {
             contents: vec![Content {
@@ -265,7 +302,12 @@ mod tests {
             tool_config: None,
         };
 
-        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        let response = http_client
+            .post(&base_url)
+            .json(&request_body)
+            .send()
+            .await
+            .unwrap();
         assert_eq!(response.status(), 401);
     }
 
@@ -284,14 +326,21 @@ mod tests {
         });
 
         Mock::given(method("POST"))
-            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .and(path(format!(
+                "/v1beta/models/{}:generateContent",
+                model_name
+            )))
             .respond_with(ResponseTemplate::new(429).set_body_json(&error_json))
             .mount(&mock_server)
             .await;
 
         let http_client = ReqwestClient::new();
-        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
-                              mock_server.uri(), model_name, api_key);
+        let base_url = format!(
+            "{}/v1beta/models/{}:generateContent?key={}",
+            mock_server.uri(),
+            model_name,
+            api_key
+        );
 
         let request_body = GenerateContentRequest {
             contents: vec![Content {
@@ -307,7 +356,12 @@ mod tests {
             tool_config: None,
         };
 
-        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        let response = http_client
+            .post(&base_url)
+            .json(&request_body)
+            .send()
+            .await
+            .unwrap();
         assert_eq!(response.status(), 429);
     }
 
@@ -318,14 +372,21 @@ mod tests {
         let model_name = "gemini-pro";
 
         Mock::given(method("POST"))
-            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .and(path(format!(
+                "/v1beta/models/{}:generateContent",
+                model_name
+            )))
             .respond_with(ResponseTemplate::new(500).set_body_string("Internal Server Error"))
             .mount(&mock_server)
             .await;
 
         let http_client = ReqwestClient::new();
-        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
-                              mock_server.uri(), model_name, api_key);
+        let base_url = format!(
+            "{}/v1beta/models/{}:generateContent?key={}",
+            mock_server.uri(),
+            model_name,
+            api_key
+        );
 
         let request_body = GenerateContentRequest {
             contents: vec![Content {
@@ -341,7 +402,12 @@ mod tests {
             tool_config: None,
         };
 
-        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        let response = http_client
+            .post(&base_url)
+            .json(&request_body)
+            .send()
+            .await
+            .unwrap();
         assert_eq!(response.status(), 500);
     }
 
@@ -352,14 +418,21 @@ mod tests {
         let model_name = "gemini-pro";
 
         Mock::given(method("POST"))
-            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .and(path(format!(
+                "/v1beta/models/{}:generateContent",
+                model_name
+            )))
             .respond_with(ResponseTemplate::new(200).set_body_string("{invalid json"))
             .mount(&mock_server)
             .await;
 
         let http_client = ReqwestClient::new();
-        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
-                              mock_server.uri(), model_name, api_key);
+        let base_url = format!(
+            "{}/v1beta/models/{}:generateContent?key={}",
+            mock_server.uri(),
+            model_name,
+            api_key
+        );
 
         let request_body = GenerateContentRequest {
             contents: vec![Content {
@@ -375,7 +448,12 @@ mod tests {
             tool_config: None,
         };
 
-        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        let response = http_client
+            .post(&base_url)
+            .json(&request_body)
+            .send()
+            .await
+            .unwrap();
         let text = response.text().await.unwrap();
         assert!(text.contains("invalid json"));
     }
@@ -391,14 +469,21 @@ mod tests {
         });
 
         Mock::given(method("POST"))
-            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .and(path(format!(
+                "/v1beta/models/{}:generateContent",
+                model_name
+            )))
             .respond_with(ResponseTemplate::new(200).set_body_json(&response_json))
             .mount(&mock_server)
             .await;
 
         let http_client = ReqwestClient::new();
-        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
-                              mock_server.uri(), model_name, api_key);
+        let base_url = format!(
+            "{}/v1beta/models/{}:generateContent?key={}",
+            mock_server.uri(),
+            model_name,
+            api_key
+        );
 
         let request_body = GenerateContentRequest {
             contents: vec![Content {
@@ -414,7 +499,12 @@ mod tests {
             tool_config: None,
         };
 
-        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        let response = http_client
+            .post(&base_url)
+            .json(&request_body)
+            .send()
+            .await
+            .unwrap();
         let response_body: GenerateContentResponse = response.json().await.unwrap();
         assert_eq!(response_body.candidates.len(), 0);
     }
@@ -429,18 +519,27 @@ mod tests {
         let sse_response = "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Hello\"}],\"role\":\"model\"}}]}\n\ndata: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\" world\"}],\"role\":\"model\"}}]}\n\n";
 
         Mock::given(method("POST"))
-            .and(path(format!("/v1beta/models/{}:streamGenerateContent", model_name)))
+            .and(path(format!(
+                "/v1beta/models/{}:streamGenerateContent",
+                model_name
+            )))
             .and(query_param("key", api_key))
             .and(query_param("alt", "sse"))
-            .respond_with(ResponseTemplate::new(200)
-                .set_body_string(sse_response)
-                .insert_header("content-type", "text/event-stream"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string(sse_response)
+                    .insert_header("content-type", "text/event-stream"),
+            )
             .mount(&mock_server)
             .await;
 
         let http_client = ReqwestClient::new();
-        let base_url = format!("{}/v1beta/models/{}:streamGenerateContent?key={}&alt=sse",
-                              mock_server.uri(), model_name, api_key);
+        let base_url = format!(
+            "{}/v1beta/models/{}:streamGenerateContent?key={}&alt=sse",
+            mock_server.uri(),
+            model_name,
+            api_key
+        );
 
         let request_body = GenerateContentRequest {
             contents: vec![Content {
@@ -456,7 +555,12 @@ mod tests {
             tool_config: None,
         };
 
-        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        let response = http_client
+            .post(&base_url)
+            .json(&request_body)
+            .send()
+            .await
+            .unwrap();
         assert!(response.status().is_success());
         // Note: content-type header may vary in mock vs real API
     }
@@ -476,14 +580,21 @@ mod tests {
         });
 
         Mock::given(method("POST"))
-            .and(path(format!("/v1beta/models/{}:streamGenerateContent", model_name)))
+            .and(path(format!(
+                "/v1beta/models/{}:streamGenerateContent",
+                model_name
+            )))
             .respond_with(ResponseTemplate::new(401).set_body_json(&error_json))
             .mount(&mock_server)
             .await;
 
         let http_client = ReqwestClient::new();
-        let base_url = format!("{}/v1beta/models/{}:streamGenerateContent?key={}&alt=sse",
-                              mock_server.uri(), model_name, api_key);
+        let base_url = format!(
+            "{}/v1beta/models/{}:streamGenerateContent?key={}&alt=sse",
+            mock_server.uri(),
+            model_name,
+            api_key
+        );
 
         let request_body = GenerateContentRequest {
             contents: vec![Content {
@@ -499,7 +610,12 @@ mod tests {
             tool_config: None,
         };
 
-        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        let response = http_client
+            .post(&base_url)
+            .json(&request_body)
+            .send()
+            .await
+            .unwrap();
         assert_eq!(response.status(), 401);
     }
 
@@ -527,14 +643,21 @@ mod tests {
         });
 
         Mock::given(method("POST"))
-            .and(path(format!("/v1beta/models/{}:generateContent", model_name)))
+            .and(path(format!(
+                "/v1beta/models/{}:generateContent",
+                model_name
+            )))
             .respond_with(ResponseTemplate::new(200).set_body_json(&response_json))
             .mount(&mock_server)
             .await;
 
         let http_client = ReqwestClient::new();
-        let base_url = format!("{}/v1beta/models/{}:generateContent?key={}",
-                              mock_server.uri(), model_name, api_key);
+        let base_url = format!(
+            "{}/v1beta/models/{}:generateContent?key={}",
+            mock_server.uri(),
+            model_name,
+            api_key
+        );
 
         let request_body = GenerateContentRequest {
             contents: vec![Content {
@@ -550,10 +673,27 @@ mod tests {
             tool_config: None,
         };
 
-        let response = http_client.post(&base_url).json(&request_body).send().await.unwrap();
+        let response = http_client
+            .post(&base_url)
+            .json(&request_body)
+            .send()
+            .await
+            .unwrap();
         let response_body: GenerateContentResponse = response.json().await.unwrap();
         assert_eq!(response_body.candidates.len(), 2);
-        assert_eq!(response_body.candidates[0].content.parts[0].text.as_ref().unwrap(), "First response");
-        assert_eq!(response_body.candidates[1].content.parts[0].text.as_ref().unwrap(), "Second response");
+        assert_eq!(
+            response_body.candidates[0].content.parts[0]
+                .text
+                .as_ref()
+                .unwrap(),
+            "First response"
+        );
+        assert_eq!(
+            response_body.candidates[1].content.parts[0]
+                .text
+                .as_ref()
+                .unwrap(),
+            "Second response"
+        );
     }
 }

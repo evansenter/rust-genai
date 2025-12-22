@@ -26,7 +26,8 @@ fn main() {
     println!("Hello, world!");
 }
 ```
-That's how you do it!"#.to_string();
+That's how you do it!"#
+        .to_string();
 
     let content = model_text(text.clone());
     assert_eq!(content.parts[0].text, Some(text));

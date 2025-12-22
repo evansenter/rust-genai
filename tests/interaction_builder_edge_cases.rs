@@ -3,8 +3,8 @@
 // These tests verify edge cases and error conditions for the InteractionBuilder.
 // Complementary to the unit tests in src/request_builder.rs
 
-use rust_genai::Client;
 use genai_client::{InteractionContent, InteractionInput};
+use rust_genai::Client;
 
 #[test]
 fn test_interaction_builder_with_complex_content_input() {
@@ -31,7 +31,7 @@ fn test_interaction_builder_with_complex_content_input() {
     // Verify the builder can be created with complex input
     // The actual request would be built when .create() or .create_stream() is called
     // This test verifies the API accepts complex content structures
-    assert!(true, "Builder should accept complex InteractionInput::Content");
+    // If this compiles and runs, the test passes
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn test_interaction_builder_with_both_model_and_agent_set() {
 
     // The builder allows setting both, but the API request will likely fail
     // This tests that the builder API is permissive
-    assert!(true, "Builder should allow setting both model and agent");
+    // If this compiles and runs, the test passes
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn test_interaction_builder_with_very_long_text() {
         .with_text(&long_text);
 
     // Verify builder accepts large text inputs
-    assert!(true, "Builder should accept very long text inputs");
+    // If this compiles and runs, the test passes
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn test_interaction_builder_with_unicode_and_emojis() {
         .with_model("gemini-pro")
         .with_text(unicode_text);
 
-    assert!(true, "Builder should handle unicode and emojis correctly");
+    // If this compiles and runs, the test passes
 }
 
 #[test]
@@ -86,13 +86,10 @@ fn test_interaction_builder_with_empty_text() {
     // Test with empty string input
     let client = Client::new("test-api-key".to_string(), None);
 
-    let _builder = client
-        .interaction()
-        .with_model("gemini-pro")
-        .with_text("");
+    let _builder = client.interaction().with_model("gemini-pro").with_text("");
 
     // Empty text is allowed by the builder
-    assert!(true, "Builder should allow empty text input");
+    // If this compiles and runs, the test passes
 }
 
 #[test]
@@ -124,7 +121,7 @@ fn test_interaction_builder_with_multiple_functions() {
         builder = builder.with_function(func);
     }
 
-    assert!(true, "Builder should handle multiple functions");
+    // If this compiles and runs, the test passes
 }
 
 #[test]
@@ -133,9 +130,9 @@ fn test_interaction_builder_with_complex_generation_config() {
     let client = Client::new("test-api-key".to_string(), None);
 
     let config = genai_client::GenerationConfig {
-        temperature: Some(2.0), // Max value
+        temperature: Some(2.0),        // Max value
         max_output_tokens: Some(8192), // High value
-        top_p: Some(1.0), // Max value
+        top_p: Some(1.0),              // Max value
         top_k: Some(40),
         thinking_level: None,
     };
@@ -146,7 +143,7 @@ fn test_interaction_builder_with_complex_generation_config() {
         .with_text("Test")
         .with_generation_config(config);
 
-    assert!(true, "Builder should accept generation config with boundary values");
+    // If this compiles and runs, the test passes
 }
 
 #[test]
@@ -183,7 +180,7 @@ fn test_interaction_builder_with_response_format_json_schema() {
         .with_text("Generate a person")
         .with_response_format(complex_schema);
 
-    assert!(true, "Builder should accept complex JSON schemas");
+    // If this compiles and runs, the test passes
 }
 
 #[tokio::test]
@@ -256,7 +253,7 @@ fn test_interaction_builder_with_all_features_combined() {
         .with_background(true)
         .with_store(false);
 
-    assert!(true, "Builder should handle all features combined");
+    // If this compiles and runs, the test passes
 }
 
 #[test]
@@ -275,5 +272,5 @@ fn test_interaction_builder_method_chaining() {
         .with_background(true); // Overwrites
 
     // All methods should be chainable
-    assert!(true, "Method chaining should work for all builder methods");
+    // If this compiles and runs, the test passes
 }

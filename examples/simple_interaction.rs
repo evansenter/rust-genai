@@ -35,15 +35,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("\nModel Output:");
                 for output in &response.outputs {
                     match output {
-                        rust_genai::InteractionContent::Text { text } => {
-                            if let Some(t) = text {
-                                println!("{t}");
-                            }
+                        rust_genai::InteractionContent::Text { text: Some(t) } => {
+                            println!("{t}");
                         }
-                        rust_genai::InteractionContent::Thought { text } => {
-                            if let Some(t) = text {
-                                println!("[Thought] {t}");
-                            }
+                        rust_genai::InteractionContent::Thought { text: Some(t) } => {
+                            println!("[Thought] {t}");
                         }
                         _ => {}
                     }

@@ -181,12 +181,21 @@ mod tests {
         }
         "#;
 
-        let response: GenerateContentResponse =
-            serde_json::from_str(response_json).expect("Multiple candidates deserialization failed");
+        let response: GenerateContentResponse = serde_json::from_str(response_json)
+            .expect("Multiple candidates deserialization failed");
         assert_eq!(response.candidates.len(), 3);
-        assert_eq!(response.candidates[0].content.parts[0].text.as_deref(), Some("First candidate"));
-        assert_eq!(response.candidates[1].content.parts[0].text.as_deref(), Some("Second candidate"));
-        assert_eq!(response.candidates[2].content.parts[0].text.as_deref(), Some("Third candidate"));
+        assert_eq!(
+            response.candidates[0].content.parts[0].text.as_deref(),
+            Some("First candidate")
+        );
+        assert_eq!(
+            response.candidates[1].content.parts[0].text.as_deref(),
+            Some("Second candidate")
+        );
+        assert_eq!(
+            response.candidates[2].content.parts[0].text.as_deref(),
+            Some("Third candidate")
+        );
     }
 
     #[test]
@@ -211,9 +220,18 @@ mod tests {
         let response: GenerateContentResponse =
             serde_json::from_str(response_json).expect("Multiple parts deserialization failed");
         assert_eq!(response.candidates[0].content.parts.len(), 3);
-        assert_eq!(response.candidates[0].content.parts[0].text.as_deref(), Some("Part 1"));
-        assert_eq!(response.candidates[0].content.parts[1].text.as_deref(), Some("Part 2"));
-        assert_eq!(response.candidates[0].content.parts[2].text.as_deref(), Some("Part 3"));
+        assert_eq!(
+            response.candidates[0].content.parts[0].text.as_deref(),
+            Some("Part 1")
+        );
+        assert_eq!(
+            response.candidates[0].content.parts[1].text.as_deref(),
+            Some("Part 2")
+        );
+        assert_eq!(
+            response.candidates[0].content.parts[2].text.as_deref(),
+            Some("Part 3")
+        );
     }
 
     #[test]
@@ -238,13 +256,16 @@ mod tests {
         }
         "#;
 
-        let response: GenerateContentResponse =
-            serde_json::from_str(response_json).expect("Code execution result deserialization failed");
+        let response: GenerateContentResponse = serde_json::from_str(response_json)
+            .expect("Code execution result deserialization failed");
         assert_eq!(response.candidates.len(), 1);
         let part = &response.candidates[0].content.parts[0];
         assert!(part.text.is_none());
         assert!(part.function_call.is_none());
-        let code_result = part.code_execution_result.as_ref().expect("Expected code execution result");
+        let code_result = part
+            .code_execution_result
+            .as_ref()
+            .expect("Expected code execution result");
         assert_eq!(code_result.outcome, "OUTCOME_OK");
         assert_eq!(code_result.output, "42");
     }
@@ -276,7 +297,10 @@ mod tests {
         assert_eq!(response.candidates.len(), 1);
         let part = &response.candidates[0].content.parts[0];
         assert!(part.text.is_none());
-        let executable_code = part.executable_code.as_ref().expect("Expected executable code");
+        let executable_code = part
+            .executable_code
+            .as_ref()
+            .expect("Expected executable code");
         assert_eq!(executable_code.language, "PYTHON");
         assert_eq!(executable_code.code, "print('Hello, World!')");
     }
@@ -314,10 +338,24 @@ mod tests {
         let response: GenerateContentResponse =
             serde_json::from_str(response_json).expect("Mixed parts deserialization failed");
         assert_eq!(response.candidates[0].content.parts.len(), 4);
-        assert_eq!(response.candidates[0].content.parts[0].text.as_deref(), Some("Here's the code:"));
-        assert!(response.candidates[0].content.parts[1].executable_code.is_some());
-        assert!(response.candidates[0].content.parts[2].code_execution_result.is_some());
-        assert_eq!(response.candidates[0].content.parts[3].text.as_deref(), Some("The result is 8"));
+        assert_eq!(
+            response.candidates[0].content.parts[0].text.as_deref(),
+            Some("Here's the code:")
+        );
+        assert!(
+            response.candidates[0].content.parts[1]
+                .executable_code
+                .is_some()
+        );
+        assert!(
+            response.candidates[0].content.parts[2]
+                .code_execution_result
+                .is_some()
+        );
+        assert_eq!(
+            response.candidates[0].content.parts[3].text.as_deref(),
+            Some("The result is 8")
+        );
     }
 
     #[test]
@@ -336,8 +374,8 @@ mod tests {
         }
         "#;
 
-        let response: GenerateContentResponse =
-            serde_json::from_str(response_json).expect("Missing optional fields deserialization failed");
+        let response: GenerateContentResponse = serde_json::from_str(response_json)
+            .expect("Missing optional fields deserialization failed");
         assert_eq!(response.candidates.len(), 1);
         let part = &response.candidates[0].content.parts[0];
         assert!(part.text.is_none());
@@ -351,7 +389,10 @@ mod tests {
     fn test_deserialize_malformed_missing_candidates() {
         let response_json = r#"{}"#;
         let result: Result<GenerateContentResponse, _> = serde_json::from_str(response_json);
-        assert!(result.is_err(), "Should fail when candidates field is missing");
+        assert!(
+            result.is_err(),
+            "Should fail when candidates field is missing"
+        );
     }
 
     #[test]
@@ -392,7 +433,10 @@ mod tests {
 
         let response: GenerateContentResponse =
             serde_json::from_str(response_json).expect("Empty text deserialization failed");
-        assert_eq!(response.candidates[0].content.parts[0].text.as_deref(), Some(""));
+        assert_eq!(
+            response.candidates[0].content.parts[0].text.as_deref(),
+            Some("")
+        );
     }
 
     #[test]
@@ -412,6 +456,9 @@ mod tests {
 
         let response: GenerateContentResponse =
             serde_json::from_str(response_json).expect("Unicode text deserialization failed");
-        assert_eq!(response.candidates[0].content.parts[0].text.as_deref(), Some("Hello 世界 🌍 مرحبا"));
+        assert_eq!(
+            response.candidates[0].content.parts[0].text.as_deref(),
+            Some("Hello 世界 🌍 مرحبا")
+        );
     }
 }
