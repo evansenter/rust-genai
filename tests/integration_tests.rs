@@ -17,7 +17,7 @@ async fn test_generate_content_with_system_instruction() {
         return;
     };
     let client = Client::builder(api_key).build();
-    let model_name = "gemini-2.5-flash-preview-05-20";
+    let model_name = "gemini-3-flash-preview";
     let prompt = "What is the capital of France?";
     let system_instruction = "You are a helpful geography expert.";
 
@@ -64,7 +64,7 @@ async fn test_generate_content_without_system_instruction() {
         return;
     };
     let client = Client::builder(api_key).build();
-    let model_name = "gemini-2.5-flash-preview-05-20";
+    let model_name = "gemini-3-flash-preview";
     let prompt = "What is the capital of Germany?";
 
     let result = client
@@ -109,7 +109,7 @@ async fn test_generate_content_stream_with_system_instruction() {
         return;
     };
     let client = Client::builder(api_key).build();
-    let model_name = "gemini-2.5-flash-preview-05-20";
+    let model_name = "gemini-3-flash-preview";
     let prompt = "Why is grass green?";
     let system_instruction = "Explain simply.";
 
@@ -159,7 +159,7 @@ async fn test_generate_content_stream_without_system_instruction() {
         return;
     };
     let client = Client::builder(api_key).build();
-    let model_name = "gemini-2.5-flash-preview-05-20";
+    let model_name = "gemini-3-flash-preview";
     let prompt = "Tell a short joke.";
 
     let stream_result = client

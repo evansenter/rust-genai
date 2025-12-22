@@ -47,5 +47,5 @@ fn test_with_model() {
     // Test creating a builder with various model names
     let _builder = client.with_model("gemini-pro");
     let _builder = client.with_model("gemini-1.5-flash");
-    let _builder = client.with_model("gemini-2.5-flash-preview-05-20");
+    let _builder = client.with_model("gemini-3-flash-preview");
 }

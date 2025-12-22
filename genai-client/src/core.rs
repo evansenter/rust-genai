@@ -1,12 +1,12 @@
 use crate::common::{ApiVersion, construct_url};
 use crate::errors::InternalError;
-use crate::models::request::{Content, GenerateContentRequest, Part};
+use crate::models::request::GenerateContentRequest;
 use crate::models::response::GenerateContentResponse;
+use crate::models::shared::{Content, Part};
+use crate::sse_parser::parse_sse_stream;
 use async_stream::try_stream;
-use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
 use reqwest::Client as ReqwestClient;
-use std::str;
 
 // --- Internal Helper Functions ---
 
@@ -55,12 +55,11 @@ pub async fn generate_content_internal(
 
     let response_body: GenerateContentResponse = serde_json::from_str(&response_text)?;
 
-    if let Some(candidate) = response_body.candidates.first() {
-        if let Some(part) = candidate.content.parts.first() {
-            if let Some(text) = &part.text {
-                return Ok(text.clone());
-            }
-        }
+    if let Some(candidate) = response_body.candidates.first()
+        && let Some(part) = candidate.content.parts.first()
+        && let Some(text) = &part.text
+    {
+        return Ok(text.clone());
     }
     Err(InternalError::Parse(
         "No text content found in response structure".to_string(),
@@ -108,22 +107,12 @@ pub fn generate_content_stream_internal<'a>(
 
         let status = response.status();
         if status.is_success() {
-            let mut byte_stream = response.bytes_stream();
-            let mut buffer = Vec::new();
-            while let Some(chunk_result) = byte_stream.next().await {
-                let chunk: Bytes = chunk_result?;
-                buffer.extend_from_slice(&chunk);
-                while let Some(newline_pos) = buffer.iter().position(|&b| b == b'\n') {
-                    let line_bytes_with_newline = buffer.drain(..=newline_pos).collect::<Vec<u8>>();
-                    let line = str::from_utf8(&line_bytes_with_newline)?.trim_end_matches(|c| c == '\n' || c == '\r');
-                    if line.starts_with("data:") {
-                        let json_data = line.strip_prefix("data:").unwrap_or("").trim_start();
-                        if !json_data.is_empty() {
-                            let chunk_response: GenerateContentResponse = serde_json::from_str(json_data)?;
-                            yield chunk_response;
-                        }
-                    }
-                }
+            let byte_stream = response.bytes_stream();
+            let parsed_stream = parse_sse_stream::<GenerateContentResponse>(byte_stream);
+            futures_util::pin_mut!(parsed_stream);
+
+            while let Some(result) = parsed_stream.next().await {
+                yield result?;
             }
         } else {
             let error_text = response.text().await.unwrap_or_else(|_| "Failed to read error body".to_string());
