@@ -201,6 +201,55 @@ The library supports different API versions via the `ApiVersion` enum in `genai-
 - Currently defaults to `V1Beta`
 - API version affects URL construction in `genai-client/src/core.rs`
 
+## Claude Code Configuration
+
+This project has Claude Code hooks and skills configured in `.claude/` to streamline development workflow.
+
+### Hooks
+
+Hooks are automatically executed at specific points during development:
+
+**PostToolUse Hook (Auto-Format)**:
+- Automatically runs `cargo fmt` on any Rust file after editing
+- Ensures consistent code formatting without manual intervention
+- Configured to run quietly and not fail the workflow
+
+**SessionStart Hook (Environment Check)**:
+- Runs at the start of each Claude Code session
+- Verifies `GEMINI_API_KEY` is set for integration tests
+- Checks if the project builds successfully
+- Located at: `.claude/hooks/session_init.sh`
+
+**Stop Hook (Intelligent Task Completion)**:
+- Uses AI to evaluate if all tasks are complete
+- Considers whether tests should run after code changes
+- Checks for compilation warnings or pending documentation
+- Helps ensure thorough testing before finishing
+
+### Skills
+
+Skills provide reusable workflows via slash commands:
+
+**`/test-full`**:
+- Runs complete test suite: `cargo test --all -- --include-ignored --nocapture`
+- Includes integration tests that require `GEMINI_API_KEY`
+- Shows full test output for debugging
+
+**`/review-workspace`**:
+- Comprehensive workspace health check
+- Runs: `cargo check`, `cargo clippy`, unit tests
+- Shows recent git commits and workspace summary
+- Useful before commits or when starting work
+
+### Configuration Files
+
+- `.claude/settings.json`: Main configuration with hooks and permissions
+- `.claude/hooks/session_init.sh`: Session initialization script
+- `.claude/skills/test-full.yaml` & `test-full.sh`: Full test suite skill
+- `.claude/skills/review-workspace.yaml` & `review-workspace.sh`: Health check skill
+
+**Note**: Changes to hooks require restarting the Claude Code session to take effect.
+
 ## Development Notes
 
 - Rust edition: 2024
