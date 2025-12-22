@@ -120,7 +120,7 @@ mod tests {
     fn test_truncate_for_context_multibyte_characters() {
         // Test with various multi-byte UTF-8: emoji (4 bytes), Chinese (3 bytes), accented (2 bytes)
         let mixed = "Hello 世界 🌍 Café"; // Mix of 1-byte, 2-byte, 3-byte, and 4-byte chars
-        let result = truncate_for_context(&mixed, 15);
+        let result = truncate_for_context(mixed, 15);
 
         // Should produce valid UTF-8 without panicking
         assert!(result.ends_with("..."));
