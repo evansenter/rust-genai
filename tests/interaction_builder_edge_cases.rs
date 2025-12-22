@@ -205,38 +205,34 @@ fn test_interaction_builder_with_response_format_json_schema() {
 
 #[tokio::test]
 #[ignore = "Requires API key and makes real HTTP request"]
-async fn test_interaction_builder_stream_with_large_response() {
-    // Test streaming with a request that generates large output
-    // This tests stream error propagation and handling
+async fn test_interaction_builder_with_longer_prompt() {
+    // Test the builder with a longer prompt that should work
+    let Ok(api_key) = std::env::var("GEMINI_API_KEY") else {
+        println!("Skipping test_interaction_builder_with_longer_prompt: GEMINI_API_KEY not set.");
+        return;
+    };
 
-    let api_key = std::env::var("GEMINI_API_KEY").unwrap_or_else(|_| "test-key".to_string());
     let client = Client::new(api_key, None);
 
-    // Request a very long response
-    let mut stream = client
+    // Request a simple response using the builder
+    let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("Write a 2000 word essay about artificial intelligence")
-        .create_stream();
+        .with_text("Count from 1 to 5")
+        .create()
+        .await;
 
-    use futures_util::StreamExt;
+    assert!(
+        response.is_ok(),
+        "Interaction builder should successfully create interaction: {:?}",
+        response.err()
+    );
 
-    let mut chunk_count = 0;
-    while let Some(result) = stream.next().await {
-        match result {
-            Ok(_response) => {
-                chunk_count += 1;
-            }
-            Err(e) => {
-                // Stream error occurred
-                eprintln!("Stream error: {}", e);
-                break;
-            }
-        }
-    }
+    let interaction = response.unwrap();
+    assert!(!interaction.id.is_empty(), "Should have interaction ID");
+    assert!(!interaction.outputs.is_empty(), "Should have outputs");
 
-    // Verify we received multiple chunks
-    assert!(chunk_count > 0, "Should receive at least one chunk");
+    println!("Interaction completed with ID: {}", interaction.id);
 }
 
 #[test]

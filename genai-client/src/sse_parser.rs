@@ -65,7 +65,8 @@ where
                         .expect("Line should start with 'data:' prefix after check");
                     let json_data = json_data.trim_start();
 
-                    if !json_data.is_empty() {
+                    // Skip empty data lines and [DONE] markers (used by some SSE endpoints)
+                    if !json_data.is_empty() && json_data != "[DONE]" {
                         let parsed: T = serde_json::from_str(json_data).map_err(|e| {
                             let context_msg = format_json_parse_error(json_data, e);
                             InternalError::Parse(context_msg)

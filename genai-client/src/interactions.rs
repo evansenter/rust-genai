@@ -1,7 +1,9 @@
 use crate::common::{Endpoint, construct_endpoint_url};
 use crate::error_helpers::read_error_with_context;
 use crate::errors::InternalError;
-use crate::models::interactions::{CreateInteractionRequest, InteractionResponse};
+use crate::models::interactions::{
+    CreateInteractionRequest, InteractionResponse, InteractionStreamEvent,
+};
 use crate::sse_parser::parse_sse_stream;
 use async_stream::try_stream;
 use futures_util::{Stream, StreamExt};
@@ -61,11 +63,16 @@ pub fn create_interaction_stream<'a>(
         let status = response.status();
         if status.is_success() {
             let byte_stream = response.bytes_stream();
-            let parsed_stream = parse_sse_stream::<InteractionResponse>(byte_stream);
+            let parsed_stream = parse_sse_stream::<InteractionStreamEvent>(byte_stream);
             futures_util::pin_mut!(parsed_stream);
 
             while let Some(result) = parsed_stream.next().await {
-                yield result?;
+                let event = result?;
+                // Only yield events that have the full interaction data
+                // Status update events are skipped as they don't contain the full response
+                if let Some(interaction) = event.interaction {
+                    yield interaction;
+                }
             }
         } else {
             Err(read_error_with_context(response).await)?;
