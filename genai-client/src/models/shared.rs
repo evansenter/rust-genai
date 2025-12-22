@@ -56,6 +56,75 @@ pub struct FunctionParameters {
     pub required: Vec<String>,
 }
 
+impl FunctionDeclaration {
+    /// Creates a builder for ergonomic FunctionDeclaration construction
+    pub fn builder(name: impl Into<String>) -> FunctionDeclarationBuilder {
+        FunctionDeclarationBuilder::new(name)
+    }
+
+    /// Converts this FunctionDeclaration into a Tool for API requests
+    pub fn into_tool(self) -> Tool {
+        Tool {
+            function_declarations: Some(vec![self]),
+            code_execution: None,
+        }
+    }
+}
+
+/// Builder for ergonomic FunctionDeclaration creation
+#[derive(Debug)]
+pub struct FunctionDeclarationBuilder {
+    name: String,
+    description: String,
+    properties: serde_json::Value,
+    required: Vec<String>,
+}
+
+impl FunctionDeclarationBuilder {
+    /// Creates a new builder with the given function name
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            description: String::new(),
+            properties: serde_json::Value::Object(serde_json::Map::new()),
+            required: Vec::new(),
+        }
+    }
+
+    /// Sets the function description
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = description.into();
+        self
+    }
+
+    /// Adds a parameter to the function schema
+    pub fn parameter(mut self, name: &str, schema: serde_json::Value) -> Self {
+        if let serde_json::Value::Object(ref mut map) = self.properties {
+            map.insert(name.to_string(), schema);
+        }
+        self
+    }
+
+    /// Sets the list of required parameter names
+    pub fn required(mut self, required: Vec<String>) -> Self {
+        self.required = required;
+        self
+    }
+
+    /// Builds the FunctionDeclaration
+    pub fn build(self) -> FunctionDeclaration {
+        FunctionDeclaration {
+            name: self.name,
+            description: self.description,
+            parameters: FunctionParameters {
+                type_: "object".to_string(),
+                properties: self.properties,
+                required: self.required,
+            },
+        }
+    }
+}
+
 /// Represents a function call made by the model.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct FunctionCall {

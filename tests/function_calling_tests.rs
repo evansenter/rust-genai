@@ -1,5 +1,5 @@
 // Tests for function calling functionality
-use rust_genai::{Client, FunctionDeclaration};
+use rust_genai::{Client, FunctionDeclaration, FunctionParameters, WithFunctionCalling};
 use serde_json::json;
 use std::env;
 
@@ -17,9 +17,9 @@ async fn test_function_calling_integration() {
     let weather_function = FunctionDeclaration {
         name: "get_weather".to_string(),
         description: "Get the current weather in a given location".to_string(),
-        parameters: Some(json!({
-            "type": "object",
-            "properties": {
+        parameters: FunctionParameters {
+            type_: "object".to_string(),
+            properties: json!({
                 "location": {
                     "type": "string",
                     "description": "The city and state, e.g. San Francisco, CA"
@@ -29,10 +29,9 @@ async fn test_function_calling_integration() {
                     "enum": ["celsius", "fahrenheit"],
                     "description": "The temperature unit"
                 }
-            },
-            "required": ["location"]
-        })),
-        required: vec!["location".to_string()],
+            }),
+            required: vec!["location".to_string()],
+        },
     };
 
     let model = "gemini-3-flash-preview";
@@ -83,10 +82,13 @@ fn test_function_declaration_edge_cases() {
     let func = FunctionDeclaration {
         name: String::new(),
         description: "Empty name function".to_string(),
-        parameters: None,
-        required: vec![],
+        parameters: FunctionParameters {
+            type_: "object".to_string(),
+            properties: json!({}),
+            required: vec![],
+        },
     };
-    let tool = func.to_tool();
+    let tool = func.into_tool();
     assert_eq!(tool.function_declarations.unwrap()[0].name, "");
 
     // Test function with very long description
@@ -94,10 +96,13 @@ fn test_function_declaration_edge_cases() {
     let func = FunctionDeclaration {
         name: "long_desc".to_string(),
         description: long_desc.clone(),
-        parameters: None,
-        required: vec![],
+        parameters: FunctionParameters {
+            type_: "object".to_string(),
+            properties: json!({}),
+            required: vec![],
+        },
     };
-    let tool = func.to_tool();
+    let tool = func.into_tool();
     assert_eq!(
         tool.function_declarations.unwrap()[0].description,
         long_desc
@@ -105,16 +110,13 @@ fn test_function_declaration_edge_cases() {
 
     // Test function with nested objects in parameters
     let nested_params = json!({
-        "type": "object",
-        "properties": {
-            "outer": {
-                "type": "object",
-                "properties": {
-                    "inner": {
-                        "type": "object",
-                        "properties": {
-                            "value": {"type": "string"}
-                        }
+        "outer": {
+            "type": "object",
+            "properties": {
+                "inner": {
+                    "type": "object",
+                    "properties": {
+                        "value": {"type": "string"}
                     }
                 }
             }
@@ -124,10 +126,13 @@ fn test_function_declaration_edge_cases() {
     let func = FunctionDeclaration {
         name: "nested".to_string(),
         description: "Nested parameters".to_string(),
-        parameters: Some(nested_params),
-        required: vec![],
+        parameters: FunctionParameters {
+            type_: "object".to_string(),
+            properties: nested_params,
+            required: vec![],
+        },
     };
 
-    let tool = func.to_tool();
+    let tool = func.into_tool();
     assert!(tool.function_declarations.is_some());
 }

@@ -4,7 +4,7 @@
 // Complementary to the unit tests in src/request_builder.rs
 
 use genai_client::{InteractionContent, InteractionInput};
-use rust_genai::Client;
+use rust_genai::{Client, FunctionDeclaration, FunctionParameters, WithFunctionCalling};
 
 #[test]
 fn test_interaction_builder_with_complex_content_input() {
@@ -127,13 +127,13 @@ fn test_interaction_builder_with_multiple_functions() {
         let func = FunctionDeclaration {
             name: format!("function_{}", i),
             description: format!("Function number {}", i),
-            parameters: Some(json!({
-                "type": "object",
-                "properties": {
+            parameters: FunctionParameters {
+                type_: "object".to_string(),
+                properties: json!({
                     "param": {"type": "string"}
-                }
-            })),
-            required: vec!["param".to_string()],
+                }),
+                required: vec!["param".to_string()],
+            },
         };
         builder = builder.with_function(func);
     }
@@ -238,7 +238,6 @@ async fn test_interaction_builder_with_longer_prompt() {
 #[test]
 fn test_interaction_builder_with_all_features_combined() {
     // Test combining many features simultaneously
-    use rust_genai::FunctionDeclaration;
     use serde_json::json;
 
     let client = Client::new("test-api-key".to_string(), None);
@@ -246,8 +245,11 @@ fn test_interaction_builder_with_all_features_combined() {
     let func = FunctionDeclaration {
         name: "get_weather".to_string(),
         description: "Get weather".to_string(),
-        parameters: Some(json!({"type": "object"})),
-        required: vec![],
+        parameters: FunctionParameters {
+            type_: "object".to_string(),
+            properties: json!({}),
+            required: vec![],
+        },
     };
 
     let config = genai_client::GenerationConfig {

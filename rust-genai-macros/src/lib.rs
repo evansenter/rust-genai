@@ -384,18 +384,21 @@ fn generate_declaration_function(
         #[::async_trait::async_trait]
         impl ::rust_genai::function_calling::CallableFunction for #callable_struct_name {
             fn declaration(&self) -> ::rust_genai::FunctionDeclaration {
+                let properties = match ::serde_json::from_str(#parameters_json_string) {
+                    Ok(p) => p,
+                    Err(_e) => {
+                        panic!("Failed to parse generated parameters JSON for '{}': {}", #func_name, _e);
+                    }
+                };
+
                 ::rust_genai::FunctionDeclaration {
                     name: #func_name.to_string(),
                     description: #func_description.to_string(),
-                    parameters: {
-                        match ::serde_json::from_str(#parameters_json_string) {
-                            Ok(p) => Some(p),
-                            Err(_e) => {
-                                panic!("Failed to parse generated parameters JSON for '{}': {}", #func_name, _e);
-                            }
-                        }
+                    parameters: ::rust_genai::FunctionParameters {
+                        type_: "object".to_string(),
+                        properties,
+                        required: #required_field_tokens,
                     },
-                    required: #required_field_tokens,
                 }
             }
 

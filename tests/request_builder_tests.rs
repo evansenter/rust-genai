@@ -1,4 +1,4 @@
-use rust_genai::{Client, FunctionDeclaration};
+use rust_genai::{Client, FunctionDeclaration, FunctionParameters, WithFunctionCalling};
 use serde_json::json;
 
 #[test]
@@ -28,20 +28,23 @@ fn test_request_builder_with_functions() {
     let function1 = FunctionDeclaration {
         name: "test_func1".to_string(),
         description: "Test function 1".to_string(),
-        parameters: Some(json!({
-            "type": "object",
-            "properties": {
+        parameters: FunctionParameters {
+            type_: "object".to_string(),
+            properties: json!({
                 "param1": {"type": "string"}
-            }
-        })),
-        required: vec![],
+            }),
+            required: vec![],
+        },
     };
 
     let function2 = FunctionDeclaration {
         name: "test_func2".to_string(),
         description: "Test function 2".to_string(),
-        parameters: None,
-        required: vec![],
+        parameters: FunctionParameters {
+            type_: "object".to_string(),
+            properties: json!({}),
+            required: vec![],
+        },
     };
 
     // Test single function
@@ -67,9 +70,9 @@ fn test_request_builder_function_variants() {
     let complex_function = FunctionDeclaration {
         name: "complex_func".to_string(),
         description: "A function with various parameter types".to_string(),
-        parameters: Some(json!({
-            "type": "object",
-            "properties": {
+        parameters: FunctionParameters {
+            type_: "object".to_string(),
+            properties: json!({
                 "string_param": {"type": "string", "description": "A string parameter"},
                 "number_param": {"type": "number", "description": "A number parameter"},
                 "boolean_param": {"type": "boolean", "description": "A boolean parameter"},
@@ -83,10 +86,9 @@ fn test_request_builder_function_variants() {
                     "enum": ["option1", "option2", "option3"],
                     "description": "An enum parameter"
                 }
-            },
-            "required": ["string_param"]
-        })),
-        required: vec!["string_param".to_string()],
+            }),
+            required: vec!["string_param".to_string()],
+        },
     };
 
     let _builder = client

@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
 
-use crate::types::FunctionDeclaration; // Assuming FunctionDeclaration is in crate::types
+use crate::FunctionDeclaration;
 
 /// Represents an error that can occur during function execution.
 #[derive(Debug)]
@@ -121,7 +121,7 @@ pub(crate) fn get_global_function_registry() -> &'static FunctionRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::FunctionDeclaration; // Assuming FunctionDeclaration is in crate::types
+    use crate::FunctionDeclaration;
     use async_trait::async_trait;
     use serde_json::json;
 
@@ -135,11 +135,11 @@ mod tests {
             FunctionDeclaration {
                 name: "test_function_global".to_string(),
                 description: "A global test function".to_string(),
-                parameters: Some(json!({
-                    "type": "object",
-                    "properties": {"param": {"type": "string"}}
-                })),
-                required: vec!["param".to_string()],
+                parameters: genai_client::FunctionParameters {
+                    type_: "object".to_string(),
+                    properties: json!({"param": {"type": "string"}}),
+                    required: vec!["param".to_string()],
+                },
             }
         }
 

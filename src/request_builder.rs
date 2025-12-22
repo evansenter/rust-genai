@@ -1,10 +1,9 @@
 use crate::GenaiError;
+use crate::builder_traits::HasToolsField;
 use crate::client::Client;
 use crate::content_api::{model_function_calls_request, model_text, user_text, user_tool_response};
 use crate::function_calling::get_global_function_registry;
-use crate::types::{
-    FunctionCall as PublicFunctionCall, FunctionDeclaration, GenerateContentResponse,
-};
+use crate::types::{FunctionCall as PublicFunctionCall, GenerateContentResponse};
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
@@ -14,7 +13,7 @@ use genai_client::{
     models::request::GenerateContentRequest as InternalGenerateContentRequest,
 };
 use log::{error, warn};
-use serde_json::{Value, json};
+use serde_json::json;
 
 const MAX_FUNCTION_CALL_LOOPS: usize = 5; // Max iterations for auto function calling
 
@@ -56,38 +55,6 @@ impl<'a> GenerateContentBuilder<'a> {
         }
     }
 
-    /// Helper function to convert public `FunctionDeclaration` to internal Tool.
-    fn convert_public_fn_decl_to_tool(function: FunctionDeclaration) -> InternalTool {
-        let schema_properties = function
-            .parameters
-            .as_ref()
-            .and_then(|p| p.get("properties"))
-            .cloned()
-            .unwrap_or(Value::Null);
-        let schema_type = function
-            .parameters
-            .as_ref()
-            .and_then(|p| p.get("type"))
-            .and_then(Value::as_str)
-            .unwrap_or("object")
-            .to_string();
-
-        let internal_function_parameters = genai_client::FunctionParameters {
-            type_: schema_type,
-            properties: schema_properties,
-            required: function.required,
-        };
-
-        InternalTool {
-            function_declarations: Some(vec![genai_client::FunctionDeclaration {
-                name: function.name,
-                description: function.description,
-                parameters: internal_function_parameters,
-            }]),
-            code_execution: None,
-        }
-    }
-
     /// Sets the prompt text for the request.
     /// Note: If using `generate_with_auto_functions`, prefer `with_initial_user_text` or `with_contents`.
     #[must_use]
@@ -119,16 +86,6 @@ impl<'a> GenerateContentBuilder<'a> {
         self
     }
 
-    /// Adds a function that the model can call.
-    /// Note: For `generate_with_auto_functions`, functions are auto-discovered.
-    /// Explicitly adding functions here might be used if auto-discovery is bypassed or supplemented.
-    #[must_use]
-    pub fn with_function(mut self, function: FunctionDeclaration) -> Self {
-        let tool = Self::convert_public_fn_decl_to_tool(function);
-        self.tools.get_or_insert_with(Vec::new).push(tool);
-        self
-    }
-
     /// Enables the code execution tool for the model.
     #[must_use]
     pub fn with_code_execution(mut self) -> Self {
@@ -136,19 +93,6 @@ impl<'a> GenerateContentBuilder<'a> {
             function_declarations: None,
             code_execution: Some(genai_client::CodeExecution::default()),
         });
-        self
-    }
-
-    #[must_use]
-    pub fn with_functions(mut self, functions: Vec<FunctionDeclaration>) -> Self {
-        let tools_vec = functions
-            .into_iter()
-            .map(Self::convert_public_fn_decl_to_tool)
-            .collect::<Vec<_>>();
-
-        if !tools_vec.is_empty() {
-            self.tools.get_or_insert_with(Vec::new).extend(tools_vec);
-        }
         self
     }
 
@@ -234,7 +178,7 @@ impl<'a> GenerateContentBuilder<'a> {
                 tools_to_send = Some(
                     auto_discovered_declarations
                         .into_iter()
-                        .map(Self::convert_public_fn_decl_to_tool)
+                        .map(|decl| decl.into_tool())
                         .collect(),
                 );
             }
@@ -358,6 +302,13 @@ impl<'a> GenerateContentBuilder<'a> {
     }
 }
 
+// Implement trait for function calling support
+impl HasToolsField for GenerateContentBuilder<'_> {
+    fn get_tools_mut(&mut self) -> &mut Option<Vec<InternalTool>> {
+        &mut self.tools
+    }
+}
+
 /// Builder for creating interactions with the Gemini Interactions API.
 ///
 /// Provides a fluent interface for constructing interaction requests with models or agents.
@@ -469,18 +420,6 @@ impl<'a> InteractionBuilder<'a> {
     /// Adds tools for function calling.
     pub fn with_tools(mut self, tools: Vec<InternalTool>) -> Self {
         self.tools = Some(tools);
-        self
-    }
-
-    /// Adds a single function as a tool.
-    ///
-    /// This is a convenience method for adding one function at a time.
-    pub fn with_function(mut self, func: FunctionDeclaration) -> Self {
-        let tool = GenerateContentBuilder::convert_public_fn_decl_to_tool(func);
-        match &mut self.tools {
-            Some(tools) => tools.push(tool),
-            None => self.tools = Some(vec![tool]),
-        }
         self
     }
 
@@ -611,11 +550,18 @@ impl<'a> InteractionBuilder<'a> {
     }
 }
 
+// Implement trait for function calling support
+impl HasToolsField for InteractionBuilder<'_> {
+    fn get_tools_mut(&mut self) -> &mut Option<Vec<InternalTool>> {
+        &mut self.tools
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Client;
-    use crate::types::FunctionDeclaration as PublicFunctionDeclaration;
+    use crate::builder_traits::WithFunctionCalling;
+    use crate::{Client, FunctionDeclaration, FunctionParameters};
     use serde_json::json;
 
     fn create_test_client() -> Client {
@@ -650,22 +596,18 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_public_fn_decl_to_tool_basic() {
-        let func_decl = PublicFunctionDeclaration {
-            name: "my_func".to_string(),
-            description: "Does something".to_string(),
-            parameters: Some(
-                json!({ "type": "object", "properties": { "arg1": { "type": "string"}}}),
-            ),
-            required: vec!["arg1".to_string()],
-        };
-        let tool = GenerateContentBuilder::convert_public_fn_decl_to_tool(func_decl);
-        assert!(tool.function_declarations.is_some());
-        let decls = tool.function_declarations.unwrap();
-        assert_eq!(decls.len(), 1);
-        assert_eq!(decls[0].name, "my_func");
+    fn test_function_declaration_builder() {
+        let func_decl = FunctionDeclaration::builder("my_func")
+            .description("Does something")
+            .parameter("arg1", json!({"type": "string"}))
+            .required(vec!["arg1".to_string()])
+            .build();
+
+        assert_eq!(func_decl.name, "my_func");
+        assert_eq!(func_decl.description, "Does something");
+        assert_eq!(func_decl.parameters.type_, "object");
         assert_eq!(
-            decls[0]
+            func_decl
                 .parameters
                 .properties
                 .get("arg1")
@@ -675,48 +617,39 @@ mod tests {
                 .as_str(),
             Some("string")
         );
+        assert_eq!(func_decl.parameters.required, vec!["arg1".to_string()]);
     }
 
     #[test]
-    fn test_convert_function_declaration_empty_params() {
-        let func_decl = PublicFunctionDeclaration {
+    fn test_function_declaration_into_tool() {
+        let func_decl = FunctionDeclaration {
             name: "test".to_string(),
-            description: "Test".to_string(),
-            parameters: None,
-            required: vec![],
-        };
-        let tool = GenerateContentBuilder::convert_public_fn_decl_to_tool(func_decl);
-        let internal_func = &tool.function_declarations.as_ref().unwrap()[0];
-        assert_eq!(internal_func.parameters.type_, "object");
-        assert_eq!(internal_func.parameters.properties, Value::Null);
-    }
-
-    #[test]
-    fn test_convert_function_declaration_missing_type() {
-        let func_decl = PublicFunctionDeclaration {
-            name: "test".to_string(),
-            description: "Test".to_string(),
-            parameters: Some(json!({
-                "properties": {
-                    "param1": {"type": "string"}
-                }
-            })),
-            required: vec![],
+            description: "Test function".to_string(),
+            parameters: FunctionParameters {
+                type_: "object".to_string(),
+                properties: json!({}),
+                required: vec![],
+            },
         };
 
-        let tool = GenerateContentBuilder::convert_public_fn_decl_to_tool(func_decl);
-        let internal_func = &tool.function_declarations.unwrap()[0];
-        assert_eq!(internal_func.parameters.type_, "object");
+        let tool = func_decl.into_tool();
+        assert!(tool.function_declarations.is_some());
+        let decls = tool.function_declarations.unwrap();
+        assert_eq!(decls.len(), 1);
+        assert_eq!(decls[0].name, "test");
     }
 
     #[test]
     fn test_with_function() {
         let client = create_test_client();
-        let func = PublicFunctionDeclaration {
+        let func = FunctionDeclaration {
             name: "test".to_string(),
-            description: "Test".to_string(),
-            parameters: None,
-            required: vec![],
+            description: "Test function".to_string(),
+            parameters: FunctionParameters {
+                type_: "object".to_string(),
+                properties: json!({"param1": {"type": "string"}}),
+                required: vec!["param1".to_string()],
+            },
         };
 
         let builder = GenerateContentBuilder::new(&client, "test-model").with_function(func);
@@ -812,11 +745,14 @@ mod tests {
     #[test]
     fn test_interaction_builder_with_function() {
         let client = create_test_client();
-        let func = PublicFunctionDeclaration {
+        let func = FunctionDeclaration {
             name: "test_func".to_string(),
             description: "Test function".to_string(),
-            parameters: None,
-            required: vec![],
+            parameters: FunctionParameters {
+                type_: "object".to_string(),
+                properties: json!({"location": {"type": "string"}}),
+                required: vec!["location".to_string()],
+            },
         };
 
         let builder = client

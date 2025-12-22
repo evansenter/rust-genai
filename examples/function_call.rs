@@ -1,6 +1,8 @@
 use rust_genai::CallableFunction;
 use rust_genai::Client;
-use rust_genai::{model_function_calls_request, user_text, user_tool_response};
+use rust_genai::{
+    WithFunctionCalling, model_function_calls_request, user_text, user_tool_response,
+};
 use rust_genai_macros::generate_function_declaration;
 use serde_json::json;
 use std::env;
