@@ -37,6 +37,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 GenaiError::Parse(p_err) => eprintln!("Parse Error: {p_err}"),
                 GenaiError::Utf8(u_err) => eprintln!("UTF8 Error: {u_err}"),
                 GenaiError::Internal(i_err) => eprintln!("Internal Error: {i_err}"),
+                GenaiError::InvalidInput(input_err) => eprintln!("Invalid Input: {input_err}"),
             }
             return Err(e.into());
         }

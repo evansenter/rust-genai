@@ -1,4 +1,4 @@
-use rust_genai::{Client, CreateInteractionRequest, GenaiError, InteractionInput};
+use rust_genai::{Client, GenaiError};
 use std::env;
 use std::error::Error;
 
@@ -10,30 +10,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Create the client
     let client = Client::builder(api_key).debug().build();
 
-    // 2. Create an interaction request
+    // 2. Create an interaction using the builder pattern
     let model_name = "gemini-3-flash-preview";
     let prompt = "Explain the concept of recursion in programming in one paragraph.";
 
     println!("Creating interaction with model: {model_name}");
     println!("Prompt: {prompt}\n");
 
-    let request = CreateInteractionRequest {
-        model: Some(model_name.to_string()),
-        agent: None,
-        input: InteractionInput::Text(prompt.to_string()),
-        previous_interaction_id: None,
-        tools: None,
-        response_modalities: None,
-        response_format: None,
-        generation_config: None,
-        stream: None,
-        background: None,
-        store: Some(true), // Store for potential follow-up
-        system_instruction: None,
-    };
-
-    // 3. Send the interaction request
-    match client.create_interaction(request).await {
+    // 3. Send the interaction request using the fluent builder API
+    match client
+        .interaction()
+        .with_model(model_name)
+        .with_text(prompt)
+        .with_store(true) // Store for potential follow-up
+        .create()
+        .await
+    {
         Ok(response) => {
             println!("--- Interaction Response ---");
             println!("Interaction ID: {}", response.id);
@@ -74,6 +66,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 GenaiError::Parse(p_err) => eprintln!("Parse Error: {p_err}"),
                 GenaiError::Utf8(u_err) => eprintln!("UTF8 Error: {u_err}"),
                 GenaiError::Internal(i_err) => eprintln!("Internal Error: {i_err}"),
+                GenaiError::InvalidInput(input_err) => eprintln!("Invalid Input: {input_err}"),
             }
             return Err(e.into());
         }

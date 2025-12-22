@@ -16,6 +16,8 @@ The project is structured as a Cargo workspace with three crates:
 
 ### Building and Testing
 
+**IMPORTANT**: By default, always run tests with `cargo test -- --include-ignored` to ensure full end-to-end testing including integration tests that require the `GEMINI_API_KEY` environment variable.
+
 ```bash
 # Build all workspace members
 cargo build
@@ -23,7 +25,10 @@ cargo build
 # Build in release mode
 cargo build --release
 
-# Run all tests (requires GEMINI_API_KEY environment variable for integration tests)
+# Run all tests including ignored integration tests (DEFAULT - use this)
+cargo test -- --include-ignored
+
+# Run only non-ignored tests
 cargo test
 
 # Run tests for a specific test file

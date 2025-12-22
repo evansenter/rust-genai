@@ -57,6 +57,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     GenaiError::Internal(i_err) => {
                         eprintln!("\nInternal Error during stream: {i_err}");
                     }
+                    GenaiError::InvalidInput(input_err) => {
+                        eprintln!("\nInvalid Input Error during stream: {input_err}");
+                    }
                 }
                 error_occurred = true;
                 break;

@@ -243,6 +243,42 @@ impl Client {
 
     // --- Interactions API methods ---
 
+    /// Creates a builder for constructing an interaction request.
+    ///
+    /// This provides a fluent interface for building interactions with models or agents.
+    /// Use this method for a more ergonomic API compared to manually constructing
+    /// `CreateInteractionRequest`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api_key".to_string()).build();
+    ///
+    /// // Simple interaction
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Hello, world!")
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // Stateful conversation
+    /// let response2 = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What did I just say?")
+    ///     .with_previous_interaction(&response.id)
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn interaction(&self) -> crate::request_builder::InteractionBuilder<'_> {
+        crate::request_builder::InteractionBuilder::new(self)
+    }
+
     /// Creates a new interaction using the Gemini Interactions API.
     ///
     /// The Interactions API provides a unified interface for working with models and agents,

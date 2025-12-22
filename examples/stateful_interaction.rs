@@ -1,4 +1,4 @@
-use rust_genai::{Client, CreateInteractionRequest, InteractionInput};
+use rust_genai::Client;
 use std::env;
 use std::error::Error;
 
@@ -18,22 +18,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let first_prompt = "My name is Alice and I like programming in Rust.";
     println!("User: {first_prompt}\n");
 
-    let first_request = CreateInteractionRequest {
-        model: Some(model_name.to_string()),
-        agent: None,
-        input: InteractionInput::Text(first_prompt.to_string()),
-        previous_interaction_id: None,
-        tools: None,
-        response_modalities: None,
-        response_format: None,
-        generation_config: None,
-        stream: None,
-        background: None,
-        store: Some(true), // Important: Store for stateful conversation
-        system_instruction: None,
-    };
-
-    let first_response = client.create_interaction(first_request).await?;
+    let first_response = client
+        .interaction()
+        .with_model(model_name)
+        .with_text(first_prompt)
+        .with_store(true) // Important: Store for stateful conversation
+        .create()
+        .await?;
     let interaction_id = first_response.id.clone();
 
     println!("Interaction ID: {interaction_id}");
@@ -56,22 +47,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let second_prompt = "What is my name and what language do I like?";
     println!("User: {second_prompt}\n");
 
-    let second_request = CreateInteractionRequest {
-        model: Some(model_name.to_string()),
-        agent: None,
-        input: InteractionInput::Text(second_prompt.to_string()),
-        previous_interaction_id: Some(interaction_id.clone()), // Reference first interaction
-        tools: None,
-        response_modalities: None,
-        response_format: None,
-        generation_config: None,
-        stream: None,
-        background: None,
-        store: Some(true),
-        system_instruction: None,
-    };
-
-    let second_response = client.create_interaction(second_request).await?;
+    let second_response = client
+        .interaction()
+        .with_model(model_name)
+        .with_text(second_prompt)
+        .with_previous_interaction(&interaction_id) // Reference first interaction
+        .with_store(true)
+        .create()
+        .await?;
 
     println!("Interaction ID: {}", second_response.id);
     println!("Previous Interaction ID: {}", interaction_id);
@@ -94,22 +77,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let third_prompt = "Why is that language interesting?";
     println!("User: {third_prompt}\n");
 
-    let third_request = CreateInteractionRequest {
-        model: Some(model_name.to_string()),
-        agent: None,
-        input: InteractionInput::Text(third_prompt.to_string()),
-        previous_interaction_id: Some(second_response.id.clone()), // Reference second interaction
-        tools: None,
-        response_modalities: None,
-        response_format: None,
-        generation_config: None,
-        stream: None,
-        background: None,
-        store: Some(true),
-        system_instruction: None,
-    };
-
-    let third_response = client.create_interaction(third_request).await?;
+    let third_response = client
+        .interaction()
+        .with_model(model_name)
+        .with_text(third_prompt)
+        .with_previous_interaction(&second_response.id) // Reference second interaction
+        .with_store(true)
+        .create()
+        .await?;
 
     println!("Interaction ID: {}", third_response.id);
     println!("Previous Interaction ID: {}", second_response.id);
