@@ -212,7 +212,7 @@ async fn test_interaction_builder_stream_with_large_response() {
     // Request a very long response
     let mut stream = client
         .interaction()
-        .with_model("gemini-2.0-flash-exp")
+        .with_model("gemini-3-flash-preview")
         .with_text("Write a 2000 word essay about artificial intelligence")
         .create_stream();
 
