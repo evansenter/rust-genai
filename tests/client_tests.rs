@@ -8,19 +8,14 @@ fn test_client_builder() {
     let _client = Client::builder(api_key.clone()).build();
     // We can't access private fields directly, but we can test the behavior
 
-    // Test builder with debug mode
-    let _debug_client = Client::builder(api_key.clone()).debug().build();
-    // Debug mode will be tested through its effects when we add debug output tests
-
     // Test builder with API version
     let _v1_client = Client::builder(api_key.clone())
         .api_version(ApiVersion::V1Beta)
         .build();
 
-    // Test builder with all options
+    // Test builder with API version option
     let _full_client = Client::builder(api_key)
         .api_version(ApiVersion::V1Alpha)
-        .debug()
         .build();
 }
 

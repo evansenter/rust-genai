@@ -9,6 +9,14 @@ use genai_client::models::request::GenerateContentRequest as InternalGenerateCon
 use reqwest::Client as ReqwestClient;
 use std::str;
 
+/// Logs a request body at debug level, preferring JSON format when possible.
+fn log_request_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
+    match serde_json::to_string_pretty(body) {
+        Ok(json) => log::debug!("Request Body (JSON):\n{json}"),
+        Err(_) => log::debug!("Request Body: {body:#?}"),
+    }
+}
+
 /// The main client for interacting with the Google Generative AI API.
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -16,7 +24,6 @@ pub struct Client {
     #[allow(clippy::struct_field_names)]
     pub(crate) http_client: ReqwestClient,
     pub(crate) api_version: ApiVersion,
-    pub(crate) debug: bool,
 }
 
 /// Builder for `Client` instances.
@@ -24,7 +31,6 @@ pub struct Client {
 pub struct ClientBuilder {
     api_key: String,
     api_version: Option<ApiVersion>,
-    debug: bool,
 }
 
 impl ClientBuilder {
@@ -36,14 +42,6 @@ impl ClientBuilder {
         self
     }
 
-    /// Enables debug mode for the client.
-    /// If not called, defaults to `false`.
-    #[must_use]
-    pub const fn debug(mut self) -> Self {
-        self.debug = true;
-        self
-    }
-
     /// Builds the `Client`.
     #[must_use]
     pub fn build(self) -> Client {
@@ -51,7 +49,6 @@ impl ClientBuilder {
             api_key: self.api_key,
             http_client: ReqwestClient::new(),
             api_version: self.api_version.unwrap_or(ApiVersion::V1Beta),
-            debug: self.debug,
         }
     }
 }
@@ -67,12 +64,10 @@ impl Client {
         ClientBuilder {
             api_key,
             api_version: None,
-            debug: false,
         }
     }
 
     /// Creates a new `GenAI` client with specified or default API version.
-    /// Debug mode is disabled by default. Use the builder to enable it.
     ///
     /// # Arguments
     ///
@@ -84,7 +79,6 @@ impl Client {
             api_key,
             http_client: ReqwestClient::new(),
             api_version: api_version.unwrap_or(ApiVersion::V1Beta),
-            debug: false,
         }
     }
 
@@ -124,13 +118,8 @@ impl Client {
     ) -> Result<GenerateContentResponse, GenaiError> {
         let url = construct_url(model_name, &self.api_key, false, self.api_version);
 
-        if self.debug {
-            println!("[DEBUG] Request URL: {url}");
-            match serde_json::to_string_pretty(&request_body) {
-                Ok(json) => println!("[DEBUG] Request Body (JSON):\n{json}"),
-                Err(_) => println!("[DEBUG] Request Body: {request_body:#?}"),
-            }
-        }
+        log::debug!("Request URL: {url}");
+        log_request_body(&request_body);
 
         let response = self
             .http_client
@@ -141,16 +130,12 @@ impl Client {
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
-            if self.debug {
-                println!("[DEBUG] Response Text: {error_text}");
-            }
+            log::debug!("Response Text: {error_text}");
             return Err(GenaiError::Api(error_text));
         }
 
         let response_text = response.text().await?;
-        if self.debug {
-            println!("[DEBUG] Response Text: {response_text}");
-        }
+        log::debug!("Response Text: {response_text}");
         let response_body: genai_client::models::response::GenerateContentResponse =
             serde_json::from_str(&response_text)?;
 
@@ -198,13 +183,8 @@ impl Client {
     {
         let url = construct_url(model_name, &self.api_key, true, self.api_version);
 
-        if self.debug {
-            println!("[DEBUG] Streaming Request URL: {url}");
-            match serde_json::to_string_pretty(&request_body) {
-                Ok(json) => println!("[DEBUG] Streaming Request Body (JSON):\n{json}"),
-                Err(_) => println!("[DEBUG] Streaming Request Body: {request_body:#?}"),
-            }
-        }
+        log::debug!("Streaming Request URL: {url}");
+        log_request_body(&request_body);
 
         let stream_val = try_stream! {
             let response = self.http_client.post(&url).json(&request_body).send().await?;
@@ -218,9 +198,7 @@ impl Client {
                 while let Some(result) = parsed_stream.next().await {
                     let chunk_response_internal = result?;
 
-                    if self.debug {
-                        println!("[DEBUG] Stream Chunk: {chunk_response_internal:#?}");
-                    }
+                    log::debug!("Stream Chunk: {chunk_response_internal:#?}");
 
                     if let Some(candidate) = chunk_response_internal.candidates.first() {
                         let processed_parts = process_response_parts(&candidate.content.parts);
@@ -236,9 +214,7 @@ impl Client {
                 }
             } else {
                 let error_text = response.text().await?;
-                if self.debug {
-                    println!("[DEBUG] Streaming Error: {error_text}");
-                }
+                log::debug!("Streaming Error: {error_text}");
                 Err(GenaiError::Api(error_text))?;
             }
         };
@@ -332,20 +308,13 @@ impl Client {
         &self,
         request: genai_client::CreateInteractionRequest,
     ) -> Result<genai_client::InteractionResponse, GenaiError> {
-        if self.debug {
-            println!("[DEBUG] Creating interaction");
-            match serde_json::to_string_pretty(&request) {
-                Ok(json) => println!("[DEBUG] Request Body (JSON):\n{json}"),
-                Err(_) => println!("[DEBUG] Request Body: {request:#?}"),
-            }
-        }
+        log::debug!("Creating interaction");
+        log_request_body(&request);
 
         let response =
             genai_client::create_interaction(&self.http_client, &self.api_key, request).await?;
 
-        if self.debug {
-            println!("[DEBUG] Interaction created: ID={}", response.id);
-        }
+        log::debug!("Interaction created: ID={}", response.id);
 
         Ok(response)
     }
@@ -368,15 +337,8 @@ impl Client {
     {
         use futures_util::StreamExt;
 
-        let debug = self.debug;
-
-        if debug {
-            println!("[DEBUG] Creating streaming interaction");
-            match serde_json::to_string_pretty(&request) {
-                Ok(json) => println!("[DEBUG] Request Body (JSON):\n{json}"),
-                Err(_) => println!("[DEBUG] Request Body: {request:#?}"),
-            }
-        }
+        log::debug!("Creating streaming interaction");
+        log_request_body(&request);
 
         let stream =
             genai_client::create_interaction_stream(&self.http_client, &self.api_key, request);
@@ -385,12 +347,7 @@ impl Client {
             .map(move |result| {
                 result
                     .inspect(|response| {
-                        if debug {
-                            println!(
-                                "[DEBUG] Received interaction update: status={:?}",
-                                response.status
-                            );
-                        }
+                        log::debug!("Received interaction update: status={:?}", response.status);
                     })
                     .map_err(GenaiError::from)
             })
@@ -416,19 +373,12 @@ impl Client {
         &self,
         interaction_id: &str,
     ) -> Result<genai_client::InteractionResponse, GenaiError> {
-        if self.debug {
-            println!("[DEBUG] Getting interaction: ID={interaction_id}");
-        }
+        log::debug!("Getting interaction: ID={interaction_id}");
 
         let response =
             genai_client::get_interaction(&self.http_client, &self.api_key, interaction_id).await?;
 
-        if self.debug {
-            println!(
-                "[DEBUG] Retrieved interaction: status={:?}",
-                response.status
-            );
-        }
+        log::debug!("Retrieved interaction: status={:?}", response.status);
 
         Ok(response)
     }
@@ -448,15 +398,11 @@ impl Client {
     /// - The HTTP request fails
     /// - The API returns an error
     pub async fn delete_interaction(&self, interaction_id: &str) -> Result<(), GenaiError> {
-        if self.debug {
-            println!("[DEBUG] Deleting interaction: ID={interaction_id}");
-        }
+        log::debug!("Deleting interaction: ID={interaction_id}");
 
         genai_client::delete_interaction(&self.http_client, &self.api_key, interaction_id).await?;
 
-        if self.debug {
-            println!("[DEBUG] Interaction deleted successfully");
-        }
+        log::debug!("Interaction deleted successfully");
 
         Ok(())
     }

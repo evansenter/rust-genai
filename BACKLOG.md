@@ -16,74 +16,30 @@ The agentic AI landscape is rapidly evolving:
 
 ## High Priority
 
-### Interactions API Builder Pattern
-**Impact:** High | **Effort:** ~2-3 hours | **Type:** Enhancement
+_No high priority items at this time._
 
-Add fluent builder API for Interactions API to match the ergonomics of GenerateContent API.
+---
 
-**Current:**
-```rust
-let request = CreateInteractionRequest {
-    model: Some("gemini-3-flash-preview".to_string()),
-    agent: None,
-    input: InteractionInput::Text("Hello".to_string()),
-    previous_interaction_id: None,
-    tools: None,
-    response_modalities: None,
-    response_format: None,
-    generation_config: None,
-    stream: None,
-    background: None,
-    store: None,
-    system_instruction: None,
-};
-client.create_interaction(request).await?;
-```
+## Completed
 
-**Proposed:**
-```rust
-client.interaction()
-    .with_model("gemini-3-flash-preview")
-    .with_input("Hello")
-    .with_previous_interaction(&id)
-    .with_tools(vec![...])
-    .create()  // or .create_stream()
-```
+### Unify Logging Approach ✓
+**Completed:** 2025-12-22 | **Impact:** Medium | **Effort:** ~1 hour | **Type:** Refactoring
 
-**Benefits:**
-- Consistent with existing GenerateContent builder pattern
-- Better IDE autocomplete and discoverability
-- Reduces boilerplate for common use cases
-- More Rust-idiomatic API
+Replaced ad-hoc println! statements with structured logging using the `log` crate.
+
+**Changes Made:**
+- Removed `debug` field from `Client` and `ClientBuilder` structs
+- Removed `.debug()` method from `ClientBuilder` (breaking change)
+- Replaced all 23 `println!` statements in `src/client.rs` with `log::debug!()`
+- Removed all `if self.debug` guards
+- Added logging documentation to CLAUDE.md
+
+**Migration Path:**
+Users now configure logging via their preferred backend (e.g., `env_logger::init()`) and control output via `RUST_LOG` environment variable.
 
 ---
 
 ## Medium Priority
-
-### Unify Logging Approach
-**Impact:** Medium | **Effort:** ~1 hour | **Type:** Refactoring
-
-Replace ad-hoc println!/eprintln! with structured logging using the `log` crate.
-
-**Current Issues:**
-- Mix of `println!` in debug mode
-- Inconsistent error logging with `eprintln!`
-- No log levels (debug, info, warn, error)
-- Debug mode is binary (on/off) rather than filtered by level
-
-**Proposed Changes:**
-- Add `log` crate dependency
-- Replace all println! with log::debug!
-- Replace all eprintln! with log::warn! or log::error!
-- Make debug mode control log filtering
-- Users can integrate with their preferred logging backend (env_logger, tracing, etc.)
-
-**Files to Update:**
-- `src/client.rs` - ~8 println! statements
-- `genai-client/src/core.rs` - Error messages
-- `genai-client/src/interactions.rs` - Error messages
-
----
 
 ### Consolidate Error Response Handling
 **Impact:** Low | **Effort:** ~1-2 hours | **Type:** Refactoring
@@ -116,6 +72,48 @@ let response = handle_api_error(response).await?;
 - `genai-client/src/core.rs`
 - `genai-client/src/interactions.rs`
 - `src/client.rs` (create_interaction, get_interaction, delete_interaction)
+
+---
+
+### Audit and Simplify Data Structures
+**Impact:** Medium | **Effort:** ~4-6 hours | **Type:** Refactoring
+
+Comprehensive audit of the main data structures across the codebase to identify opportunities for simplification, consolidation, and improved ergonomics.
+
+**Areas to Review:**
+
+1. **Request/Response Models:**
+   - `genai-client/src/models/request.rs` - GenerateContent API request types
+   - `genai-client/src/models/response.rs` - GenerateContent API response types
+   - `genai-client/src/models/interactions.rs` - Interactions API types
+   - `genai-client/src/models/shared.rs` - Shared types between APIs
+
+2. **Content Representations:**
+   - Dual content models: `Content`/`Part` (GenerateContent) vs `InteractionContent` (Interactions)
+   - Conversion patterns between internal and public types
+   - Possibility of unified content representation
+
+3. **Builder Patterns:**
+   - `GenerateContentBuilder` vs `InteractionBuilder` - can they share common traits?
+   - Repeated conversion logic for `FunctionDeclaration` → `Tool`
+
+4. **Function Calling Types:**
+   - Public vs internal `FunctionCall` types (conversion overhead)
+   - `FunctionDeclaration` vs `genai_client::FunctionDeclaration`
+   - Registry patterns in `src/function_calling.rs`
+
+**Questions to Answer:**
+- Can we reduce the number of type conversions between layers?
+- Are there redundant or overly complex structures?
+- Can we leverage more traits for polymorphism instead of separate types?
+- Are Optional fields correctly positioned (API-level vs builder-level)?
+- Can we consolidate the two content models into a single abstraction?
+
+**Expected Outcomes:**
+- Documentation of current data structure landscape
+- Identified simplification opportunities
+- Proposal for consolidations (if any)
+- Maintain backward compatibility where possible
 
 ---
 
@@ -353,25 +351,6 @@ while let Some(response) = session.next().await {
 ```
 
 **Estimated Total:** ~1500 lines
-
----
-
-## Completed
-
-### ✅ Extract SSE Parser to Shared Module
-**Completed:** 2024 (commit 23ab1ee)
-
-Created `genai-client/src/sse_parser.rs` with generic parsing function, eliminating ~75 lines of duplicated code across 3 files.
-
-### ✅ Implement Interactions API (Phase 2)
-**Completed:** 2024
-
-Added full support for Gemini's Interactions API including models, client functions, examples, and tests.
-
-### ✅ Refactor to Endpoint Abstraction (Phase 1)
-**Completed:** 2024
-
-Introduced `Endpoint` enum for flexible URL construction supporting multiple API versions.
 
 ---
 
