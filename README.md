@@ -493,10 +493,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```rust
 // Create a client with API key
 let client = Client::builder(api_key).build();
-
-// Create a client with debug logging enabled
-let client = Client::builder(api_key).debug().build();
 ```
+
+For debug logging, see the [Logging](#logging) section below.
 
 ### Request Builder Methods
 
@@ -559,6 +558,36 @@ impl CallableFunction for MyFunction {
 // Functions marked with #[generate_function_declaration] are automatically
 // registered in a global registry and discovered by generate_with_auto_functions()
 ```
+
+## Logging
+
+The library uses the standard Rust `log` crate for structured logging. To see debug output, initialize a logging backend in your application:
+
+```toml
+# Add to your Cargo.toml
+[dependencies]
+env_logger = "0.11"  # or simplelog, tracing-subscriber, etc.
+```
+
+```rust
+// Initialize logging in your application
+fn main() {
+    env_logger::init();
+    // ... your code
+}
+```
+
+Control log levels via the `RUST_LOG` environment variable:
+
+```bash
+# Show all debug logs from rust-genai
+RUST_LOG=rust_genai=debug cargo run
+
+# Show only warnings and errors
+RUST_LOG=rust_genai=warn cargo run
+```
+
+The library logs request/response details, streaming events, and interaction lifecycle at the `debug` level.
 
 ## Project Structure
 

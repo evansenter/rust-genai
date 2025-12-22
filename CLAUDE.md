@@ -265,6 +265,48 @@ Skills provide reusable workflows that are automatically invoked by Claude Code 
 
 **Note**: Changes to hooks require restarting the Claude Code session to take effect.
 
+## Logging
+
+The library uses the standard Rust `log` crate for logging. Users need to initialize their preferred logging backend to see log output.
+
+### Setting Up Logging
+
+Add a logging backend to your `Cargo.toml`:
+```toml
+[dependencies]
+env_logger = "0.11"  # or simplelog, tracing-subscriber, etc.
+```
+
+Initialize the logger in your application:
+```rust
+fn main() {
+    env_logger::init();
+    // ... rest of your code
+}
+```
+
+### Controlling Log Levels
+
+Use the `RUST_LOG` environment variable to control logging:
+```bash
+# Show all debug logs from rust-genai
+RUST_LOG=rust_genai=debug cargo run
+
+# Show only warnings and errors
+RUST_LOG=rust_genai=warn cargo run
+
+# Show debug logs from rust-genai and info from other crates
+RUST_LOG=rust_genai=debug,info cargo run
+```
+
+### What Gets Logged
+
+At the `debug` level, the library logs:
+- Request URLs and bodies (both GenerateContent and Interactions APIs)
+- Response content (success and error cases)
+- Streaming events and chunks
+- Interaction lifecycle events (create, retrieve, delete)
+
 ## Development Notes
 
 - Rust edition: 2024
