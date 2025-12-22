@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use inventory;
+use log::warn;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
@@ -79,8 +80,9 @@ impl FunctionRegistry {
     fn register_raw(&mut self, function: Box<dyn CallableFunction>) {
         let name = function.declaration().name;
         if self.functions.contains_key(&name) {
-            eprintln!(
-                "Warning: Duplicate function name '{name}' encountered during auto-registration. The last one found will be used."
+            warn!(
+                "Duplicate function name in auto-registration: function='{}'. Last registration will be used.",
+                name
             );
         }
         self.functions.insert(name, function);

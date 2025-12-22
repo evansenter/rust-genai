@@ -11,4 +11,8 @@ thiserror = { workspace = true }
 async-stream = { workspace = true }
 bytes = { workspace = true }
 futures-util = { workspace = true }
+log = { workspace = true }
 tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

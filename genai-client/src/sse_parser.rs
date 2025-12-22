@@ -2,6 +2,7 @@
 ///
 /// This module provides generic utilities for parsing SSE streams from the Gemini API.
 /// SSE format consists of lines starting with "data: " followed by JSON payloads.
+use crate::error_helpers::format_json_parse_error;
 use crate::errors::InternalError;
 use async_stream::try_stream;
 use bytes::Bytes;
@@ -59,9 +60,17 @@ where
                 let line = str::from_utf8(&line_bytes)?.trim_end_matches(|c| c == '\n' || c == '\r');
 
                 if line.starts_with("data:") {
-                    let json_data = line.strip_prefix("data:").unwrap_or("").trim_start();
-                    if !json_data.is_empty() {
-                        let parsed: T = serde_json::from_str(json_data)?;
+                    let json_data = line
+                        .strip_prefix("data:")
+                        .expect("Line should start with 'data:' prefix after check");
+                    let json_data = json_data.trim_start();
+
+                    // Skip empty data lines and [DONE] markers (used by some SSE endpoints)
+                    if !json_data.is_empty() && json_data != "[DONE]" {
+                        let parsed: T = serde_json::from_str(json_data).map_err(|e| {
+                            let context_msg = format_json_parse_error(json_data, e);
+                            InternalError::Parse(context_msg)
+                        })?;
                         yield parsed;
                     }
                 }
@@ -167,5 +176,96 @@ mod tests {
 
         let result = parsed_stream.next().await.unwrap();
         assert!(result.is_err());
+    }
+
+    // Stress tests for SSE parser
+
+    #[tokio::test]
+    async fn test_parse_sse_stream_large_message() {
+        // Test with a very large message (>1MB)
+        let large_text = "x".repeat(1_000_000);
+        let data = format!("data: {{\"text\":\"{}\"}}\n\n", large_text);
+        let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
+
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        pin_mut!(parsed_stream);
+
+        let result = parsed_stream.next().await;
+        assert!(result.is_some());
+        let message = result.unwrap().unwrap();
+        assert_eq!(message.text.len(), 1_000_000);
+    }
+
+    #[tokio::test]
+    async fn test_parse_sse_stream_many_rapid_messages() {
+        // Test with many messages in rapid succession
+        let mut data = Vec::new();
+        for i in 0..1000 {
+            data.extend_from_slice(format!("data: {{\"text\":\"Message {}\"}}\n\n", i).as_bytes());
+        }
+
+        let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        pin_mut!(parsed_stream);
+
+        let mut count = 0;
+        while let Some(result) = parsed_stream.next().await {
+            assert!(result.is_ok());
+            let message = result.unwrap();
+            assert_eq!(message.text, format!("Message {}", count));
+            count += 1;
+        }
+
+        assert_eq!(count, 1000);
+    }
+
+    #[tokio::test]
+    async fn test_parse_sse_stream_very_small_chunks() {
+        // Test with extremely small chunks (1 byte at a time for part of the message)
+        let full_message = b"data: {\"text\":\"Hello\"}\n\n";
+        let chunks: Vec<Result<Bytes, reqwest::Error>> = full_message
+            .iter()
+            .map(|&byte| Ok(Bytes::from(vec![byte])))
+            .collect();
+
+        let byte_stream = stream::iter(chunks);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        pin_mut!(parsed_stream);
+
+        let message = parsed_stream.next().await.unwrap().unwrap();
+        assert_eq!(message.text, "Hello");
+    }
+
+    #[tokio::test]
+    async fn test_parse_sse_stream_mixed_line_endings() {
+        // Test with different line ending types (\n, \r\n)
+        let data = b"data: {\"text\":\"First\"}\n\ndata: {\"text\":\"Second\"}\r\n\r\ndata: {\"text\":\"Third\"}\n\n".to_vec();
+        let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
+
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        pin_mut!(parsed_stream);
+
+        let first = parsed_stream.next().await.unwrap().unwrap();
+        assert_eq!(first.text, "First");
+
+        let second = parsed_stream.next().await.unwrap().unwrap();
+        assert_eq!(second.text, "Second");
+
+        let third = parsed_stream.next().await.unwrap().unwrap();
+        assert_eq!(third.text, "Third");
+    }
+
+    #[tokio::test]
+    async fn test_parse_sse_stream_with_unicode() {
+        // Test with Unicode characters in SSE stream
+        let data = b"data: {\"text\":\"Hello \\u4e16\\u754c \\ud83c\\udf0d\"}\n\n".to_vec();
+        let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
+
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        pin_mut!(parsed_stream);
+
+        let message = parsed_stream.next().await.unwrap().unwrap();
+        // The JSON parser should decode \u sequences to actual Unicode characters
+        assert_eq!(message.text, "Hello 世界 🌍");
     }
 }

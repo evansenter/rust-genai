@@ -103,42 +103,57 @@ mod tests {
 
     #[test]
     fn test_construct_url_non_streaming() {
-        let url = construct_url("gemini-pro", "test-key", false, ApiVersion::V1Alpha);
+        let url = construct_url(
+            "gemini-3-flash-preview",
+            "test-key",
+            false,
+            ApiVersion::V1Alpha,
+        );
         assert_eq!(
             url,
-            "https://generativelanguage.googleapis.com/v1alpha/models/gemini-pro:generateContent?key=test-key"
+            "https://generativelanguage.googleapis.com/v1alpha/models/gemini-3-flash-preview:generateContent?key=test-key"
         );
 
-        let url = construct_url("gemini-pro", "test-key", false, ApiVersion::V1Beta);
+        let url = construct_url(
+            "gemini-3-flash-preview",
+            "test-key",
+            false,
+            ApiVersion::V1Beta,
+        );
         assert_eq!(
             url,
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=test-key"
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=test-key"
         );
     }
 
     #[test]
     fn test_construct_url_streaming() {
-        let url = construct_url("gemini-pro", "test-key", true, ApiVersion::V1Alpha);
+        let url = construct_url(
+            "gemini-3-flash-preview",
+            "test-key",
+            true,
+            ApiVersion::V1Alpha,
+        );
         assert_eq!(
             url,
-            "https://generativelanguage.googleapis.com/v1alpha/models/gemini-pro:streamGenerateContent?key=test-key&alt=sse"
+            "https://generativelanguage.googleapis.com/v1alpha/models/gemini-3-flash-preview:streamGenerateContent?key=test-key&alt=sse"
         );
 
-        let url = construct_url("gemini-pro", "test-key", true, ApiVersion::V1Beta);
+        let url = construct_url(
+            "gemini-3-flash-preview",
+            "test-key",
+            true,
+            ApiVersion::V1Beta,
+        );
         assert_eq!(
             url,
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=test-key&alt=sse"
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:streamGenerateContent?key=test-key&alt=sse"
         );
     }
 
     #[test]
     fn test_construct_url_different_models() {
-        let models = vec![
-            "gemini-pro",
-            "gemini-1.5-flash",
-            "gemini-3-flash-preview",
-            "test-model-123",
-        ];
+        let models = vec!["gemini-3-flash-preview", "test-model-123"];
 
         for model in models {
             let url = construct_url(model, "api-key", false, ApiVersion::V1Alpha);
@@ -272,15 +287,21 @@ mod tests {
     #[test]
     fn test_endpoint_to_path_with_different_versions() {
         let endpoint = Endpoint::GenerateContent {
-            model: "gemini-pro",
+            model: "gemini-3-flash-preview",
             stream: false,
         };
 
         let path_v1alpha = endpoint.to_path(ApiVersion::V1Alpha);
-        assert_eq!(path_v1alpha, "/v1alpha/models/gemini-pro:generateContent");
+        assert_eq!(
+            path_v1alpha,
+            "/v1alpha/models/gemini-3-flash-preview:generateContent"
+        );
 
         let path_v1beta = endpoint.to_path(ApiVersion::V1Beta);
-        assert_eq!(path_v1beta, "/v1beta/models/gemini-pro:generateContent");
+        assert_eq!(
+            path_v1beta,
+            "/v1beta/models/gemini-3-flash-preview:generateContent"
+        );
     }
 
     #[test]

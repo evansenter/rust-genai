@@ -1,4 +1,5 @@
 use crate::common::{ApiVersion, construct_url};
+use crate::error_helpers::read_error_with_context;
 use crate::errors::InternalError;
 use crate::models::request::GenerateContentRequest;
 use crate::models::response::GenerateContentResponse;
@@ -13,7 +14,12 @@ use reqwest::Client as ReqwestClient;
 /// Sends a content generation request to the Google Generative AI API.
 ///
 /// # Errors
-/// Returns an error if the HTTP request fails, the response status is not successful, the response cannot be parsed as JSON, or if no text content is found in the response structure.
+///
+/// Returns an error if:
+/// - The HTTP request fails
+/// - The response status is not successful
+/// - The response cannot be parsed as JSON
+/// - No text content is found in the response structure
 pub async fn generate_content_internal(
     http_client: &ReqwestClient,
     api_key: &str,
@@ -115,8 +121,7 @@ pub fn generate_content_stream_internal<'a>(
                 yield result?;
             }
         } else {
-            let error_text = response.text().await.unwrap_or_else(|_| "Failed to read error body".to_string());
-            Err(InternalError::Api(error_text))?;
+            Err(read_error_with_context(response).await)?;
         }
     }
 }

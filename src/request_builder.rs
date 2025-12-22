@@ -13,6 +13,7 @@ use genai_client::{
     Part as InternalPart, Tool as InternalTool, ToolConfig as InternalToolConfig,
     models::request::GenerateContentRequest as InternalGenerateContentRequest,
 };
+use log::{error, warn};
 use serde_json::{Value, json};
 
 const MAX_FUNCTION_CALL_LOOPS: usize = 5; // Max iterations for auto function calling
@@ -206,8 +207,13 @@ impl<'a> GenerateContentBuilder<'a> {
     /// 4. This process repeats until the model responds with text or a loop limit is reached.
     ///
     /// # Errors
-    /// Returns an error if the HTTP request fails, response parsing fails, the API returns an error,
-    /// or if a function execution fails critically.
+    ///
+    /// Returns an error if:
+    /// - The HTTP request fails
+    /// - Response parsing fails
+    /// - The API returns an error
+    /// - A function execution fails critically
+    /// - The maximum function call loop limit is exceeded
     pub async fn generate_with_auto_functions(self) -> Result<GenerateContentResponse, GenaiError> {
         let mut conversation_history = self
             .initial_contents
@@ -275,8 +281,8 @@ impl<'a> GenerateContentBuilder<'a> {
                                     .push(user_tool_response(call_to_execute.name.clone(), result));
                             }
                             Err(e) => {
-                                eprintln!(
-                                    "Error executing function '{}': {}",
+                                error!(
+                                    "Function execution failed: function='{}', error='{}'",
                                     call_to_execute.name, e
                                 );
                                 let error_response_val = json!({ "error": e.to_string() });
@@ -287,8 +293,8 @@ impl<'a> GenerateContentBuilder<'a> {
                             }
                         }
                     } else {
-                        eprintln!(
-                            "Function '{}' not found in registry. Informing model.",
+                        warn!(
+                            "Function not found in registry: function='{}'. Informing model.",
                             call_to_execute.name
                         );
                         let error_response_val = json!({ "error": format!("Function '{}' is not available or not found.", call_to_execute.name) });
@@ -571,7 +577,11 @@ impl<'a> InteractionBuilder<'a> {
     }
 
     /// Builds the `CreateInteractionRequest` from the builder state.
-    fn build_request(self) -> Result<CreateInteractionRequest, GenaiError> {
+    ///
+    /// This method is primarily for testing validation logic. In normal usage,
+    /// call `.create()` or `.create_stream()` instead, which call this internally.
+    #[doc(hidden)]
+    pub fn build_request(self) -> Result<CreateInteractionRequest, GenaiError> {
         // Validate that we have input
         let input = self.input.ok_or_else(|| {
             GenaiError::InvalidInput("Input is required for interaction".to_string())

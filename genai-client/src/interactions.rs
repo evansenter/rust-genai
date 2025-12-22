@@ -1,6 +1,9 @@
 use crate::common::{Endpoint, construct_endpoint_url};
+use crate::error_helpers::read_error_with_context;
 use crate::errors::InternalError;
-use crate::models::interactions::{CreateInteractionRequest, InteractionResponse};
+use crate::models::interactions::{
+    CreateInteractionRequest, InteractionResponse, InteractionStreamEvent,
+};
 use crate::sse_parser::parse_sse_stream;
 use async_stream::try_stream;
 use futures_util::{Stream, StreamExt};
@@ -12,8 +15,11 @@ use reqwest::Client as ReqwestClient;
 /// Supports function calling, structured outputs, and more.
 ///
 /// # Errors
-/// Returns an error if the HTTP request fails, the response status is not successful,
-/// or the response cannot be parsed as JSON.
+///
+/// Returns an error if:
+/// - The HTTP request fails
+/// - The response status is not successful
+/// - The response cannot be parsed as JSON
 pub async fn create_interaction(
     http_client: &ReqwestClient,
     api_key: &str,
@@ -57,15 +63,19 @@ pub fn create_interaction_stream<'a>(
         let status = response.status();
         if status.is_success() {
             let byte_stream = response.bytes_stream();
-            let parsed_stream = parse_sse_stream::<InteractionResponse>(byte_stream);
+            let parsed_stream = parse_sse_stream::<InteractionStreamEvent>(byte_stream);
             futures_util::pin_mut!(parsed_stream);
 
             while let Some(result) = parsed_stream.next().await {
-                yield result?;
+                let event = result?;
+                // Only yield events that have the full interaction data
+                // Status update events are skipped as they don't contain the full response
+                if let Some(interaction) = event.interaction {
+                    yield interaction;
+                }
             }
         } else {
-            let error_text = response.text().await.unwrap_or_else(|_| "Failed to read error body".to_string());
-            Err(InternalError::Api(error_text))?;
+            Err(read_error_with_context(response).await)?;
         }
     }
 }
@@ -76,8 +86,11 @@ pub fn create_interaction_stream<'a>(
 /// or for retrieving the full conversation history.
 ///
 /// # Errors
-/// Returns an error if the HTTP request fails, the response status is not successful,
-/// or the response cannot be parsed as JSON.
+///
+/// Returns an error if:
+/// - The HTTP request fails
+/// - The response status is not successful
+/// - The response cannot be parsed as JSON
 pub async fn get_interaction(
     http_client: &ReqwestClient,
     api_key: &str,
@@ -105,7 +118,10 @@ pub async fn get_interaction(
 /// unavailable for future reference via `previous_interaction_id`.
 ///
 /// # Errors
-/// Returns an error if the HTTP request fails or the response status is not successful.
+///
+/// Returns an error if:
+/// - The HTTP request fails
+/// - The response status is not successful
 pub async fn delete_interaction(
     http_client: &ReqwestClient,
     api_key: &str,
