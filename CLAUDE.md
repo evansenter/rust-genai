@@ -240,6 +240,18 @@ Skills provide reusable workflows that are automatically invoked by Claude Code 
 - Useful before commits or when starting work
 - Example trigger: "Can you review the workspace health?"
 
+**`check-docs` skill** (auto-invoked when you ask about documentation):
+- Builds documentation for all workspace crates
+- Verifies no documentation warnings exist
+- Checks for missing docs, broken links, and invalid code examples
+- Example trigger: "Can you check the documentation?"
+
+**`run-examples` skill** (auto-invoked when you ask to run examples):
+- Runs all 6 example programs to verify they work with current API
+- Requires `GEMINI_API_KEY` environment variable
+- Useful for catching API breaking changes
+- Example trigger: "Can you run all the examples?"
+
 ### Configuration Files
 
 - `.claude/settings.json`: Main configuration with hooks and permissions
