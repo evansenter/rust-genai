@@ -112,7 +112,11 @@ impl Client {
     /// * `request_body` - The fully constructed `genai_client::models::request::GenerateContentRequest`.
     ///
     /// # Errors
-    /// Returns an error if the HTTP request fails, response parsing fails, or the API returns an error.
+    ///
+    /// Returns an error if:
+    /// - The HTTP request fails
+    /// - Response parsing fails
+    /// - The API returns an error
     pub async fn generate_from_request(
         &self,
         model_name: &str,
@@ -289,7 +293,11 @@ impl Client {
     /// * `request` - The interaction request with model/agent, input, and optional configuration.
     ///
     /// # Errors
-    /// Returns an error if the HTTP request fails, response parsing fails, or the API returns an error.
+    ///
+    /// Returns an error if:
+    /// - The HTTP request fails
+    /// - Response parsing fails
+    /// - The API returns an error
     ///
     /// # Example
     ///
@@ -399,7 +407,11 @@ impl Client {
     /// * `interaction_id` - The unique identifier of the interaction to retrieve.
     ///
     /// # Errors
-    /// Returns an error if the HTTP request fails, response parsing fails, or the API returns an error.
+    ///
+    /// Returns an error if:
+    /// - The HTTP request fails
+    /// - Response parsing fails
+    /// - The API returns an error
     pub async fn get_interaction(
         &self,
         interaction_id: &str,
@@ -431,7 +443,10 @@ impl Client {
     /// * `interaction_id` - The unique identifier of the interaction to delete.
     ///
     /// # Errors
-    /// Returns an error if the HTTP request fails or the API returns an error.
+    ///
+    /// Returns an error if:
+    /// - The HTTP request fails
+    /// - The API returns an error
     pub async fn delete_interaction(&self, interaction_id: &str) -> Result<(), GenaiError> {
         if self.debug {
             println!("[DEBUG] Deleting interaction: ID={interaction_id}");

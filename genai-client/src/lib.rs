@@ -1,6 +1,7 @@
 // Declare the models, errors, common, core, interactions, and sse_parser modules
 pub mod common;
 pub mod core;
+pub(crate) mod error_helpers; // Internal helpers, not part of public API
 pub mod errors;
 pub mod interactions;
 pub mod models;

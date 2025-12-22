@@ -41,7 +41,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
     let client = Client::builder(api_key).debug().build();
 
-    let model_name = "gemini-3-flash-preview"; // Or your preferred model like "gemini-pro"
+    let model_name = "gemini-3-flash-preview";
 
     // Test Case 1: Manual function calling (demonstrating the traditional approach)
     println!("\n--- Test Case 1: Weather in London (Manual Function Calling) ---");
@@ -132,12 +132,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             } else {
                 println!("Model did not provide a final text response.");
             }
-            if let Some(function_calls) = response.function_calls {
-                if !function_calls.is_empty() {
-                    eprintln!(
-                        "Warning: Final response still contained unhandled function calls: {function_calls:?}"
-                    );
-                }
+            if let Some(function_calls) = response.function_calls
+                && !function_calls.is_empty()
+            {
+                eprintln!(
+                    "Warning: Final response still contained unhandled function calls: {function_calls:?}"
+                );
             }
         }
         Err(e) => {

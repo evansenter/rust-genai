@@ -189,6 +189,9 @@ Tests are organized into two categories:
   - `macro_tests.rs`: Procedural macro functionality
   - `function_calling_tests.rs`: Function execution system
   - `content_api_tests.rs`: Conversation helper functions
+  - `auto_function_tests.rs`: Auto-function execution tests (requires HTTP mocking)
+  - `content_api_edge_cases.rs`: Edge cases for content API helper functions
+  - `interaction_builder_edge_cases.rs`: InteractionBuilder edge cases and validation tests
 
 Integration tests that require a real API key use `#[ignore]` attribute and must be run with `cargo test -- --ignored`.
 
@@ -217,26 +220,41 @@ Hooks are automatically executed at specific points during development:
 - Checks if the project builds successfully
 - Located at: `.claude/hooks/session_init.sh`
 
-**Stop Hook (Intelligent Task Completion)**:
-- Uses AI to evaluate if all tasks are complete
-- Considers whether tests should run after code changes
-- Checks for compilation warnings or pending documentation
-- Helps ensure thorough testing before finishing
+**Stop Hook (Pre-Push Validation)**:
+- Automatically runs before considering work complete
+- Matches CI checks exactly to catch issues before pushing
+- Runs: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo check`, unit tests
+- Ensures all changes will pass CI before being pushed
+- Located at: `.claude/hooks/stop.sh`
 
 ### Skills
 
-Skills provide reusable workflows via slash commands:
+Skills provide reusable workflows that are automatically invoked by Claude Code when relevant to your request:
 
-**`/test-full`**:
+**`test-full` skill** (auto-invoked when you ask to run tests):
 - Runs complete test suite: `cargo test --all -- --include-ignored --nocapture`
 - Includes integration tests that require `GEMINI_API_KEY`
 - Shows full test output for debugging
+- Example trigger: "Can you run the full test suite?"
 
-**`/review-workspace`**:
+**`review-workspace` skill** (auto-invoked when you ask for a health check):
 - Comprehensive workspace health check
 - Runs: `cargo check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, unit tests
 - Shows recent git commits and workspace summary
 - Useful before commits or when starting work
+- Example trigger: "Can you review the workspace health?"
+
+**`check-docs` skill** (auto-invoked when you ask about documentation):
+- Builds documentation for all workspace crates
+- Verifies no documentation warnings exist
+- Checks for missing docs, broken links, and invalid code examples
+- Example trigger: "Can you check the documentation?"
+
+**`run-examples` skill** (auto-invoked when you ask to run examples):
+- Runs all 6 example programs to verify they work with current API
+- Requires `GEMINI_API_KEY` environment variable
+- Useful for catching API breaking changes
+- Example trigger: "Can you run all the examples?"
 
 ### Configuration Files
 

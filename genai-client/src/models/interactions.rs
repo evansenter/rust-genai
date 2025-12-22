@@ -197,6 +197,27 @@ pub struct InteractionResponse {
     pub previous_interaction_id: Option<String>,
 }
 
+/// Wrapper for SSE streaming events from the Interactions API
+/// The API returns events with this structure rather than bare InteractionResponse objects
+#[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct InteractionStreamEvent {
+    /// Event type (e.g., "interaction.start", "interaction.update", "interaction.complete")
+    pub event_type: String,
+
+    /// The full interaction data (present in start/complete events)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interaction: Option<InteractionResponse>,
+
+    /// Interaction ID (present in status update events)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interaction_id: Option<String>,
+
+    /// Status (present in status update events)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<InteractionStatus>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

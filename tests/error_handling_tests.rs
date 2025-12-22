@@ -90,7 +90,7 @@ async fn test_empty_prompt_handling() {
 
     // Empty prompt should still work
     let result = client
-        .with_model("gemini-pro")
+        .with_model("gemini-3-flash-preview")
         .with_prompt("")
         .generate()
         .await;
