@@ -233,9 +233,7 @@ fn test_auto_function_api_exists() {
     let client = Client::new("test-key".to_string(), None);
 
     // These methods should exist and be chainable
-    let _builder = client
-        .with_model("test")
-        .with_initial_user_text("test");
+    let _builder = client.with_model("test").with_initial_user_text("test");
 
     // The generate_with_auto_functions method should exist
     // (We can't call it without mocking, but we verify it compiles)
