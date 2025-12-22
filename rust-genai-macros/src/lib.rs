@@ -391,15 +391,15 @@ fn generate_declaration_function(
                     }
                 };
 
-                ::rust_genai::FunctionDeclaration {
-                    name: #func_name.to_string(),
-                    description: #func_description.to_string(),
-                    parameters: ::rust_genai::FunctionParameters {
-                        type_: "object".to_string(),
+                ::rust_genai::FunctionDeclaration::new(
+                    #func_name.to_string(),
+                    #func_description.to_string(),
+                    ::rust_genai::FunctionParameters::new(
+                        "object".to_string(),
                         properties,
-                        required: #required_field_tokens,
-                    },
-                }
+                        #required_field_tokens,
+                    ),
+                )
             }
 
             async fn call(&self, args: ::serde_json::Value) -> Result<::serde_json::Value, ::rust_genai::function_calling::FunctionError> {

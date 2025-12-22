@@ -26,8 +26,8 @@ fn verify_parameter_descriptions_work() {
 
     // Verify the parameters contain descriptions
     let schema_properties = declaration
-        .parameters
-        .properties
+        .parameters()
+        .properties()
         .get("properties")
         .expect("Should have properties field");
 
@@ -57,7 +57,7 @@ fn verify_function_documentation_preserved() {
     let callable = WithFunctionDocsCallable;
     let declaration = callable.declaration();
     assert_eq!(
-        declaration.description,
+        declaration.description(),
         "This function calculates the area of a rectangle"
     );
 }
@@ -77,8 +77,8 @@ fn verify_comment_about_param_docs_is_accurate() {
     let callable = RegularCommentsCallable;
     let declaration = callable.declaration();
     let schema_properties = declaration
-        .parameters
-        .properties
+        .parameters()
+        .properties()
         .get("properties")
         .expect("Should have properties field");
 

@@ -56,7 +56,9 @@ impl<'a> GenerateContentBuilder<'a> {
     }
 
     /// Sets the prompt text for the request.
-    /// Note: If using `generate_with_auto_functions`, prefer `with_initial_user_text` or `with_contents`.
+    ///
+    /// This is the simplest way to set user input and works with all generation methods
+    /// including `generate()`, `generate_stream()`, and `generate_with_auto_functions()`.
     #[must_use]
     pub const fn with_prompt(mut self, prompt: &'a str) -> Self {
         self.prompt_text = Some(prompt);
@@ -259,8 +261,18 @@ impl<'a> GenerateContentBuilder<'a> {
     }
 
     /// Generates content as a stream based on the configured parameters.
-    /// Note: Automatic function calling is not supported for streaming responses directly in this builder.
-    /// You would typically get a function call, execute it, then start a new stream request with the result.
+    ///
+    /// # Automatic Function Calling Limitation
+    ///
+    /// Note: This method does not support automatic function execution (like `generate_with_auto_functions` does).
+    /// The reason is architectural: function execution may require multiple round-trips with the API, and each
+    /// round-trip would need to be a separate streaming request. The current design doesn't support automatically
+    /// chaining multiple streams together.
+    ///
+    /// For function calling with streaming, you need to manually:
+    /// 1. Receive the function call from the stream
+    /// 2. Execute the function
+    /// 3. Start a new streaming request with the function result
     ///
     /// # Errors
     /// Returns an error if:
@@ -603,13 +615,13 @@ mod tests {
             .required(vec!["arg1".to_string()])
             .build();
 
-        assert_eq!(func_decl.name, "my_func");
-        assert_eq!(func_decl.description, "Does something");
-        assert_eq!(func_decl.parameters.type_, "object");
+        assert_eq!(func_decl.name(), "my_func");
+        assert_eq!(func_decl.description(), "Does something");
+        assert_eq!(func_decl.parameters().type_(), "object");
         assert_eq!(
             func_decl
-                .parameters
-                .properties
+                .parameters()
+                .properties()
                 .get("arg1")
                 .unwrap()
                 .get("type")
@@ -617,40 +629,30 @@ mod tests {
                 .as_str(),
             Some("string")
         );
-        assert_eq!(func_decl.parameters.required, vec!["arg1".to_string()]);
+        assert_eq!(func_decl.parameters().required(), vec!["arg1".to_string()]);
     }
 
     #[test]
     fn test_function_declaration_into_tool() {
-        let func_decl = FunctionDeclaration {
-            name: "test".to_string(),
-            description: "Test function".to_string(),
-            parameters: FunctionParameters {
-                type_: "object".to_string(),
-                properties: json!({}),
-                required: vec![],
-            },
-        };
+        let func_decl = FunctionDeclaration::builder("test")
+            .description("Test function")
+            .build();
 
         let tool = func_decl.into_tool();
         assert!(tool.function_declarations.is_some());
         let decls = tool.function_declarations.unwrap();
         assert_eq!(decls.len(), 1);
-        assert_eq!(decls[0].name, "test");
+        assert_eq!(decls[0].name(), "test");
     }
 
     #[test]
     fn test_with_function() {
         let client = create_test_client();
-        let func = FunctionDeclaration {
-            name: "test".to_string(),
-            description: "Test function".to_string(),
-            parameters: FunctionParameters {
-                type_: "object".to_string(),
-                properties: json!({"param1": {"type": "string"}}),
-                required: vec!["param1".to_string()],
-            },
-        };
+        let func = FunctionDeclaration::builder("test")
+            .description("Test function")
+            .parameter("param1", json!({"type": "string"}))
+            .required(vec!["param1".to_string()])
+            .build();
 
         let builder = GenerateContentBuilder::new(&client, "test-model").with_function(func);
 
@@ -745,15 +747,11 @@ mod tests {
     #[test]
     fn test_interaction_builder_with_function() {
         let client = create_test_client();
-        let func = FunctionDeclaration {
-            name: "test_func".to_string(),
-            description: "Test function".to_string(),
-            parameters: FunctionParameters {
-                type_: "object".to_string(),
-                properties: json!({"location": {"type": "string"}}),
-                required: vec!["location".to_string()],
-            },
-        };
+        let func = FunctionDeclaration::builder("test_func")
+            .description("Test function")
+            .parameter("location", json!({"type": "string"}))
+            .required(vec!["location".to_string()])
+            .build();
 
         let builder = client
             .interaction()

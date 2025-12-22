@@ -41,25 +41,53 @@ pub struct CodeExecution {
 /// Represents a function that can be called by the model.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct FunctionDeclaration {
-    pub name: String,
-    pub description: String,
-    pub parameters: FunctionParameters,
+    name: String,
+    description: String,
+    parameters: FunctionParameters,
 }
 
 /// Represents the parameters schema for a function.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct FunctionParameters {
     #[serde(rename = "type")]
-    pub type_: String,
-    pub properties: serde_json::Value,
+    type_: String,
+    properties: serde_json::Value,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub required: Vec<String>,
+    required: Vec<String>,
 }
 
 impl FunctionDeclaration {
+    /// Creates a new FunctionDeclaration with the given fields.
+    ///
+    /// This is primarily intended for internal use by the macro system.
+    /// For manual construction, prefer using `FunctionDeclaration::builder()`.
+    #[doc(hidden)]
+    pub fn new(name: String, description: String, parameters: FunctionParameters) -> Self {
+        Self {
+            name,
+            description,
+            parameters,
+        }
+    }
+
     /// Creates a builder for ergonomic FunctionDeclaration construction
     pub fn builder(name: impl Into<String>) -> FunctionDeclarationBuilder {
         FunctionDeclarationBuilder::new(name)
+    }
+
+    /// Returns the function name
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the function description
+    pub fn description(&self) -> &str {
+        &self.description
+    }
+
+    /// Returns a reference to the function parameters
+    pub fn parameters(&self) -> &FunctionParameters {
+        &self.parameters
     }
 
     /// Converts this FunctionDeclaration into a Tool for API requests
@@ -68,6 +96,36 @@ impl FunctionDeclaration {
             function_declarations: Some(vec![self]),
             code_execution: None,
         }
+    }
+}
+
+impl FunctionParameters {
+    /// Creates a new FunctionParameters with the given fields.
+    ///
+    /// This is primarily intended for internal use by the macro system.
+    /// For manual construction, prefer using `FunctionDeclaration::builder()`.
+    #[doc(hidden)]
+    pub fn new(type_: String, properties: serde_json::Value, required: Vec<String>) -> Self {
+        Self {
+            type_,
+            properties,
+            required,
+        }
+    }
+
+    /// Returns the parameter type (typically "object")
+    pub fn type_(&self) -> &str {
+        &self.type_
+    }
+
+    /// Returns the properties schema
+    pub fn properties(&self) -> &serde_json::Value {
+        &self.properties
+    }
+
+    /// Returns the list of required parameter names
+    pub fn required(&self) -> &[String] {
+        &self.required
     }
 }
 
@@ -112,7 +170,38 @@ impl FunctionDeclarationBuilder {
     }
 
     /// Builds the FunctionDeclaration
+    ///
+    /// # Validation
+    ///
+    /// This method performs validation and logs warnings for:
+    /// - Empty or whitespace-only function names
+    /// - Required parameters that don't exist in the properties schema
+    ///
+    /// These conditions may cause API errors but are allowed by the builder
+    /// for backwards compatibility.
     pub fn build(self) -> FunctionDeclaration {
+        // Validate function name
+        if self.name.trim().is_empty() {
+            log::warn!(
+                "FunctionDeclaration built with empty or whitespace-only name. \
+                This will likely be rejected by the API."
+            );
+        }
+
+        // Validate required parameters exist in properties
+        if let serde_json::Value::Object(ref props) = self.properties {
+            for req in &self.required {
+                if !props.contains_key(req) {
+                    log::warn!(
+                        "FunctionDeclaration '{}' requires parameter '{}' which is not defined in properties. \
+                        This will likely cause API errors.",
+                        self.name,
+                        req
+                    );
+                }
+            }
+        }
+
         FunctionDeclaration {
             name: self.name,
             description: self.description,
@@ -190,28 +279,25 @@ mod tests {
 
     #[test]
     fn test_serialize_function_declaration() {
-        let function = FunctionDeclaration {
-            name: "get_weather".to_string(),
-            description: "Get the current weather in a given location".to_string(),
-            parameters: FunctionParameters {
-                type_: "object".to_string(),
-                properties: serde_json::json!({
-                    "location": {
-                        "type": "string",
-                        "description": "The city and state, e.g. San Francisco, CA"
-                    }
+        let function = FunctionDeclaration::builder("get_weather")
+            .description("Get the current weather in a given location")
+            .parameter(
+                "location",
+                serde_json::json!({
+                    "type": "string",
+                    "description": "The city and state, e.g. San Francisco, CA"
                 }),
-                required: vec!["location".to_string()],
-            },
-        };
+            )
+            .required(vec!["location".to_string()])
+            .build();
 
         let json_string = serde_json::to_string(&function).expect("Serialization failed");
         let parsed: FunctionDeclaration =
             serde_json::from_str(&json_string).expect("Deserialization failed");
 
-        assert_eq!(parsed.name, "get_weather");
+        assert_eq!(parsed.name(), "get_weather");
         assert_eq!(
-            parsed.description,
+            parsed.description(),
             "Get the current weather in a given location"
         );
     }
