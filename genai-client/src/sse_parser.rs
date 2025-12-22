@@ -2,6 +2,7 @@
 ///
 /// This module provides generic utilities for parsing SSE streams from the Gemini API.
 /// SSE format consists of lines starting with "data: " followed by JSON payloads.
+use crate::error_helpers::format_json_parse_error;
 use crate::errors::InternalError;
 use async_stream::try_stream;
 use bytes::Bytes;
@@ -59,9 +60,16 @@ where
                 let line = str::from_utf8(&line_bytes)?.trim_end_matches(|c| c == '\n' || c == '\r');
 
                 if line.starts_with("data:") {
-                    let json_data = line.strip_prefix("data:").unwrap_or("").trim_start();
+                    let json_data = line
+                        .strip_prefix("data:")
+                        .expect("Line should start with 'data:' prefix after check");
+                    let json_data = json_data.trim_start();
+
                     if !json_data.is_empty() {
-                        let parsed: T = serde_json::from_str(json_data)?;
+                        let parsed: T = serde_json::from_str(json_data).map_err(|e| {
+                            let context_msg = format_json_parse_error(json_data, e);
+                            InternalError::Parse(context_msg)
+                        })?;
                         yield parsed;
                     }
                 }

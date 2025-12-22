@@ -29,13 +29,15 @@ async fn test_auto_functions_missing_initial_prompt() {
 }
 
 #[test]
-fn test_max_function_call_loops_constant() {
-    // Verify that MAX_FUNCTION_CALL_LOOPS is set to a reasonable value
-    // This is a compile-time check that the constant exists and can be referenced
-    // The actual value is checked indirectly through integration tests
-
-    // If this compiles, we know the constant exists in the module
-    // The value is verified through the behavior in ignored integration tests below
+fn test_max_function_call_loops_limit() {
+    // Documents the MAX_FUNCTION_CALL_LOOPS behavior (value is 5).
+    // This limit prevents infinite loops while allowing reasonable multi-step workflows.
+    //
+    // The actual enforcement is tested through ignored integration tests below:
+    // - test_auto_functions_single_iteration (1 loop succeeds)
+    // - test_auto_functions_max_iterations_exceeded (exceeds 5 loops)
+    //
+    // Note: The constant is private to request_builder.rs and cannot be tested directly.
 }
 
 // ===========================================
