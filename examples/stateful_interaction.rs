@@ -33,10 +33,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if !first_response.outputs.is_empty() {
         println!("Assistant:");
         for output in &first_response.outputs {
-            if let rust_genai::InteractionContent::Text { text } = output {
-                if let Some(t) = text {
-                    println!("{t}");
-                }
+            if let rust_genai::InteractionContent::Text { text } = output
+                && let Some(t) = text
+            {
+                println!("{t}");
             }
         }
     }
@@ -63,10 +63,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if !second_response.outputs.is_empty() {
         println!("Assistant:");
         for output in &second_response.outputs {
-            if let rust_genai::InteractionContent::Text { text } = output {
-                if let Some(t) = text {
-                    println!("{t}");
-                }
+            if let rust_genai::InteractionContent::Text { text } = output
+                && let Some(t) = text
+            {
+                println!("{t}");
             }
         }
     }
@@ -93,10 +93,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if !third_response.outputs.is_empty() {
         println!("Assistant:");
         for output in &third_response.outputs {
-            if let rust_genai::InteractionContent::Text { text } = output {
-                if let Some(t) = text {
-                    println!("{t}");
-                }
+            if let rust_genai::InteractionContent::Text { text } = output
+                && let Some(t) = text
+            {
+                println!("{t}");
             }
         }
     }

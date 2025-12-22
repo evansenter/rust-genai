@@ -2,7 +2,6 @@
 ///
 /// This module provides generic utilities for parsing SSE streams from the Gemini API.
 /// SSE format consists of lines starting with "data: " followed by JSON payloads.
-
 use crate::errors::InternalError;
 use async_stream::try_stream;
 use bytes::Bytes;
@@ -74,7 +73,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::stream;
+    use futures_util::{pin_mut, stream};
     use serde::Deserialize;
 
     #[derive(Debug, Deserialize, PartialEq)]
@@ -88,7 +87,8 @@ mod tests {
         let data = b"data: {\"text\":\"Hello\"}\n\n".to_vec();
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
 
-        let mut parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        pin_mut!(parsed_stream);
 
         let result = parsed_stream.next().await;
         assert!(result.is_some());
@@ -103,7 +103,8 @@ mod tests {
         let data = b"data: {\"text\":\"First\"}\n\ndata: {\"text\":\"Second\"}\n\n".to_vec();
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
 
-        let mut parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        pin_mut!(parsed_stream);
 
         let first = parsed_stream.next().await.unwrap().unwrap();
         assert_eq!(first.text, "First");
@@ -117,12 +118,10 @@ mod tests {
         // Simulate chunked SSE stream where data arrives in pieces
         let chunk1 = b"data: {\"te".to_vec();
         let chunk2 = b"xt\":\"Hello\"}\n\n".to_vec();
-        let byte_stream = stream::iter(vec![
-            Ok(Bytes::from(chunk1)),
-            Ok(Bytes::from(chunk2)),
-        ]);
+        let byte_stream = stream::iter(vec![Ok(Bytes::from(chunk1)), Ok(Bytes::from(chunk2))]);
 
-        let mut parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        pin_mut!(parsed_stream);
 
         let message = parsed_stream.next().await.unwrap().unwrap();
         assert_eq!(message.text, "Hello");
@@ -134,7 +133,8 @@ mod tests {
         let data = b": comment\ndata: {\"text\":\"Hello\"}\n\nevent: test\n\n".to_vec();
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
 
-        let mut parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        pin_mut!(parsed_stream);
 
         let message = parsed_stream.next().await.unwrap().unwrap();
         assert_eq!(message.text, "Hello");
@@ -149,7 +149,8 @@ mod tests {
         let data = b"data: \ndata: {\"text\":\"Hello\"}\n\n".to_vec();
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
 
-        let mut parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        pin_mut!(parsed_stream);
 
         let message = parsed_stream.next().await.unwrap().unwrap();
         assert_eq!(message.text, "Hello");
@@ -161,7 +162,8 @@ mod tests {
         let data = b"data: {invalid json}\n\n".to_vec();
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
 
-        let mut parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        pin_mut!(parsed_stream);
 
         let result = parsed_stream.next().await.unwrap();
         assert!(result.is_err());

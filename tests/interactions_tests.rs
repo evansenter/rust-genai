@@ -53,7 +53,7 @@ async fn test_create_simple_interaction() {
     // Verify output contains expected answer
     let has_four = response.outputs.iter().any(|output| match output {
         rust_genai::InteractionContent::Text { text } => {
-            text.as_ref().map_or(false, |t| t.contains('4'))
+            text.as_ref().is_some_and(|t| t.contains('4'))
         }
         _ => false,
     });
@@ -128,10 +128,9 @@ async fn test_stateful_interaction_with_previous_id() {
 
     // Verify the model remembers the color
     let mentions_blue = second_response.outputs.iter().any(|output| match output {
-        rust_genai::InteractionContent::Text { text } => {
-            text.as_ref()
-                .map_or(false, |t| t.to_lowercase().contains("blue"))
-        }
+        rust_genai::InteractionContent::Text { text } => text
+            .as_ref()
+            .is_some_and(|t| t.to_lowercase().contains("blue")),
         _ => false,
     });
 
@@ -275,11 +274,7 @@ async fn test_streaming_interaction() {
     let mut final_interaction_id = None;
 
     while let Some(result) = stream.next().await {
-        assert!(
-            result.is_ok(),
-            "Streaming chunk failed: {:?}",
-            result.err()
-        );
+        assert!(result.is_ok(), "Streaming chunk failed: {:?}", result.err());
 
         let response = result.unwrap();
         chunk_count += 1;
@@ -294,10 +289,7 @@ async fn test_streaming_interaction() {
         chunk_count > 0,
         "Expected at least one chunk from streaming"
     );
-    assert!(
-        final_interaction_id.is_some(),
-        "No interaction ID received"
-    );
+    assert!(final_interaction_id.is_some(), "No interaction ID received");
 
     println!("Total chunks received: {chunk_count}");
     println!("Final Interaction ID: {:?}", final_interaction_id.unwrap());

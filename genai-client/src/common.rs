@@ -21,22 +21,13 @@ const BASE_URL_PREFIX: &str = "https://generativelanguage.googleapis.com";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Endpoint<'a> {
     /// Generate content with a specific model
-    GenerateContent {
-        model: &'a str,
-        stream: bool,
-    },
+    GenerateContent { model: &'a str, stream: bool },
     /// Create a new interaction
-    CreateInteraction {
-        stream: bool,
-    },
+    CreateInteraction { stream: bool },
     /// Retrieve an interaction by ID
-    GetInteraction {
-        id: &'a str,
-    },
+    GetInteraction { id: &'a str },
     /// Delete an interaction by ID
-    DeleteInteraction {
-        id: &'a str,
-    },
+    DeleteInteraction { id: &'a str },
 }
 
 impl Endpoint<'_> {
@@ -77,7 +68,11 @@ impl Endpoint<'_> {
 pub fn construct_endpoint_url(endpoint: Endpoint, api_key: &str) -> String {
     let version = ApiVersion::V1Beta; // Default version for new function
     let path = endpoint.to_path(version);
-    let sse_param = if endpoint.requires_sse() { "&alt=sse" } else { "" };
+    let sse_param = if endpoint.requires_sse() {
+        "&alt=sse"
+    } else {
+        ""
+    };
 
     format!("{BASE_URL_PREFIX}{path}?key={api_key}{sse_param}")
 }
@@ -224,7 +219,9 @@ mod tests {
 
     #[test]
     fn test_endpoint_get_interaction() {
-        let endpoint = Endpoint::GetInteraction { id: "interaction-123" };
+        let endpoint = Endpoint::GetInteraction {
+            id: "interaction-123",
+        };
         let url = construct_endpoint_url(endpoint, "api-key");
 
         assert_eq!(
@@ -237,7 +234,9 @@ mod tests {
 
     #[test]
     fn test_endpoint_delete_interaction() {
-        let endpoint = Endpoint::DeleteInteraction { id: "interaction-456" };
+        let endpoint = Endpoint::DeleteInteraction {
+            id: "interaction-456",
+        };
         let url = construct_endpoint_url(endpoint, "api-key");
 
         assert_eq!(
@@ -250,8 +249,20 @@ mod tests {
 
     #[test]
     fn test_endpoint_requires_sse() {
-        assert!(Endpoint::GenerateContent { model: "test", stream: true }.requires_sse());
-        assert!(!Endpoint::GenerateContent { model: "test", stream: false }.requires_sse());
+        assert!(
+            Endpoint::GenerateContent {
+                model: "test",
+                stream: true
+            }
+            .requires_sse()
+        );
+        assert!(
+            !Endpoint::GenerateContent {
+                model: "test",
+                stream: false
+            }
+            .requires_sse()
+        );
         assert!(Endpoint::CreateInteraction { stream: true }.requires_sse());
         assert!(!Endpoint::CreateInteraction { stream: false }.requires_sse());
         assert!(!Endpoint::GetInteraction { id: "test" }.requires_sse());

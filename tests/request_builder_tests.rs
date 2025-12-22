@@ -101,9 +101,7 @@ fn test_request_builder_edge_cases() {
     let client = Client::builder(api_key).build();
 
     // Test empty prompt
-    let _builder = client
-        .with_model("gemini-3-flash-preview")
-        .with_prompt("");
+    let _builder = client.with_model("gemini-3-flash-preview").with_prompt("");
 
     // Test very long prompt
     let long_prompt = "x".repeat(10_000);

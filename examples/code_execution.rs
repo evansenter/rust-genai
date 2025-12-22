@@ -35,12 +35,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            if let Some(ref fcs) = res.function_calls {
-                if !fcs.is_empty() {
-                    println!("\nUnexpected function calls received (showing first):");
-                    println!("  Name: {}", fcs[0].name);
-                    println!("  Args: {}", fcs[0].args);
-                }
+            if let Some(ref fcs) = res.function_calls
+                && !fcs.is_empty()
+            {
+                println!("\nUnexpected function calls received (showing first):");
+                println!("  Name: {}", fcs[0].name);
+                println!("  Args: {}", fcs[0].args);
             }
 
             if res.text.is_none()

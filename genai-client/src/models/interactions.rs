@@ -268,7 +268,8 @@ mod tests {
 
     #[test]
     fn test_deserialize_function_call_content() {
-        let content_json = r#"{"type": "function_call", "name": "get_weather", "args": {"location": "Paris"}}"#;
+        let content_json =
+            r#"{"type": "function_call", "name": "get_weather", "args": {"location": "Paris"}}"#;
 
         let content: InteractionContent =
             serde_json::from_str(content_json).expect("Deserialization failed");

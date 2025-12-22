@@ -332,7 +332,8 @@ impl Client {
             }
         }
 
-        let response = genai_client::create_interaction(&self.http_client, &self.api_key, request).await?;
+        let response =
+            genai_client::create_interaction(&self.http_client, &self.api_key, request).await?;
 
         if self.debug {
             println!("[DEBUG] Interaction created: ID={}", response.id);
@@ -355,7 +356,8 @@ impl Client {
     pub fn create_interaction_stream(
         &self,
         request: genai_client::CreateInteractionRequest,
-    ) -> futures_util::stream::BoxStream<'_, Result<genai_client::InteractionResponse, GenaiError>> {
+    ) -> futures_util::stream::BoxStream<'_, Result<genai_client::InteractionResponse, GenaiError>>
+    {
         use futures_util::StreamExt;
 
         let debug = self.debug;
@@ -368,17 +370,21 @@ impl Client {
             }
         }
 
-        let stream = genai_client::create_interaction_stream(&self.http_client, &self.api_key, request);
+        let stream =
+            genai_client::create_interaction_stream(&self.http_client, &self.api_key, request);
 
         stream
             .map(move |result| {
-                result.map(|response| {
-                    if debug {
-                        println!("[DEBUG] Received interaction update: status={:?}", response.status);
-                    }
-                    response
-                })
-                .map_err(GenaiError::from)
+                result
+                    .inspect(|response| {
+                        if debug {
+                            println!(
+                                "[DEBUG] Received interaction update: status={:?}",
+                                response.status
+                            );
+                        }
+                    })
+                    .map_err(GenaiError::from)
             })
             .boxed()
     }
@@ -402,10 +408,14 @@ impl Client {
             println!("[DEBUG] Getting interaction: ID={interaction_id}");
         }
 
-        let response = genai_client::get_interaction(&self.http_client, &self.api_key, interaction_id).await?;
+        let response =
+            genai_client::get_interaction(&self.http_client, &self.api_key, interaction_id).await?;
 
         if self.debug {
-            println!("[DEBUG] Retrieved interaction: status={:?}", response.status);
+            println!(
+                "[DEBUG] Retrieved interaction: status={:?}",
+                response.status
+            );
         }
 
         Ok(response)

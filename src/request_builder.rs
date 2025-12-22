@@ -8,17 +8,10 @@ use crate::types::{
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
-    self,
+    self, Content as InternalContent, CreateInteractionRequest,
+    FunctionCall as InternalFunctionCall, GenerationConfig, InteractionInput, InteractionResponse,
+    Part as InternalPart, Tool as InternalTool, ToolConfig as InternalToolConfig,
     models::request::GenerateContentRequest as InternalGenerateContentRequest,
-    Content as InternalContent,
-    FunctionCall as InternalFunctionCall,
-    Part as InternalPart,
-    Tool as InternalTool,
-    ToolConfig as InternalToolConfig,
-    CreateInteractionRequest,
-    InteractionInput,
-    InteractionResponse,
-    GenerationConfig,
 };
 use serde_json::{Value, json};
 
@@ -261,10 +254,10 @@ impl<'a> GenerateContentBuilder<'a> {
                 .generate_from_request(self.model_name, request_body)
                 .await?;
 
-            if let Some(text_part) = &response.text {
-                if response.function_calls.is_none() || !text_part.trim().is_empty() {
-                    conversation_history.push(model_text(text_part.clone()));
-                }
+            if let Some(text_part) = &response.text
+                && (response.function_calls.is_none() || !text_part.trim().is_empty())
+            {
+                conversation_history.push(model_text(text_part.clone()));
             }
 
             if let Some(public_function_calls) = &response.function_calls {
@@ -727,19 +720,24 @@ mod tests {
     #[test]
     fn test_interaction_builder_with_model() {
         let client = create_test_client();
-        let builder = client.interaction()
+        let builder = client
+            .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("Hello");
 
         assert_eq!(builder.model.as_deref(), Some("gemini-3-flash-preview"));
         assert!(builder.agent.is_none());
-        assert!(matches!(builder.input, Some(genai_client::InteractionInput::Text(_))));
+        assert!(matches!(
+            builder.input,
+            Some(genai_client::InteractionInput::Text(_))
+        ));
     }
 
     #[test]
     fn test_interaction_builder_with_agent() {
         let client = create_test_client();
-        let builder = client.interaction()
+        let builder = client
+            .interaction()
             .with_agent("deep-research-pro")
             .with_text("Research topic");
 
@@ -750,18 +748,23 @@ mod tests {
     #[test]
     fn test_interaction_builder_with_previous_interaction() {
         let client = create_test_client();
-        let builder = client.interaction()
+        let builder = client
+            .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("Follow-up question")
             .with_previous_interaction("interaction_123");
 
-        assert_eq!(builder.previous_interaction_id.as_deref(), Some("interaction_123"));
+        assert_eq!(
+            builder.previous_interaction_id.as_deref(),
+            Some("interaction_123")
+        );
     }
 
     #[test]
     fn test_interaction_builder_with_system_instruction() {
         let client = create_test_client();
-        let builder = client.interaction()
+        let builder = client
+            .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("Hello")
             .with_system_instruction("You are a helpful assistant");
@@ -783,13 +786,17 @@ mod tests {
             thinking_level: Some("medium".to_string()),
         };
 
-        let builder = client.interaction()
+        let builder = client
+            .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("Hello")
             .with_generation_config(config.clone());
 
         assert!(builder.generation_config.is_some());
-        assert_eq!(builder.generation_config.as_ref().unwrap().temperature, Some(0.7));
+        assert_eq!(
+            builder.generation_config.as_ref().unwrap().temperature,
+            Some(0.7)
+        );
     }
 
     #[test]
@@ -802,7 +809,8 @@ mod tests {
             required: vec![],
         };
 
-        let builder = client.interaction()
+        let builder = client
+            .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("Call a function")
             .with_function(func);
@@ -814,7 +822,8 @@ mod tests {
     #[test]
     fn test_interaction_builder_with_background() {
         let client = create_test_client();
-        let builder = client.interaction()
+        let builder = client
+            .interaction()
             .with_agent("deep-research-pro")
             .with_text("Long running task")
             .with_background(true);
@@ -825,7 +834,8 @@ mod tests {
     #[test]
     fn test_interaction_builder_with_store() {
         let client = create_test_client();
-        let builder = client.interaction()
+        let builder = client
+            .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("Temporary interaction")
             .with_store(false);
@@ -836,7 +846,8 @@ mod tests {
     #[test]
     fn test_interaction_builder_build_request_success() {
         let client = create_test_client();
-        let builder = client.interaction()
+        let builder = client
+            .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("Hello");
 
@@ -845,35 +856,43 @@ mod tests {
 
         let request = result.unwrap();
         assert_eq!(request.model.as_deref(), Some("gemini-3-flash-preview"));
-        assert!(matches!(request.input, genai_client::InteractionInput::Text(_)));
+        assert!(matches!(
+            request.input,
+            genai_client::InteractionInput::Text(_)
+        ));
     }
 
     #[test]
     fn test_interaction_builder_build_request_missing_input() {
         let client = create_test_client();
-        let builder = client.interaction()
-            .with_model("gemini-3-flash-preview");
+        let builder = client.interaction().with_model("gemini-3-flash-preview");
 
         let result = builder.build_request();
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), crate::GenaiError::InvalidInput(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            crate::GenaiError::InvalidInput(_)
+        ));
     }
 
     #[test]
     fn test_interaction_builder_build_request_missing_model_and_agent() {
         let client = create_test_client();
-        let builder = client.interaction()
-            .with_text("Hello");
+        let builder = client.interaction().with_text("Hello");
 
         let result = builder.build_request();
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), crate::GenaiError::InvalidInput(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            crate::GenaiError::InvalidInput(_)
+        ));
     }
 
     #[test]
     fn test_interaction_builder_with_response_modalities() {
         let client = create_test_client();
-        let builder = client.interaction()
+        let builder = client
+            .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("Generate an image")
             .with_response_modalities(vec!["IMAGE".to_string()]);

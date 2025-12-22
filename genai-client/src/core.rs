@@ -55,12 +55,11 @@ pub async fn generate_content_internal(
 
     let response_body: GenerateContentResponse = serde_json::from_str(&response_text)?;
 
-    if let Some(candidate) = response_body.candidates.first() {
-        if let Some(part) = candidate.content.parts.first() {
-            if let Some(text) = &part.text {
-                return Ok(text.clone());
-            }
-        }
+    if let Some(candidate) = response_body.candidates.first()
+        && let Some(part) = candidate.content.parts.first()
+        && let Some(text) = &part.text
+    {
+        return Ok(text.clone());
     }
     Err(InternalError::Parse(
         "No text content found in response structure".to_string(),

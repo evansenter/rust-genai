@@ -70,11 +70,8 @@ cargo fmt
 # Check formatting without making changes
 cargo fmt -- --check
 
-# Run clippy for linting
-cargo clippy
-
-# Run clippy with all features and deny warnings
-cargo clippy --all-features -- -D warnings
+# Run clippy for linting (comprehensive check across workspace)
+cargo clippy --workspace --all-targets --all-features -- -D warnings
 ```
 
 ## Architecture
@@ -237,7 +234,7 @@ Skills provide reusable workflows via slash commands:
 
 **`/review-workspace`**:
 - Comprehensive workspace health check
-- Runs: `cargo check`, `cargo clippy`, unit tests
+- Runs: `cargo check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, unit tests
 - Shows recent git commits and workspace summary
 - Useful before commits or when starting work
 
