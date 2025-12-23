@@ -488,11 +488,13 @@ mod tests {
             input: vec![],
             outputs: vec![
                 InteractionContent::FunctionCall {
+                    id: Some("call_001".to_string()),
                     name: "get_weather".to_string(),
                     args: serde_json::json!({"location": "Paris"}),
                     thought_signature: Some("sig123".to_string()),
                 },
                 InteractionContent::FunctionCall {
+                    id: Some("call_002".to_string()),
                     name: "get_time".to_string(),
                     args: serde_json::json!({"timezone": "UTC"}),
                     thought_signature: None,
@@ -506,11 +508,14 @@ mod tests {
 
         let calls = response.function_calls();
         assert_eq!(calls.len(), 2);
-        assert_eq!(calls[0].0, "get_weather");
-        assert_eq!(calls[0].1["location"], "Paris");
-        assert_eq!(calls[0].2, Some("sig123"));
-        assert_eq!(calls[1].0, "get_time");
-        assert_eq!(calls[1].2, None);
+        // Tuple is (call_id, name, args, signature)
+        assert_eq!(calls[0].0, Some("call_001")); // call_id at index 0
+        assert_eq!(calls[0].1, "get_weather"); // name at index 1
+        assert_eq!(calls[0].2["location"], "Paris"); // args at index 2
+        assert_eq!(calls[0].3, Some("sig123")); // signature at index 3
+        assert_eq!(calls[1].0, Some("call_002")); // call_id at index 0
+        assert_eq!(calls[1].1, "get_time"); // name at index 1
+        assert_eq!(calls[1].3, None); // signature at index 3
         assert!(response.has_function_calls());
         assert!(!response.has_text());
     }
@@ -527,6 +532,7 @@ mod tests {
                     text: Some("Let me check".to_string()),
                 },
                 InteractionContent::FunctionCall {
+                    id: Some("call_mixed".to_string()),
                     name: "check_status".to_string(),
                     args: serde_json::json!({}),
                     thought_signature: None,
