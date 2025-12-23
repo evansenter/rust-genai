@@ -1,6 +1,5 @@
-// Declare the models, errors, common, core, interactions, and sse_parser modules
+// Declare the models, errors, common, interactions, and sse_parser modules
 pub mod common;
-pub mod core;
 pub mod error_helpers;
 pub mod errors;
 pub mod interactions;
@@ -10,7 +9,7 @@ pub mod sse_parser;
 // Import and selectively re-export the necessary structs from the models module
 
 // Shared types (used by multiple APIs)
-pub use models::shared::CodeExecution;
+// CodeExecution is now part of the Tool enum
 pub use models::shared::Content;
 pub use models::shared::FunctionCall;
 pub use models::shared::FunctionCallingConfig;
@@ -22,15 +21,6 @@ pub use models::shared::FunctionResponse;
 pub use models::shared::Part;
 pub use models::shared::Tool;
 pub use models::shared::ToolConfig;
-
-// generateContent-specific types
-pub use models::request::GenerateContentRequest;
-
-pub use models::response::Candidate;
-pub use models::response::ContentResponse;
-pub use models::response::FunctionCallResponse;
-pub use models::response::GenerateContentResponse;
-pub use models::response::PartResponse;
 
 // Interactions API types
 pub use models::interactions::CreateInteractionRequest;
@@ -49,10 +39,6 @@ pub use common::ApiVersion;
 pub use common::Endpoint;
 pub use common::construct_endpoint_url;
 pub use common::construct_url;
-
-// Re-export internal helper functions from the core module
-pub use core::generate_content_internal;
-pub use core::generate_content_stream_internal;
 
 // Re-export Interactions API functions from the interactions module
 pub use interactions::create_interaction;

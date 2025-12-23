@@ -1,333 +1,14 @@
 use crate::GenaiError;
 use crate::builder_traits::HasToolsField;
 use crate::client::Client;
-use crate::content_api::{model_function_calls_request, model_text, user_text, user_tool_response};
-use crate::function_calling::get_global_function_registry;
-use crate::types::{FunctionCall as PublicFunctionCall, GenerateContentResponse};
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
-    self, Content as InternalContent, CreateInteractionRequest,
-    FunctionCall as InternalFunctionCall, GenerationConfig, InteractionInput, InteractionResponse,
-    Part as InternalPart, Tool as InternalTool, ToolConfig as InternalToolConfig,
-    models::request::GenerateContentRequest as InternalGenerateContentRequest,
+    self, CreateInteractionRequest, GenerationConfig, InteractionContent, InteractionInput,
+    InteractionResponse, Tool as InternalTool,
 };
-use log::{error, warn};
-use serde_json::json;
 
 const MAX_FUNCTION_CALL_LOOPS: usize = 5; // Max iterations for auto function calling
-
-/// Builder for generating content with optional system instructions and function calling.
-#[derive(Debug)]
-pub struct GenerateContentBuilder<'a> {
-    pub(crate) client: &'a Client,
-    pub(crate) model_name: &'a str,
-    pub(crate) prompt_text: Option<&'a str>, // Used for single-turn generation
-    pub(crate) initial_contents: Option<Vec<InternalContent>>, // Used for multi-turn/auto-functions
-    pub(crate) system_instruction: Option<&'a str>,
-    pub(crate) tools: Option<Vec<InternalTool>>,
-    pub(crate) tool_config: Option<InternalToolConfig>,
-}
-
-// Helper to convert public FunctionCall to internal FunctionCall
-fn to_internal_function_call(public_fc: &PublicFunctionCall) -> InternalFunctionCall {
-    InternalFunctionCall {
-        name: public_fc.name.clone(),
-        args: public_fc.args.clone(), // Assuming serde_json::Value is Clone
-    }
-}
-
-fn to_internal_function_calls(public_fcs: &[PublicFunctionCall]) -> Vec<InternalFunctionCall> {
-    public_fcs.iter().map(to_internal_function_call).collect()
-}
-
-impl<'a> GenerateContentBuilder<'a> {
-    /// Creates a new builder for generating content.
-    pub(crate) const fn new(client: &'a Client, model_name: &'a str) -> Self {
-        Self {
-            client,
-            model_name,
-            prompt_text: None,
-            initial_contents: None,
-            system_instruction: None,
-            tools: None,
-            tool_config: None,
-        }
-    }
-
-    /// Sets the prompt text for the request.
-    ///
-    /// This is the simplest way to set user input and works with all generation methods
-    /// including `generate()`, `generate_stream()`, and `generate_with_auto_functions()`.
-    ///
-    /// **Note**: While `with_prompt()` works with `generate_stream()`, the streaming method
-    /// does not support automatic function execution. For function calling with streaming,
-    /// you must manually handle function calls as they arrive in the stream.
-    #[must_use]
-    pub const fn with_prompt(mut self, prompt: &'a str) -> Self {
-        self.prompt_text = Some(prompt);
-        self
-    }
-
-    /// Sets the initial user text for a conversation that might involve automatic function calls.
-    /// This will be the first user message in the conversation history.
-    #[must_use]
-    pub fn with_initial_user_text(mut self, user_text_prompt: &'a str) -> Self {
-        self.initial_contents = Some(vec![user_text(user_text_prompt.to_string())]);
-        self
-    }
-
-    /// Sets the initial conversation contents. Use this if you need to start
-    /// with a more complex history than a single user prompt.
-    #[must_use]
-    pub fn with_contents(mut self, contents: Vec<InternalContent>) -> Self {
-        self.initial_contents = Some(contents);
-        self
-    }
-
-    /// Sets the system instruction for the request.
-    #[must_use]
-    pub const fn with_system_instruction(mut self, instruction: &'a str) -> Self {
-        self.system_instruction = Some(instruction);
-        self
-    }
-
-    /// Enables the code execution tool for the model.
-    #[must_use]
-    pub fn with_code_execution(mut self) -> Self {
-        self.tools.get_or_insert_with(Vec::new).push(InternalTool {
-            function_declarations: None,
-            code_execution: Some(genai_client::CodeExecution::default()),
-        });
-        self
-    }
-
-    /// Sets the tool configuration for the request.
-    #[must_use]
-    pub fn with_tool_config(mut self, config: InternalToolConfig) -> Self {
-        self.tool_config = Some(config);
-        self
-    }
-
-    /// Generates content based on the configured parameters (single turn, no automatic function execution loop).
-    ///
-    /// # Errors
-    /// Returns an error if:
-    /// - The HTTP request fails
-    /// - Response parsing fails
-    /// - The API returns an error
-    /// - Neither prompt text nor initial contents are provided
-    pub async fn generate(self) -> Result<GenerateContentResponse, GenaiError> {
-        let current_contents = if let Some(initial_contents) = self.initial_contents {
-            initial_contents
-        } else if let Some(prompt_text) = self.prompt_text {
-            vec![user_text(prompt_text.to_string())]
-        } else {
-            return Err(GenaiError::Internal(
-                "Prompt text or initial contents are required for content generation".to_string(),
-            ));
-        };
-
-        let request_body = InternalGenerateContentRequest {
-            contents: current_contents,
-            system_instruction: self.system_instruction.map(|text| InternalContent {
-                parts: vec![InternalPart {
-                    text: Some(text.to_string()),
-                    function_call: None,
-                    function_response: None,
-                    thought_signature: None,
-                }],
-                role: Some("system".to_string()),
-            }),
-            tools: self.tools,
-            tool_config: self.tool_config,
-        };
-
-        self.client
-            .generate_from_request(self.model_name, request_body)
-            .await
-    }
-
-    /// Generates content with automatic function call handling.
-    ///
-    /// This method will:
-    /// 1. Send the initial prompt/contents to the model.
-    /// 2. If the model requests function calls, these functions (auto-discovered via macros)
-    ///    will be executed locally.
-    /// 3. The function results will be sent back to the model.
-    /// 4. This process repeats until the model responds with text or a loop limit is reached.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - The HTTP request fails
-    /// - Response parsing fails
-    /// - The API returns an error
-    /// - A function execution fails critically
-    /// - The maximum function call loop limit is exceeded
-    pub async fn generate_with_auto_functions(self) -> Result<GenerateContentResponse, GenaiError> {
-        let mut conversation_history = self
-            .initial_contents
-            .or_else(|| self.prompt_text.map(|pt| vec![user_text(pt.to_string())]))
-            .ok_or_else(|| {
-                GenaiError::Internal(
-                    "Initial prompt or contents are required for automatic function calling."
-                        .to_string(),
-                )
-            })?;
-
-        let function_registry = get_global_function_registry();
-        let mut tools_to_send = self.tools.clone();
-
-        if tools_to_send.is_none() {
-            let auto_discovered_declarations = function_registry.all_declarations();
-            if !auto_discovered_declarations.is_empty() {
-                tools_to_send = Some(
-                    auto_discovered_declarations
-                        .into_iter()
-                        .map(|decl| decl.into_tool())
-                        .collect(),
-                );
-            }
-        }
-
-        for _loop_count in 0..MAX_FUNCTION_CALL_LOOPS {
-            let request_body = InternalGenerateContentRequest {
-                contents: conversation_history.clone(),
-                system_instruction: self.system_instruction.map(|text| InternalContent {
-                    parts: vec![InternalPart {
-                        text: Some(text.to_string()),
-                        function_call: None,
-                        function_response: None,
-                        thought_signature: None,
-                    }],
-                    role: Some("system".to_string()),
-                }),
-                tools: tools_to_send.clone(),
-                tool_config: self.tool_config.clone(),
-            };
-
-            let response = self
-                .client
-                .generate_from_request(self.model_name, request_body)
-                .await?;
-
-            if let Some(text_part) = &response.text
-                && (response.function_calls.is_none() || !text_part.trim().is_empty())
-            {
-                conversation_history.push(model_text(text_part.clone()));
-            }
-
-            if let Some(public_function_calls) = &response.function_calls {
-                if public_function_calls.is_empty() {
-                    return Ok(response);
-                }
-                let internal_fcs = to_internal_function_calls(public_function_calls);
-                conversation_history.push(model_function_calls_request(internal_fcs));
-
-                for call_to_execute in public_function_calls {
-                    if let Some(function_to_call) = function_registry.get(&call_to_execute.name) {
-                        match function_to_call.call(call_to_execute.args.clone()).await {
-                            Ok(result) => {
-                                conversation_history
-                                    .push(user_tool_response(call_to_execute.name.clone(), result));
-                            }
-                            Err(e) => {
-                                error!(
-                                    "Function execution failed: function='{}', error='{}'",
-                                    call_to_execute.name, e
-                                );
-                                let error_response_val = json!({ "error": e.to_string() });
-                                conversation_history.push(user_tool_response(
-                                    call_to_execute.name.clone(),
-                                    error_response_val,
-                                ));
-                            }
-                        }
-                    } else {
-                        warn!(
-                            "Function not found in registry: function='{}'. Informing model.",
-                            call_to_execute.name
-                        );
-                        let error_response_val = json!({ "error": format!("Function '{}' is not available or not found.", call_to_execute.name) });
-                        conversation_history.push(user_tool_response(
-                            call_to_execute.name.clone(),
-                            error_response_val,
-                        ));
-                    }
-                }
-            } else {
-                return Ok(response);
-            }
-        }
-
-        Err(GenaiError::Internal(format!(
-            "Exceeded maximum function call loops ({MAX_FUNCTION_CALL_LOOPS}). Returning last known conversation state."
-        )))
-    }
-
-    /// Generates content as a stream based on the configured parameters.
-    ///
-    /// # Automatic Function Calling Limitation
-    ///
-    /// Note: This method does not support automatic function execution (like `generate_with_auto_functions` does).
-    /// The reason is architectural: function execution may require multiple round-trips with the API, and each
-    /// round-trip would need to be a separate streaming request. The current design doesn't support automatically
-    /// chaining multiple streams together.
-    ///
-    /// For function calling with streaming, you need to manually:
-    /// 1. Receive the function call from the stream
-    /// 2. Execute the function
-    /// 3. Start a new streaming request with the function result
-    ///
-    /// # Errors
-    /// Returns an error if:
-    /// - Prompt text is not provided (streaming requires a prompt)
-    pub fn generate_stream(
-        self,
-    ) -> Result<impl StreamExt<Item = Result<GenerateContentResponse, GenaiError>>, GenaiError>
-    {
-        let prompt_text = self.prompt_text.ok_or_else(|| {
-            GenaiError::Internal(
-                "Prompt text is required for streaming content generation".to_string(),
-            )
-        })?;
-
-        let request_body = InternalGenerateContentRequest {
-            contents: vec![InternalContent {
-                parts: vec![InternalPart {
-                    text: Some(prompt_text.to_string()),
-                    function_call: None,
-                    function_response: None,
-                    thought_signature: None,
-                }],
-                role: None,
-            }],
-            system_instruction: self.system_instruction.map(|text| InternalContent {
-                parts: vec![InternalPart {
-                    text: Some(text.to_string()),
-                    function_call: None,
-                    function_response: None,
-                    thought_signature: None,
-                }],
-                role: Some("system".to_string()),
-            }),
-            tools: self.tools,
-            tool_config: self.tool_config,
-        };
-
-        Ok(self
-            .client
-            .stream_from_request(self.model_name, request_body))
-    }
-}
-
-// Implement trait for function calling support
-impl HasToolsField for GenerateContentBuilder<'_> {
-    fn get_tools_mut(&mut self) -> &mut Option<Vec<InternalTool>> {
-        &mut self.tools
-    }
-}
 
 /// Builder for creating interactions with the Gemini Interactions API.
 ///
@@ -426,6 +107,33 @@ impl<'a> InteractionBuilder<'a> {
     /// This is a convenience method that creates an `InteractionInput::Text`.
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
         self.input = Some(InteractionInput::Text(text.into()));
+        self
+    }
+
+    /// Sets the input from a vector of content objects.
+    ///
+    /// This is useful for building multi-part inputs or for sending function results.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use rust_genai::{Client, function_result_content};
+    /// # use serde_json::json;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api_key".to_string()).build();
+    ///
+    /// let result = function_result_content("my_func", "call_123", json!({"data": "result"}));
+    ///
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_content(vec![result])
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_content(mut self, content: Vec<InteractionContent>) -> Self {
+        self.input = Some(InteractionInput::Content(content));
         self
     }
 
@@ -535,6 +243,140 @@ impl<'a> InteractionBuilder<'a> {
         })
     }
 
+    /// Creates interaction with automatic function call handling.
+    ///
+    /// This method implements the auto-function execution loop:
+    /// 1. Send initial input to model with available tools
+    /// 2. If response contains function calls, execute them
+    /// 3. Send function results back to model in new interaction
+    /// 4. Repeat until model returns text or max iterations reached
+    ///
+    /// Functions are auto-discovered from the global registry (via `#[generate_function_declaration]` macro)
+    /// or can be explicitly provided via `.with_function()` or `.with_tools()`.
+    ///
+    /// The loop automatically stops when:
+    /// - Model returns text without function calls
+    /// - Function calls array is empty
+    /// - Maximum iterations (5) is reached
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use rust_genai::{Client, FunctionDeclaration};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api_key".to_string()).build();
+    ///
+    /// // Functions are auto-discovered from registry
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What's the weather in Tokyo?")
+    ///     .create_with_auto_functions()
+    ///     .await?;
+    ///
+    /// println!("{}", response.text().unwrap_or("No text"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - No input was provided
+    /// - Neither model nor agent was specified
+    /// - The API request fails
+    /// - Maximum function call loops (5) is exceeded
+    pub async fn create_with_auto_functions(self) -> Result<InteractionResponse, GenaiError> {
+        use crate::function_calling::get_global_function_registry;
+        use crate::interactions_api::function_result_content;
+        use log::{error, warn};
+        use serde_json::json;
+
+        let client = self.client;
+        let mut request = self.build_request()?;
+
+        // Auto-discover functions from registry if not explicitly provided
+        let function_registry = get_global_function_registry();
+        if request.tools.is_none() {
+            let auto_discovered_declarations = function_registry.all_declarations();
+            if !auto_discovered_declarations.is_empty() {
+                request.tools = Some(
+                    auto_discovered_declarations
+                        .into_iter()
+                        .map(|decl| decl.into_tool())
+                        .collect(),
+                );
+            }
+        }
+
+        // Main auto-function loop (max 5 iterations to prevent infinite loops)
+        for _loop_count in 0..MAX_FUNCTION_CALL_LOOPS {
+            let response = client.create_interaction(request.clone()).await?;
+
+            // Extract function calls using convenience method
+            let function_calls = response.function_calls();
+
+            // If no function calls, we're done!
+            if function_calls.is_empty() {
+                return Ok(response);
+            }
+
+            // Build function results for next iteration
+            let mut function_results = Vec::new();
+
+            for (call_id, name, args, _thought_signature) in function_calls {
+                // Validate that we have a call_id (required by API)
+                let call_id = match call_id {
+                    Some(id) => id,
+                    None => {
+                        warn!(
+                            "Function call '{}' missing call_id. Using fallback value.",
+                            name
+                        );
+                        "unknown"
+                    }
+                };
+
+                // Execute the function
+                let result = if let Some(function) = function_registry.get(name) {
+                    match function.call(args.clone()).await {
+                        Ok(result) => result,
+                        Err(e) => {
+                            error!(
+                                "Function execution failed: function='{}', error='{}'",
+                                name, e
+                            );
+                            json!({ "error": e.to_string() })
+                        }
+                    }
+                } else {
+                    warn!(
+                        "Function not found in registry: function='{}'. Informing model.",
+                        name
+                    );
+                    json!({ "error": format!("Function '{}' is not available or not found.", name) })
+                };
+
+                // Add function result (only the result, not the call - server has it via previous_interaction_id)
+                function_results.push(function_result_content(
+                    name.to_string(),
+                    call_id.to_string(),
+                    result,
+                ));
+            }
+
+            // Create new request with function results
+            // The server maintains function call context via previous_interaction_id
+            request.previous_interaction_id = Some(response.id);
+            request.input = InteractionInput::Content(function_results);
+        }
+
+        Err(GenaiError::Internal(format!(
+            "Exceeded maximum function call loops ({MAX_FUNCTION_CALL_LOOPS}). \
+             The model may be stuck in a loop. Check your function implementations \
+             or use manual function calling for more control."
+        )))
+    }
+
     /// Builds the `CreateInteractionRequest` from the builder state.
     ///
     /// This method is primarily for testing validation logic. In normal usage,
@@ -582,37 +424,11 @@ mod tests {
     use super::*;
     use crate::builder_traits::WithFunctionCalling;
     use crate::{Client, FunctionDeclaration};
+    use genai_client::Tool;
     use serde_json::json;
 
     fn create_test_client() -> Client {
         Client::builder("test-api-key".to_string()).build()
-    }
-
-    #[test]
-    fn test_builder_with_prompt() {
-        let client = create_test_client();
-        let builder = GenerateContentBuilder::new(&client, "test-model").with_prompt("Hello");
-        assert_eq!(builder.prompt_text, Some("Hello"));
-    }
-
-    #[test]
-    fn test_builder_with_initial_user_text() {
-        let client = create_test_client();
-        let builder =
-            GenerateContentBuilder::new(&client, "test-model").with_initial_user_text("Hi there");
-        assert!(builder.initial_contents.is_some());
-        let contents = builder.initial_contents.unwrap();
-        assert_eq!(contents.len(), 1);
-        assert_eq!(contents[0].parts[0].text.as_deref(), Some("Hi there"));
-        assert_eq!(contents[0].role.as_deref(), Some("user"));
-    }
-
-    #[test]
-    fn test_builder_with_system_instruction() {
-        let client = create_test_client();
-        let builder = GenerateContentBuilder::new(&client, "test-model")
-            .with_system_instruction("Be concise");
-        assert_eq!(builder.system_instruction, Some("Be concise"));
     }
 
     #[test]
@@ -647,25 +463,12 @@ mod tests {
             .build();
 
         let tool = func_decl.into_tool();
-        assert!(tool.function_declarations.is_some());
-        let decls = tool.function_declarations.unwrap();
-        assert_eq!(decls.len(), 1);
-        assert_eq!(decls[0].name(), "test");
-    }
-
-    #[test]
-    fn test_with_function() {
-        let client = create_test_client();
-        let func = FunctionDeclaration::builder("test")
-            .description("Test function")
-            .parameter("param1", json!({"type": "string"}))
-            .required(vec!["param1".to_string()])
-            .build();
-
-        let builder = GenerateContentBuilder::new(&client, "test-model").with_function(func);
-
-        assert!(builder.tools.is_some());
-        assert_eq!(builder.tools.as_ref().unwrap().len(), 1);
+        match tool {
+            Tool::Function { name, .. } => {
+                assert_eq!(name, "test");
+            }
+            _ => panic!("Expected Tool::Function variant"),
+        }
     }
 
     // --- InteractionBuilder Tests ---

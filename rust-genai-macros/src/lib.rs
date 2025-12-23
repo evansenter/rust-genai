@@ -384,12 +384,20 @@ fn generate_declaration_function(
         #[::async_trait::async_trait]
         impl ::rust_genai::function_calling::CallableFunction for #callable_struct_name {
             fn declaration(&self) -> ::rust_genai::FunctionDeclaration {
-                let properties = match ::serde_json::from_str(#parameters_json_string) {
+                // Parse the full OpenAPI schema object
+                let schema: ::serde_json::Value = match ::serde_json::from_str(#parameters_json_string) {
                     Ok(p) => p,
                     Err(_e) => {
                         panic!("Failed to parse generated parameters JSON for '{}': {}", #func_name, _e);
                     }
                 };
+
+                // Extract just the "properties" field from the schema
+                // The OpenAPI schema has format: {"type": "object", "properties": {...}}
+                // We only need the inner properties object for FunctionParameters
+                let properties = schema.get("properties")
+                    .cloned()
+                    .unwrap_or(::serde_json::json!({}));
 
                 ::rust_genai::FunctionDeclaration::new(
                     #func_name.to_string(),

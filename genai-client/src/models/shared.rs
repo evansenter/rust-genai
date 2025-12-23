@@ -26,19 +26,27 @@ pub struct Part {
     // pub inline_data: Option<Blob>,
 }
 
-/// Represents a tool that can be used by the model.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
-pub struct Tool {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_declarations: Option<Vec<FunctionDeclaration>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub code_execution: Option<CodeExecution>,
-}
-
-/// Represents the code execution tool.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
-pub struct CodeExecution {
-    // No fields, as per API documentation for the basic CodeExecution tool.
+/// Represents a tool that can be used by the model (Interactions API format).
+///
+/// Tools in the Interactions API use a flat structure with the tool type and details
+/// at the top level, rather than nested in arrays.
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Tool {
+    /// A custom function that the model can call
+    Function {
+        name: String,
+        description: String,
+        parameters: FunctionParameters,
+    },
+    /// Built-in Google Search tool
+    GoogleSearch,
+    /// Built-in code execution tool
+    CodeExecution,
+    /// Built-in URL context tool
+    UrlContext,
+    /// Model Context Protocol (MCP) server
+    McpServer { name: String, url: String },
 }
 
 /// Represents a function that can be called by the model.
@@ -95,9 +103,10 @@ impl FunctionDeclaration {
 
     /// Converts this FunctionDeclaration into a Tool for API requests
     pub fn into_tool(self) -> Tool {
-        Tool {
-            function_declarations: Some(vec![self]),
-            code_execution: None,
+        Tool::Function {
+            name: self.name,
+            description: self.description,
+            parameters: self.parameters,
         }
     }
 }

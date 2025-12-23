@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`rust-genai` is a Rust client library for Google's Generative AI (Gemini) API. The project supports both the **GenerateContent API** (legacy) and the **Interactions API** (unified interface for models and agents).
+`rust-genai` is a Rust client library for Google's Generative AI (Gemini) API. The project uses the **Interactions API** which provides a unified interface for working with both models and agents.
 
 The project is structured as a Cargo workspace with three crates:
 
@@ -32,7 +32,7 @@ cargo test -- --include-ignored
 cargo test
 
 # Run tests for a specific test file
-cargo test --test integration_tests
+cargo test --test interactions_tests
 cargo test --test macro_tests
 
 # Run only unit tests (no integration tests)
@@ -50,12 +50,6 @@ cargo test -- --nocapture
 All examples require the `GEMINI_API_KEY` environment variable:
 
 ```bash
-# GenerateContent API examples
-cargo run --example simple_request
-cargo run --example stream_request
-cargo run --example function_call
-cargo run --example code_execution
-
 # Interactions API examples
 cargo run --example simple_interaction
 cargo run --example stateful_interaction
@@ -81,21 +75,19 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 The codebase follows a layered architecture where each layer has distinct responsibilities:
 
 1. **Public API Layer** (`src/lib.rs`, `src/client.rs`, `src/request_builder.rs`):
-   - Exposes the user-facing `Client` and `GenerateContentBuilder` types
+   - Exposes the user-facing `Client` and `InteractionBuilder` types
    - Converts internal errors (`genai_client::InternalError`) to public errors (`GenaiError`)
    - Provides high-level abstractions like automatic function calling
 
-2. **Internal Logic Layer** (`src/internal/`, `src/function_calling.rs`, `src/content_api.rs`):
-   - Response processing and streaming logic
+2. **Internal Logic Layer** (`src/function_calling.rs`, `src/interactions_api.rs`):
    - Function calling registry and execution system using the `inventory` crate
-   - Helper functions for building conversation content
+   - Helper functions for building Interactions API content (text, images, function calls, etc.)
 
 3. **HTTP Client Layer** (`genai-client/`):
    - Raw HTTP requests to Google's Generative AI API
    - JSON models for request/response serialization:
-     - `models/request.rs` & `models/response.rs`: GenerateContent API
      - `models/interactions.rs`: Interactions API (flat content structure with type tags)
-     - `models/shared.rs`: Shared types used by both APIs
+     - `models/shared.rs`: Shared types (FunctionDeclaration, Tool, etc.)
    - Error handling for network and API errors
    - SSE (Server-Sent Events) streaming support
    - Endpoint abstraction in `common.rs` for flexible URL construction
@@ -108,24 +100,25 @@ The codebase follows a layered architecture where each layer has distinct respon
 ### Key Architectural Patterns
 
 **Builder Pattern**: The library uses a fluent builder API throughout:
-- `Client::builder(api_key).debug().build()` for client creation
-- `client.with_model(...).with_prompt(...).generate()` for requests
+- `Client::builder(api_key).build()` for client creation
+- `client.interaction().with_model(...).with_text(...).create()` for requests
+- `FunctionDeclaration::builder()` for creating function declarations ergonomically
 - This pattern is implemented in `src/client.rs` and `src/request_builder.rs`
 
 **Function Calling System**: The library supports three levels of function calling:
 1. **Manual**: User explicitly passes `FunctionDeclaration` and handles function calls
 2. **Semi-automatic**: Macro generates declarations, but user controls execution
-3. **Fully automatic**: `generate_with_auto_functions()` discovers and executes functions automatically using the `inventory` crate
+3. **Fully automatic**: `create_with_auto_functions()` discovers and executes functions automatically using the `inventory` crate
 
 The function calling system is implemented across:
 - `src/function_calling.rs`: Core traits (`CallableFunction`) and registry
 - `rust-genai-macros/src/lib.rs`: Procedural macro for function declaration generation
-- `src/request_builder.rs`: The `generate_with_auto_functions()` method that orchestrates automatic execution
+- `src/request_builder.rs`: The `create_with_auto_functions()` method that orchestrates automatic execution
 
 **Streaming Architecture**: SSE streaming is implemented using:
 - `async-stream` for async generators
 - `futures-util::Stream` trait for composable streaming
-- Response chunking and text aggregation in `src/internal/response_processing.rs`
+- Response chunking handled by the Interactions API streaming endpoint
 
 ### Error Handling Strategy
 
@@ -136,63 +129,6 @@ The library uses two distinct error types:
 Internal errors from `genai-client` are converted to public `GenaiError` variants via `From` trait implementation in `src/lib.rs:43`.
 
 ## Important Implementation Details
-
-### Content API Helper Functions
-
-The `content_api` module (`src/content_api.rs`) provides builder functions for constructing multi-turn conversations:
-- `user_text()`: Create user messages
-- `model_text()`: Create model responses
-- `model_function_call()` / `model_function_calls_request()`: Record function calls
-- `user_tool_response()`: Send function results back to model
-
-These are essential for implementing multi-turn conversations with function calling.
-
-### Gemini 3 Thought Signatures
-
-Gemini 3 models require **thought signatures** for multi-turn function calling. Without these signatures, Gemini 3 returns 400 errors when receiving function call responses.
-
-**What are thought signatures?**
-- Opaque encrypted tokens that represent the model's internal reasoning state
-- Generated by Gemini 3 during responses that include function calls
-- Must be preserved and passed back unchanged in subsequent conversation turns
-
-**Implementation:**
-- Extract from `GenerateContentResponse.thought_signatures` field
-- Pass to `model_function_calls_request_with_signatures()` when building conversation history
-- For Interactions API, use `function_call_content_with_signature()`
-
-**Example workflow:**
-```rust
-// Step 1: Initial request with function declaration
-let response = client
-    .with_model("gemini-3-flash-preview")
-    .with_prompt("What's the weather in Tokyo?")
-    .with_function(weather_fn)
-    .generate()
-    .await?;
-
-// Step 2: Extract thought signatures (critical for Gemini 3!)
-let signatures = response.thought_signatures.clone();
-
-// Step 3: Build conversation history WITH signatures
-let contents = vec![
-    user_text("What's the weather in Tokyo?"),
-    model_function_calls_request_with_signatures(calls, signatures),
-    user_tool_response("get_weather", json!({"temp": "22°C"})),
-];
-
-// Step 4: Continue conversation
-let response2 = client
-    .with_model("gemini-3-flash-preview")
-    .with_contents(contents)
-    .with_function(weather_fn)
-    .generate()
-    .await?;
-```
-
-**See:** `examples/gemini3_thought_signatures.rs` for a complete working example.
-
-**Note:** This is only required for Gemini 3 models. Earlier Gemini models (1.5, 2.0) don't use thought signatures.
 
 ### Interactions API Implementation
 
@@ -211,8 +147,8 @@ The Interactions API provides a unified interface for both models and agents. Ke
 
 **Content Structure** (`genai-client/src/models/interactions.rs`):
 - Uses flat `InteractionContent` enum with type-tagged variants (Text, Thought, Image, Audio, Video, FunctionCall, FunctionResponse)
-- Different from GenerateContent API which uses nested `Content` with `parts` arrays
 - Fields are often optional as API doesn't always return all data
+- Helper functions in `src/interactions_api.rs` provide ergonomic content builders
 
 **Stateful Conversations**:
 - Pass `previous_interaction_id` to reference earlier interactions
@@ -229,15 +165,11 @@ The Interactions API provides a unified interface for both models and agents. Ke
 ### Test Organization
 
 Tests are organized into two categories:
-- **Unit tests**: Inline with source code (e.g., `src/lib.rs:55-134`)
+- **Unit tests**: Inline with source code (e.g., `src/lib.rs`, `src/request_builder.rs`, `src/interactions_api.rs`)
 - **Integration tests**: In `tests/` directory, each file tests a specific feature:
-  - `integration_tests.rs`: GenerateContent API workflow tests (requires API key)
   - `interactions_tests.rs`: Interactions API tests (requires API key)
   - `macro_tests.rs`: Procedural macro functionality
-  - `function_calling_tests.rs`: Function execution system
-  - `content_api_tests.rs`: Conversation helper functions
-  - `auto_function_tests.rs`: Auto-function execution tests (requires HTTP mocking)
-  - `content_api_edge_cases.rs`: Edge cases for content API helper functions
+  - `function_declaration_builder_tests.rs`: FunctionDeclaration builder tests
   - `interaction_builder_edge_cases.rs`: InteractionBuilder edge cases and validation tests
 
 Integration tests that require a real API key use `#[ignore]` attribute and must be run with `cargo test -- --ignored`.
@@ -246,7 +178,7 @@ Integration tests that require a real API key use `#[ignore]` attribute and must
 
 The library supports different API versions via the `ApiVersion` enum in `genai-client`:
 - Currently defaults to `V1Beta`
-- API version affects URL construction in `genai-client/src/core.rs`
+- API version affects URL construction in `genai-client/src/common.rs`
 
 ## Claude Code Configuration
 
@@ -298,7 +230,7 @@ Skills provide reusable workflows that are automatically invoked by Claude Code 
 - Example trigger: "Can you check the documentation?"
 
 **`run-examples` skill** (auto-invoked when you ask to run examples):
-- Runs all 6 example programs to verify they work with current API
+- Runs all example programs to verify they work with current API
 - Requires `GEMINI_API_KEY` environment variable
 - Useful for catching API breaking changes
 - Example trigger: "Can you run all the examples?"
@@ -349,7 +281,7 @@ RUST_LOG=rust_genai=debug,info cargo run
 ### What Gets Logged
 
 At the `debug` level, the library logs:
-- Request URLs and bodies (both GenerateContent and Interactions APIs)
+- Request URLs and bodies for Interactions API
 - Response content (success and error cases)
 - Streaming events and chunks
 - Interaction lifecycle events (create, retrieve, delete)

@@ -1,7 +1,6 @@
 /// Helper functions for building Interactions API content
 ///
-/// This module provides ergonomic builders for InteractionContent and InteractionInput,
-/// matching the pattern established by content_api.rs for the GenerateContent API.
+/// This module provides ergonomic builders for InteractionContent and InteractionInput.
 use genai_client::{InteractionContent, InteractionInput};
 use serde_json::Value;
 
@@ -45,7 +44,7 @@ pub fn thought_content(text: impl Into<String>) -> InteractionContent {
     }
 }
 
-/// Creates a function call content with optional thought signature
+/// Creates a function call content with optional thought signature and call ID
 ///
 /// For Gemini 3 models, thought signatures are required for multi-turn function calling.
 /// Extract them from the interaction response and pass them here when building conversation history.
@@ -56,12 +55,14 @@ pub fn thought_content(text: impl Into<String>) -> InteractionContent {
 /// use serde_json::json;
 ///
 /// let call = function_call_content_with_signature(
+///     Some("call_123"),
 ///     "get_weather",
 ///     json!({"location": "San Francisco"}),
 ///     Some("encrypted_signature_token".to_string())
 /// );
 /// ```
 pub fn function_call_content_with_signature(
+    id: Option<impl Into<String>>,
     name: impl Into<String>,
     args: Value,
     thought_signature: Option<String>,
@@ -69,24 +70,25 @@ pub fn function_call_content_with_signature(
     let function_name = name.into();
 
     // Validate that signature is not empty if provided
-    if let Some(ref sig) = thought_signature {
-        if sig.trim().is_empty() {
-            log::warn!(
-                "Empty thought signature provided for function call '{}'. \
-                 This may cause issues with Gemini 3 multi-turn conversations.",
-                function_name
-            );
-        }
+    if let Some(ref sig) = thought_signature
+        && sig.trim().is_empty()
+    {
+        log::warn!(
+            "Empty thought signature provided for function call '{}'. \
+             This may cause issues with Gemini 3 multi-turn conversations.",
+            function_name
+        );
     }
 
     InteractionContent::FunctionCall {
+        id: id.map(|s| s.into()),
         name: function_name,
         args,
         thought_signature,
     }
 }
 
-/// Creates a function call content (without thought signature)
+/// Creates a function call content (without thought signature or call ID)
 ///
 /// For Gemini 3 models, prefer using `function_call_content_with_signature` instead.
 ///
@@ -101,10 +103,55 @@ pub fn function_call_content_with_signature(
 /// );
 /// ```
 pub fn function_call_content(name: impl Into<String>, args: Value) -> InteractionContent {
-    function_call_content_with_signature(name, args, None)
+    function_call_content_with_signature(None::<String>, name, args, None)
 }
 
-/// Creates a function response content
+/// Creates a function result content (preferred for new code)
+///
+/// This is the correct way to send function execution results back to the Interactions API.
+/// The call_id must match the id from the FunctionCall you're responding to.
+///
+/// # Panics
+///
+/// Will log a warning if call_id is empty or whitespace-only, as this may cause
+/// API errors when the server tries to match the result to a function call.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::function_result_content;
+/// use serde_json::json;
+///
+/// let result = function_result_content(
+///     "get_weather",
+///     "call_abc123",
+///     json!({"temperature": "72F", "conditions": "sunny"})
+/// );
+/// ```
+pub fn function_result_content(
+    name: impl Into<String>,
+    call_id: impl Into<String>,
+    result: Value,
+) -> InteractionContent {
+    let function_name = name.into();
+    let call_id_str = call_id.into();
+
+    // Validate call_id is not empty
+    if call_id_str.trim().is_empty() {
+        log::warn!(
+            "Empty call_id provided for function result '{}'. \
+             This may cause the API to fail to match the result to its function call.",
+            function_name
+        );
+    }
+
+    InteractionContent::FunctionResult {
+        name: function_name,
+        call_id: call_id_str,
+        result,
+    }
+}
+
+/// Creates a function response content (legacy - prefer function_result_content)
 ///
 /// # Example
 /// ```
@@ -116,7 +163,9 @@ pub fn function_call_content(name: impl Into<String>, args: Value) -> Interactio
 ///     json!({"temperature": "72F", "conditions": "sunny"})
 /// );
 /// ```
+#[deprecated(note = "Use function_result_content instead for correct API compatibility")]
 pub fn function_response_content(name: impl Into<String>, response: Value) -> InteractionContent {
+    #[allow(deprecated)]
     InteractionContent::FunctionResponse {
         name: name.into(),
         response,
@@ -308,6 +357,24 @@ mod tests {
     }
 
     #[test]
+    fn test_function_result_content() {
+        let content = function_result_content("test", "call_123", json!({"result": "ok"}));
+        match content {
+            InteractionContent::FunctionResult {
+                name,
+                call_id,
+                result,
+            } => {
+                assert_eq!(name, "test");
+                assert_eq!(call_id, "call_123");
+                assert_eq!(result, json!({"result": "ok"}));
+            }
+            _ => panic!("Expected FunctionResult variant"),
+        }
+    }
+
+    #[test]
+    #[allow(deprecated)]
     fn test_function_response_content() {
         let content = function_response_content("test", json!({"result": "ok"}));
         match content {
