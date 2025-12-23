@@ -552,6 +552,7 @@ match result {
 **Test failures (intermittent)**
 - LLM responses are non-deterministic; some tests may occasionally fail
 - Re-running the test usually succeeds
+- Use `--nocapture` to see test output: `cargo test test_name -- --include-ignored --nocapture`
 - This is expected behavior for integration tests with AI models
 
 ### Debug Logging

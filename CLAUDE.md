@@ -49,9 +49,13 @@ cargo test -- --nocapture
 cargo test --test interactions_api_tests -- --include-ignored --test-threads=4
 ```
 
-**Test Execution Time**: Running all integration tests takes approximately 2-5 minutes depending on API response times. Individual tests typically complete in 2-10 seconds.
+**Test Execution Time**: Running all integration tests takes approximately 2-5 minutes depending on API response times and network latency. Using `--test-threads=4` can speed this up but may trigger rate limits. Individual tests typically complete in 2-10 seconds.
 
 **Known Test Flakiness**: Some integration tests may occasionally fail due to LLM behavior variability (model may paraphrase data, not follow instructions perfectly, etc.). Re-running usually succeeds.
+
+**Environment Variables for Tests**:
+- `GEMINI_API_KEY` (required): API key for running integration tests
+- `TEST_IMAGE_URL` (optional): Custom image URL for `test_image_input_from_uri` (defaults to Google's sample scones.jpg)
 
 ### Running Examples
 
