@@ -103,9 +103,9 @@ pub fn model_function_calls_request_with_signatures(
 
     // Log signature count mismatches to help users debug issues
     if !signatures.is_empty() && signatures.len() != calls.len() {
-        log::debug!(
+        log::warn!(
             "Thought signature count ({}) doesn't match function call count ({}). \
-             Extra calls will have no signature.",
+             Extra calls will have no signature. This may cause Gemini 3 to return errors.",
             signatures.len(),
             calls.len()
         );
