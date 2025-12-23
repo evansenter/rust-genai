@@ -200,6 +200,119 @@ pub struct InteractionResponse {
     pub previous_interaction_id: Option<String>,
 }
 
+impl InteractionResponse {
+    /// Extract the first text content from outputs
+    ///
+    /// Returns the first text found in the outputs vector.
+    /// Useful for simple queries where you expect a single text response.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(text) = response.text() {
+    ///     println!("Response: {}", text);
+    /// }
+    /// ```
+    pub fn text(&self) -> Option<&str> {
+        self.outputs.iter().find_map(|content| {
+            if let InteractionContent::Text { text: Some(t) } = content {
+                Some(t.as_str())
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Extract all text contents concatenated
+    ///
+    /// Combines all text outputs into a single string.
+    /// Useful when the model returns multiple text chunks.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// let full_text = response.all_text();
+    /// println!("Complete response: {}", full_text);
+    /// ```
+    pub fn all_text(&self) -> String {
+        self.outputs
+            .iter()
+            .filter_map(|content| {
+                if let InteractionContent::Text { text: Some(t) } = content {
+                    Some(t.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("")
+    }
+
+    /// Extract function calls from outputs
+    ///
+    /// Returns a vector of (function_name, arguments, thought_signature) tuples.
+    /// Useful for implementing function calling workflows.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// for (name, args, signature) in response.function_calls() {
+    ///     println!("Function: {} with args: {}", name, args);
+    /// }
+    /// ```
+    pub fn function_calls(&self) -> Vec<(&str, &serde_json::Value, Option<&str>)> {
+        self.outputs
+            .iter()
+            .filter_map(|content| {
+                if let InteractionContent::FunctionCall {
+                    name,
+                    args,
+                    thought_signature,
+                } = content
+                {
+                    Some((
+                        name.as_str(),
+                        args,
+                        thought_signature.as_ref().map(|s| s.as_str()),
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Check if response contains text
+    ///
+    /// Returns true if any output contains text content.
+    pub fn has_text(&self) -> bool {
+        self.outputs
+            .iter()
+            .any(|c| matches!(c, InteractionContent::Text { text: Some(_) }))
+    }
+
+    /// Check if response contains function calls
+    ///
+    /// Returns true if any output contains a function call.
+    pub fn has_function_calls(&self) -> bool {
+        self.outputs
+            .iter()
+            .any(|c| matches!(c, InteractionContent::FunctionCall { .. }))
+    }
+
+    /// Check if response contains thoughts (internal reasoning)
+    ///
+    /// Returns true if any output contains thought content.
+    pub fn has_thoughts(&self) -> bool {
+        self.outputs
+            .iter()
+            .any(|c| matches!(c, InteractionContent::Thought { text: Some(_) }))
+    }
+}
+
 /// Wrapper for SSE streaming events from the Interactions API
 /// The API returns events with this structure rather than bare InteractionResponse objects
 #[derive(Clone, Deserialize, Debug)]
@@ -323,5 +436,122 @@ mod tests {
         assert_eq!(value["temperature"], 0.7);
         assert_eq!(value["maxOutputTokens"], 500);
         assert_eq!(value["thinkingLevel"], "medium");
+    }
+
+    #[test]
+    fn test_interaction_response_text() {
+        let response = InteractionResponse {
+            id: "test_id".to_string(),
+            model: Some("gemini-3-flash".to_string()),
+            agent: None,
+            input: vec![],
+            outputs: vec![
+                InteractionContent::Text {
+                    text: Some("Hello".to_string()),
+                },
+                InteractionContent::Text {
+                    text: Some("World".to_string()),
+                },
+            ],
+            status: InteractionStatus::Completed,
+            usage: None,
+            tools: None,
+            previous_interaction_id: None,
+        };
+
+        assert_eq!(response.text(), Some("Hello"));
+        assert_eq!(response.all_text(), "HelloWorld");
+        assert!(response.has_text());
+        assert!(!response.has_function_calls());
+    }
+
+    #[test]
+    fn test_interaction_response_function_calls() {
+        let response = InteractionResponse {
+            id: "test_id".to_string(),
+            model: Some("gemini-3-flash".to_string()),
+            agent: None,
+            input: vec![],
+            outputs: vec![
+                InteractionContent::FunctionCall {
+                    name: "get_weather".to_string(),
+                    args: serde_json::json!({"location": "Paris"}),
+                    thought_signature: Some("sig123".to_string()),
+                },
+                InteractionContent::FunctionCall {
+                    name: "get_time".to_string(),
+                    args: serde_json::json!({"timezone": "UTC"}),
+                    thought_signature: None,
+                },
+            ],
+            status: InteractionStatus::Completed,
+            usage: None,
+            tools: None,
+            previous_interaction_id: None,
+        };
+
+        let calls = response.function_calls();
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[0].0, "get_weather");
+        assert_eq!(calls[0].1["location"], "Paris");
+        assert_eq!(calls[0].2, Some("sig123"));
+        assert_eq!(calls[1].0, "get_time");
+        assert_eq!(calls[1].2, None);
+        assert!(response.has_function_calls());
+        assert!(!response.has_text());
+    }
+
+    #[test]
+    fn test_interaction_response_mixed_content() {
+        let response = InteractionResponse {
+            id: "test_id".to_string(),
+            model: Some("gemini-3-flash".to_string()),
+            agent: None,
+            input: vec![],
+            outputs: vec![
+                InteractionContent::Text {
+                    text: Some("Let me check".to_string()),
+                },
+                InteractionContent::FunctionCall {
+                    name: "check_status".to_string(),
+                    args: serde_json::json!({}),
+                    thought_signature: None,
+                },
+                InteractionContent::Text {
+                    text: Some("Done!".to_string()),
+                },
+            ],
+            status: InteractionStatus::Completed,
+            usage: None,
+            tools: None,
+            previous_interaction_id: None,
+        };
+
+        assert_eq!(response.text(), Some("Let me check"));
+        assert_eq!(response.all_text(), "Let me checkDone!");
+        assert_eq!(response.function_calls().len(), 1);
+        assert!(response.has_text());
+        assert!(response.has_function_calls());
+    }
+
+    #[test]
+    fn test_interaction_response_empty_outputs() {
+        let response = InteractionResponse {
+            id: "test_id".to_string(),
+            model: Some("gemini-3-flash".to_string()),
+            agent: None,
+            input: vec![],
+            outputs: vec![],
+            status: InteractionStatus::Completed,
+            usage: None,
+            tools: None,
+            previous_interaction_id: None,
+        };
+
+        assert_eq!(response.text(), None);
+        assert_eq!(response.all_text(), "");
+        assert_eq!(response.function_calls().len(), 0);
+        assert!(!response.has_text());
+        assert!(!response.has_function_calls());
     }
 }

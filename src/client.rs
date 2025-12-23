@@ -1,14 +1,6 @@
 use crate::GenaiError;
-use crate::internal::response_processing::process_response_parts;
-use crate::types::GenerateContentResponse;
-use async_stream::try_stream;
-use futures_util::StreamExt;
 use genai_client::ApiVersion;
-use genai_client::construct_url;
-use genai_client::error_helpers::check_response;
-use genai_client::models::request::GenerateContentRequest as InternalGenerateContentRequest;
 use reqwest::Client as ReqwestClient;
-use std::str;
 
 /// Logs a request body at debug level, preferring JSON format when possible.
 fn log_request_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
@@ -24,6 +16,8 @@ pub struct Client {
     pub(crate) api_key: String,
     #[allow(clippy::struct_field_names)]
     pub(crate) http_client: ReqwestClient,
+    /// API version - currently unused by Interactions API but kept for potential future use
+    #[allow(dead_code)]
     pub(crate) api_version: ApiVersion,
 }
 
@@ -81,145 +75,6 @@ impl Client {
             http_client: ReqwestClient::new(),
             api_version: api_version.unwrap_or(ApiVersion::V1Beta),
         }
-    }
-
-    /// Starts building a content generation request using a specific model.
-    ///
-    /// # Arguments
-    ///
-    /// * `model_name` - The name of the model to use (e.g., "gemini-3-flash-preview")
-    #[must_use]
-    pub const fn with_model<'a>(
-        &'a self,
-        model_name: &'a str,
-    ) -> crate::request_builder::GenerateContentBuilder<'a> {
-        crate::request_builder::GenerateContentBuilder::new(self, model_name)
-    }
-
-    /// Generates content directly from a pre-constructed request body.
-    ///
-    /// This method is useful for advanced scenarios where you need to manually build the
-    /// `GenerateContentRequest`, for example, in multi-turn conversations with function calls.
-    ///
-    /// # Arguments
-    ///
-    /// * `model_name` - The name of the model to use.
-    /// * `request_body` - The fully constructed `genai_client::models::request::GenerateContentRequest`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - The HTTP request fails
-    /// - Response parsing fails
-    /// - The API returns an error
-    pub async fn generate_from_request(
-        &self,
-        model_name: &str,
-        request_body: InternalGenerateContentRequest,
-    ) -> Result<GenerateContentResponse, GenaiError> {
-        let url = construct_url(model_name, &self.api_key, false, self.api_version);
-
-        log::debug!("Request URL: {url}");
-        log_request_body(&request_body);
-
-        let response = self
-            .http_client
-            .post(&url)
-            .json(&request_body)
-            .send()
-            .await?;
-        let response = check_response(response).await?;
-        let response_text = response.text().await?;
-        log::debug!("Response Text: {response_text}");
-        let response_body: genai_client::models::response::GenerateContentResponse =
-            serde_json::from_str(&response_text)?;
-
-        if let Some(candidate) = response_body.candidates.first() {
-            let processed_parts = process_response_parts(&candidate.content.parts);
-
-            if !processed_parts.function_calls.is_empty()
-                || !processed_parts.code_execution_results.is_empty()
-                || processed_parts.text.is_some()
-            {
-                return Ok(GenerateContentResponse {
-                    text: processed_parts.text,
-                    function_calls: if processed_parts.function_calls.is_empty() {
-                        None
-                    } else {
-                        Some(processed_parts.function_calls)
-                    },
-                    code_execution_results: if processed_parts.code_execution_results.is_empty() {
-                        None
-                    } else {
-                        Some(processed_parts.code_execution_results)
-                    },
-                    thought_signatures: if processed_parts.thought_signatures.is_empty() {
-                        None
-                    } else {
-                        Some(processed_parts.thought_signatures)
-                    },
-                });
-            }
-        }
-        Err(GenaiError::Parse(
-            "No text, function calls, or actionable tool code results found in response structure (from client::generate_from_request)".to_string(),
-        ))
-    }
-
-    /// Generates content as a stream directly from a pre-constructed request body.
-    ///
-    /// This method is useful for advanced scenarios where you need to manually build the
-    /// `GenerateContentRequest` for streaming, e.g., in multi-turn conversations.
-    ///
-    /// # Arguments
-    ///
-    /// * `model_name` - The name of the model to use.
-    /// * `request_body` - The fully constructed `genai_client::models::request::GenerateContentRequest`.
-    pub fn stream_from_request<'b>(
-        &'b self,
-        model_name: &'b str,
-        request_body: InternalGenerateContentRequest,
-    ) -> impl futures_util::stream::Stream<Item = Result<GenerateContentResponse, GenaiError>> + Send + 'b
-    {
-        let url = construct_url(model_name, &self.api_key, true, self.api_version);
-
-        log::debug!("Streaming Request URL: {url}");
-        log_request_body(&request_body);
-
-        let stream_val = try_stream! {
-            let response = self.http_client.post(&url).json(&request_body).send().await?;
-            let status = response.status();
-
-            if status.is_success() {
-                let byte_stream = response.bytes_stream();
-                let parsed_stream = genai_client::sse_parser::parse_sse_stream::<genai_client::models::response::GenerateContentResponse>(byte_stream);
-                futures_util::pin_mut!(parsed_stream);
-
-                while let Some(result) = parsed_stream.next().await {
-                    let chunk_response_internal = result?;
-
-                    log::debug!("Stream Chunk: {chunk_response_internal:#?}");
-
-                    if let Some(candidate) = chunk_response_internal.candidates.first() {
-                        let processed_parts = process_response_parts(&candidate.content.parts);
-
-                        if processed_parts.text.is_some() || !processed_parts.function_calls.is_empty() || !processed_parts.code_execution_results.is_empty() {
-                            yield GenerateContentResponse {
-                                text: processed_parts.text,
-                                function_calls: if processed_parts.function_calls.is_empty() { None } else { Some(processed_parts.function_calls) },
-                                code_execution_results: if processed_parts.code_execution_results.is_empty() { None } else { Some(processed_parts.code_execution_results) },
-                                thought_signatures: if processed_parts.thought_signatures.is_empty() { None } else { Some(processed_parts.thought_signatures) },
-                            };
-                        }
-                    }
-                }
-            } else {
-                let error_text = response.text().await?;
-                log::debug!("Streaming Error: {error_text}");
-                Err(GenaiError::Api(error_text))?;
-            }
-        };
-        stream_val.boxed()
     }
 
     // --- Interactions API methods ---

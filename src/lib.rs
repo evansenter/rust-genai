@@ -5,23 +5,13 @@ pub use genai_client::ApiVersion;
 // Re-export unified function declaration types from genai_client
 pub use genai_client::{FunctionDeclaration, FunctionDeclarationBuilder, FunctionParameters, Tool};
 
-pub mod types;
-pub use types::{CodeExecutionResult, FunctionCall, GenerateContentResponse};
-
 // Re-export Interactions API types for convenient access
 pub use genai_client::{
     CreateInteractionRequest, GenerationConfig, InteractionContent, InteractionInput,
     InteractionResponse, InteractionStatus, UsageMetadata,
 };
 
-pub mod content_api;
-pub use content_api::{
-    build_content_request, model_function_call, model_function_call_with_signature,
-    model_function_calls_request, model_function_calls_request_with_signatures, model_text,
-    user_text, user_tool_response,
-};
-
-// NEW: Interactions API helper functions
+// Interactions API helper functions
 pub mod interactions_api;
 pub use interactions_api::{
     audio_data_content, audio_uri_content, build_interaction_input, function_call_content,
@@ -38,9 +28,7 @@ pub mod client;
 pub use client::{Client, ClientBuilder};
 
 pub mod request_builder;
-pub use request_builder::{GenerateContentBuilder, InteractionBuilder};
-
-pub(crate) mod internal;
+pub use request_builder::InteractionBuilder;
 
 pub mod function_calling;
 // Re-export public types from function_calling module
@@ -114,49 +102,5 @@ mod tests {
         let internal_api = InternalError::Api("api error".to_string());
         let public_api: GenaiError = internal_api.into();
         assert!(matches!(public_api, GenaiError::Api(s) if s == "api error"));
-    }
-
-    #[test]
-    fn test_public_response_struct() {
-        let response = GenerateContentResponse {
-            text: Some("test".to_string()),
-            function_calls: None,
-            code_execution_results: None,
-            thought_signatures: None,
-        };
-        assert_eq!(response.text.as_deref(), Some("test"));
-        assert!(response.function_calls.is_none());
-
-        let fc = FunctionCall {
-            name: "test_function".to_string(),
-            args: serde_json::json!({ "arg": "value" }),
-        };
-        let response = GenerateContentResponse {
-            text: None,
-            function_calls: Some(vec![fc]),
-            code_execution_results: None,
-            thought_signatures: None,
-        };
-        assert!(response.text.is_none());
-        assert_eq!(
-            response
-                .function_calls
-                .as_ref()
-                .unwrap()
-                .first()
-                .unwrap()
-                .name,
-            "test_function"
-        );
-        assert_eq!(
-            response
-                .function_calls
-                .as_ref()
-                .unwrap()
-                .first()
-                .unwrap()
-                .args,
-            serde_json::json!({ "arg": "value" })
-        );
     }
 }

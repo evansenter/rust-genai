@@ -1,16 +1,13 @@
-/// Builder traits for shared functionality across GenerateContent and Interactions APIs
+/// Builder traits for shared functionality across Interactions API builders
 ///
 /// # Architecture
 ///
-/// This module provides a trait hierarchy that enables code reuse across the different
-/// builder types in the library:
+/// This module provides a trait hierarchy that enables code reuse across builder types:
 ///
-/// - [`GenerateContentBuilder`]: For the legacy GenerateContent API
-/// - [`InteractionBuilder`]: For the newer Interactions API
+/// - [`InteractionBuilder`]: For the Interactions API (models and agents)
 ///
 /// By implementing [`HasToolsField`], a builder automatically gets the [`WithFunctionCalling`]
-/// trait implementation through a blanket impl. This ensures both builders have identical
-/// function calling APIs.
+/// trait implementation through a blanket impl.
 ///
 /// # Trait Hierarchy
 ///
@@ -19,7 +16,7 @@
 ///       ↓
 /// WithFunctionCalling (blanket impl for all T: HasToolsField)
 ///       ↓
-/// GenerateContentBuilder / InteractionBuilder (implement HasToolsField)
+/// InteractionBuilder (implements HasToolsField)
 /// ```
 ///
 /// # Example
@@ -32,22 +29,16 @@
 ///     .description("Get the current weather")
 ///     .build();
 ///
-/// // Both builders support the same function calling API
-/// let gc_builder = client
-///     .with_model("gemini-2.0-flash-exp")
-///     .with_prompt("What's the weather?")
-///     .with_function(func.clone());
-///
-/// let int_builder = client
+/// // Builders support function calling via the trait
+/// let builder = client
 ///     .interaction()
-///     .with_model("gemini-2.0-flash-exp")
+///     .with_model("gemini-3-flash-preview")
 ///     .with_text("What's the weather?")
 ///     .with_function(func);
 /// ```
 ///
-/// [`GenerateContentBuilder`]: crate::GenerateContentBuilder
 /// [`InteractionBuilder`]: crate::InteractionBuilder
-use genai_client::{FunctionDeclaration, GenerationConfig, Tool};
+use genai_client::{FunctionDeclaration, Tool};
 
 /// Core trait for builders that support function calling.
 ///
@@ -88,8 +79,9 @@ pub trait WithFunctionCalling: Sized {
     ///     .build();
     ///
     /// let builder = client
-    ///     .with_model("gemini-2.0-flash-exp")
-    ///     .with_prompt("What's the temperature in Paris?")
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What's the temperature in Paris?")
     ///     .with_function(func);
     /// ```
     fn with_function(self, function: FunctionDeclaration) -> Self;
@@ -114,8 +106,9 @@ pub trait WithFunctionCalling: Sized {
     /// ];
     ///
     /// let builder = client
-    ///     .with_model("gemini-2.0-flash-exp")
-    ///     .with_prompt("What's the weather and time?")
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What's the weather and time?")
     ///     .with_functions(functions);
     /// ```
     ///
@@ -190,21 +183,6 @@ pub trait HasToolsField {
     /// This method should return a reference to the `Option<Vec<Tool>>` field
     /// in your builder struct.
     fn get_tools_mut(&mut self) -> &mut Option<Vec<Tool>>;
-}
-
-/// Trait for builders that support system instructions
-pub trait WithSystemInstruction: Sized {
-    fn with_system_instruction(self, instruction: impl Into<String>) -> Self;
-}
-
-/// Trait for builders that support generation config
-pub trait WithGenerationConfig: Sized {
-    fn with_generation_config(self, config: GenerationConfig) -> Self;
-}
-
-/// Trait for builders that support code execution
-pub trait WithCodeExecution: Sized {
-    fn with_code_execution(self) -> Self;
 }
 
 #[cfg(test)]

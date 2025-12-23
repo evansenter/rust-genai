@@ -1,7 +1,6 @@
 /// Helper functions for building Interactions API content
 ///
-/// This module provides ergonomic builders for InteractionContent and InteractionInput,
-/// matching the pattern established by content_api.rs for the GenerateContent API.
+/// This module provides ergonomic builders for InteractionContent and InteractionInput.
 use genai_client::{InteractionContent, InteractionInput};
 use serde_json::Value;
 
