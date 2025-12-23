@@ -60,6 +60,18 @@ pub fn process_response_parts(parts: &[PartResponse]) -> ProcessedParts {
         }
     }
 
+    // Validate thought signature count matches function call count
+    if !collected_thought_signatures.is_empty() && !collected_function_calls.is_empty() {
+        if collected_thought_signatures.len() != collected_function_calls.len() {
+            log::debug!(
+                "API response has mismatched counts: {} thought signatures but {} function calls. \
+                 This may indicate an API inconsistency.",
+                collected_thought_signatures.len(),
+                collected_function_calls.len()
+            );
+        }
+    }
+
     ProcessedParts {
         text: collected_text,
         function_calls: collected_function_calls,

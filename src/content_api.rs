@@ -43,6 +43,17 @@ pub fn model_function_call_with_signature(
     args: Value,
     thought_signature: Option<String>,
 ) -> Content {
+    // Validate that signature is not empty if provided
+    if let Some(ref sig) = thought_signature {
+        if sig.trim().is_empty() {
+            log::warn!(
+                "Empty thought signature provided for function call '{}'. \
+                 This may cause issues with Gemini 3 multi-turn conversations.",
+                name
+            );
+        }
+    }
+
     Content {
         parts: vec![Part {
             text: None,
@@ -78,6 +89,17 @@ pub fn model_function_calls_request_with_signatures(
     thought_signatures: Option<Vec<String>>,
 ) -> Content {
     let signatures = thought_signatures.unwrap_or_default();
+
+    // Validate empty signatures
+    for (i, sig) in signatures.iter().enumerate() {
+        if sig.trim().is_empty() {
+            log::warn!(
+                "Empty thought signature at index {}. \
+                 This may cause issues with Gemini 3 multi-turn conversations.",
+                i
+            );
+        }
+    }
 
     // Log signature count mismatches to help users debug issues
     if !signatures.is_empty() && signatures.len() != calls.len() {

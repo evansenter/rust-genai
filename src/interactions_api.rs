@@ -66,8 +66,21 @@ pub fn function_call_content_with_signature(
     args: Value,
     thought_signature: Option<String>,
 ) -> InteractionContent {
+    let function_name = name.into();
+
+    // Validate that signature is not empty if provided
+    if let Some(ref sig) = thought_signature {
+        if sig.trim().is_empty() {
+            log::warn!(
+                "Empty thought signature provided for function call '{}'. \
+                 This may cause issues with Gemini 3 multi-turn conversations.",
+                function_name
+            );
+        }
+    }
+
     InteractionContent::FunctionCall {
-        name: name.into(),
+        name: function_name,
         args,
         thought_signature,
     }
