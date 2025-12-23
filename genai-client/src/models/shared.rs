@@ -1,4 +1,4 @@
-// Shared types used by multiple API endpoints (generateContent, interactions, etc.)
+// Shared types used by the Interactions API
 
 use serde::{Deserialize, Serialize};
 

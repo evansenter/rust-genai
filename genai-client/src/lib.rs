@@ -38,7 +38,6 @@ pub use errors::InternalError;
 pub use common::ApiVersion;
 pub use common::Endpoint;
 pub use common::construct_endpoint_url;
-pub use common::construct_url;
 
 // Re-export Interactions API functions from the interactions module
 pub use interactions::create_interaction;
