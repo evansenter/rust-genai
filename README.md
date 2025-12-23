@@ -1,6 +1,6 @@
 # Rust GenAI
 
-A Rust client library for interacting with Google's Generative AI (Gemini) API.
+A Rust client library for interacting with Google's Generative AI (Gemini) API using the Interactions API.
 
 ## Table of Contents
 
@@ -8,35 +8,33 @@ A Rust client library for interacting with Google's Generative AI (Gemini) API.
 - [Installation](#installation)
 - [Usage](#usage)
   - [API Key](#api-key)
-  - [Simple Request Example](#simple-request-example)
-  - [Streaming Request Example](#streaming-request-example)
-  - [Using System Instructions](#using-system-instructions)
-  - [Function Calling Example](#function-calling-example)
-  - [Manual Function Calling with Multi-Turn Conversations](#manual-function-calling-with-multi-turn-conversations)
-  - [Helper Functions for Building Conversations](#helper-functions-for-building-conversations)
+  - [Simple Interaction](#simple-interaction)
+  - [Streaming Responses](#streaming-responses)
+  - [System Instructions](#system-instructions)
+  - [Stateful Conversations](#stateful-conversations)
+  - [Function Calling](#function-calling)
   - [Automatic Function Calling](#automatic-function-calling)
-  - [Using the Procedural Macro for Function Declarations](#using-the-procedural-macro-for-function-declarations)
-  - [Code Execution](#code-execution)
+  - [Using the Procedural Macro](#using-the-procedural-macro)
 - [API Reference](#api-reference)
 - [Project Structure](#project-structure)
 - [Available Models](#available-models)
 - [Error Handling](#error-handling)
+- [Logging](#logging)
 - [License](#license)
 - [Contributing](#contributing)
 
 ## Features
 
 - Simple, intuitive API for making requests to Google's Generative AI models
-- Support for both single-shot and streaming text generation
-- Function calling support with both manual and automatic execution
+- Support for both single-shot and streaming interactions
+- Stateful conversations with automatic context management via `previous_interaction_id`
+- Function calling with both manual and automatic execution
 - Automatic function discovery at compile time using procedural macros
-- Multi-turn conversation handling with function execution
-- Helper functions for building complex conversations
+- Helper functions for building multi-turn conversations
 - Comprehensive error handling with detailed error types
 - Async/await support with Tokio
 - Type-safe function argument handling with serde
 - Support for both synchronous and asynchronous functions
-- Well-documented code with examples
 
 ## Installation
 
@@ -44,8 +42,8 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rust-genai = "0.1.0"
-rust-genai-macros = "0.1.0"  # Only if using the procedural macros
+rust-genai = "0.2.0"
+rust-genai-macros = "0.2.0"  # Only if using the procedural macros
 tokio = { version = "1.0", features = ["full"] }
 serde_json = "1.0"  # For JSON values in function calls
 futures-util = "0.3"  # Only if using streaming responses
@@ -61,16 +59,14 @@ Note: `async-trait` and `inventory` are already included as dependencies of `rus
 ## Usage
 
 > **Note**: For complete, runnable examples, check out the `examples/` directory in the repository:
-> - `simple_request.rs` - Basic text generation
-> - `stream_request.rs` - Streaming responses
-> - `function_call.rs` - Both manual and automatic function calling
-> - `code_execution.rs` - Code execution in Python
+> - `simple_interaction.rs` - Basic text generation
+> - `stateful_interaction.rs` - Multi-turn conversations
 
 ### API Key
 
 You'll need a Google API key with access to the Gemini models. You can get one from the [Google AI Studio](https://ai.dev/).
 
-### Simple Request Example
+### Simple Interaction
 
 ```rust
 use rust_genai::Client;
@@ -80,29 +76,26 @@ use std::env;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get API key from environment variable
     let api_key = env::var("GEMINI_API_KEY")?;
-    
-    // Create the client using the builder
+
+    // Create the client
     let client = Client::builder(api_key).build();
-    
-    // Define model and prompt
-    let model = "gemini-3-flash-preview";
-    let prompt = "Write a short poem about Rust programming.";
-    
-    // Send request and get response using the builder pattern
+
+    // Send an interaction and get response
     let response = client
-        .with_model(model)
-        .with_prompt(prompt)
-        .generate()
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Write a short poem about Rust programming.")
+        .create()
         .await?;
-    
+
     // Print the generated text
-    println!("{}", response.text.unwrap_or_default());
-    
+    println!("{}", response.text().unwrap_or("No response"));
+
     Ok(())
 }
 ```
 
-### Streaming Request Example
+### Streaming Responses
 
 ```rust
 use rust_genai::Client;
@@ -112,24 +105,21 @@ use std::{env, io::{stdout, Write}};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = env::var("GEMINI_API_KEY")?;
-    // Create the client using the builder
     let client = Client::builder(api_key).build();
-    
-    let model = "gemini-3-flash-preview";
-    let prompt = "Explain quantum computing in simple terms.";
-    
-    // Get a stream of response chunks using the builder pattern
+
+    // Get a stream of response chunks
     let stream = client
-        .with_model(model)
-        .with_prompt(prompt)
-        .generate_stream()?;
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Explain quantum computing in simple terms.")
+        .create_stream();
     pin_mut!(stream);
-    
+
     // Process each chunk as it arrives
     while let Some(result) = stream.next().await {
         match result {
             Ok(chunk) => {
-                if let Some(text) = chunk.text {
+                if let Some(text) = chunk.text() {
                     print!("{}", text);
                     stdout().flush()?;
                 }
@@ -140,13 +130,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-    
+
     println!("\n");
     Ok(())
 }
 ```
 
-### Using System Instructions
+### System Instructions
 
 ```rust
 use rust_genai::Client;
@@ -155,207 +145,130 @@ use std::env;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = env::var("GEMINI_API_KEY")?;
-    // Create the client using the builder
     let client = Client::builder(api_key).build();
-    
-    let model = "gemini-3-flash-preview";
-    let prompt = "What is the capital of France?";
-    let system_instruction = "You are a helpful geography expert.";
-    
-    // Send request with system instruction using the builder pattern
+
+    // Send request with system instruction
     let response = client
-        .with_model(model)
-        .with_prompt(prompt)
-        .with_system_instruction(system_instruction)
-        .generate()
-        .await?;
-    
-    println!("{}", response.text.unwrap_or_default());
-    Ok(())
-}
-```
-
-### Function Calling Example
-
-```rust
-use rust_genai::{Client, FunctionDeclaration};
-use serde_json::json;
-use std::env;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let api_key = env::var("GEMINI_API_KEY")?;
-    // Create the client using the builder
-    let client = Client::builder(api_key).build();
-    
-    // Define a function that the model can call
-    let weather_function = FunctionDeclaration {
-        name: "get_weather".to_string(),
-        description: "Get the current weather in a given location".to_string(),
-        parameters: json!({
-            "type": "object",
-            "properties": {
-                "location": {
-                    "type": "string",
-                    "description": "The city and state, e.g. San Francisco, CA"
-                },
-                "unit": {
-                    "type": "string",
-                    "enum": ["celsius", "fahrenheit"],
-                    "description": "The temperature unit to use"
-                }
-            },
-            "required": ["location"]
-        }),
-        required: vec!["location".to_string()],
-    };
-    
-    let model = "gemini-3-flash-preview";
-    let prompt = "What's the weather like in London?";
-    
-    // Send request with function calling enabled
-    let response = client
-        .with_model(model)
-        .with_prompt(prompt)
-        .with_function(weather_function)
-        .generate()
-        .await?;
-    
-    // Handle the response
-    if let Some(text) = response.text {
-        println!("Text response: {text}");
-    }
-    if let Some(function_calls) = response.function_calls {
-        for call in function_calls {
-            println!("Function call: {} with args: {}", call.name, call.args);
-        }
-        // Next steps would typically involve: 
-        // 1. Executing this function with the provided arguments.
-        // 2. Sending the function's output back to the model in a new request
-        //    along with the conversation history.
-    }
-    
-    Ok(())
-}
-```
-
-### Manual Function Calling with Multi-Turn Conversations
-
-For more control over function execution, you can manually handle function calls and build multi-turn conversations:
-
-```rust
-use rust_genai::{Client, model_function_calls_request, user_text, user_tool_response};
-use rust_genai_macros::generate_function_declaration;
-use serde_json::json;
-use std::env;
-
-#[generate_function_declaration(
-    location(description = "The city and state, e.g. San Francisco, CA")
-)]
-fn get_weather(location: String) -> String {
-    format!("The weather in {} is sunny and 72°F", location)
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let api_key = env::var("GEMINI_API_KEY")?;
-    let client = Client::builder(api_key).build();
-    
-    let prompt = "What's the weather in London?";
-    let weather_func = get_weather_declaration();
-    
-    // First request with function available
-    let response = client
+        .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_prompt(prompt)
-        .with_function(weather_func.clone())
-        .generate()
+        .with_system_instruction("You are a helpful geography expert.")
+        .with_text("What is the capital of France?")
+        .create()
         .await?;
-    
-    // Check if the model wants to call a function
-    if let Some(function_calls) = response.function_calls {
-        for call in &function_calls {
-            if call.name == "get_weather" {
-                // Extract arguments and execute function
-                let location = call.args.get("location")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown");
-                let result = get_weather(location.to_string());
-                
-                // Build conversation history
-                let contents = vec![
-                    user_text(prompt.to_string()),
-                    model_function_calls_request(function_calls.clone()),
-                    user_tool_response(call.name.clone(), json!({ "result": result })),
-                ];
-                
-                // Send function result back to model
-                let final_response = client
-                    .with_model("gemini-3-flash-preview")
-                    .with_contents(contents)
-                    .with_function(weather_func)
-                    .generate()
-                    .await?;
-                
-                println!("{}", final_response.text.unwrap_or_default());
-            }
-        }
-    }
-    
+
+    println!("{}", response.text().unwrap_or("No response"));
     Ok(())
 }
 ```
 
-### Helper Functions for Building Conversations
+### Stateful Conversations
 
-The library provides several helper functions for building complex conversation histories:
+The Interactions API supports stateful conversations using `previous_interaction_id`. The server automatically maintains context:
 
 ```rust
-use rust_genai::{user_text, model_text, model_function_call, user_tool_response};
-use serde_json::json;
+use rust_genai::Client;
+use std::env;
 
-// Create user messages
-let user_msg = user_text("Hello, how are you?".to_string());
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api_key = env::var("GEMINI_API_KEY")?;
+    let client = Client::builder(api_key).build();
 
-// Create model text responses
-let model_msg = model_text("I'm doing well, thank you!".to_string());
+    // First interaction - establish context
+    let response1 = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("My name is Alice and I live in New York.")
+        .with_store(true)  // Store for later reference
+        .create()
+        .await?;
 
-// Record function calls made by the model
-let function_call = model_function_call(
-    "get_weather".to_string(),
-    json!({ "location": "New York" })
-);
+    println!("Response 1: {}", response1.text().unwrap_or(""));
 
-// Create tool/function responses
-let tool_response = user_tool_response(
-    "get_weather".to_string(),
-    json!({ "temperature": "72°F", "condition": "sunny" })
-);
+    // Second interaction - reference the first
+    let response2 = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_previous_interaction(&response1.id)  // Link to previous
+        .with_text("What is my name and where do I live?")
+        .create()
+        .await?;
 
-// Use these to build complex conversations
-let contents = vec![
-    user_text("What's the weather?".to_string()),
-    model_function_call("get_weather".to_string(), json!({"location": "NYC"})),
-    user_tool_response("get_weather".to_string(), json!({"temp": "72°F"})),
-    model_text("The weather in NYC is 72°F.".to_string()),
-    user_text("Thanks!".to_string()),
-];
+    // Model remembers: "Your name is Alice and you live in New York."
+    println!("Response 2: {}", response2.text().unwrap_or(""));
 
-let response = client
-    .with_model("gemini-3-flash-preview")
-    .with_contents(contents)
-    .generate()
-    .await?;
+    Ok(())
+}
 ```
 
-For a more complete, multi-turn function calling example that shows how to execute the function and send its result back to the model, please see `examples/function_call.rs` in the project repository.
+### Function Calling
+
+For manual function calling with full control over execution:
+
+```rust
+use rust_genai::{Client, FunctionDeclaration, function_result_content, WithFunctionCalling};
+use serde_json::json;
+use std::env;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api_key = env::var("GEMINI_API_KEY")?;
+    let client = Client::builder(api_key).build();
+
+    // Define a function using the builder
+    let weather_function = FunctionDeclaration::builder("get_weather")
+        .description("Get the current weather in a given location")
+        .parameter("location", json!({
+            "type": "string",
+            "description": "The city and state, e.g. San Francisco, CA"
+        }))
+        .required(vec!["location".to_string()])
+        .build();
+
+    // First request with function declaration
+    let response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What's the weather like in London?")
+        .with_function(weather_function.clone())
+        .create()
+        .await?;
+
+    // Check if model wants to call a function
+    let function_calls = response.function_calls();
+    if !function_calls.is_empty() {
+        let (call_id, name, args, _signature) = &function_calls[0];
+        println!("Function call: {} with args: {}", name, args);
+
+        // Execute your function logic here...
+        let weather_result = json!({"temperature": "72°F", "conditions": "sunny"});
+
+        // Send the result back using function_result_content
+        let call_id = call_id.clone().expect("call_id required");
+        let function_result = function_result_content(name, call_id, weather_result);
+
+        let final_response = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_previous_interaction(&response.id)
+            .with_content(vec![function_result])
+            .with_function(weather_function)
+            .create()
+            .await?;
+
+        println!("{}", final_response.text().unwrap_or("No response"));
+    }
+
+    Ok(())
+}
+```
 
 ### Automatic Function Calling
 
-The library now supports automatic function discovery and execution. Functions decorated with the `#[generate_function_declaration]` macro are automatically discovered and can be executed when the model requests them:
+The library supports automatic function discovery and execution. Functions decorated with `#[generate_function_declaration]` are automatically discovered and executed when the model requests them:
 
 ```rust
-use rust_genai::Client;
+use rust_genai::{Client, CallableFunction, WithFunctionCalling};
 use rust_genai_macros::generate_function_declaration;
 use std::env;
 
@@ -365,43 +278,35 @@ use std::env;
     unit(description = "The temperature unit", enum_values = ["celsius", "fahrenheit"])
 )]
 fn get_weather(location: String, unit: Option<String>) -> String {
-    format!("The weather in {} is 22 degrees {}", 
-        location, 
+    format!("The weather in {} is 22 degrees {}",
+        location,
         unit.as_deref().unwrap_or("celsius"))
-}
-
-/// Get city details
-#[generate_function_declaration(
-    city(description = "The city to get details for")
-)]
-async fn get_city_details(city: String) -> serde_json::Value {
-    serde_json::json!({
-        "city": city,
-        "population": 1_000_000,
-        "country": "Example Country"
-    })
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = env::var("GEMINI_API_KEY")?;
     let client = Client::builder(api_key).build();
-    
-    // Use generate_with_auto_functions() to automatically handle function calls
+
+    // Get the function declaration from the generated callable
+    let weather_func = GetWeatherCallable.declaration();
+
+    // Use create_with_auto_functions() to automatically handle function calls
     let response = client
+        .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_initial_user_text("What's the weather in Tokyo? Also tell me about the city.")
-        .generate_with_auto_functions()
+        .with_text("What's the weather in Tokyo?")
+        .with_function(weather_func)
+        .create_with_auto_functions()
         .await?;
-    
+
     // The library automatically:
-    // 1. Discovers all functions marked with #[generate_function_declaration]
-    // 2. Sends their declarations to the model
-    // 3. Executes requested functions when the model calls them
-    // 4. Sends results back to the model
-    // 5. Continues until the model provides a final response
-    
-    println!("{}", response.text.unwrap_or_default());
+    // 1. Sends the function declaration to the model
+    // 2. Executes the function when the model calls it
+    // 3. Sends results back to the model
+    // 4. Continues until the model provides a final response
+
+    println!("{}", response.text().unwrap_or("No response"));
     Ok(())
 }
 ```
@@ -413,9 +318,9 @@ Key features of automatic function calling:
 - Error handling is built-in - function errors are reported back to the model
 - Maximum of 5 conversation turns to prevent infinite loops
 
-### Using the Procedural Macro for Function Declarations
+### Using the Procedural Macro
 
-For a more ergonomic way to create function declarations, you can use the provided procedural macro:
+The `#[generate_function_declaration]` macro provides an ergonomic way to create function declarations:
 
 ```rust
 use rust_genai_macros::generate_function_declaration;
@@ -426,21 +331,13 @@ use rust_genai_macros::generate_function_declaration;
     unit(description = "The temperature unit to use", enum_values = ["celsius", "fahrenheit"])
 )]
 fn get_weather(location: String, unit: Option<String>) -> String {
-    // Your implementation here
     format!("Weather for {}", location)
 }
 
-// The macro generates a function called `get_weather_declaration()` 
-// that returns a FunctionDeclaration
-let weather_function = get_weather_declaration();
-
-// Use it with the client
-let response = client
-    .with_model(model)
-    .with_prompt("What's the weather in Paris?")
-    .with_function(weather_function)
-    .generate()
-    .await?;
+// The macro generates:
+// - A `get_weather_declaration()` function returning FunctionDeclaration
+// - A `GetWeatherCallable` struct implementing CallableFunction
+// - Automatic registration in the global function registry
 ```
 
 The macro supports:
@@ -449,42 +346,6 @@ The macro supports:
 - Enum constraints for parameters with fixed values
 - Proper handling of optional parameters (Option<T>)
 - Type mapping for common Rust types (String, i32, i64, f32, f64, bool, Vec<T>, serde_json::Value)
-
-### Code Execution
-
-The library supports code execution, allowing the model to run Python code and return results:
-
-```rust
-use rust_genai::Client;
-use std::env;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let api_key = env::var("GEMINI_API_KEY")?;
-    let client = Client::builder(api_key).build();
-    
-    let response = client
-        .with_model("gemini-3-flash-preview")
-        .with_prompt("Calculate the factorial of 7 using Python")
-        .with_code_execution()  // Enable code execution
-        .generate()
-        .await?;
-    
-    // Handle the response
-    if let Some(text) = response.text {
-        println!("Model says: {}", text);
-    }
-    
-    if let Some(code_results) = response.code_execution_results {
-        for result in code_results {
-            println!("Executed code:\n{}", result.code);
-            println!("Output:\n{}", result.output);
-        }
-    }
-    
-    Ok(())
-}
-```
 
 ## API Reference
 
@@ -497,40 +358,44 @@ let client = Client::builder(api_key).build();
 
 For debug logging, see the [Logging](#logging) section below.
 
-### Request Builder Methods
+### InteractionBuilder Methods
 
-The `GenerateContentBuilder` provides a fluent API for constructing requests:
+The `InteractionBuilder` provides a fluent API for constructing requests:
 
 ```rust
 client
-    .with_model("model-name")              // Set the model (required)
-    .with_prompt("prompt")                  // Set initial prompt text
-    .with_initial_user_text("text")         // Alternative to with_prompt
-    .with_system_instruction("instruction") // Set system instruction
-    .with_contents(vec![...])               // Set full conversation history
-    .with_function(func_decl)               // Add a function declaration
-    .with_functions(vec![...])              // Add multiple function declarations
-    .with_code_execution()                  // Enable code execution
-    .with_tool_config(config)               // Set tool configuration
-    .generate()                             // Execute and get response
-    .generate_stream()                      // Get streaming response
-    .generate_with_auto_functions()         // Execute with automatic function calling
+    .interaction()                              // Start building an interaction
+    .with_model("model-name")                   // Set the model (required unless using agent)
+    .with_agent("agent-name")                   // Use an agent instead of model
+    .with_text("prompt")                        // Set input as simple text
+    .with_input(InteractionInput::...)          // Set complex input
+    .with_content(vec![...])                    // Set content array directly
+    .with_system_instruction("instruction")     // Set system instruction
+    .with_previous_interaction("id")            // Link to previous interaction
+    .with_function(func_decl)                   // Add a function declaration
+    .with_functions(vec![...])                  // Add multiple function declarations
+    .with_generation_config(config)             // Set generation parameters
+    .with_response_modalities(vec![...])        // Set response modalities
+    .with_response_format(schema)               // Set JSON schema for output
+    .with_store(true)                           // Whether to store the interaction
+    .with_background(false)                     // Run in background mode
+    .create()                                   // Execute and get response
+    .create_stream()                            // Get streaming response
+    .create_with_auto_functions()               // Execute with auto function calling
 ```
 
 ### Response Types
 
 ```rust
-// GenerateContentResponse
-pub struct GenerateContentResponse {
-    pub text: Option<String>,
-    pub function_calls: Option<Vec<FunctionCall>>,
-    pub code_execution_results: Option<Vec<CodeExecutionResult>>,
-}
-
-// FunctionCall
-pub struct FunctionCall {
-    pub name: String,
-    pub args: serde_json::Value,
+// InteractionResponse provides convenience methods
+impl InteractionResponse {
+    fn text(&self) -> Option<String>;           // Get first text output
+    fn all_text(&self) -> String;               // Concatenate all text outputs
+    fn has_text(&self) -> bool;                 // Check if response has text
+    fn has_function_calls(&self) -> bool;       // Check for function calls
+    fn has_thoughts(&self) -> bool;             // Check for thought content
+    fn function_calls(&self) -> Vec<(Option<String>, String, Value, Option<String>)>;
+    // Returns: (call_id, name, args, thought_signature)
 }
 ```
 
@@ -549,14 +414,14 @@ impl CallableFunction for MyFunction {
     fn declaration(&self) -> FunctionDeclaration {
         // Return function declaration
     }
-    
+
     async fn call(&self, args: serde_json::Value) -> Result<serde_json::Value, FunctionError> {
         // Implement function logic
     }
 }
 
 // Functions marked with #[generate_function_declaration] are automatically
-// registered in a global registry and discovered by generate_with_auto_functions()
+// registered in a global registry and discovered by create_with_auto_functions()
 ```
 
 ## Logging
@@ -591,17 +456,23 @@ The library logs request/response details, streaming events, and interaction lif
 
 ## Project Structure
 
-The project consists of two main components:
+The project consists of three main components:
 
-1. **Public API Crate (`rust-genai`)**: 
+1. **Public API Crate (`rust-genai`)**:
    - Provides a user-friendly interface in `src/lib.rs`
    - Handles high-level error representation and client creation
+   - Contains the `InteractionBuilder` for fluent API construction
 
-2. **Internal Client (`genai-client/`)**: 
+2. **Internal Client (`genai-client/`)**:
    - Contains the low-level implementation for API communication
    - Defines the JSON serialization/deserialization models
    - Handles the actual HTTP requests and response parsing
-   Users of the `rust-genai` crate typically do not need to interact with `genai-client` directly, as its functionalities are exposed through the main `rust-genai` API.
+
+3. **Macro Crate (`rust-genai-macros/`)**:
+   - Procedural macro for `#[generate_function_declaration]`
+   - Automatic function registration via `inventory` crate
+
+Users of the `rust-genai` crate typically do not need to interact with `genai-client` directly, as its functionalities are exposed through the main `rust-genai` API.
 
 ## Available Models
 
@@ -625,6 +496,7 @@ The main error type for API interactions:
 - `Utf8`: Text encoding errors
 - `Api`: Errors returned by the Google API
 - `Internal`: Other internal errors
+- `InvalidInput`: Validation errors (missing model, missing input, etc.)
 
 ### FunctionError
 
@@ -658,4 +530,4 @@ The MIT License is a permissive license that is short and to the point. It lets 
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. 
+Contributions are welcome! Please feel free to submit a Pull Request.

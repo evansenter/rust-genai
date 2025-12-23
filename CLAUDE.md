@@ -32,7 +32,8 @@ cargo test -- --include-ignored
 cargo test
 
 # Run tests for a specific test file
-cargo test --test interactions_tests
+cargo test --test interactions_api_tests
+cargo test --test builder_tests
 cargo test --test macro_tests
 
 # Run only unit tests (no integration tests)
@@ -165,14 +166,20 @@ The Interactions API provides a unified interface for both models and agents. Ke
 ### Test Organization
 
 Tests are organized into two categories:
-- **Unit tests**: Inline with source code (e.g., `src/lib.rs`, `src/request_builder.rs`, `src/interactions_api.rs`)
-- **Integration tests**: In `tests/` directory, each file tests a specific feature:
-  - `interactions_tests.rs`: Interactions API tests (requires API key)
-  - `macro_tests.rs`: Procedural macro functionality
-  - `function_declaration_builder_tests.rs`: FunctionDeclaration builder tests
-  - `interaction_builder_edge_cases.rs`: InteractionBuilder edge cases and validation tests
+- **Unit tests**: Inline with source code (e.g., `src/lib.rs`, `src/request_builder.rs`, `src/interactions_api.rs`, `genai-client/src/models/interactions.rs`)
+- **Integration tests**: In `tests/` directory:
+  - `builder_tests.rs`: Unit tests for FunctionDeclaration and InteractionBuilder (no API key required)
+  - `macro_tests.rs`: Procedural macro functionality (no API key required)
+  - `interactions_api_tests.rs`: Comprehensive API integration tests including:
+    - Basic CRUD operations (create, get, delete interactions)
+    - Stateful conversations with `previous_interaction_id`
+    - Streaming responses
+    - Manual and automatic function calling
+    - Thought signatures for multi-turn function calls
+    - Generation config and system instructions
+    - Error handling and edge cases
 
-Integration tests that require a real API key use `#[ignore]` attribute and must be run with `cargo test -- --ignored`.
+Integration tests that require a real API key use `#[ignore]` attribute and must be run with `cargo test -- --include-ignored`.
 
 ## API Version Support
 
