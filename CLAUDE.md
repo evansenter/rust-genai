@@ -39,12 +39,23 @@ cargo test --test macro_tests
 # Run only unit tests (no integration tests)
 cargo test --lib
 
-# Run a single test by name
-cargo test test_name
+# Run a single test by name (including ignored tests)
+cargo test test_simple_interaction -- --include-ignored
 
 # Run tests with output visible
 cargo test -- --nocapture
+
+# Run integration tests in parallel (faster, but may hit rate limits)
+cargo test --test interactions_api_tests -- --include-ignored --test-threads=4
 ```
+
+**Test Execution Time**: Running all integration tests takes approximately 2-5 minutes depending on API response times and network latency. Using `--test-threads=4` can speed this up but may trigger rate limits. Individual tests typically complete in 2-10 seconds.
+
+**Known Test Flakiness**: Some integration tests may occasionally fail due to LLM behavior variability (model may paraphrase data, not follow instructions perfectly, etc.). Re-running usually succeeds.
+
+**Environment Variables for Tests**:
+- `GEMINI_API_KEY` (required): API key for running integration tests
+- `TEST_IMAGE_URL` (optional): Custom image URL for `test_image_input_from_uri` (defaults to Google's sample scones.jpg)
 
 ### Running Examples
 

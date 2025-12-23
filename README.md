@@ -20,6 +20,7 @@ A Rust client library for interacting with Google's Generative AI (Gemini) API u
 - [Available Models](#available-models)
 - [Error Handling](#error-handling)
 - [Logging](#logging)
+- [Troubleshooting](#troubleshooting)
 - [License](#license)
 - [Contributing](#contributing)
 
@@ -520,6 +521,46 @@ match result {
         // Process result
     }
 }
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**"API key not valid" error**
+- Ensure `GEMINI_API_KEY` environment variable is set correctly
+- Verify your API key has access to the Gemini models at [Google AI Studio](https://ai.dev/)
+
+**"Model not found" error**
+- Check that you're using a valid model name (e.g., `gemini-3-flash-preview`)
+- Some models may require specific API access or be in preview
+
+**Function calls not being executed**
+- Ensure you're using `create_with_auto_functions()` for automatic execution
+- For manual execution, check that you're sending the `FunctionResult` back correctly
+- Verify your function is registered via `#[generate_function_declaration]`
+
+**Image URL not accessible**
+- The API blocks most public HTTP URLs for security
+- Use Google Cloud Storage URLs (`gs://...`) or base64-encoded images
+- See `image_data_content()` for base64 encoding
+
+**Rate limiting errors**
+- The free tier has request limits; wait and retry
+- Consider adding delays between requests in batch operations
+
+**Test failures (intermittent)**
+- LLM responses are non-deterministic; some tests may occasionally fail
+- Re-running the test usually succeeds
+- Use `--nocapture` to see test output: `cargo test test_name -- --include-ignored --nocapture`
+- This is expected behavior for integration tests with AI models
+
+### Debug Logging
+
+Enable debug logging to see request/response details:
+
+```bash
+RUST_LOG=rust_genai=debug cargo run --example simple_interaction
 ```
 
 ## License

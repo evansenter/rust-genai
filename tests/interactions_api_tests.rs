@@ -1,9 +1,34 @@
 //! Integration tests for the Interactions API
 //!
 //! These tests require the GEMINI_API_KEY environment variable to be set.
-//! Run with: cargo test --test interactions_api_tests -- --include-ignored --nocapture
-
-#![allow(dead_code)] // Functions are used by the macro, not called directly
+//!
+//! # Running Tests
+//!
+//! ```bash
+//! # Run all integration tests
+//! cargo test --test interactions_api_tests -- --include-ignored --nocapture
+//!
+//! # Run a specific test
+//! cargo test test_simple_interaction -- --include-ignored
+//!
+//! # Run tests in parallel (faster, but may hit rate limits)
+//! cargo test --test interactions_api_tests -- --include-ignored --test-threads=4
+//! ```
+//!
+//! # Test Execution Time
+//!
+//! Running all tests takes approximately 2-5 minutes depending on API response times.
+//! Individual tests typically complete in 2-10 seconds.
+//!
+//! # Known Flakiness
+//!
+//! Some tests may occasionally fail due to model behavior variability:
+//! - Models may paraphrase data (e.g., "seventy-five" instead of "75")
+//! - System instructions may not always be followed perfectly
+//! - Function calling decisions are non-deterministic
+//!
+//! If a test fails intermittently, re-running usually succeeds. This is expected
+//! behavior for LLM integration tests.
 
 use futures_util::StreamExt;
 use rust_genai::{
@@ -25,8 +50,10 @@ fn get_client() -> Option<Client> {
         .map(|key| Client::builder(key).build())
 }
 
-// Define a test function that will be registered in the global registry
+// Define a test function that will be registered in the global registry.
+// The macro generates a callable wrapper, so the function itself appears unused.
 /// Gets a mock weather report for a city
+#[allow(dead_code)]
 #[generate_function_declaration(city(description = "The city to get weather for"))]
 fn get_mock_weather(city: String) -> String {
     format!("Weather in {}: Sunny, 75°F", city)
@@ -446,7 +473,9 @@ async fn test_requires_action_status() {
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_auto_function_calling() {
-    // Test the complete auto-function calling workflow
+    // Test the complete auto-function calling workflow.
+    // NOTE: This test may occasionally fail if the model paraphrases the weather
+    // data (e.g., "seventy-five degrees" instead of "75"). Re-run if it fails.
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -724,6 +753,8 @@ async fn test_generation_config_max_tokens() {
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_system_instruction_text() {
+    // NOTE: This test may occasionally fail if the model doesn't follow the
+    // system instruction perfectly. LLMs don't always comply with instructions.
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -744,6 +775,7 @@ async fn test_system_instruction_text() {
     let text = response.text().unwrap().to_lowercase();
     println!("Response: {}", text);
 
+    // Check for common pirate vocabulary - model may not always include all of these
     assert!(
         text.contains("arr") || text.contains("matey") || text.contains("ahoy"),
         "Response should contain pirate speak"
@@ -982,13 +1014,17 @@ async fn test_image_input_from_uri() {
         return;
     };
 
-    // Use a Google Cloud Storage URL (these work with the API)
+    // Test image: Google Cloud Storage sample image of scones/pastries
+    // URL: gs://cloud-samples-data/generative-ai/image/scones.jpg
+    // This is a publicly accessible GCS URL from Google's AI samples.
+    // Note: Public HTTP URLs (e.g., Wikipedia) are often blocked by the API.
+    // For custom images, use base64 encoding or your own GCS bucket.
+    let image_url = std::env::var("TEST_IMAGE_URL")
+        .unwrap_or_else(|_| "gs://cloud-samples-data/generative-ai/image/scones.jpg".to_string());
+
     let contents = vec![
         text_content("What is in this image? Describe it briefly."),
-        image_uri_content(
-            "gs://cloud-samples-data/generative-ai/image/scones.jpg",
-            Some("image/jpeg".to_string()),
-        ),
+        image_uri_content(&image_url, Some("image/jpeg".to_string())),
     ];
 
     let result = client
