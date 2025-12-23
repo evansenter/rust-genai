@@ -70,14 +70,14 @@ pub fn function_call_content_with_signature(
     let function_name = name.into();
 
     // Validate that signature is not empty if provided
-    if let Some(ref sig) = thought_signature {
-        if sig.trim().is_empty() {
-            log::warn!(
-                "Empty thought signature provided for function call '{}'. \
-                 This may cause issues with Gemini 3 multi-turn conversations.",
-                function_name
-            );
-        }
+    if let Some(ref sig) = thought_signature
+        && sig.trim().is_empty()
+    {
+        log::warn!(
+            "Empty thought signature provided for function call '{}'. \
+             This may cause issues with Gemini 3 multi-turn conversations.",
+            function_name
+        );
     }
 
     InteractionContent::FunctionCall {
@@ -111,6 +111,11 @@ pub fn function_call_content(name: impl Into<String>, args: Value) -> Interactio
 /// This is the correct way to send function execution results back to the Interactions API.
 /// The call_id must match the id from the FunctionCall you're responding to.
 ///
+/// # Panics
+///
+/// Will log a warning if call_id is empty or whitespace-only, as this may cause
+/// API errors when the server tries to match the result to a function call.
+///
 /// # Example
 /// ```
 /// use rust_genai::interactions_api::function_result_content;
@@ -127,9 +132,21 @@ pub fn function_result_content(
     call_id: impl Into<String>,
     result: Value,
 ) -> InteractionContent {
+    let function_name = name.into();
+    let call_id_str = call_id.into();
+
+    // Validate call_id is not empty
+    if call_id_str.trim().is_empty() {
+        log::warn!(
+            "Empty call_id provided for function result '{}'. \
+             This may cause the API to fail to match the result to its function call.",
+            function_name
+        );
+    }
+
     InteractionContent::FunctionResult {
-        name: name.into(),
-        call_id: call_id.into(),
+        name: function_name,
+        call_id: call_id_str,
         result,
     }
 }

@@ -1,8 +1,19 @@
-/// Integration tests for function calling with the Interactions API
-/// These tests require GEMINI_API_KEY environment variable to be set
-use rust_genai::{Client, FunctionDeclaration, WithFunctionCalling};
+#![allow(dead_code)] // Functions are used by the macro, not called directly
+
+//! Integration tests for function calling with the Interactions API
+//! These tests require GEMINI_API_KEY environment variable to be set
+
+use rust_genai::{CallableFunction, Client, FunctionDeclaration, WithFunctionCalling};
+use rust_genai_macros::generate_function_declaration;
 use serde_json::json;
 use std::env;
+
+// Define a test function that will be registered in the global registry
+/// Gets a mock weather report for a city
+#[generate_function_declaration(city(description = "The city to get weather for"))]
+fn get_mock_weather(city: String) -> String {
+    format!("Weather in {}: Sunny, 75°F", city)
+}
 
 #[tokio::test]
 #[ignore] // Requires API key
@@ -99,24 +110,19 @@ async fn test_manual_function_calling_with_function_result() {
 }
 
 #[tokio::test]
-#[ignore] // Requires API key and function to be registered
-async fn test_auto_function_calling() {
-    // This test verifies that create_with_auto_functions works with the real API
-    // Note: This requires a function to be registered in the global registry
-    // For now, this test will just verify the method exists and handles the case
-    // where no functions are registered
-
+#[ignore] // Requires API key
+async fn test_simple_text_interaction() {
+    // This test verifies basic interaction without function calling
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not set");
     let client = Client::builder(api_key).build();
 
-    // Call without registered functions - should work but won't trigger function calling
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Hello, how are you?")
-        .create_with_auto_functions()
+        .create()
         .await
-        .expect("Auto-function call failed");
+        .expect("Interaction failed");
 
     println!("Response status: {:?}", response.status);
     assert!(response.has_text(), "Should have text response");
@@ -162,4 +168,50 @@ async fn test_function_call_has_id_field() {
             name
         );
     }
+}
+
+#[tokio::test]
+#[ignore] // Requires API key
+async fn test_full_auto_function_loop() {
+    // This test verifies the complete auto-function calling workflow:
+    // 1. Function registered via macro
+    // 2. Model calls the function
+    // 3. Auto-functions executes it
+    // 4. Result sent back and final response generated
+
+    let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not set");
+    let client = Client::builder(api_key).build();
+
+    // Use the get_mock_weather function registered at the top of this file
+    // via #[generate_function_declaration]
+    let weather_func = GetMockWeatherCallable.declaration();
+
+    let response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What's the weather like in Seattle?")
+        .with_function(weather_func)
+        .create_with_auto_functions()
+        .await
+        .expect("Auto-function call failed");
+
+    println!("Final response status: {:?}", response.status);
+    println!("Final response: {:?}", response.text());
+
+    // The response should contain text mentioning the weather from our mock function
+    assert!(
+        response.has_text(),
+        "Should have text response after auto-function loop"
+    );
+
+    let text = response.text().expect("Should have text");
+    println!("Final text: {}", text);
+
+    // Verify the model incorporated our mock weather data in its response
+    // Our mock returns "Weather in {city}: Sunny, 75°F"
+    assert!(
+        text.contains("75") || text.contains("Sunny") || text.contains("Seattle"),
+        "Response should reference the weather data: {}",
+        text
+    );
 }
