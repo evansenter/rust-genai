@@ -44,15 +44,27 @@ pub enum InteractionContent {
         #[serde(skip_serializing_if = "Option::is_none")]
         mime_type: Option<String>,
     },
-    /// Function call
+    /// Function call (output from model)
     FunctionCall {
+        /// Unique identifier for this function call
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
         name: String,
+        #[serde(rename = "arguments")]
         args: serde_json::Value,
         /// Thought signature for Gemini 3 reasoning continuity
         #[serde(rename = "thoughtSignature", skip_serializing_if = "Option::is_none")]
         thought_signature: Option<String>,
     },
-    /// Function response
+    /// Function result (input to model with execution result)
+    FunctionResult {
+        name: String,
+        /// The call_id from the FunctionCall being responded to
+        call_id: String,
+        result: serde_json::Value,
+    },
+    /// Function response (legacy - prefer FunctionResult for new code)
+    #[deprecated(note = "Use FunctionResult instead for correct API compatibility")]
     FunctionResponse {
         name: String,
         response: serde_json::Value,
@@ -252,28 +264,30 @@ impl InteractionResponse {
 
     /// Extract function calls from outputs
     ///
-    /// Returns a vector of (function_name, arguments, thought_signature) tuples.
-    /// Useful for implementing function calling workflows.
+    /// Returns a vector of (call_id, function_name, arguments, thought_signature) tuples.
+    /// The call_id should be used when sending function results back to the model.
     ///
     /// # Example
     /// ```no_run
     /// # use genai_client::models::interactions::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
-    /// for (name, args, signature) in response.function_calls() {
-    ///     println!("Function: {} with args: {}", name, args);
+    /// for (call_id, name, args, signature) in response.function_calls() {
+    ///     println!("Call ID: {:?}, Function: {} with args: {}", call_id, name, args);
     /// }
     /// ```
-    pub fn function_calls(&self) -> Vec<(&str, &serde_json::Value, Option<&str>)> {
+    pub fn function_calls(&self) -> Vec<(Option<&str>, &str, &serde_json::Value, Option<&str>)> {
         self.outputs
             .iter()
             .filter_map(|content| {
                 if let InteractionContent::FunctionCall {
+                    id,
                     name,
                     args,
                     thought_signature,
                 } = content
                 {
                     Some((
+                        id.as_ref().map(|s| s.as_str()),
                         name.as_str(),
                         args,
                         thought_signature.as_ref().map(|s| s.as_str()),

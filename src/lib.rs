@@ -13,11 +13,12 @@ pub use genai_client::{
 
 // Interactions API helper functions
 pub mod interactions_api;
+#[allow(deprecated)]
 pub use interactions_api::{
     audio_data_content, audio_uri_content, build_interaction_input, function_call_content,
-    function_call_content_with_signature, function_response_content, image_data_content,
-    image_uri_content, text_content, text_input, thought_content, video_data_content,
-    video_uri_content,
+    function_call_content_with_signature, function_response_content, function_result_content,
+    image_data_content, image_uri_content, text_content, text_input, thought_content,
+    video_data_content, video_uri_content,
 };
 
 // Builder traits module - provides shared builder functionality

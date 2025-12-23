@@ -260,9 +260,7 @@ impl<'a> InteractionBuilder<'a> {
     /// - Maximum function call loops (5) is exceeded
     pub async fn create_with_auto_functions(self) -> Result<InteractionResponse, GenaiError> {
         use crate::function_calling::get_global_function_registry;
-        use crate::interactions_api::{
-            function_call_content_with_signature, function_response_content,
-        };
+        use crate::interactions_api::function_result_content;
         use log::{error, warn};
         use serde_json::json;
 
@@ -283,7 +281,7 @@ impl<'a> InteractionBuilder<'a> {
             }
         }
 
-        // Main auto-function loop
+        // Main auto-function loop (max 5 iterations to prevent infinite loops)
         for _loop_count in 0..MAX_FUNCTION_CALL_LOOPS {
             let response = client.create_interaction(request.clone()).await?;
 
@@ -295,16 +293,21 @@ impl<'a> InteractionBuilder<'a> {
                 return Ok(response);
             }
 
-            // Build function responses for next iteration
-            let mut function_responses = Vec::new();
+            // Build function results for next iteration
+            let mut function_results = Vec::new();
 
-            for (name, args, thought_signature) in function_calls {
-                // Record the function call in conversation (for context)
-                function_responses.push(function_call_content_with_signature(
-                    name.to_string(),
-                    args.clone(),
-                    thought_signature.map(|s| s.to_string()),
-                ));
+            for (call_id, name, args, _thought_signature) in function_calls {
+                // Validate that we have a call_id (required by API)
+                let call_id = match call_id {
+                    Some(id) => id,
+                    None => {
+                        warn!(
+                            "Function call '{}' missing call_id. Using fallback value.",
+                            name
+                        );
+                        "unknown"
+                    }
+                };
 
                 // Execute the function
                 let result = if let Some(function) = function_registry.get(name) {
@@ -326,18 +329,24 @@ impl<'a> InteractionBuilder<'a> {
                     json!({ "error": format!("Function '{}' is not available or not found.", name) })
                 };
 
-                // Add function result
-                function_responses.push(function_response_content(name.to_string(), result));
+                // Add function result (only the result, not the call - server has it via previous_interaction_id)
+                function_results.push(function_result_content(
+                    name.to_string(),
+                    call_id.to_string(),
+                    result,
+                ));
             }
 
             // Create new request with function results
-            // Key difference from GenerateContent: use previous_interaction_id for state
+            // The server maintains function call context via previous_interaction_id
             request.previous_interaction_id = Some(response.id);
-            request.input = InteractionInput::Content(function_responses);
+            request.input = InteractionInput::Content(function_results);
         }
 
         Err(GenaiError::Internal(format!(
-            "Exceeded maximum function call loops ({MAX_FUNCTION_CALL_LOOPS})"
+            "Exceeded maximum function call loops ({MAX_FUNCTION_CALL_LOOPS}). \
+             The model may be stuck in a loop. Check your function implementations \
+             or use manual function calling for more control."
         )))
     }
 

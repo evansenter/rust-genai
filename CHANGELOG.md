@@ -45,6 +45,20 @@ This release removes the legacy GenerateContent API in favor of the unified Inte
   - Auto-discovers and executes functions from the global registry
   - Supports multi-turn function calling with automatic loop handling
 
+- **New helper functions**:
+  - `function_result_content()` for sending function execution results (correct API format)
+  - Enhanced `function_call_content_with_signature()` to include optional call ID
+
+### Fixed
+
+- **Function calling implementation** now correctly follows Google's Interactions API specification:
+  - Added `id` field to `FunctionCall` to capture the call identifier from the API
+  - Added new `FunctionResult` content type with `call_id` field (replaces `FunctionResponse`)
+  - `create_with_auto_functions()` now sends only function results (not the original calls)
+  - The API server maintains function call context via `previous_interaction_id`
+  - Deprecated `FunctionResponse` variant (use `FunctionResult` instead)
+  - Improved error message when max function call loops (5) is exceeded
+
 ### Changed
 
 - **Primary API**: The Interactions API is now the only supported API
