@@ -6,6 +6,11 @@ This document tracks future improvements, refactoring opportunities, and feature
 
 ## Summary of Changes (2025-12-23)
 
+### Latest Updates
+- **Added:** Enhanced Multimodal Input Helpers (file loading, MIME detection)
+- **Added:** CI/CD Improvements (crates.io publishing, MSRV testing, coverage)
+- **Cleaned:** Removed stale GenerateContent API references (removed in v0.2.0)
+
 ### Research Findings (Anthropic, Google, OpenAI Blogs)
 
 Conducted comprehensive research on 2025 agentic AI trends and Gemini API updates:
@@ -15,11 +20,10 @@ Conducted comprehensive research on 2025 agentic AI trends and Gemini API update
 - **ReAct Pattern** - Validated as dominant agentic pattern across all major providers
 
 **✅ Fixed Critical Bugs:**
-- **Thought Signatures** - Implemented full support for Gemini 3 thought signatures in both GenerateContent and Interactions APIs
+- **Thought Signatures** - Implemented full support for Gemini 3 thought signatures in Interactions API
 
 **🎯 New High Priority Items:**
 - **Grounding with Google Search** - Gemini-specific real-time web grounding, unique differentiator
-- **thinking_level Parameter** - Gemini 3 parameter for controlling reasoning depth (already partially supported for Interactions API, need GenerateContent API support)
 
 **📋 New Features Identified:**
 - Deep Research Agent support (via Interactions API)
@@ -28,8 +32,8 @@ Conducted comprehensive research on 2025 agentic AI trends and Gemini API update
 
 **Current Status:**
 - 0 CRITICAL items ✓
-- 6 High Priority items (2 strategic standards, 2 Gemini-specific features, 2 production)
-- 9 Medium Priority items (features, quality, documentation)
+- 5 High Priority items (2 strategic standards, 1 Gemini-specific feature, 2 production)
+- 11 Medium Priority items (features, quality, documentation, CI/CD)
 - 164 tests passing (138 regular, 26 ignored/require API key)
 - ~9,100 lines of Rust code
 
@@ -191,10 +195,12 @@ Implement Gemini's unique real-time web grounding capability that connects model
 
 **What It Enables:**
 ```rust
-let response = client.with_model("gemini-3-flash")
-    .with_prompt("What are the latest developments in Rust async?")
+let response = client
+    .interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text("What are the latest developments in Rust async?")
     .with_google_search()  // Enable grounding
-    .generate()
+    .create()
     .await?;
 
 // Response includes citations with verifiable sources
@@ -229,49 +235,6 @@ pub struct GroundingMetadata {
 **References:**
 - [Grounding with Google Search](https://ai.google.dev/gemini-api/docs/google-search)
 - [Multi-tool Use Announcement](https://developers.googleblog.com/new-gemini-api-updates-for-gemini-3/)
-
----
-
-### Complete thinking_level Parameter Support 🎯
-**Impact:** Medium-High | **Effort:** ~3-4 hours | **Type:** Feature
-
-Add full support for Gemini 3's `thinking_level` parameter across both APIs.
-
-**Current Status:**
-- ✅ Supported in Interactions API (`InteractionConfig`)
-- ❌ NOT supported in GenerateContent API
-
-**What It Does:**
-Controls the depth of the model's internal reasoning before producing a response.
-
-**Values:**
-- Gemini 3 Flash: "minimal", "low", "medium", "high"
-- Gemini 3 Pro: "low", "high"
-
-**Implementation:**
-```rust
-// Add to GenerateContentBuilder
-pub fn thinking_level(mut self, level: impl Into<String>) -> Self {
-    self.thinking_level = Some(level.into());
-    self
-}
-
-// Usage
-let response = client.with_model("gemini-3-flash")
-    .with_prompt("Solve this complex problem...")
-    .thinking_level("high")  // NEW
-    .generate()
-    .await?;
-```
-
-**Files to Update:**
-- `genai-client/src/models/request.rs` - Add thinking_level to GenerationConfig
-- `src/request_builder.rs` - Add thinking_level method
-- Add tests for different thinking levels
-
-**References:**
-- [Gemini Thinking Documentation](https://ai.google.dev/gemini-api/docs/thinking)
-- [thinking_level Parameter Guide](https://www.aifreeapi.com/en/posts/gemini-api-thinking-level)
 
 ---
 
@@ -311,49 +274,29 @@ let client = Client::builder(api_key)
 Fixed critical bug where Gemini 3 function calling was broken due to missing thought signature support.
 
 **What Was Implemented:**
-- Added `thought_signature` field to `PartResponse` (GenerateContent API responses)
-- Added `thought_signature` field to `Part` (GenerateContent API requests)
 - Added `thought_signature` to `InteractionContent::FunctionCall` (Interactions API)
-- Added `thought_signatures` field to `GenerateContentResponse` public type
 - Updated response processing to extract and preserve signatures
-- Created helper functions:
-  - `model_function_call_with_signature()`
-  - `model_function_calls_request_with_signatures()`
-  - `function_call_content_with_signature()`
-
-**Code Sharing Analysis:**
-- Core `FunctionCall` struct remains shared between APIs ✓
-- Thought signature storage location differs by API design (necessary)
-- No unnecessary duplication - implementation is optimal
+- Created helper function `function_call_content_with_signature()`
 
 **What It Enables:**
 ```rust
 // Extract signatures from response
-let response = client.with_model("gemini-3-flash-preview")
-    .with_prompt("What's the weather?")
+let response = client
+    .interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text("What's the weather?")
     .with_function(weather_fn)
-    .generate()
+    .create()
     .await?;
 
-// Pass them back in conversation history for multi-turn
-let contents = vec![
-    user_text(prompt),
-    model_function_calls_request_with_signatures(
-        response.function_calls.unwrap(),
-        response.thought_signatures  // Critical for Gemini 3!
-    ),
-    user_tool_response("get_weather", result),
-];
+// Function calls include thought_signature for multi-turn conversations
+for (call_id, name, args, signature) in response.function_calls() {
+    // signature is critical for Gemini 3 multi-turn function calling
+}
 ```
 
 **Files Modified:**
-- `genai-client/src/models/response.rs`
-- `genai-client/src/models/shared.rs`
 - `genai-client/src/models/interactions.rs`
-- `src/types.rs`
-- `src/internal/response_processing.rs`
-- `src/client.rs`
-- `src/content_api.rs`
 - `src/interactions_api.rs`
 - All tests updated (164 tests passing)
 
@@ -577,11 +520,13 @@ Support Gemini's ability to use multiple tools simultaneously in a single reques
 
 **What Multi-Tool Enables:**
 ```rust
-let response = client.with_model("gemini-3-flash")
-    .with_prompt("Search for current weather data and plot it")
+let response = client
+    .interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text("Search for current weather data and plot it")
     .with_google_search()
     .with_code_execution()  // Both at once!
-    .generate()
+    .create()
     .await?;
 ```
 
@@ -619,6 +564,165 @@ Add more comprehensive examples demonstrating real-world use cases.
 - `examples/real_world/` directory
 - Each with comprehensive README and comments
 - Focus on production patterns and error handling
+
+---
+
+### Enhanced Multimodal Input Helpers
+**Impact:** Medium | **Effort:** ~4-6 hours | **Type:** Feature
+
+Add higher-level convenience functions for working with images, audio, and video content.
+
+**Current State:**
+Basic helpers exist in `src/interactions_api.rs`:
+- `image_data_content()` / `image_uri_content()`
+- `audio_data_content()` / `audio_uri_content()`
+- `video_data_content()` / `video_uri_content()`
+
+**Proposed Enhancements:**
+
+1. **File Loading Helpers:**
+```rust
+// Load image from file path with automatic base64 encoding
+let image = image_from_file("photo.jpg").await?;
+
+// Load with explicit MIME type override
+let image = image_from_file_with_mime("photo.jpg", "image/jpeg").await?;
+
+// Same for audio/video
+let audio = audio_from_file("recording.mp3").await?;
+let video = video_from_file("clip.mp4").await?;
+```
+
+2. **MIME Type Detection:**
+```rust
+// Auto-detect MIME type from file extension
+fn detect_mime_type(path: &Path) -> Option<String>;
+
+// Supported types:
+// Images: jpg, jpeg, png, gif, webp, heic, heif
+// Audio: mp3, wav, ogg, flac, aac, m4a
+// Video: mp4, webm, mov, avi, mkv
+```
+
+3. **Builder Pattern for Complex Inputs:**
+```rust
+let input = MultimodalInput::builder()
+    .text("What's in this image?")
+    .image_file("photo.jpg")
+    .build()?;
+```
+
+4. **Validation:**
+- File size limits (warn if > 20MB for inline data)
+- Supported format validation
+- URI scheme validation (http/https/gs://)
+
+**Files to Create/Update:**
+- `src/interactions_api.rs` - Add new helper functions
+- `src/multimodal.rs` (new) - Dedicated module for multimodal utilities
+- Add `mime_guess` or similar crate for MIME detection
+
+**Benefits:**
+- Reduces boilerplate for common use cases
+- Prevents common errors (wrong MIME types, missing base64 encoding)
+- Better developer experience for multimodal applications
+
+---
+
+### CI/CD Improvements
+**Impact:** Medium | **Effort:** ~4-6 hours | **Type:** Tooling
+
+Enhance the CI/CD pipeline for better reliability, coverage, and release automation.
+
+**Current State:**
+`.github/workflows/rust.yml` has:
+- ✅ cargo check, test, fmt, clippy, doc
+- ✅ Integration tests with GEMINI_API_KEY secret
+- ✅ Rust caching with Swatinem/rust-cache
+
+**Proposed Improvements:**
+
+1. **Automated crates.io Publishing:**
+```yaml
+release:
+  name: Publish to crates.io
+  runs-on: ubuntu-latest
+  if: startsWith(github.ref, 'refs/tags/v')
+  steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Publish rust-genai-macros
+      run: cargo publish -p rust-genai-macros
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    - name: Publish genai-client
+      run: cargo publish -p genai-client
+    - name: Publish rust-genai
+      run: cargo publish -p rust-genai
+```
+
+2. **MSRV (Minimum Supported Rust Version) Testing:**
+```yaml
+msrv:
+  name: MSRV Check
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@1.75.0  # Our MSRV
+    - run: cargo check --workspace
+```
+
+3. **Code Coverage with Codecov:**
+```yaml
+coverage:
+  name: Code Coverage
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: taiki-e/install-action@cargo-llvm-cov
+    - run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+    - uses: codecov/codecov-action@v4
+      with:
+        files: lcov.info
+```
+
+4. **Dependency Auditing:**
+```yaml
+audit:
+  name: Security Audit
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - uses: rustsec/audit-check@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+5. **Release Drafter:**
+- Auto-generate release notes from PR titles
+- Categorize changes (features, fixes, docs, etc.)
+
+6. **Matrix Testing:**
+```yaml
+strategy:
+  matrix:
+    os: [ubuntu-latest, macos-latest, windows-latest]
+    rust: [stable, beta]
+```
+
+**Files to Update:**
+- `.github/workflows/rust.yml` - Add new jobs
+- `.github/workflows/release.yml` (new) - Publishing workflow
+- `.github/release-drafter.yml` (new) - Release notes config
+- `Cargo.toml` - Add `rust-version = "1.75"` for MSRV
+
+**Benefits:**
+- Automated releases reduce manual work and errors
+- MSRV testing prevents accidental compatibility breaks
+- Coverage tracking identifies untested code paths
+- Security auditing catches vulnerable dependencies early
+- Cross-platform testing ensures portability
 
 ---
 
@@ -785,7 +889,7 @@ while let Some(response) = session.next().await {
 
 When working on items from this backlog:
 
-1. Create a feature branch from `master`
+1. Create a feature branch from `main`
 2. Update this document to move items from their current section to "In Progress" (add a new section if needed)
 3. When complete, move to "Completed" section with completion date and relevant commit SHA
 4. Consider breaking large features into smaller milestones
