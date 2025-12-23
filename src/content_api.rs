@@ -78,6 +78,17 @@ pub fn model_function_calls_request_with_signatures(
     thought_signatures: Option<Vec<String>>,
 ) -> Content {
     let signatures = thought_signatures.unwrap_or_default();
+
+    // Log signature count mismatches to help users debug issues
+    if !signatures.is_empty() && signatures.len() != calls.len() {
+        log::debug!(
+            "Thought signature count ({}) doesn't match function call count ({}). \
+             Extra calls will have no signature.",
+            signatures.len(),
+            calls.len()
+        );
+    }
+
     Content {
         parts: calls
             .into_iter()

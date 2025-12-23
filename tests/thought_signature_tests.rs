@@ -3,10 +3,11 @@
 use genai_client::models::response::PartResponse;
 use genai_client::{FunctionCall, InteractionContent, Part};
 use rust_genai::{
-    GenerateContentResponse, function_call_content_with_signature,
-    model_function_calls_request_with_signatures, user_text,
+    Client, GenerateContentResponse, WithFunctionCalling, function_call_content_with_signature,
+    model_function_calls_request_with_signatures, user_text, user_tool_response,
 };
 use serde_json::json;
+use std::env;
 
 #[test]
 fn test_part_response_deserializes_thought_signature() {
@@ -239,4 +240,111 @@ fn test_conversation_history_preserves_signatures() {
         serde_json::to_string(&contents[1]).expect("Failed to serialize conversation turn");
     assert!(serialized.contains("thoughtSignature"));
     assert!(serialized.contains("gemini3_sig_abc"));
+}
+
+// Integration test that verifies thought signatures work with real Gemini 3 API calls
+#[tokio::test]
+#[ignore = "Makes real API calls - requires GEMINI_API_KEY"]
+async fn test_gemini3_thought_signatures_integration() {
+    let Ok(api_key) = env::var("GEMINI_API_KEY") else {
+        println!("Skipping test_gemini3_thought_signatures_integration: GEMINI_API_KEY not set.");
+        return;
+    };
+
+    let client = Client::builder(api_key).build();
+
+    // Define a simple mock function for weather
+    let weather_function = rust_genai::FunctionDeclaration::builder("get_weather")
+        .description("Get the weather for a location")
+        .parameter(
+            "location",
+            json!({"type": "string", "description": "The city name"}),
+        )
+        .required(vec!["location".to_string()])
+        .build();
+
+    // Step 1: Make initial request with function declaration
+    let response1 = client
+        .with_model("gemini-3-flash-preview")
+        .with_prompt("What's the weather in Tokyo?")
+        .with_function(weather_function.clone())
+        .generate()
+        .await;
+
+    assert!(
+        response1.is_ok(),
+        "Initial request failed: {:?}",
+        response1.err()
+    );
+
+    let response1 = response1.unwrap();
+
+    // Verify we got function calls
+    assert!(
+        response1.function_calls.is_some(),
+        "Expected function calls from Gemini 3"
+    );
+
+    // Step 2: Extract thought signatures (critical for Gemini 3)
+    let thought_signatures = response1.thought_signatures.clone();
+    assert!(
+        thought_signatures.is_some(),
+        "Expected thought signatures from Gemini 3 response"
+    );
+
+    let function_calls = response1.function_calls.unwrap();
+    let signatures = thought_signatures.as_ref().unwrap();
+
+    // Verify signature count matches function call count
+    assert_eq!(
+        function_calls.len(),
+        signatures.len(),
+        "Thought signature count should match function call count"
+    );
+
+    // Step 3: Build conversation history WITH thought signatures
+    let internal_calls: Vec<FunctionCall> = function_calls
+        .into_iter()
+        .map(|fc| FunctionCall {
+            name: fc.name,
+            args: fc.args,
+        })
+        .collect();
+
+    let contents = vec![
+        user_text("What's the weather in Tokyo?".to_string()),
+        model_function_calls_request_with_signatures(internal_calls, thought_signatures),
+        user_tool_response(
+            "get_weather".to_string(),
+            json!({"temperature": "22°C", "conditions": "sunny"}),
+        ),
+    ];
+
+    // Step 4: Send follow-up request with conversation history
+    let response2 = client
+        .with_model("gemini-3-flash-preview")
+        .with_contents(contents)
+        .with_function(weather_function)
+        .generate()
+        .await;
+
+    // This should succeed with thought signatures, but would fail with 400 without them
+    assert!(
+        response2.is_ok(),
+        "Follow-up request with thought signatures failed: {:?}",
+        response2.err()
+    );
+
+    let response2 = response2.unwrap();
+
+    // Verify we got a text response (not another function call)
+    assert!(
+        response2.text.is_some(),
+        "Expected text response after providing function result"
+    );
+
+    println!(
+        "Integration test successful! Final response: {}",
+        response2.text.as_deref().unwrap_or("")
+    );
 }
