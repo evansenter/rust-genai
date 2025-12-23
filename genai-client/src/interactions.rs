@@ -1,5 +1,5 @@
 use crate::common::{Endpoint, construct_endpoint_url};
-use crate::error_helpers::read_error_with_context;
+use crate::error_helpers::check_response;
 use crate::errors::InternalError;
 use crate::models::interactions::{
     CreateInteractionRequest, InteractionResponse, InteractionStreamEvent,
@@ -29,12 +29,7 @@ pub async fn create_interaction(
     let url = construct_endpoint_url(endpoint, api_key);
 
     let response = http_client.post(&url).json(&request).send().await?;
-
-    if !response.status().is_success() {
-        let error_text = response.text().await.map_err(InternalError::Http)?;
-        return Err(InternalError::Api(error_text));
-    }
-
+    let response = check_response(response).await?;
     let response_text = response.text().await.map_err(InternalError::Http)?;
     let interaction_response: InteractionResponse = serde_json::from_str(&response_text)?;
 
@@ -59,23 +54,18 @@ pub fn create_interaction_stream<'a>(
             .json(&request)
             .send()
             .await?;
+        let response = check_response(response).await?;
+        let byte_stream = response.bytes_stream();
+        let parsed_stream = parse_sse_stream::<InteractionStreamEvent>(byte_stream);
+        futures_util::pin_mut!(parsed_stream);
 
-        let status = response.status();
-        if status.is_success() {
-            let byte_stream = response.bytes_stream();
-            let parsed_stream = parse_sse_stream::<InteractionStreamEvent>(byte_stream);
-            futures_util::pin_mut!(parsed_stream);
-
-            while let Some(result) = parsed_stream.next().await {
-                let event = result?;
-                // Only yield events that have the full interaction data
-                // Status update events are skipped as they don't contain the full response
-                if let Some(interaction) = event.interaction {
-                    yield interaction;
-                }
+        while let Some(result) = parsed_stream.next().await {
+            let event = result?;
+            // Only yield events that have the full interaction data
+            // Status update events are skipped as they don't contain the full response
+            if let Some(interaction) = event.interaction {
+                yield interaction;
             }
-        } else {
-            Err(read_error_with_context(response).await)?;
         }
     }
 }
@@ -100,12 +90,7 @@ pub async fn get_interaction(
     let url = construct_endpoint_url(endpoint, api_key);
 
     let response = http_client.get(&url).send().await?;
-
-    if !response.status().is_success() {
-        let error_text = response.text().await.map_err(InternalError::Http)?;
-        return Err(InternalError::Api(error_text));
-    }
-
+    let response = check_response(response).await?;
     let response_text = response.text().await.map_err(InternalError::Http)?;
     let interaction_response: InteractionResponse = serde_json::from_str(&response_text)?;
 
@@ -131,12 +116,7 @@ pub async fn delete_interaction(
     let url = construct_endpoint_url(endpoint, api_key);
 
     let response = http_client.delete(&url).send().await?;
-
-    if !response.status().is_success() {
-        let error_text = response.text().await.map_err(InternalError::Http)?;
-        return Err(InternalError::Api(error_text));
-    }
-
+    check_response(response).await?;
     Ok(())
 }
 
