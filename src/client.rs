@@ -5,6 +5,7 @@ use async_stream::try_stream;
 use futures_util::StreamExt;
 use genai_client::ApiVersion;
 use genai_client::construct_url;
+use genai_client::error_helpers::check_response;
 use genai_client::models::request::GenerateContentRequest as InternalGenerateContentRequest;
 use reqwest::Client as ReqwestClient;
 use std::str;
@@ -127,13 +128,7 @@ impl Client {
             .json(&request_body)
             .send()
             .await?;
-
-        if !response.status().is_success() {
-            let error_text = response.text().await?;
-            log::debug!("Response Text: {error_text}");
-            return Err(GenaiError::Api(error_text));
-        }
-
+        let response = check_response(response).await?;
         let response_text = response.text().await?;
         log::debug!("Response Text: {response_text}");
         let response_body: genai_client::models::response::GenerateContentResponse =

@@ -1,5 +1,5 @@
 use crate::common::{ApiVersion, construct_url};
-use crate::error_helpers::read_error_with_context;
+use crate::error_helpers::check_response;
 use crate::errors::InternalError;
 use crate::models::request::GenerateContentRequest;
 use crate::models::response::GenerateContentResponse;
@@ -51,12 +51,7 @@ pub async fn generate_content_internal(
     };
 
     let response = http_client.post(&url).json(&request_body).send().await?;
-
-    if !response.status().is_success() {
-        let error_text = response.text().await.map_err(InternalError::Http)?;
-        return Err(InternalError::Api(error_text));
-    }
-
+    let response = check_response(response).await?;
     let response_text = response.text().await.map_err(InternalError::Http)?;
 
     let response_body: GenerateContentResponse = serde_json::from_str(&response_text)?;
@@ -110,18 +105,13 @@ pub fn generate_content_stream_internal<'a>(
             .json(&request_body)
             .send()
             .await?;
+        let response = check_response(response).await?;
+        let byte_stream = response.bytes_stream();
+        let parsed_stream = parse_sse_stream::<GenerateContentResponse>(byte_stream);
+        futures_util::pin_mut!(parsed_stream);
 
-        let status = response.status();
-        if status.is_success() {
-            let byte_stream = response.bytes_stream();
-            let parsed_stream = parse_sse_stream::<GenerateContentResponse>(byte_stream);
-            futures_util::pin_mut!(parsed_stream);
-
-            while let Some(result) = parsed_stream.next().await {
-                yield result?;
-            }
-        } else {
-            Err(read_error_with_context(response).await)?;
+        while let Some(result) = parsed_stream.next().await {
+            yield result?;
         }
     }
 }

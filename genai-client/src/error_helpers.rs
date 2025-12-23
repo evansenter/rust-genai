@@ -6,6 +6,22 @@ use reqwest::Response;
 /// Maximum characters to include from error body in context messages
 const ERROR_BODY_PREVIEW_LENGTH: usize = 200;
 
+/// Checks if an HTTP response is successful, returning it if so or an error otherwise.
+///
+/// This helper consolidates the common pattern of checking response status and
+/// extracting error details on failure.
+///
+/// # Errors
+///
+/// Returns an error with status code and body preview on non-success status.
+pub async fn check_response(response: Response) -> Result<Response, InternalError> {
+    if response.status().is_success() {
+        Ok(response)
+    } else {
+        Err(read_error_with_context(response).await)
+    }
+}
+
 /// Reads error response body and creates a detailed InternalError::Api with context.
 ///
 /// Includes:

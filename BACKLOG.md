@@ -39,41 +39,26 @@ Users now configure logging via their preferred backend (e.g., `env_logger::init
 
 ---
 
-## Medium Priority
+### Consolidate Error Response Handling ✓
+**Completed:** 2025-12-23 | **Impact:** Low | **Effort:** ~1 hour | **Type:** Refactoring
 
-### Consolidate Error Response Handling
-**Impact:** Low | **Effort:** ~1-2 hours | **Type:** Refactoring
+Extracted common HTTP error response handling pattern into shared `check_response` helper function.
 
-Extract common error handling pattern into shared helper function.
+**Changes Made:**
+- Added `check_response()` async function in `genai-client/src/error_helpers.rs`
+- Function checks response status, returns `Ok(response)` on success or detailed error on failure
+- Leverages existing `read_error_with_context()` for consistent error formatting with HTTP status codes
+- Made `error_helpers` module public to allow use from root crate
+- Updated 7 call sites across 3 files:
+  - `genai-client/src/core.rs`: `generate_content_internal`, `generate_content_stream_internal`
+  - `genai-client/src/interactions.rs`: `create_interaction`, `create_interaction_stream`, `get_interaction`, `delete_interaction`
+  - `src/client.rs`: `generate_from_request`
 
-**Current Pattern (repeated 3+ times):**
-```rust
-if !response.status().is_success() {
-    let error_text = response.text().await.map_err(InternalError::Http)?;
-    return Err(InternalError::Api(error_text));
-}
-```
-
-**Proposed:**
-```rust
-async fn handle_api_error(response: Response) -> Result<Response, InternalError> {
-    if !response.status().is_success() {
-        let error_text = response.text().await.map_err(InternalError::Http)?;
-        return Err(InternalError::Api(error_text));
-    }
-    Ok(response)
-}
-
-// Usage:
-let response = handle_api_error(response).await?;
-```
-
-**Files to Update:**
-- `genai-client/src/core.rs`
-- `genai-client/src/interactions.rs`
-- `src/client.rs` (create_interaction, get_interaction, delete_interaction)
+**Benefit:** Consistent error handling with HTTP status codes included in all API error messages.
 
 ---
+
+## Medium Priority
 
 ### Audit and Simplify Data Structures
 **Impact:** Medium | **Effort:** ~4-6 hours | **Type:** Refactoring
