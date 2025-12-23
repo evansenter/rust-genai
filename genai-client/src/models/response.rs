@@ -32,6 +32,9 @@ pub struct PartResponse {
         skip_serializing_if = "Option::is_none"
     )]
     pub code_execution_result: Option<CodeExecutionResultResponse>,
+    /// Thought signature for Gemini 3 reasoning continuity (required for function calling)
+    #[serde(rename = "thoughtSignature", skip_serializing_if = "Option::is_none")]
+    pub thought_signature: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]

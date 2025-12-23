@@ -104,6 +104,7 @@ fn test_generate_content_response() {
         text: Some("Hello from AI".to_string()),
         function_calls: None,
         code_execution_results: None,
+        thought_signatures: None,
     };
     assert_eq!(text_response.text, Some("Hello from AI".to_string()));
     assert!(text_response.function_calls.is_none());
@@ -118,6 +119,7 @@ fn test_generate_content_response() {
         text: None,
         function_calls: Some(vec![fc]),
         code_execution_results: None,
+        thought_signatures: None,
     };
     assert!(fc_response.text.is_none());
     assert_eq!(fc_response.function_calls.as_ref().unwrap().len(), 1);
@@ -131,6 +133,7 @@ fn test_generate_content_response() {
         text: Some("The result is:".to_string()),
         function_calls: None,
         code_execution_results: Some(vec![code_result]),
+        thought_signatures: None,
     };
     assert!(code_response.text.is_some());
     assert!(code_response.function_calls.is_none());
@@ -156,6 +159,7 @@ fn test_generate_content_response() {
             code: "test".to_string(),
             output: "output".to_string(),
         }]),
+        thought_signatures: None,
     };
     assert!(mixed_response.text.is_some());
     assert_eq!(mixed_response.function_calls.as_ref().unwrap().len(), 2);

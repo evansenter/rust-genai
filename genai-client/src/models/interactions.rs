@@ -48,6 +48,9 @@ pub enum InteractionContent {
     FunctionCall {
         name: String,
         args: serde_json::Value,
+        /// Thought signature for Gemini 3 reasoning continuity
+        #[serde(rename = "thoughtSignature", skip_serializing_if = "Option::is_none")]
+        thought_signature: Option<String>,
     },
     /// Function response
     FunctionResponse {
@@ -296,7 +299,7 @@ mod tests {
             serde_json::from_str(content_json).expect("Deserialization failed");
 
         match content {
-            InteractionContent::FunctionCall { name, args } => {
+            InteractionContent::FunctionCall { name, args, .. } => {
                 assert_eq!(name, "get_weather");
                 assert_eq!(args["location"], "Paris");
             }

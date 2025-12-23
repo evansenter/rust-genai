@@ -7,6 +7,7 @@ pub struct ProcessedParts {
     pub(crate) text: Option<String>,
     pub(crate) function_calls: Vec<FunctionCall>,
     pub(crate) code_execution_results: Vec<CodeExecutionResult>,
+    pub(crate) thought_signatures: Vec<String>,
 }
 
 /// Processes a slice of `PartResponse` objects and extracts structured data.
@@ -14,6 +15,7 @@ pub fn process_response_parts(parts: &[PartResponse]) -> ProcessedParts {
     let mut collected_text: Option<String> = None;
     let mut collected_function_calls: Vec<FunctionCall> = Vec::new();
     let mut collected_code_execution_results: Vec<CodeExecutionResult> = Vec::new();
+    let mut collected_thought_signatures: Vec<String> = Vec::new();
     let mut last_executable_code: Option<String> = None;
 
     for part in parts {
@@ -51,12 +53,30 @@ pub fn process_response_parts(parts: &[PartResponse]) -> ProcessedParts {
                 );
             }
         }
+
+        // Collect thought signatures from parts (Gemini 3)
+        if let Some(signature) = &part.thought_signature {
+            collected_thought_signatures.push(signature.clone());
+        }
+    }
+
+    // Validate thought signature count matches function call count
+    if !collected_thought_signatures.is_empty() && !collected_function_calls.is_empty() {
+        if collected_thought_signatures.len() != collected_function_calls.len() {
+            log::warn!(
+                "API response has mismatched counts: {} thought signatures but {} function calls. \
+                 This may indicate an API inconsistency. Please report this if you see it.",
+                collected_thought_signatures.len(),
+                collected_function_calls.len()
+            );
+        }
     }
 
     ProcessedParts {
         text: collected_text,
         function_calls: collected_function_calls,
         code_execution_results: collected_code_execution_results,
+        thought_signatures: collected_thought_signatures,
     }
 }
 
@@ -87,6 +107,7 @@ mod tests {
                 executable_code: None,
                 code_execution_result: None,
                 function_response: None,
+                thought_signature: None,
             },
             PartResponse {
                 text: Some("world!".to_string()),
@@ -94,6 +115,7 @@ mod tests {
                 executable_code: None,
                 code_execution_result: None,
                 function_response: None,
+                thought_signature: None,
             },
         ];
 
@@ -113,6 +135,7 @@ mod tests {
                 executable_code: None,
                 code_execution_result: None,
                 function_response: None,
+                thought_signature: None,
             },
             PartResponse {
                 text: None,
@@ -123,6 +146,7 @@ mod tests {
                 executable_code: None,
                 code_execution_result: None,
                 function_response: None,
+                thought_signature: None,
             },
         ];
 
@@ -144,6 +168,7 @@ mod tests {
                 }),
                 code_execution_result: None,
                 function_response: None,
+                thought_signature: None,
             },
             PartResponse {
                 text: None,
@@ -154,6 +179,7 @@ mod tests {
                     output: "hello".to_string(),
                 }),
                 function_response: None,
+                thought_signature: None,
             },
         ];
 
@@ -175,6 +201,7 @@ mod tests {
                 output: "orphaned output".to_string(),
             }),
             function_response: None,
+            thought_signature: None,
         }];
 
         let result = process_response_parts(&parts);
@@ -190,6 +217,7 @@ mod tests {
                 executable_code: None,
                 code_execution_result: None,
                 function_response: None,
+                thought_signature: None,
             },
             PartResponse {
                 text: None,
@@ -200,6 +228,7 @@ mod tests {
                 executable_code: None,
                 code_execution_result: None,
                 function_response: None,
+                thought_signature: None,
             },
             PartResponse {
                 text: None,
@@ -210,6 +239,7 @@ mod tests {
                 }),
                 code_execution_result: None,
                 function_response: None,
+                thought_signature: None,
             },
             PartResponse {
                 text: None,
@@ -220,6 +250,7 @@ mod tests {
                     output: "8".to_string(),
                 }),
                 function_response: None,
+                thought_signature: None,
             },
         ];
 

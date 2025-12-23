@@ -27,6 +27,34 @@ pub struct GenerateContentResponse {
     pub function_calls: Option<Vec<FunctionCall>>,
     /// The results of any code executions performed by the model.
     pub code_execution_results: Option<Vec<CodeExecutionResult>>,
+    /// Opaque thought signatures from Gemini 3 models.
+    ///
+    /// These encrypted tokens represent the model's internal reasoning state and must be
+    /// passed back unchanged in multi-turn function calling conversations. Without them,
+    /// Gemini 3 returns 400 errors when receiving function call responses.
+    ///
+    /// Extract from responses using this field and pass to
+    /// `model_function_calls_request_with_signatures()` when building conversation history.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let response = client.with_model("gemini-3-flash-preview")
+    ///     .with_prompt("What's the weather?")
+    ///     .with_function(weather_fn)
+    ///     .generate()
+    ///     .await?;
+    ///
+    /// // Extract signatures
+    /// let signatures = response.thought_signatures.clone();
+    ///
+    /// // Pass them back with function responses
+    /// let contents = vec![
+    ///     user_text(prompt),
+    ///     model_function_calls_request_with_signatures(calls, signatures),
+    ///     user_tool_response("weather", result),
+    /// ];
+    /// ```
+    pub thought_signatures: Option<Vec<String>>,
 }
 
 // NOTE: FunctionDeclaration has been moved to genai_client and is re-exported from the root crate.

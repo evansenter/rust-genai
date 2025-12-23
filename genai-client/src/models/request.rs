@@ -31,6 +31,7 @@ mod tests {
                     text: Some("Hello".to_string()),
                     function_call: None,
                     function_response: None,
+                    thought_signature: None,
                 }],
                 role: None,
             }],

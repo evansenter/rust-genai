@@ -153,6 +153,11 @@ impl Client {
                     } else {
                         Some(processed_parts.code_execution_results)
                     },
+                    thought_signatures: if processed_parts.thought_signatures.is_empty() {
+                        None
+                    } else {
+                        Some(processed_parts.thought_signatures)
+                    },
                 });
             }
         }
@@ -203,6 +208,7 @@ impl Client {
                                 text: processed_parts.text,
                                 function_calls: if processed_parts.function_calls.is_empty() { None } else { Some(processed_parts.function_calls) },
                                 code_execution_results: if processed_parts.code_execution_results.is_empty() { None } else { Some(processed_parts.code_execution_results) },
+                                thought_signatures: if processed_parts.thought_signatures.is_empty() { None } else { Some(processed_parts.thought_signatures) },
                             };
                         }
                     }
