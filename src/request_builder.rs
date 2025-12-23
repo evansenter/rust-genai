@@ -4,8 +4,8 @@ use crate::client::Client;
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
-    self, CreateInteractionRequest, GenerationConfig, InteractionInput, InteractionResponse,
-    Tool as InternalTool,
+    self, CreateInteractionRequest, GenerationConfig, InteractionContent, InteractionInput,
+    InteractionResponse, Tool as InternalTool,
 };
 
 const MAX_FUNCTION_CALL_LOOPS: usize = 5; // Max iterations for auto function calling
@@ -107,6 +107,33 @@ impl<'a> InteractionBuilder<'a> {
     /// This is a convenience method that creates an `InteractionInput::Text`.
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
         self.input = Some(InteractionInput::Text(text.into()));
+        self
+    }
+
+    /// Sets the input from a vector of content objects.
+    ///
+    /// This is useful for building multi-part inputs or for sending function results.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use rust_genai::{Client, function_result_content};
+    /// # use serde_json::json;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api_key".to_string()).build();
+    ///
+    /// let result = function_result_content("my_func", "call_123", json!({"data": "result"}));
+    ///
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_content(vec![result])
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_content(mut self, content: Vec<InteractionContent>) -> Self {
+        self.input = Some(InteractionInput::Content(content));
         self
     }
 
@@ -397,6 +424,7 @@ mod tests {
     use super::*;
     use crate::builder_traits::WithFunctionCalling;
     use crate::{Client, FunctionDeclaration};
+    use genai_client::Tool;
     use serde_json::json;
 
     fn create_test_client() -> Client {
@@ -435,10 +463,12 @@ mod tests {
             .build();
 
         let tool = func_decl.into_tool();
-        assert!(tool.function_declarations.is_some());
-        let decls = tool.function_declarations.unwrap();
-        assert_eq!(decls.len(), 1);
-        assert_eq!(decls[0].name(), "test");
+        match tool {
+            Tool::Function { name, .. } => {
+                assert_eq!(name, "test");
+            }
+            _ => panic!("Expected Tool::Function variant"),
+        }
     }
 
     // --- InteractionBuilder Tests ---

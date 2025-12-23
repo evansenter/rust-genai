@@ -9,7 +9,7 @@ pub mod sse_parser;
 // Import and selectively re-export the necessary structs from the models module
 
 // Shared types (used by multiple APIs)
-pub use models::shared::CodeExecution;
+// CodeExecution is now part of the Tool enum
 pub use models::shared::Content;
 pub use models::shared::FunctionCall;
 pub use models::shared::FunctionCallingConfig;

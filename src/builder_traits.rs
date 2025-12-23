@@ -216,7 +216,7 @@ mod tests {
         assert!(builder.tools.is_some());
         let tools = builder.tools.unwrap();
         assert_eq!(tools.len(), 1);
-        assert!(tools[0].function_declarations.is_some());
+        assert!(matches!(tools[0], Tool::Function { .. }));
     }
 
     #[test]
