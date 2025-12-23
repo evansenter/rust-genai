@@ -21,10 +21,6 @@ pub use interactions_api::{
     video_data_content, video_uri_content,
 };
 
-// Builder traits module - provides shared builder functionality
-pub mod builder_traits;
-pub use builder_traits::WithFunctionCalling;
-
 pub mod client;
 pub use client::{Client, ClientBuilder};
 

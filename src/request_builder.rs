@@ -1,11 +1,10 @@
 use crate::GenaiError;
-use crate::builder_traits::HasToolsField;
 use crate::client::Client;
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
-    self, CreateInteractionRequest, GenerationConfig, InteractionContent, InteractionInput,
-    InteractionResponse, Tool as InternalTool,
+    self, CreateInteractionRequest, FunctionDeclaration, GenerationConfig, InteractionContent,
+    InteractionInput, InteractionResponse, Tool as InternalTool,
 };
 
 const MAX_FUNCTION_CALL_LOOPS: usize = 5; // Max iterations for auto function calling
@@ -149,6 +148,67 @@ impl<'a> InteractionBuilder<'a> {
     pub fn with_tools(mut self, tools: Vec<InternalTool>) -> Self {
         self.tools = Some(tools);
         self
+    }
+
+    /// Adds a single function declaration to the request.
+    ///
+    /// This method can be called multiple times to add several functions.
+    /// Each function is converted into a [`Tool`] and added to the request.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, FunctionDeclaration};
+    /// use serde_json::json;
+    ///
+    /// let client = Client::new("api-key".to_string(), None);
+    ///
+    /// let func = FunctionDeclaration::builder("get_temperature")
+    ///     .description("Get the temperature for a location")
+    ///     .parameter("location", json!({"type": "string"}))
+    ///     .required(vec!["location".to_string()])
+    ///     .build();
+    ///
+    /// let builder = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What's the temperature in Paris?")
+    ///     .with_function(func);
+    /// ```
+    pub fn with_function(mut self, function: FunctionDeclaration) -> Self {
+        let tool = function.into_tool();
+        self.tools.get_or_insert_with(Vec::new).push(tool);
+        self
+    }
+
+    /// Adds multiple function declarations to the request at once.
+    ///
+    /// This is a convenience method equivalent to calling [`with_function`] multiple times.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, FunctionDeclaration};
+    ///
+    /// let client = Client::new("api-key".to_string(), None);
+    ///
+    /// let functions = vec![
+    ///     FunctionDeclaration::builder("get_weather").build(),
+    ///     FunctionDeclaration::builder("get_time").build(),
+    /// ];
+    ///
+    /// let builder = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What's the weather and time?")
+    ///     .with_functions(functions);
+    /// ```
+    ///
+    /// [`with_function`]: InteractionBuilder::with_function
+    pub fn with_functions(self, functions: Vec<FunctionDeclaration>) -> Self {
+        functions
+            .into_iter()
+            .fold(self, |builder, func| builder.with_function(func))
     }
 
     /// Sets response modalities (e.g., ["IMAGE"]).
@@ -412,17 +472,9 @@ impl<'a> InteractionBuilder<'a> {
     }
 }
 
-// Implement trait for function calling support
-impl HasToolsField for InteractionBuilder<'_> {
-    fn get_tools_mut(&mut self) -> &mut Option<Vec<InternalTool>> {
-        &mut self.tools
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder_traits::WithFunctionCalling;
     use crate::{Client, FunctionDeclaration};
     use genai_client::Tool;
     use serde_json::json;
