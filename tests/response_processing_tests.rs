@@ -21,6 +21,7 @@ fn test_response_conversion() {
             code: "print('test')".to_string(),
             output: "test".to_string(),
         }]),
+        thought_signatures: None,
     };
 
     // Verify all fields are present
@@ -36,6 +37,7 @@ fn test_empty_response_handling() {
         text: None,
         function_calls: None,
         code_execution_results: None,
+        thought_signatures: None,
     };
 
     assert!(empty_response.text.is_none());
@@ -50,6 +52,7 @@ fn test_response_with_empty_collections() {
         text: Some(String::new()),            // Empty string
         function_calls: Some(vec![]),         // Empty vector
         code_execution_results: Some(vec![]), // Empty vector
+        thought_signatures: None,
     };
 
     assert_eq!(response.text, Some(String::new()));
@@ -77,6 +80,7 @@ fn test_response_with_multiple_function_calls() {
             },
         ]),
         code_execution_results: None,
+        thought_signatures: None,
     };
 
     let calls = response.function_calls.as_ref().unwrap();

@@ -19,6 +19,9 @@ pub struct Part {
     pub function_call: Option<FunctionCall>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function_response: Option<FunctionResponse>,
+    /// Thought signature for Gemini 3 reasoning continuity (required for function calling)
+    #[serde(rename = "thoughtSignature", skip_serializing_if = "Option::is_none")]
+    pub thought_signature: Option<String>,
     // Add other part types later e.g.:
     // pub inline_data: Option<Blob>,
 }
@@ -265,6 +268,7 @@ mod tests {
                 text: Some("Hello".to_string()),
                 function_call: None,
                 function_response: None,
+                thought_signature: None,
             }],
             role: Some("user".to_string()),
         };

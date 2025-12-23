@@ -45,7 +45,37 @@ pub fn thought_content(text: impl Into<String>) -> InteractionContent {
     }
 }
 
-/// Creates a function call content
+/// Creates a function call content with optional thought signature
+///
+/// For Gemini 3 models, thought signatures are required for multi-turn function calling.
+/// Extract them from the interaction response and pass them here when building conversation history.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::function_call_content_with_signature;
+/// use serde_json::json;
+///
+/// let call = function_call_content_with_signature(
+///     "get_weather",
+///     json!({"location": "San Francisco"}),
+///     Some("encrypted_signature_token".to_string())
+/// );
+/// ```
+pub fn function_call_content_with_signature(
+    name: impl Into<String>,
+    args: Value,
+    thought_signature: Option<String>,
+) -> InteractionContent {
+    InteractionContent::FunctionCall {
+        name: name.into(),
+        args,
+        thought_signature,
+    }
+}
+
+/// Creates a function call content (without thought signature)
+///
+/// For Gemini 3 models, prefer using `function_call_content_with_signature` instead.
 ///
 /// # Example
 /// ```
@@ -58,10 +88,7 @@ pub fn thought_content(text: impl Into<String>) -> InteractionContent {
 /// );
 /// ```
 pub fn function_call_content(name: impl Into<String>, args: Value) -> InteractionContent {
-    InteractionContent::FunctionCall {
-        name: name.into(),
-        args,
-    }
+    function_call_content_with_signature(name, args, None)
 }
 
 /// Creates a function response content
@@ -259,7 +286,7 @@ mod tests {
     fn test_function_call_content() {
         let content = function_call_content("test", json!({"key": "value"}));
         match content {
-            InteractionContent::FunctionCall { name, args } => {
+            InteractionContent::FunctionCall { name, args, .. } => {
                 assert_eq!(name, "test");
                 assert_eq!(args, json!({"key": "value"}));
             }

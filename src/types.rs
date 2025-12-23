@@ -27,6 +27,9 @@ pub struct GenerateContentResponse {
     pub function_calls: Option<Vec<FunctionCall>>,
     /// The results of any code executions performed by the model.
     pub code_execution_results: Option<Vec<CodeExecutionResult>>,
+    /// Thought signatures from Gemini 3 for maintaining reasoning continuity.
+    /// Required when passing function call responses back to the model.
+    pub thought_signatures: Option<Vec<String>>,
 }
 
 // NOTE: FunctionDeclaration has been moved to genai_client and is re-exported from the root crate.
