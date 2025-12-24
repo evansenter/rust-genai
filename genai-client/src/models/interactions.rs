@@ -561,16 +561,28 @@ pub enum InteractionStatus {
     Cancelled,
 }
 
-/// Token usage information
-#[derive(Clone, Deserialize, Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
+/// Token usage information from the Interactions API
+#[derive(Clone, Deserialize, Serialize, Debug, Default)]
+#[serde(default)]
 pub struct UsageMetadata {
+    /// Total number of input tokens
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompt_tokens: Option<i32>,
+    pub total_input_tokens: Option<i32>,
+    /// Total number of output tokens
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub candidates_tokens: Option<i32>,
+    pub total_output_tokens: Option<i32>,
+    /// Total number of tokens (input + output)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_tokens: Option<i32>,
+    /// Total number of cached tokens
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_cached_tokens: Option<i32>,
+    /// Total number of reasoning tokens (for thinking models)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_reasoning_tokens: Option<i32>,
+    /// Total number of tool use tokens
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_tool_use_tokens: Option<i32>,
 }
 
 /// Response from creating or retrieving an interaction
@@ -972,9 +984,9 @@ mod tests {
             "outputs": [{"type": "text", "text": "Hi there!"}],
             "status": "completed",
             "usage": {
-                "promptTokens": 5,
-                "candidatesTokens": 10,
-                "totalTokens": 15
+                "total_input_tokens": 5,
+                "total_output_tokens": 10,
+                "total_tokens": 15
             }
         }"#;
 
@@ -987,7 +999,10 @@ mod tests {
         assert_eq!(response.input.len(), 1);
         assert_eq!(response.outputs.len(), 1);
         assert!(response.usage.is_some());
-        assert_eq!(response.usage.unwrap().total_tokens, Some(15));
+        let usage = response.usage.unwrap();
+        assert_eq!(usage.total_input_tokens, Some(5));
+        assert_eq!(usage.total_output_tokens, Some(10));
+        assert_eq!(usage.total_tokens, Some(15));
     }
 
     #[test]

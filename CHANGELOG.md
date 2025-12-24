@@ -64,6 +64,14 @@ if let Some(text) = delta.text() { /* ... */ }
   - The `call_id` parameter is required for proper API response matching
 - **`InteractionContent::FunctionResponse` variant removed**: Use `FunctionResult` variant instead
 
+#### UsageMetadata field names updated (#24)
+- **Field names now match Interactions API**: The old GenerateContent API field names have been replaced
+  - `prompt_tokens` → `total_input_tokens`
+  - `candidates_tokens` → `total_output_tokens`
+  - `total_tokens` remains unchanged
+- **New fields added**: `total_cached_tokens`, `total_reasoning_tokens`, `total_tool_use_tokens`
+- **Token usage now works**: Previously always returned `None` due to field name mismatch
+
 ## [0.2.0] - 2025-12-23
 
 ### BREAKING CHANGES

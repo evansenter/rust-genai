@@ -559,22 +559,22 @@ async fn test_usage_metadata_returned() {
     // Check usage metadata
     if let Some(usage) = &response.usage {
         println!("Usage metadata:");
-        println!("  Prompt tokens: {:?}", usage.prompt_tokens);
-        println!("  Candidates tokens: {:?}", usage.candidates_tokens);
+        println!("  Input tokens: {:?}", usage.total_input_tokens);
+        println!("  Output tokens: {:?}", usage.total_output_tokens);
         println!("  Total tokens: {:?}", usage.total_tokens);
 
         // At least one of these should be set
-        let has_usage = usage.prompt_tokens.is_some()
-            || usage.candidates_tokens.is_some()
+        let has_usage = usage.total_input_tokens.is_some()
+            || usage.total_output_tokens.is_some()
             || usage.total_tokens.is_some();
 
         if has_usage {
             // Verify reasonable values
-            if let Some(prompt) = usage.prompt_tokens {
-                assert!(prompt > 0, "Prompt tokens should be positive");
+            if let Some(input) = usage.total_input_tokens {
+                assert!(input > 0, "Input tokens should be positive");
             }
-            if let Some(candidates) = usage.candidates_tokens {
-                assert!(candidates > 0, "Candidates tokens should be positive");
+            if let Some(output) = usage.total_output_tokens {
+                assert!(output > 0, "Output tokens should be positive");
             }
             if let Some(total) = usage.total_tokens {
                 assert!(total > 0, "Total tokens should be positive");
