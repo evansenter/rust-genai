@@ -1,7 +1,5 @@
 use thiserror::Error;
 
-pub use genai_client::ApiVersion;
-
 // Re-export unified function declaration types from genai_client
 pub use genai_client::{FunctionDeclaration, FunctionDeclarationBuilder, FunctionParameters, Tool};
 
