@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 // Import only Tool from shared types
 use super::shared::Tool;
@@ -1209,6 +1210,79 @@ pub struct ContentSummary {
     pub unknown_types: Vec<String>,
 }
 
+impl fmt::Display for ContentSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut parts = Vec::new();
+
+        if self.text_count > 0 {
+            parts.push(format!("{} text", self.text_count));
+        }
+        if self.thought_count > 0 {
+            parts.push(format!("{} thought", self.thought_count));
+        }
+        if self.image_count > 0 {
+            parts.push(format!("{} image", self.image_count));
+        }
+        if self.audio_count > 0 {
+            parts.push(format!("{} audio", self.audio_count));
+        }
+        if self.video_count > 0 {
+            parts.push(format!("{} video", self.video_count));
+        }
+        if self.function_call_count > 0 {
+            parts.push(format!("{} function_call", self.function_call_count));
+        }
+        if self.function_result_count > 0 {
+            parts.push(format!("{} function_result", self.function_result_count));
+        }
+        if self.code_execution_call_count > 0 {
+            parts.push(format!(
+                "{} code_execution_call",
+                self.code_execution_call_count
+            ));
+        }
+        if self.code_execution_result_count > 0 {
+            parts.push(format!(
+                "{} code_execution_result",
+                self.code_execution_result_count
+            ));
+        }
+        if self.google_search_call_count > 0 {
+            parts.push(format!(
+                "{} google_search_call",
+                self.google_search_call_count
+            ));
+        }
+        if self.google_search_result_count > 0 {
+            parts.push(format!(
+                "{} google_search_result",
+                self.google_search_result_count
+            ));
+        }
+        if self.url_context_call_count > 0 {
+            parts.push(format!("{} url_context_call", self.url_context_call_count));
+        }
+        if self.url_context_result_count > 0 {
+            parts.push(format!(
+                "{} url_context_result",
+                self.url_context_result_count
+            ));
+        }
+        if self.unknown_count > 0 {
+            parts.push(format!(
+                "{} unknown ({:?})",
+                self.unknown_count, self.unknown_types
+            ));
+        }
+
+        if parts.is_empty() {
+            write!(f, "empty")
+        } else {
+            write!(f, "{}", parts.join(", "))
+        }
+    }
+}
+
 /// A chunk from the streaming API
 ///
 /// During streaming, the API sends different types of events:
@@ -1863,6 +1937,45 @@ mod tests {
     }
 
     #[test]
+    fn test_content_summary_display() {
+        // Test Display for ContentSummary with various counts
+        let summary = ContentSummary {
+            text_count: 2,
+            thought_count: 1,
+            code_execution_call_count: 1,
+            code_execution_result_count: 1,
+            ..Default::default()
+        };
+        let display = format!("{}", summary);
+        assert!(display.contains("2 text"));
+        assert!(display.contains("1 thought"));
+        assert!(display.contains("1 code_execution_call"));
+        assert!(display.contains("1 code_execution_result"));
+        // Should not contain zero-count items
+        assert!(!display.contains("image"));
+        assert!(!display.contains("audio"));
+    }
+
+    #[test]
+    fn test_content_summary_display_empty() {
+        let summary = ContentSummary::default();
+        assert_eq!(format!("{}", summary), "empty");
+    }
+
+    #[test]
+    fn test_content_summary_display_with_unknown() {
+        let summary = ContentSummary {
+            unknown_count: 2,
+            unknown_types: vec!["new_type_a".to_string(), "new_type_b".to_string()],
+            ..Default::default()
+        };
+        let display = format!("{}", summary);
+        assert!(display.contains("2 unknown"));
+        assert!(display.contains("new_type_a"));
+        assert!(display.contains("new_type_b"));
+    }
+
+    #[test]
     fn test_serialize_unknown_content_roundtrip() {
         // Create an Unknown content (simulating what we'd receive from API)
         let unknown = InteractionContent::Unknown {
@@ -2175,6 +2288,39 @@ mod tests {
 
         assert!(content.is_url_context_result());
         assert!(!content.is_unknown());
+    }
+
+    #[test]
+    fn test_url_context_result_with_none_content() {
+        // Test that UrlContextResult with content: None serializes without the content field
+        // (the API omits this field when content is not available, e.g., network errors)
+        let content = InteractionContent::UrlContextResult {
+            url: "https://example.com/blocked".to_string(),
+            content: None,
+        };
+
+        // Serialize and verify content field is absent
+        let json = serde_json::to_string(&content).expect("Serialization should work");
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(value["type"], "url_context_result");
+        assert_eq!(value["url"], "https://example.com/blocked");
+        // content field should be absent (not null)
+        assert!(value.get("content").is_none());
+
+        // Deserialize without content field and verify it works
+        let json_without_content =
+            r#"{"type": "url_context_result", "url": "https://example.com/timeout"}"#;
+        let deserialized: InteractionContent =
+            serde_json::from_str(json_without_content).expect("Should deserialize");
+
+        match &deserialized {
+            InteractionContent::UrlContextResult { url, content } => {
+                assert_eq!(url, "https://example.com/timeout");
+                assert_eq!(*content, None);
+            }
+            _ => panic!("Expected UrlContextResult variant"),
+        }
     }
 
     #[test]
