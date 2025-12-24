@@ -165,7 +165,7 @@ impl<'a> InteractionBuilder<'a> {
     /// Adds a single function declaration to the request.
     ///
     /// This method can be called multiple times to add several functions.
-    /// Each function is converted into a [`Tool`] and added to the request.
+    /// Each function is converted into a [`crate::Tool`] and added to the request.
     ///
     /// # Example
     ///
