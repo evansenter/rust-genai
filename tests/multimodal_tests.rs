@@ -19,12 +19,12 @@
 mod common;
 
 use common::{
-    SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TINY_RED_PNG_BASE64, TINY_WAV_BASE64,
-    get_client,
+    SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TINY_MP4_BASE64, TINY_RED_PNG_BASE64,
+    TINY_WAV_BASE64, get_client,
 };
 use rust_genai::{
     InteractionInput, InteractionStatus, audio_uri_content, image_data_content, image_uri_content,
-    text_content, video_uri_content,
+    text_content, video_data_content, video_uri_content,
 };
 
 // =============================================================================
@@ -346,6 +346,51 @@ async fn test_video_input_from_uri() {
             } else {
                 println!("Video input error (may be expected): {:?}", e);
             }
+        }
+    }
+}
+
+/// Tests video input from base64.
+/// Note: This uses a minimal MP4 header, so the model may report it's empty/corrupt.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_video_input_from_base64() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Use minimal MP4 for testing base64 video input
+    // Note: This is a minimal header with no actual video frames, so the model may report it's empty
+    let contents = vec![
+        text_content("Describe what you see in this video file."),
+        video_data_content(TINY_MP4_BASE64, "video/mp4"),
+    ];
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_input(InteractionInput::Content(contents))
+        .with_store(true)
+        .create()
+        .await;
+
+    match result {
+        Ok(response) => {
+            println!("Base64 video response status: {:?}", response.status);
+            if response.has_text() {
+                let text = response.text().unwrap();
+                println!("Video response: {}", text);
+                // Just verify we got some response - the content can vary
+                assert!(!text.is_empty(), "Should get some response about the video");
+            }
+        }
+        Err(e) => {
+            // A minimal MP4 header may not be accepted by the API
+            println!(
+                "Base64 video error (may be expected for minimal MP4): {:?}",
+                e
+            );
         }
     }
 }

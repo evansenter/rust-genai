@@ -53,3 +53,8 @@ pub const TINY_RED_PNG_BASE64: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfF
 /// This is a 44-byte WAV header with no actual audio data
 #[allow(dead_code)]
 pub const TINY_WAV_BASE64: &str = "UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+
+/// Minimal MP4 video file (ftyp box only) for testing base64 video input
+/// This is a minimal valid MP4 container header - the model may report it's empty/corrupt
+#[allow(dead_code)]
+pub const TINY_MP4_BASE64: &str = "AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDE=";
