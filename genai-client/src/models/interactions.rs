@@ -338,6 +338,11 @@ pub enum StreamDelta {
         #[serde(default)]
         text: String,
     },
+    /// Thought signature (cryptographic signature for thought verification)
+    ThoughtSignature {
+        #[serde(default)]
+        signature: String,
+    },
 }
 
 impl StreamDelta {
@@ -379,7 +384,7 @@ pub enum StreamChunk {
 /// - `content.delta`: Contains incremental content in the `delta` field
 /// - `interaction.complete`: Contains the full interaction in the `interaction` field
 #[derive(Clone, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct InteractionStreamEvent {
     /// Event type (e.g., "content.delta", "interaction.complete")
     pub event_type: String,
@@ -667,8 +672,8 @@ mod tests {
     #[test]
     fn test_deserialize_content_delta_event() {
         let event_json = r#"{
-            "eventType": "content.delta",
-            "interactionId": "test_123",
+            "event_type": "content.delta",
+            "interaction_id": "test_123",
             "delta": {"type": "text", "text": "Hello"}
         }"#;
 
@@ -688,7 +693,7 @@ mod tests {
     #[test]
     fn test_deserialize_interaction_complete_event() {
         let event_json = r#"{
-            "eventType": "interaction.complete",
+            "event_type": "interaction.complete",
             "interaction": {
                 "id": "interaction_456",
                 "model": "gemini-3-flash-preview",

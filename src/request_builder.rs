@@ -173,7 +173,7 @@ impl<'a> InteractionBuilder<'a> {
     /// use rust_genai::{Client, FunctionDeclaration};
     /// use serde_json::json;
     ///
-    /// let client = Client::new("api-key".to_string(), None);
+    /// let client = Client::new("api-key".to_string());
     ///
     /// let func = FunctionDeclaration::builder("get_temperature")
     ///     .description("Get the temperature for a location")
@@ -202,7 +202,7 @@ impl<'a> InteractionBuilder<'a> {
     /// ```no_run
     /// use rust_genai::{Client, FunctionDeclaration};
     ///
-    /// let client = Client::new("api-key".to_string(), None);
+    /// let client = Client::new("api-key".to_string());
     ///
     /// let functions = vec![
     ///     FunctionDeclaration::builder("get_weather").build(),
@@ -344,7 +344,8 @@ impl<'a> InteractionBuilder<'a> {
     pub fn create_stream(self) -> BoxStream<'a, Result<StreamChunk, GenaiError>> {
         let client = self.client;
         Box::pin(async_stream::try_stream! {
-            let request = self.build_request()?;
+            let mut request = self.build_request()?;
+            request.stream = Some(true);
             let mut stream = client.create_interaction_stream(request);
 
             while let Some(result) = stream.next().await {
