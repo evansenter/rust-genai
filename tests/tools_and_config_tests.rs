@@ -395,13 +395,19 @@ async fn test_response_modalities_image() {
                 println!("Output {}: {:?}", i, output);
             }
 
-            // Image generation might return base64 data or a URL
+            // Image generation should return image content
             let has_image = response
                 .outputs
                 .iter()
                 .any(|o| matches!(o, rust_genai::InteractionContent::Image { .. }));
 
             println!("Has image output: {}", has_image);
+
+            // Assert we got an image when the model successfully responded
+            assert!(
+                has_image,
+                "Expected image content in response when using IMAGE modality"
+            );
         }
         Err(e) => {
             let error_str = format!("{:?}", e);
