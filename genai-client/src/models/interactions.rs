@@ -164,10 +164,65 @@ pub enum InteractionContent {
     /// }
     /// ```
     ///
-    /// # Serialization
+    /// # Serialization Behavior
     ///
-    /// Unknown variants can be serialized back to JSON, preserving the original
-    /// structure. This enables round-trip in multi-turn conversations.
+    /// Unknown variants can be serialized back to JSON, enabling round-trip in
+    /// multi-turn conversations. The serialization follows these rules:
+    ///
+    /// 1. **Type field**: The `type_name` becomes the `"type"` field in output
+    /// 2. **Object data**: If `data` is a JSON object, its fields are flattened
+    ///    into the output (excluding any existing `"type"` field to avoid duplicates)
+    /// 3. **Non-object data**: If `data` is a non-object value (array, string, etc.),
+    ///    it's placed under a `"data"` key
+    /// 4. **Null data**: Omitted entirely from the output
+    ///
+    /// ## Example: Object Data (Common Case)
+    ///
+    /// ```
+    /// # use genai_client::models::interactions::InteractionContent;
+    /// # use serde_json::json;
+    /// let content = InteractionContent::Unknown {
+    ///     type_name: "new_feature".to_string(),
+    ///     data: json!({"field1": "value1", "field2": 42}),
+    /// };
+    /// // Serializes to: {"type": "new_feature", "field1": "value1", "field2": 42}
+    /// ```
+    ///
+    /// ## Example: Duplicate Type Field
+    ///
+    /// If `data` contains a `"type"` field, it's ignored (the `type_name` takes precedence):
+    ///
+    /// ```
+    /// # use genai_client::models::interactions::InteractionContent;
+    /// # use serde_json::json;
+    /// let content = InteractionContent::Unknown {
+    ///     type_name: "my_type".to_string(),
+    ///     data: json!({"type": "ignored", "value": 123}),
+    /// };
+    /// // Serializes to: {"type": "my_type", "value": 123}
+    /// // Note: "type": "ignored" is not included
+    /// ```
+    ///
+    /// ## Example: Non-Object Data
+    ///
+    /// ```
+    /// # use genai_client::models::interactions::InteractionContent;
+    /// # use serde_json::json;
+    /// let content = InteractionContent::Unknown {
+    ///     type_name: "array_type".to_string(),
+    ///     data: json!([1, 2, 3]),
+    /// };
+    /// // Serializes to: {"type": "array_type", "data": [1, 2, 3]}
+    /// ```
+    ///
+    /// # Manual Construction
+    ///
+    /// While Unknown variants are typically created by deserialization, you can
+    /// construct them manually for testing or edge cases. Note that:
+    ///
+    /// - The `type_name` can be any string (including empty, though not recommended)
+    /// - The `data` can be any valid JSON value
+    /// - For multi-turn conversations, the serialized form must match what the API expects
     Unknown {
         /// The unrecognized type name from the API
         type_name: String,
@@ -2132,6 +2187,100 @@ mod tests {
         assert_eq!(value["type"], "null_type");
         // Null data should be omitted
         assert!(value.get("data").is_none());
+    }
+
+    #[test]
+    fn test_serialize_unknown_with_duplicate_type_field() {
+        // When data contains a "type" field, it should be ignored in serialization
+        // (the type_name takes precedence)
+        let unknown = InteractionContent::Unknown {
+            type_name: "correct_type".to_string(),
+            data: serde_json::json!({
+                "type": "should_be_ignored",
+                "field1": "value1",
+                "field2": 42
+            }),
+        };
+
+        let json = serde_json::to_string(&unknown).expect("Serialization should work");
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        // The type should be from type_name, not from data
+        assert_eq!(value["type"], "correct_type");
+        // Other fields should be preserved
+        assert_eq!(value["field1"], "value1");
+        assert_eq!(value["field2"], 42);
+        // There should be exactly one "type" field, not two
+        let obj = value.as_object().unwrap();
+        let type_count = obj.keys().filter(|k| *k == "type").count();
+        assert_eq!(type_count, 1);
+    }
+
+    #[test]
+    fn test_serialize_unknown_with_empty_type_name() {
+        // Empty type_name is allowed but not recommended
+        let unknown = InteractionContent::Unknown {
+            type_name: String::new(),
+            data: serde_json::json!({"field": "value"}),
+        };
+
+        let json = serde_json::to_string(&unknown).expect("Serialization should work");
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(value["type"], "");
+        assert_eq!(value["field"], "value");
+    }
+
+    #[test]
+    fn test_serialize_unknown_with_special_characters() {
+        // Type names with special characters should be preserved
+        let unknown = InteractionContent::Unknown {
+            type_name: "special/type:with.chars-and_underscores".to_string(),
+            data: serde_json::json!({"key": "value"}),
+        };
+
+        let json = serde_json::to_string(&unknown).expect("Serialization should work");
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(value["type"], "special/type:with.chars-and_underscores");
+    }
+
+    #[test]
+    fn test_unknown_manual_construction_roundtrip() {
+        // Test that manually constructed Unknown variants can round-trip through JSON
+        let original = InteractionContent::Unknown {
+            type_name: "manual_test".to_string(),
+            data: serde_json::json!({
+                "nested": {"deeply": {"nested": "value"}},
+                "array": [1, 2, 3],
+                "number": 42,
+                "boolean": true,
+                "null_field": null
+            }),
+        };
+
+        // Serialize
+        let json = serde_json::to_string(&original).expect("Serialization should work");
+
+        // Deserialize back
+        let deserialized: InteractionContent =
+            serde_json::from_str(&json).expect("Deserialization should work");
+
+        // Verify it's still Unknown with same type
+        assert!(deserialized.is_unknown());
+        assert_eq!(deserialized.unknown_type(), Some("manual_test"));
+
+        // Verify the data was preserved (check a few fields)
+        if let InteractionContent::Unknown { data, .. } = deserialized {
+            assert_eq!(data["nested"]["deeply"]["nested"], "value");
+            assert_eq!(data["array"], serde_json::json!([1, 2, 3]));
+            assert_eq!(data["number"], 42);
+            assert_eq!(data["boolean"], true);
+            // null_field should be present
+            assert!(data.get("null_field").is_some());
+        } else {
+            panic!("Expected Unknown variant");
+        }
     }
 
     #[test]
