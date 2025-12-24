@@ -632,4 +632,95 @@ mod tests {
         assert!(!response.has_text());
         assert!(!response.has_function_calls());
     }
+
+    // --- Streaming Event Tests ---
+
+    #[test]
+    fn test_deserialize_stream_delta_text() {
+        let delta_json = r#"{"type": "text", "text": "Hello world"}"#;
+        let delta: StreamDelta = serde_json::from_str(delta_json).expect("Deserialization failed");
+
+        match &delta {
+            StreamDelta::Text { text } => {
+                assert_eq!(text, "Hello world");
+            }
+            _ => panic!("Expected Text delta"),
+        }
+
+        assert!(delta.is_text());
+        assert!(!delta.is_thought());
+        assert_eq!(delta.text(), Some("Hello world"));
+    }
+
+    #[test]
+    fn test_deserialize_stream_delta_thought() {
+        let delta_json = r#"{"type": "thought", "text": "I'm thinking..."}"#;
+        let delta: StreamDelta = serde_json::from_str(delta_json).expect("Deserialization failed");
+
+        match &delta {
+            StreamDelta::Thought { text } => {
+                assert_eq!(text, "I'm thinking...");
+            }
+            _ => panic!("Expected Thought delta"),
+        }
+
+        assert!(!delta.is_text());
+        assert!(delta.is_thought());
+        // text() returns None for thoughts
+        assert_eq!(delta.text(), None);
+    }
+
+    #[test]
+    fn test_deserialize_content_delta_event() {
+        let event_json = r#"{
+            "eventType": "content.delta",
+            "interactionId": "test_123",
+            "delta": {"type": "text", "text": "Hello"}
+        }"#;
+
+        let event: InteractionStreamEvent =
+            serde_json::from_str(event_json).expect("Deserialization failed");
+
+        assert_eq!(event.event_type, "content.delta");
+        assert_eq!(event.interaction_id.as_deref(), Some("test_123"));
+        assert!(event.delta.is_some());
+        assert!(event.interaction.is_none());
+
+        let delta = event.delta.unwrap();
+        assert!(delta.is_text());
+        assert_eq!(delta.text(), Some("Hello"));
+    }
+
+    #[test]
+    fn test_deserialize_interaction_complete_event() {
+        let event_json = r#"{
+            "eventType": "interaction.complete",
+            "interaction": {
+                "id": "interaction_456",
+                "model": "gemini-3-flash-preview",
+                "input": [{"type": "text", "text": "Count to 3"}],
+                "outputs": [{"type": "text", "text": "1, 2, 3"}],
+                "status": "completed"
+            }
+        }"#;
+
+        let event: InteractionStreamEvent =
+            serde_json::from_str(event_json).expect("Deserialization failed");
+
+        assert_eq!(event.event_type, "interaction.complete");
+        assert!(event.interaction.is_some());
+        assert!(event.delta.is_none());
+
+        let interaction = event.interaction.unwrap();
+        assert_eq!(interaction.id, "interaction_456");
+        assert_eq!(interaction.text(), Some("1, 2, 3"));
+    }
+
+    #[test]
+    fn test_stream_delta_empty_text_returns_none() {
+        let delta = StreamDelta::Text {
+            text: String::new(),
+        };
+        assert_eq!(delta.text(), None);
+    }
 }
