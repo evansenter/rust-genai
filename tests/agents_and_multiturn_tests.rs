@@ -564,11 +564,7 @@ async fn test_usage_metadata_returned() {
         println!("  Total tokens: {:?}", usage.total_tokens);
 
         // At least one of these should be set
-        let has_usage = usage.total_input_tokens.is_some()
-            || usage.total_output_tokens.is_some()
-            || usage.total_tokens.is_some();
-
-        if has_usage {
+        if usage.has_data() {
             // Verify reasonable values
             if let Some(input) = usage.total_input_tokens {
                 assert!(input > 0, "Input tokens should be positive");

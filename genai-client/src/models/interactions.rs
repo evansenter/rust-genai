@@ -562,7 +562,7 @@ pub enum InteractionStatus {
 }
 
 /// Token usage information from the Interactions API
-#[derive(Clone, Deserialize, Serialize, Debug, Default)]
+#[derive(Clone, Deserialize, Serialize, Debug, Default, PartialEq)]
 #[serde(default)]
 pub struct UsageMetadata {
     /// Total number of input tokens (prompt tokens sent to the model)
@@ -1042,6 +1042,27 @@ mod tests {
         assert_eq!(usage.total_tokens, None);
         assert_eq!(usage.total_input_tokens, None);
         assert_eq!(usage.total_output_tokens, None);
+    }
+
+    #[test]
+    fn test_usage_metadata_has_data() {
+        // Empty usage has no data
+        let empty = UsageMetadata::default();
+        assert!(!empty.has_data());
+
+        // Usage with only total_tokens
+        let with_total = UsageMetadata {
+            total_tokens: Some(100),
+            ..Default::default()
+        };
+        assert!(with_total.has_data());
+
+        // Usage with only cached tokens
+        let with_cached = UsageMetadata {
+            total_cached_tokens: Some(50),
+            ..Default::default()
+        };
+        assert!(with_cached.has_data());
     }
 
     #[test]
