@@ -438,8 +438,7 @@ async fn test_thought_signature_sequential_each_step() {
 #[ignore = "Requires API key"]
 async fn test_streaming_with_function_calls() {
     // Test that streaming works with function calling.
-    // Note: The library's delta parser may not support function_call deltas yet,
-    // so this test gracefully handles parse errors.
+    // Function call deltas are now properly recognized (fixed in #52, closes #27).
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -462,7 +461,7 @@ async fn test_streaming_with_function_calls() {
     let mut delta_count = 0;
     let mut complete_count = 0;
     let mut final_response = None;
-    let mut stream_error_is_unsupported_delta = false;
+    let mut saw_function_call_delta = false;
 
     while let Some(result) = stream.next().await {
         match result {
@@ -472,6 +471,10 @@ async fn test_streaming_with_function_calls() {
                     if let Some(text) = delta.text() {
                         print!("{}", text);
                     }
+                    if delta.is_function_call() {
+                        saw_function_call_delta = true;
+                        println!("[Received function_call delta]");
+                    }
                 }
                 StreamChunk::Complete(response) => {
                     complete_count += 1;
@@ -479,68 +482,38 @@ async fn test_streaming_with_function_calls() {
                 }
             },
             Err(e) => {
-                let error_str = format!("{:?}", e);
-                println!("Stream error: {:?}", e);
-                // Check if this is a known limitation (function_call delta not supported)
-                if error_str.contains("function_call") && error_str.contains("unknown variant") {
-                    stream_error_is_unsupported_delta = true;
-                    println!(
-                        "Note: function_call deltas not yet supported in streaming parser. This is a known limitation."
-                    );
-                }
-                break;
+                panic!("Stream error: {:?}", e);
             }
         }
     }
 
-    println!("\nDeltas: {}, Completes: {}", delta_count, complete_count);
+    println!(
+        "\nDeltas: {}, Completes: {}, Saw function_call delta: {}",
+        delta_count, complete_count, saw_function_call_delta
+    );
 
-    // If the stream failed due to unsupported function_call delta, that's acceptable for now
-    if stream_error_is_unsupported_delta {
-        println!(
-            "Test passed with known limitation: function_call deltas not supported in streaming"
-        );
+    let response = final_response.expect("Should receive a complete response");
+    println!("Final status: {:?}", response.status);
+    let function_calls = response.function_calls();
+    println!("Function calls in final response: {}", function_calls.len());
+    println!("Output count: {}", response.outputs.len());
+    let summary = response.content_summary();
+    println!("Content summary: {:?}", summary);
+
+    // Verify that function_call deltas were successfully received during streaming
+    // Note: The API sends function_call as a delta but may not populate the final
+    // Complete response's outputs. This is API behavior, not a parsing issue.
+    if saw_function_call_delta {
+        println!("SUCCESS: Function call deltas were properly parsed during streaming");
+        // If we received function_call deltas, the test passes regardless of final response
         return;
     }
 
-    if let Some(response) = final_response {
-        println!("Final status: {:?}", response.status);
-        let function_calls = response.function_calls();
-        println!("Function calls in final response: {}", function_calls.len());
-        println!("Output count: {}", response.outputs.len());
-        let summary = response.content_summary();
-        println!("Content summary: {:?}", summary);
-
-        // Check if response has unknown content (graceful handling of unsupported types)
-        if response.has_unknown() {
-            let unknowns = response.unknown_content();
-            println!(
-                "Response contains {} unknown content types (graceful degradation): {:?}",
-                unknowns.len(),
-                unknowns.iter().map(|(t, _)| *t).collect::<Vec<_>>()
-            );
-            // This is acceptable - the library captured unknown types instead of crashing
-            // Issue #27 tracks adding proper support for function_call deltas
-            return;
-        }
-
-        // If we have RequiresAction status but no function calls, this is expected
-        // when streaming - the function_call deltas may not be present in final response
-        if response.status == rust_genai::InteractionStatus::RequiresAction
-            && response.outputs.is_empty()
-        {
-            println!(
-                "Note: RequiresAction with empty outputs during streaming is a known limitation"
-            );
-            return;
-        }
-
-        // Stream should either have text or function calls
-        assert!(
-            response.has_text() || response.has_function_calls(),
-            "Streaming response should have text or function calls"
-        );
-    }
+    // Stream should either have text or function calls
+    assert!(
+        response.has_text() || response.has_function_calls(),
+        "Streaming response should have text or function calls"
+    );
 }
 
 #[tokio::test]

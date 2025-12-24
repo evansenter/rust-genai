@@ -9,14 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING CHANGES
 
-#### Improved Streaming API
-- **`create_stream()` return type changed**: Now returns `Stream<StreamChunk>` instead of `Stream<InteractionResponse>`
-  - `StreamChunk::Delta(StreamDelta)` contains incremental text/thought content during streaming
+#### Unified Streaming Content Types (#39, #27)
+- **`StreamDelta` enum removed**: Streaming deltas now use `InteractionContent` directly
+  - `StreamChunk::Delta(InteractionContent)` contains incremental content during streaming
   - `StreamChunk::Complete(InteractionResponse)` contains the final complete response
-  - New helper methods: `StreamDelta::text()`, `is_text()`, `is_thought()`
-- **New types exported**: `StreamChunk`, `StreamDelta`
+- **New `InteractionContent::ThoughtSignature` variant**: Captures streaming thought signatures
+- **New helper methods on `InteractionContent`**: `text()`, `is_text()`, `is_thought()`, `is_thought_signature()`, `is_function_call()`
+- **New type exported**: `StreamChunk` (note: `StreamDelta` is no longer exported)
+
+**Migration guide:**
+```rust
+// Before:
+match chunk {
+    StreamChunk::Delta(delta) => match delta {
+        StreamDelta::Text { text } => println!("{}", text),
+        StreamDelta::Thought { text } => println!("[thinking: {}]", text),
+        _ => {}
+    }
+    StreamChunk::Complete(response) => { /* ... */ }
+}
+
+// After:
+match chunk {
+    StreamChunk::Delta(content) => match content {
+        InteractionContent::Text { text } => println!("{}", text.as_deref().unwrap_or("")),
+        InteractionContent::Thought { text } => println!("[thinking: {}]", text.as_deref().unwrap_or("")),
+        InteractionContent::FunctionCall { name, args, .. } => {
+            println!("Function call: {}({:?})", name, args);
+        }
+        _ => {}
+    }
+    StreamChunk::Complete(response) => { /* ... */ }
+}
+
+// Helper methods still work the same:
+if let Some(text) = delta.text() { /* ... */ }
+```
 
 ### Fixed
+- **Streaming with function calls now works** (#27): Function call deltas are now properly parsed instead of causing errors
 - **Streaming now properly yields content chunks** (#17): The streaming API was returning 0 chunks because the code expected all SSE events to have an `interaction` field, but the API sends different event types (`content.delta` and `interaction.complete`)
 
 #### Simplified Client API
