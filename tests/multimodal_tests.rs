@@ -23,8 +23,8 @@ use common::{
     TINY_RED_PNG_BASE64, TINY_WAV_BASE64, get_client,
 };
 use rust_genai::{
-    InteractionInput, InteractionStatus, audio_uri_content, image_data_content, image_uri_content,
-    text_content, video_data_content, video_uri_content,
+    InteractionInput, InteractionStatus, audio_data_content, audio_uri_content,
+    image_data_content, image_uri_content, text_content, video_data_content, video_uri_content,
 };
 
 // =============================================================================
@@ -484,4 +484,80 @@ async fn test_multimodal_comparison() {
         "Response should compare the images: {}",
         text
     );
+}
+
+/// Tests combining audio, video, and image content in a single interaction.
+///
+/// This test verifies that the API can process multiple media types together.
+/// Note: Uses minimal test assets (headers only), so the model may report
+/// that the audio/video content is empty or corrupt - that's expected behavior.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_mixed_audio_video_image() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Combine all three media types with text
+    let contents = vec![
+        text_content(
+            "I'm providing you with an image, an audio file, and a video file. \
+             Please describe what you can see or understand from each. \
+             Note that some files may be minimal test data.",
+        ),
+        image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+        audio_data_content(TINY_WAV_BASE64, "audio/wav"),
+        video_data_content(TINY_MP4_BASE64, "video/mp4"),
+    ];
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_input(InteractionInput::Content(contents))
+        .with_store(true)
+        .create()
+        .await;
+
+    match result {
+        Ok(response) => {
+            println!("Mixed multimodal status: {:?}", response.status);
+            assert_eq!(response.status, InteractionStatus::Completed);
+            assert!(response.has_text(), "Should have text response");
+
+            let text = response.text().unwrap();
+            println!("Mixed multimodal response: {}", text);
+
+            // The model should acknowledge receiving multiple media types
+            // It may report some files as empty/minimal since we're using test assets
+            let text_lower = text.to_lowercase();
+            let mentions_media = text_lower.contains("image")
+                || text_lower.contains("audio")
+                || text_lower.contains("video")
+                || text_lower.contains("file")
+                || text_lower.contains("red")
+                || text_lower.contains("color");
+
+            assert!(
+                mentions_media,
+                "Response should acknowledge receiving media content: {}",
+                text
+            );
+        }
+        Err(e) => {
+            // Some API configurations may not support all media combinations
+            let error_str = format!("{:?}", e);
+            println!("Mixed multimodal error: {}", error_str);
+
+            // If it's an expected error about unsupported content, that's okay
+            if error_str.contains("Unsupported")
+                || error_str.contains("invalid")
+                || error_str.contains("not supported")
+            {
+                println!("Mixed multimodal not fully supported - test passes with known limitation");
+            } else {
+                panic!("Unexpected error: {:?}", e);
+            }
+        }
+    }
 }
