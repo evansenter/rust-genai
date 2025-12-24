@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             // 5. Display the executed code
             println!("--- Executed Code ---");
-            for (language, code) in response.executable_code() {
+            for (language, code) in response.code_execution_calls() {
                 println!("Language: {language}");
                 println!("```python\n{code}\n```\n");
             }

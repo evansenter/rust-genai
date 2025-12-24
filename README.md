@@ -240,15 +240,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Check if model wants to call a function
     let function_calls = response.function_calls();
     if !function_calls.is_empty() {
-        let (call_id, name, args, _signature) = &function_calls[0];
-        println!("Function call: {} with args: {}", name, args);
+        let call = &function_calls[0];
+        println!("Function call: {} with args: {}", call.name, call.args);
 
         // Execute your function logic here...
         let weather_result = json!({"temperature": "72°F", "conditions": "sunny"});
 
         // Send the result back using function_result_content
-        let call_id = call_id.clone().expect("call_id required");
-        let function_result = function_result_content(name, call_id, weather_result);
+        let call_id = call.id.expect("call_id required");
+        let function_result = function_result_content(call.name, call_id, weather_result);
 
         let final_response = client
             .interaction()

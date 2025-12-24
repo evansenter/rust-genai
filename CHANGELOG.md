@@ -50,7 +50,7 @@ if let Some(text) = delta.text() { /* ... */ }
 - **Google Search grounding support** (#25): Enable real-time web search integration with Gemini models
   - New `with_google_search()` builder method on `InteractionBuilder`
   - New types: `GroundingMetadata`, `GroundingChunk`, `WebSource`
-  - New helper methods: `has_grounding()`, `grounding_metadata()` on `InteractionResponse`
+  - New helper methods: `has_google_search_metadata()`, `google_search_metadata()`, `has_google_search_calls()`, `google_search_calls()` on `InteractionResponse`
   - Full streaming support via `StreamChunk::Complete`
 
 - **Code execution support** (#26): Enable Python code execution via Gemini's built-in sandbox
@@ -58,7 +58,7 @@ if let Some(text) = delta.text() { /* ... */ }
   - New `CodeExecutionOutcome` enum with `Ok`, `Failed`, `DeadlineExceeded`, `Unspecified` variants
   - Updated `InteractionContent::CodeExecutionCall` with typed fields: `id`, `language`, `code`
   - Updated `InteractionContent::CodeExecutionResult` with typed fields: `call_id`, `outcome`, `output`
-  - New helper methods on `InteractionResponse`: `executable_code()`, `code_execution_results()`, `successful_code_output()`
+  - New helper methods on `InteractionResponse`: `code_execution_calls()`, `code_execution_results()`, `successful_code_output()`
   - New helper functions: `code_execution_call_content()`, `code_execution_result_content()`, `code_execution_success()`, `code_execution_error()`
   - Backward-compatible deserialization for old API response format
   - **Breaking (serialization)**: `CodeExecutionCall` now serializes `language` and `code` as top-level fields instead of nested in `arguments`. Deserialization remains backward-compatible with both formats.
@@ -66,7 +66,7 @@ if let Some(text) = delta.text() { /* ... */ }
 - **URL context support** (#63): Enable URL content fetching and analysis
   - New `with_url_context()` builder method on `InteractionBuilder`
   - New types: `UrlContextMetadata`, `UrlMetadataEntry`, `UrlRetrievalStatus`
-  - New helper methods: `has_url_context_metadata()`, `url_context_metadata()` on `InteractionResponse`
+  - New helper methods: `has_url_context_metadata()`, `url_context_metadata()`, `has_url_context_calls()`, `url_context_calls()` on `InteractionResponse`
   - Supports up to 20 URLs per request, max 34MB per URL
 
 - **Structured output JSON schema support** (#80): Enforce JSON schema constraints on model responses
@@ -74,6 +74,11 @@ if let Some(text) = delta.text() { /* ... */ }
   - Works standalone for structured data extraction
   - Combines with built-in tools (Google Search, URL Context)
   - New comprehensive example: `examples/structured_output.rs`
+
+- **Function call/result structs**: New `FunctionCallInfo` and `FunctionResultInfo` structs with named fields for cleaner access
+  - `function_calls()` now returns `Vec<FunctionCallInfo>` with fields: `id`, `name`, `args`, `thought_signature`
+  - `function_results()` now returns `Vec<FunctionResultInfo>` with fields: `name`, `call_id`, `result`
+  - New `has_function_results()` method on `InteractionResponse` for parity with `has_function_calls()`
 
 ### Changed
 - **`InteractionContent` is now `#[non_exhaustive]`** (#44): Match statements must include a wildcard arm (`_ => {}`). This allows adding new variants in minor version updates without breaking downstream code.

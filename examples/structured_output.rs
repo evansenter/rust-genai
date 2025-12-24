@@ -205,7 +205,7 @@ async fn structured_with_search(client: &Client) -> Result<(), Box<dyn Error>> {
     println!("Stock Info JSON:\n{}", serde_json::to_string_pretty(&json)?);
 
     // Show grounding metadata if available
-    if let Some(metadata) = response.grounding_metadata() {
+    if let Some(metadata) = response.google_search_metadata() {
         println!(
             "\nGrounded with {} sources from web search",
             metadata.grounding_chunks.len()

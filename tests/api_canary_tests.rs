@@ -137,19 +137,18 @@ async fn canary_function_calling_interaction() {
     // This tests for unknown types in the model's response to function results,
     // which may differ from the initial function call response.
     if !response.function_calls().is_empty() {
-        // function_calls() returns (id, name, args, thought_signature)
-        let (id, name, _args, _thought_sig) = &response.function_calls()[0];
+        let call = &response.function_calls()[0];
 
         use rust_genai::interactions_api::{
             build_interaction_input, function_call_content, function_result_content, text_content,
         };
 
         // Build conversation history with the function call and result
-        let call_id = id.unwrap_or("call_1");
+        let call_id = call.id.unwrap_or("call_1");
         let history = build_interaction_input(vec![
             text_content("What time is it?"),
-            function_call_content(*name, json!({})),
-            function_result_content(*name, call_id, json!({"time": "12:00 PM"})),
+            function_call_content(call.name, json!({})),
+            function_result_content(call.name, call_id, json!({"time": "12:00 PM"})),
         ]);
 
         let followup = client

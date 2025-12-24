@@ -350,12 +350,12 @@ async fn test_function_call_returns_id() {
     }
 
     // Verify all function calls have IDs
-    for (call_id, name, _args, _sig) in function_calls {
-        println!("Function call: {} has call_id: {:?}", name, call_id);
+    for call in function_calls {
+        println!("Function call: {} has call_id: {:?}", call.name, call.id);
         assert!(
-            call_id.is_some(),
+            call.id.is_some(),
             "Function call '{}' must have an id field",
-            name
+            call.name
         );
     }
 }
@@ -398,11 +398,14 @@ async fn test_manual_function_calling_with_result() {
     }
 
     // Verify we got a call_id
-    let (call_id, name, _args, _signature) = &function_calls[0];
-    assert_eq!(*name, "get_weather", "Expected get_weather function call");
-    assert!(call_id.is_some(), "Function call must have an id field");
+    let call = &function_calls[0];
+    assert_eq!(
+        call.name, "get_weather",
+        "Expected get_weather function call"
+    );
+    assert!(call.id.is_some(), "Function call must have an id field");
 
-    let call_id = call_id.expect("call_id should exist");
+    let call_id = call.id.expect("call_id should exist");
 
     // Step 2: Send function result back using FunctionResult pattern
     let function_result = function_result_content(
@@ -469,7 +472,7 @@ async fn test_requires_action_status() {
 
         // Provide the function result
         let function_calls = response.function_calls();
-        let call_id = function_calls[0].0.expect("call_id should exist");
+        let call_id = function_calls[0].id.expect("call_id should exist");
 
         let function_result = function_result_content(
             "get_current_time",
@@ -617,14 +620,14 @@ async fn test_thought_signatures_in_multi_turn() {
         return;
     }
 
-    let (call_id, name, _args, thought_signature) = &function_calls[0];
+    let call = &function_calls[0];
     println!(
         "Function call: {} with signature: {:?}",
-        name, thought_signature
+        call.name, call.thought_signature
     );
 
-    assert!(call_id.is_some(), "Function call must have an id");
-    let call_id = call_id.expect("call_id should exist");
+    assert!(call.id.is_some(), "Function call must have an id");
+    let call_id = call.id.expect("call_id should exist");
 
     // Turn 2: Send function result back
     let function_result = function_result_content(
@@ -698,15 +701,15 @@ async fn test_multiple_function_calls_with_signatures() {
     let function_calls = response.function_calls();
     println!("Number of function calls: {}", function_calls.len());
 
-    for (call_id, name, args, signature) in &function_calls {
+    for call in &function_calls {
         println!(
             "  - {} (id: {:?}, args: {}, has_signature: {})",
-            name,
-            call_id,
-            args,
-            signature.is_some()
+            call.name,
+            call.id,
+            call.args,
+            call.thought_signature.is_some()
         );
-        assert!(call_id.is_some(), "Each function call must have an id");
+        assert!(call.id.is_some(), "Each function call must have an id");
     }
 }
 
