@@ -19,6 +19,7 @@ pub use models::shared::Tool;
 pub use models::shared::ToolConfig;
 
 // Interactions API types
+pub use models::interactions::ContentSummary;
 pub use models::interactions::CreateInteractionRequest;
 pub use models::interactions::GenerationConfig;
 pub use models::interactions::InteractionContent;
