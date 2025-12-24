@@ -5,7 +5,7 @@
 //! - InteractionBuilder edge cases and validation
 
 use genai_client::{GenerationConfig, InteractionContent, InteractionInput};
-use rust_genai::{Client, FunctionDeclaration, WithFunctionCalling};
+use rust_genai::{Client, FunctionDeclaration};
 use serde_json::json;
 
 // =============================================================================
