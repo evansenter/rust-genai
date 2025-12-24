@@ -279,7 +279,7 @@ async fn test_url_context() {
         .with_text(
             "Fetch and summarize the main content from https://example.com using URL context.",
         )
-        .with_tools(vec![Tool::UrlContext])
+        .with_url_context() // Use convenience method
         .with_store(true)
         .create()
         .await;
@@ -287,6 +287,20 @@ async fn test_url_context() {
     match result {
         Ok(response) => {
             println!("Status: {:?}", response.status);
+
+            // Check for URL context metadata
+            if let Some(metadata) = response.url_context_metadata() {
+                println!("URL Context metadata found:");
+                for entry in &metadata.url_metadata {
+                    println!(
+                        "  URL: {} - Status: {:?}",
+                        entry.retrieved_url, entry.url_retrieval_status
+                    );
+                }
+            } else {
+                println!("No URL context metadata in response (may be normal for some responses)");
+            }
+
             if response.has_text() {
                 let text = response.text().unwrap();
                 println!("URL Context response: {}", text);

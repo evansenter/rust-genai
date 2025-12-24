@@ -887,6 +887,54 @@ pub struct WebSource {
     pub domain: String,
 }
 
+/// Metadata returned when using the UrlContext tool.
+///
+/// Contains retrieval status for each URL that was processed.
+/// This is useful for verification and debugging URL fetches.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::InteractionResponse;
+/// # let response: InteractionResponse = todo!();
+/// if let Some(metadata) = response.url_context_metadata() {
+///     for entry in &metadata.url_metadata {
+///         println!("URL: {} - Status: {:?}", entry.retrieved_url, entry.url_retrieval_status);
+///     }
+/// }
+/// ```
+#[derive(Clone, Deserialize, Serialize, Debug, Default, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct UrlContextMetadata {
+    /// Metadata for each URL that was processed
+    pub url_metadata: Vec<UrlMetadataEntry>,
+}
+
+/// Retrieval status for a single URL processed by the UrlContext tool.
+#[derive(Clone, Deserialize, Serialize, Debug, Default, PartialEq, Eq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct UrlMetadataEntry {
+    /// The URL that was retrieved
+    pub retrieved_url: String,
+    /// Status of the retrieval attempt
+    pub url_retrieval_status: UrlRetrievalStatus,
+}
+
+/// Status of a URL retrieval attempt.
+#[derive(Clone, Deserialize, Serialize, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum UrlRetrievalStatus {
+    /// Status not specified
+    #[default]
+    UrlRetrievalStatusUnspecified,
+    /// URL content was successfully retrieved
+    UrlRetrievalStatusSuccess,
+    /// URL failed safety/content moderation checks
+    UrlRetrievalStatusUnsafe,
+    /// URL retrieval failed for other reasons
+    UrlRetrievalStatusError,
+}
+
 /// Response from creating or retrieving an interaction
 #[derive(Clone, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -924,6 +972,10 @@ pub struct InteractionResponse {
     /// Grounding metadata when using GoogleSearch tool
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grounding_metadata: Option<GroundingMetadata>,
+
+    /// URL context metadata when using UrlContext tool
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url_context_metadata: Option<UrlContextMetadata>,
 
     /// Previous interaction ID if this was a follow-up
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1133,6 +1185,43 @@ impl InteractionResponse {
     /// ```
     pub fn grounding_metadata(&self) -> Option<&GroundingMetadata> {
         self.grounding_metadata.as_ref()
+    }
+
+    /// Check if response has URL context metadata.
+    ///
+    /// Returns true if the UrlContext tool was used and metadata is available.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if response.has_url_context_metadata() {
+    ///     println!("Response includes URL context");
+    /// }
+    /// ```
+    pub fn has_url_context_metadata(&self) -> bool {
+        self.url_context_metadata.is_some()
+    }
+
+    /// Get URL context metadata if present.
+    ///
+    /// Returns metadata about URLs that were fetched when the UrlContext tool was used,
+    /// including retrieval status for each URL.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(metadata) = response.url_context_metadata() {
+    ///     for entry in &metadata.url_metadata {
+    ///         println!("URL: {} - Status: {:?}", entry.retrieved_url, entry.url_retrieval_status);
+    ///     }
+    /// }
+    /// ```
+    pub fn url_context_metadata(&self) -> Option<&UrlContextMetadata> {
+        self.url_context_metadata.as_ref()
     }
 
     /// Check if response contains code execution calls
@@ -1649,6 +1738,7 @@ mod tests {
             tools: None,
             previous_interaction_id: None,
             grounding_metadata: None,
+            url_context_metadata: None,
         };
 
         assert_eq!(response.text(), Some("Hello"));
@@ -1683,6 +1773,7 @@ mod tests {
             tools: None,
             previous_interaction_id: None,
             grounding_metadata: None,
+            url_context_metadata: None,
         };
 
         let calls = response.function_calls();
@@ -1725,6 +1816,7 @@ mod tests {
             tools: None,
             previous_interaction_id: None,
             grounding_metadata: None,
+            url_context_metadata: None,
         };
 
         assert_eq!(response.text(), Some("Let me check"));
@@ -1747,6 +1839,7 @@ mod tests {
             tools: None,
             previous_interaction_id: None,
             grounding_metadata: None,
+            url_context_metadata: None,
         };
 
         assert_eq!(response.text(), None);
@@ -1987,6 +2080,7 @@ mod tests {
             tools: None,
             previous_interaction_id: None,
             grounding_metadata: None,
+            url_context_metadata: None,
         };
 
         assert!(response.has_unknown());
@@ -2013,6 +2107,7 @@ mod tests {
             tools: None,
             previous_interaction_id: None,
             grounding_metadata: None,
+            url_context_metadata: None,
         };
 
         assert!(!response.has_unknown());
@@ -2060,6 +2155,7 @@ mod tests {
             tools: None,
             previous_interaction_id: None,
             grounding_metadata: None,
+            url_context_metadata: None,
         };
 
         let summary = response.content_summary();
@@ -2086,6 +2182,7 @@ mod tests {
             tools: None,
             previous_interaction_id: None,
             grounding_metadata: None,
+            url_context_metadata: None,
         };
 
         let summary = response.content_summary();
@@ -2787,6 +2884,7 @@ mod tests {
             tools: None,
             previous_interaction_id: None,
             grounding_metadata: None,
+            url_context_metadata: None,
         };
 
         assert!(response.has_code_execution_calls());
@@ -2824,6 +2922,7 @@ mod tests {
             tools: None,
             previous_interaction_id: None,
             grounding_metadata: None,
+            url_context_metadata: None,
         };
 
         assert!(response.has_google_search_results());
@@ -2849,6 +2948,7 @@ mod tests {
             tools: None,
             previous_interaction_id: None,
             grounding_metadata: None,
+            url_context_metadata: None,
         };
 
         assert!(response.has_url_context_results());
@@ -2901,6 +3001,7 @@ mod tests {
             tools: None,
             previous_interaction_id: None,
             grounding_metadata: None,
+            url_context_metadata: None,
         };
 
         let summary = response.content_summary();
@@ -2912,5 +3013,91 @@ mod tests {
         assert_eq!(summary.url_context_call_count, 1);
         assert_eq!(summary.url_context_result_count, 1);
         assert_eq!(summary.unknown_count, 0);
+    }
+
+    #[test]
+    fn test_deserialize_url_context_metadata() {
+        // Test full deserialization with all statuses
+        let json = r#"{
+            "urlMetadata": [
+                {
+                    "retrievedUrl": "https://example.com",
+                    "urlRetrievalStatus": "URL_RETRIEVAL_STATUS_SUCCESS"
+                },
+                {
+                    "retrievedUrl": "https://blocked.com",
+                    "urlRetrievalStatus": "URL_RETRIEVAL_STATUS_UNSAFE"
+                },
+                {
+                    "retrievedUrl": "https://failed.com",
+                    "urlRetrievalStatus": "URL_RETRIEVAL_STATUS_ERROR"
+                }
+            ]
+        }"#;
+
+        let metadata: UrlContextMetadata =
+            serde_json::from_str(json).expect("Failed to deserialize");
+
+        assert_eq!(metadata.url_metadata.len(), 3);
+
+        assert_eq!(
+            metadata.url_metadata[0].retrieved_url,
+            "https://example.com"
+        );
+        assert_eq!(
+            metadata.url_metadata[0].url_retrieval_status,
+            UrlRetrievalStatus::UrlRetrievalStatusSuccess
+        );
+
+        assert_eq!(
+            metadata.url_metadata[1].retrieved_url,
+            "https://blocked.com"
+        );
+        assert_eq!(
+            metadata.url_metadata[1].url_retrieval_status,
+            UrlRetrievalStatus::UrlRetrievalStatusUnsafe
+        );
+
+        assert_eq!(metadata.url_metadata[2].retrieved_url, "https://failed.com");
+        assert_eq!(
+            metadata.url_metadata[2].url_retrieval_status,
+            UrlRetrievalStatus::UrlRetrievalStatusError
+        );
+    }
+
+    #[test]
+    fn test_deserialize_url_context_metadata_empty() {
+        // Test empty url_metadata array
+        let json = r#"{"urlMetadata": []}"#;
+        let metadata: UrlContextMetadata =
+            serde_json::from_str(json).expect("Failed to deserialize");
+        assert!(metadata.url_metadata.is_empty());
+    }
+
+    #[test]
+    fn test_deserialize_url_context_metadata_missing_field() {
+        // Test missing urlMetadata field (should default to empty vec)
+        let json = r#"{}"#;
+        let metadata: UrlContextMetadata =
+            serde_json::from_str(json).expect("Failed to deserialize");
+        assert!(metadata.url_metadata.is_empty());
+    }
+
+    #[test]
+    fn test_url_retrieval_status_serialization_roundtrip() {
+        // Test all enum variants roundtrip correctly
+        let statuses = vec![
+            UrlRetrievalStatus::UrlRetrievalStatusUnspecified,
+            UrlRetrievalStatus::UrlRetrievalStatusSuccess,
+            UrlRetrievalStatus::UrlRetrievalStatusUnsafe,
+            UrlRetrievalStatus::UrlRetrievalStatusError,
+        ];
+
+        for status in statuses {
+            let serialized = serde_json::to_string(&status).expect("Failed to serialize");
+            let deserialized: UrlRetrievalStatus =
+                serde_json::from_str(&serialized).expect("Failed to deserialize");
+            assert_eq!(status, deserialized);
+        }
     }
 }
