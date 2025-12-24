@@ -46,6 +46,13 @@ match chunk {
 if let Some(text) = delta.text() { /* ... */ }
 ```
 
+### Added
+- **Google Search grounding support** (#25): Enable real-time web search integration with Gemini models
+  - New `with_google_search()` builder method on `InteractionBuilder`
+  - New types: `GroundingMetadata`, `GroundingChunk`, `WebSource`
+  - New helper methods: `has_grounding()`, `grounding_metadata()` on `InteractionResponse`
+  - Full streaming support via `StreamChunk::Complete`
+
 ### Changed
 - **`InteractionContent` is now `#[non_exhaustive]`** (#44): Match statements must include a wildcard arm (`_ => {}`). This allows adding new variants in minor version updates without breaking downstream code.
 

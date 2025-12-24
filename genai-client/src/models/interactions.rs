@@ -857,7 +857,7 @@ impl UsageMetadata {
 ///     }
 /// }
 /// ```
-#[derive(Clone, Deserialize, Debug, Default)]
+#[derive(Clone, Deserialize, Serialize, Debug, Default, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct GroundingMetadata {
     /// Search queries that were executed by the model
