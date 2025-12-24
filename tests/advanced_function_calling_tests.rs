@@ -22,6 +22,16 @@ use serde_json::json;
 // =============================================================================
 // Test Functions (registered via macro)
 // =============================================================================
+//
+// NOTE: These functions are marked #[allow(dead_code)] because they're registered
+// with the inventory crate via #[generate_function_declaration]. The macro creates
+// `Callable*` structs that are collected at runtime for automatic function calling.
+//
+// While not all functions are explicitly called in tests, they serve these purposes:
+// - get_weather_test, get_time_test, convert_temperature: Used in parallel/sequential tests
+// - get_server_status: Used in no-argument function tests
+// - search_with_filters: Used in complex argument tests
+// - always_fails: Reserved for future error handling tests (demonstrates panic behavior)
 
 /// Gets the current weather for a city
 #[allow(dead_code)]
