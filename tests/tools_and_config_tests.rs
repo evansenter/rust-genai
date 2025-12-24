@@ -41,7 +41,7 @@ async fn test_google_search_grounding() {
         .with_text(
             "What is the current weather in New York City today? Use search to find current data.",
         )
-        .with_tools(vec![Tool::GoogleSearch])
+        .with_google_search() // Use convenience method
         .with_store(true)
         .create()
         .await;
@@ -63,6 +63,21 @@ async fn test_google_search_grounding() {
                     "Response should mention weather-related content"
                 );
             }
+
+            // Verify grounding metadata is available
+            if let Some(metadata) = response.grounding_metadata() {
+                println!("Grounding metadata found:");
+                println!("  Search queries: {:?}", metadata.web_search_queries);
+                println!("  Grounding chunks: {}", metadata.grounding_chunks.len());
+                for chunk in &metadata.grounding_chunks {
+                    println!(
+                        "    - {} [{}] ({})",
+                        chunk.web.title, chunk.web.domain, chunk.web.uri
+                    );
+                }
+            } else {
+                println!("Note: No grounding metadata returned (may vary by API response)");
+            }
         }
         Err(e) => {
             let error_str = format!("{:?}", e);
@@ -76,6 +91,69 @@ async fn test_google_search_grounding() {
             }
         }
     }
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_google_search_grounding_streaming() {
+    // Test Google Search with streaming
+    use futures_util::StreamExt;
+    use rust_genai::StreamChunk;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let mut stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What's the latest news about Rust programming language?")
+        .with_google_search()
+        .create_stream();
+
+    let mut chunk_count = 0;
+    let mut final_response = None;
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(chunk) => {
+                chunk_count += 1;
+                match chunk {
+                    StreamChunk::Delta(content) => {
+                        println!("Delta chunk {}: {:?}", chunk_count, content);
+                    }
+                    StreamChunk::Complete(response) => {
+                        println!("Complete response received");
+                        // Check for grounding metadata in the final response
+                        if let Some(metadata) = response.grounding_metadata() {
+                            println!("Streaming grounding metadata:");
+                            println!("  Search queries: {:?}", metadata.web_search_queries);
+                            println!("  Chunks: {}", metadata.grounding_chunks.len());
+                        }
+                        final_response = Some(response);
+                    }
+                }
+            }
+            Err(e) => {
+                let error_str = format!("{:?}", e);
+                println!("Stream error: {}", error_str);
+                // Google Search may not be available in all accounts
+                if error_str.contains("not supported")
+                    || error_str.contains("not available")
+                    || error_str.contains("permission")
+                {
+                    println!("Google Search tool not available - skipping test");
+                    return;
+                }
+                // For other errors, break but let assertions catch issues
+                break;
+            }
+        }
+    }
+
+    assert!(chunk_count > 0, "Should receive at least one chunk");
+    assert!(final_response.is_some(), "Should receive complete response");
 }
 
 // =============================================================================

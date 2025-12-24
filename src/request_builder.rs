@@ -223,6 +223,49 @@ impl<'a> InteractionBuilder<'a> {
             .fold(self, |builder, func| builder.with_function(func))
     }
 
+    /// Enables Google Search grounding for this interaction.
+    ///
+    /// This adds the built-in `GoogleSearch` tool which allows the model to
+    /// search the web and ground its responses in real-time information.
+    /// Grounding metadata will be available in the response via
+    /// [`InteractionResponse::grounding_metadata`].
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Who won the 2024 World Series?")
+    ///     .with_google_search()
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // Access grounding metadata
+    /// if let Some(metadata) = response.grounding_metadata() {
+    ///     println!("Search queries: {:?}", metadata.web_search_queries);
+    ///     for chunk in &metadata.grounding_chunks {
+    ///         println!("Source: {}", chunk.web.uri);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`InteractionResponse::grounding_metadata`]: crate::InteractionResponse::grounding_metadata
+    pub fn with_google_search(mut self) -> Self {
+        self.tools
+            .get_or_insert_with(Vec::new)
+            .push(InternalTool::GoogleSearch);
+        self
+    }
+
     /// Sets response modalities (e.g., ["IMAGE"]).
     pub fn with_response_modalities(mut self, modalities: Vec<String>) -> Self {
         self.response_modalities = Some(modalities);

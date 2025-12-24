@@ -840,6 +840,53 @@ impl UsageMetadata {
     }
 }
 
+/// Grounding metadata returned when using the GoogleSearch tool.
+///
+/// Contains search queries executed by the model and web sources that
+/// ground the response in real-time information.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::InteractionResponse;
+/// # let response: InteractionResponse = todo!();
+/// if let Some(metadata) = response.grounding_metadata() {
+///     println!("Search queries: {:?}", metadata.web_search_queries);
+///     for chunk in &metadata.grounding_chunks {
+///         println!("Source: {} - {}", chunk.web.title, chunk.web.uri);
+///     }
+/// }
+/// ```
+#[derive(Clone, Deserialize, Serialize, Debug, Default, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct GroundingMetadata {
+    /// Search queries that were executed by the model
+    pub web_search_queries: Vec<String>,
+
+    /// Web sources referenced in the response
+    pub grounding_chunks: Vec<GroundingChunk>,
+}
+
+/// A web source referenced in grounding.
+#[derive(Clone, Deserialize, Serialize, Debug, Default, PartialEq)]
+pub struct GroundingChunk {
+    /// Web resource information
+    #[serde(default)]
+    pub web: WebSource,
+}
+
+/// Web source details (URI, title, and domain).
+#[derive(Clone, Deserialize, Serialize, Debug, Default, PartialEq, Eq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct WebSource {
+    /// URI of the web page
+    pub uri: String,
+    /// Title of the source
+    pub title: String,
+    /// Domain of the web page (e.g., "wikipedia.org")
+    pub domain: String,
+}
+
 /// Response from creating or retrieving an interaction
 #[derive(Clone, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -873,6 +920,10 @@ pub struct InteractionResponse {
     /// Tools that were available for this interaction
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<Tool>>,
+
+    /// Grounding metadata when using GoogleSearch tool
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grounding_metadata: Option<GroundingMetadata>,
 
     /// Previous interaction ID if this was a follow-up
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1044,6 +1095,44 @@ impl InteractionResponse {
                 }
             })
             .collect()
+    }
+
+    /// Check if response has grounding metadata from Google Search.
+    ///
+    /// Returns true if the response was grounded using the GoogleSearch tool.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if response.has_grounding() {
+    ///     println!("Response is grounded with web sources");
+    /// }
+    /// ```
+    pub fn has_grounding(&self) -> bool {
+        self.grounding_metadata.is_some()
+    }
+
+    /// Get grounding metadata if present.
+    ///
+    /// Returns the grounding metadata containing search queries and web sources
+    /// when the GoogleSearch tool was used.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(metadata) = response.grounding_metadata() {
+    ///     println!("Search queries: {:?}", metadata.web_search_queries);
+    ///     for chunk in &metadata.grounding_chunks {
+    ///         println!("Source: {} - {}", chunk.web.title, chunk.web.uri);
+    ///     }
+    /// }
+    /// ```
+    pub fn grounding_metadata(&self) -> Option<&GroundingMetadata> {
+        self.grounding_metadata.as_ref()
     }
 
     /// Check if response contains code execution calls
@@ -1559,6 +1648,7 @@ mod tests {
             usage: None,
             tools: None,
             previous_interaction_id: None,
+            grounding_metadata: None,
         };
 
         assert_eq!(response.text(), Some("Hello"));
@@ -1592,6 +1682,7 @@ mod tests {
             usage: None,
             tools: None,
             previous_interaction_id: None,
+            grounding_metadata: None,
         };
 
         let calls = response.function_calls();
@@ -1633,6 +1724,7 @@ mod tests {
             usage: None,
             tools: None,
             previous_interaction_id: None,
+            grounding_metadata: None,
         };
 
         assert_eq!(response.text(), Some("Let me check"));
@@ -1654,6 +1746,7 @@ mod tests {
             usage: None,
             tools: None,
             previous_interaction_id: None,
+            grounding_metadata: None,
         };
 
         assert_eq!(response.text(), None);
@@ -1893,6 +1986,7 @@ mod tests {
             usage: None,
             tools: None,
             previous_interaction_id: None,
+            grounding_metadata: None,
         };
 
         assert!(response.has_unknown());
@@ -1918,6 +2012,7 @@ mod tests {
             usage: None,
             tools: None,
             previous_interaction_id: None,
+            grounding_metadata: None,
         };
 
         assert!(!response.has_unknown());
@@ -1964,6 +2059,7 @@ mod tests {
             usage: None,
             tools: None,
             previous_interaction_id: None,
+            grounding_metadata: None,
         };
 
         let summary = response.content_summary();
@@ -1989,6 +2085,7 @@ mod tests {
             usage: None,
             tools: None,
             previous_interaction_id: None,
+            grounding_metadata: None,
         };
 
         let summary = response.content_summary();
@@ -2689,6 +2786,7 @@ mod tests {
             usage: None,
             tools: None,
             previous_interaction_id: None,
+            grounding_metadata: None,
         };
 
         assert!(response.has_code_execution_calls());
@@ -2725,6 +2823,7 @@ mod tests {
             usage: None,
             tools: None,
             previous_interaction_id: None,
+            grounding_metadata: None,
         };
 
         assert!(response.has_google_search_results());
@@ -2749,6 +2848,7 @@ mod tests {
             usage: None,
             tools: None,
             previous_interaction_id: None,
+            grounding_metadata: None,
         };
 
         assert!(response.has_url_context_results());
@@ -2800,6 +2900,7 @@ mod tests {
             usage: None,
             tools: None,
             previous_interaction_id: None,
+            grounding_metadata: None,
         };
 
         let summary = response.content_summary();
