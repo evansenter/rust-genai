@@ -364,7 +364,9 @@ async fn test_url_context() {
 // =============================================================================
 
 /// Test structured output with JSON schema enforcement.
-/// Note: The Interactions API may not support json_schema response format.
+///
+/// The response_format parameter accepts a JSON schema directly to enforce
+/// structured output from the model.
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_structured_output_json_schema() {
@@ -373,6 +375,7 @@ async fn test_structured_output_json_schema() {
         return;
     };
 
+    // Pass the JSON schema directly to response_format
     let schema = json!({
         "type": "object",
         "properties": {
@@ -386,56 +389,35 @@ async fn test_structured_output_json_schema() {
     let result = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("Generate a fake user profile with name, age, and email.")
-        .with_response_format(json!({
-            "type": "json_schema",
-            "json_schema": schema
-        }))
+        .with_text("Generate a fake user profile with name John Smith, age 30, and email john@example.com. Return ONLY the JSON object, no other text.")
+        .with_response_format(schema)
         .with_store(true)
         .create()
         .await;
 
-    match result {
-        Ok(response) => {
-            assert_eq!(response.status, InteractionStatus::Completed);
-            assert!(response.has_text(), "Should have text response");
+    let response = result.expect("Structured output request should succeed");
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
 
-            let text = response.text().unwrap();
-            println!("Structured output: {}", text);
+    let text = response.text().unwrap();
+    println!("Structured output: {}", text);
 
-            // Try to parse as JSON
-            let parsed: Result<serde_json::Value, _> = serde_json::from_str(text);
-            match parsed {
-                Ok(json) => {
-                    println!("Parsed JSON: {}", json);
-                    assert!(json.get("name").is_some(), "Should have name field");
-                    assert!(json.get("age").is_some(), "Should have age field");
-                    assert!(json.get("email").is_some(), "Should have email field");
-                }
-                Err(e) => {
-                    println!("Could not parse as pure JSON: {}", e);
-                    assert!(
-                        text.contains("name") && text.contains("age") && text.contains("email"),
-                        "Response should contain the required fields"
-                    );
-                }
-            }
-        }
-        Err(e) => {
-            let error_str = format!("{:?}", e);
-            if error_str.contains("json_schema") || error_str.contains("unrecognized type") {
-                println!(
-                    "Note: json_schema response format not supported by Interactions API. This is expected."
-                );
-            } else {
-                panic!("Unexpected error: {:?}", e);
-            }
-        }
-    }
+    // Parse as JSON - should be valid JSON matching our schema
+    let json: serde_json::Value =
+        serde_json::from_str(text).expect("Response should be valid JSON");
+    println!(
+        "Parsed JSON: {}",
+        serde_json::to_string_pretty(&json).unwrap()
+    );
+
+    assert!(json.get("name").is_some(), "Should have name field");
+    assert!(json.get("age").is_some(), "Should have age field");
+    assert!(json.get("email").is_some(), "Should have email field");
 }
 
 /// Test structured output with enum constraints.
-/// Note: The Interactions API may not support json_schema response format.
+///
+/// The response_format parameter enforces specific enum values for fields.
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_structured_output_enum_constraint() {
@@ -444,6 +426,7 @@ async fn test_structured_output_enum_constraint() {
         return;
     };
 
+    // Pass the JSON schema directly - enum constrains valid values
     let schema = json!({
         "type": "object",
         "properties": {
@@ -452,9 +435,7 @@ async fn test_structured_output_enum_constraint() {
                 "enum": ["positive", "negative", "neutral"]
             },
             "confidence": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1
+                "type": "number"
             }
         },
         "required": ["sentiment", "confidence"]
@@ -464,42 +445,236 @@ async fn test_structured_output_enum_constraint() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Analyze the sentiment of: 'I love this product, it's amazing!'")
-        .with_response_format(json!({
-            "type": "json_schema",
-            "json_schema": schema
-        }))
+        .with_response_format(schema)
         .with_store(true)
         .create()
         .await;
 
-    match result {
-        Ok(response) => {
-            assert_eq!(response.status, InteractionStatus::Completed);
+    let response = result.expect("Structured output with enum should succeed");
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
 
-            if response.has_text() {
-                let text = response.text().unwrap();
-                println!("Sentiment analysis: {}", text);
+    let text = response.text().unwrap();
+    println!("Sentiment analysis: {}", text);
 
-                // Should contain one of the enum values
-                let text_lower = text.to_lowercase();
-                assert!(
-                    text_lower.contains("positive")
-                        || text_lower.contains("negative")
-                        || text_lower.contains("neutral"),
-                    "Response should contain a valid sentiment enum value"
-                );
+    // Parse as JSON
+    let json: serde_json::Value =
+        serde_json::from_str(text).expect("Response should be valid JSON");
+    println!(
+        "Parsed JSON: {}",
+        serde_json::to_string_pretty(&json).unwrap()
+    );
+
+    // Verify sentiment is one of the enum values
+    let sentiment = json
+        .get("sentiment")
+        .and_then(|v| v.as_str())
+        .expect("Should have sentiment field");
+    assert!(
+        ["positive", "negative", "neutral"].contains(&sentiment),
+        "Sentiment '{}' should be one of: positive, negative, neutral",
+        sentiment
+    );
+
+    // Verify confidence exists
+    assert!(
+        json.get("confidence").is_some(),
+        "Should have confidence field"
+    );
+}
+
+/// Test structured output combined with Google Search grounding.
+///
+/// This demonstrates using response_format with built-in tools to get
+/// structured data from real-time web searches.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_structured_output_with_google_search() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Schema for structured search results
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "answer": {"type": "string"},
+            "source_count": {"type": "integer"}
+        },
+        "required": ["answer"]
+    });
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What is the current population of Tokyo, Japan?")
+        .with_google_search()
+        .with_response_format(schema)
+        .with_store(true)
+        .create()
+        .await;
+
+    let response = result.expect("Structured output with Google Search should succeed");
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().unwrap();
+    println!("Google Search structured output: {}", text);
+
+    // Parse as JSON
+    let json: serde_json::Value =
+        serde_json::from_str(text).expect("Response should be valid JSON");
+    println!(
+        "Parsed JSON: {}",
+        serde_json::to_string_pretty(&json).unwrap()
+    );
+
+    // Verify required field exists
+    assert!(json.get("answer").is_some(), "Should have answer field");
+
+    // Verify grounding metadata is present (Google Search was used)
+    if let Some(metadata) = response.grounding_metadata() {
+        println!("Grounding chunks: {:?}", metadata.grounding_chunks.len());
+    }
+}
+
+/// Test structured output combined with URL context fetching.
+///
+/// This demonstrates using response_format with URL context to extract
+/// structured data from web pages.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_structured_output_with_url_context() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Schema for extracting page metadata
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "description": {"type": "string"},
+            "has_navigation": {"type": "boolean"}
+        },
+        "required": ["title", "description"]
+    });
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Analyze the page at https://example.com and extract metadata.")
+        .with_url_context()
+        .with_response_format(schema)
+        .with_store(true)
+        .create()
+        .await;
+
+    let response = result.expect("Structured output with URL context should succeed");
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().unwrap();
+    println!("URL context structured output: {}", text);
+
+    // Parse as JSON
+    let json: serde_json::Value =
+        serde_json::from_str(text).expect("Response should be valid JSON");
+    println!(
+        "Parsed JSON: {}",
+        serde_json::to_string_pretty(&json).unwrap()
+    );
+
+    // Verify required fields exist
+    assert!(json.get("title").is_some(), "Should have title field");
+    assert!(
+        json.get("description").is_some(),
+        "Should have description field"
+    );
+
+    // Verify URL context metadata is present
+    if let Some(metadata) = response.url_context_metadata() {
+        println!("URL metadata entries: {:?}", metadata.url_metadata.len());
+    }
+}
+
+/// Test structured output with complex nested schema.
+///
+/// This demonstrates more complex JSON schemas with nested objects and arrays.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_structured_output_nested_schema() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Complex nested schema
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "company": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "founded": {"type": "integer"}
+                },
+                "required": ["name"]
+            },
+            "employees": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "role": {"type": "string"}
+                    },
+                    "required": ["name", "role"]
+                }
             }
-        }
-        Err(e) => {
-            let error_str = format!("{:?}", e);
-            if error_str.contains("json_schema") || error_str.contains("unrecognized type") {
-                println!(
-                    "Note: json_schema response format not supported by Interactions API. This is expected."
-                );
-            } else {
-                panic!("Unexpected error: {:?}", e);
-            }
-        }
+        },
+        "required": ["company", "employees"]
+    });
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Generate data for a fictional tech startup called 'CloudAI' founded in 2023 with 3 employees: a CEO, CTO, and designer.")
+        .with_response_format(schema)
+        .with_store(true)
+        .create()
+        .await;
+
+    let response = result.expect("Nested schema structured output should succeed");
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().unwrap();
+    println!("Nested structured output: {}", text);
+
+    // Parse as JSON
+    let json: serde_json::Value =
+        serde_json::from_str(text).expect("Response should be valid JSON");
+    println!(
+        "Parsed JSON: {}",
+        serde_json::to_string_pretty(&json).unwrap()
+    );
+
+    // Verify nested structure
+    let company = json.get("company").expect("Should have company object");
+    assert!(company.get("name").is_some(), "Company should have name");
+
+    let employees = json
+        .get("employees")
+        .and_then(|e| e.as_array())
+        .expect("Should have employees array");
+    assert_eq!(employees.len(), 3, "Should have 3 employees");
+
+    for emp in employees {
+        assert!(emp.get("name").is_some(), "Each employee should have name");
+        assert!(emp.get("role").is_some(), "Each employee should have role");
     }
 }
 

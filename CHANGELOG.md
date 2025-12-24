@@ -69,6 +69,12 @@ if let Some(text) = delta.text() { /* ... */ }
   - New helper methods: `has_url_context_metadata()`, `url_context_metadata()` on `InteractionResponse`
   - Supports up to 20 URLs per request, max 34MB per URL
 
+- **Structured output JSON schema support** (#80): Enforce JSON schema constraints on model responses
+  - Use `.with_response_format(schema)` to specify a JSON schema for structured output
+  - Works standalone for structured data extraction
+  - Combines with built-in tools (Google Search, URL Context)
+  - New comprehensive example: `examples/structured_output.rs`
+
 ### Changed
 - **`InteractionContent` is now `#[non_exhaustive]`** (#44): Match statements must include a wildcard arm (`_ => {}`). This allows adding new variants in minor version updates without breaking downstream code.
 

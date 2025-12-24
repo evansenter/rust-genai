@@ -370,7 +370,85 @@ impl<'a> InteractionBuilder<'a> {
         self
     }
 
-    /// Sets a JSON schema for structured output.
+    /// Sets a JSON schema to enforce structured output from the model.
+    ///
+    /// When you provide a JSON schema, the model will return responses that
+    /// conform exactly to your schema structure. This is useful for:
+    /// - Extracting structured data from text
+    /// - Building reliable data pipelines
+    /// - Ensuring consistent API responses
+    ///
+    /// The schema should be a standard JSON Schema object with `type`, `properties`,
+    /// and optionally `required` fields.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    /// use serde_json::json;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let schema = json!({
+    ///     "type": "object",
+    ///     "properties": {
+    ///         "name": {"type": "string"},
+    ///         "age": {"type": "integer"},
+    ///         "hobbies": {
+    ///             "type": "array",
+    ///             "items": {"type": "string"}
+    ///         }
+    ///     },
+    ///     "required": ["name", "age"]
+    /// });
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Generate info for someone named Alice who is 30 and likes hiking")
+    ///     .with_response_format(schema)
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // Response is guaranteed to be valid JSON matching the schema
+    /// let text = response.text().unwrap();
+    /// let data: serde_json::Value = serde_json::from_str(text)?;
+    /// println!("Name: {}", data["name"]);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Combining with Tools
+    ///
+    /// Structured output can be combined with built-in tools like Google Search
+    /// or URL Context to get structured data from real-time sources:
+    ///
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # use serde_json::json;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Client::new("api-key".to_string());
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What is the current weather in Tokyo?")
+    ///     .with_google_search()
+    ///     .with_response_format(json!({
+    ///         "type": "object",
+    ///         "properties": {
+    ///             "temperature": {"type": "string"},
+    ///             "conditions": {"type": "string"}
+    ///         },
+    ///         "required": ["temperature", "conditions"]
+    ///     }))
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn with_response_format(mut self, format: serde_json::Value) -> Self {
         self.response_format = Some(format);
         self
