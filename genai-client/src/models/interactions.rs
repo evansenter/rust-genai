@@ -744,7 +744,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                             Some(true) => CodeExecutionOutcome::Failed,
                             Some(false) => CodeExecutionOutcome::Ok,
                             None => CodeExecutionOutcome::Unspecified,
-                        }
+                        },
                     );
 
                     let exec_output = output.or(result).unwrap_or_default();
@@ -1038,7 +1038,6 @@ impl fmt::Display for CodeExecutionOutcome {
     }
 }
 
-
 /// Response from creating or retrieving an interaction
 #[derive(Clone, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -1312,10 +1311,7 @@ impl InteractionResponse {
         self.outputs
             .iter()
             .filter_map(|content| {
-                if let InteractionContent::CodeExecutionCall {
-                    language, code, ..
-                } = content
-                {
+                if let InteractionContent::CodeExecutionCall { language, code, .. } = content {
                     Some((language.as_str(), code.as_str()))
                 } else {
                     None
@@ -1381,7 +1377,10 @@ impl InteractionResponse {
     /// ```
     pub fn successful_code_output(&self) -> Option<&str> {
         self.outputs.iter().find_map(|content| {
-            if let InteractionContent::CodeExecutionResult { outcome, output, .. } = content {
+            if let InteractionContent::CodeExecutionResult {
+                outcome, output, ..
+            } = content
+            {
                 if outcome.is_success() {
                     Some(output.as_str())
                 } else {
@@ -2717,6 +2716,28 @@ mod tests {
                 assert_eq!(call_id, "call_456");
                 assert!(outcome.is_error());
                 assert!(output.contains("NameError"));
+            }
+            _ => panic!("Expected CodeExecutionResult variant, got {:?}", content),
+        }
+    }
+
+    #[test]
+    fn test_deserialize_code_execution_result_deadline_exceeded() {
+        // Test deserialization of OUTCOME_DEADLINE_EXCEEDED (timeout scenario)
+        let json = r#"{"type": "code_execution_result", "call_id": "call_789", "outcome": "OUTCOME_DEADLINE_EXCEEDED", "output": "Execution timed out after 30 seconds"}"#;
+        let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+        match &content {
+            InteractionContent::CodeExecutionResult {
+                call_id,
+                outcome,
+                output,
+            } => {
+                assert_eq!(call_id, "call_789");
+                assert_eq!(*outcome, CodeExecutionOutcome::DeadlineExceeded);
+                assert!(outcome.is_error());
+                assert!(!outcome.is_success());
+                assert!(output.contains("timed out"));
             }
             _ => panic!("Expected CodeExecutionResult variant, got {:?}", content),
         }

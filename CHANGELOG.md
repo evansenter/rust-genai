@@ -61,6 +61,7 @@ if let Some(text) = delta.text() { /* ... */ }
   - New helper methods on `InteractionResponse`: `executable_code()`, `code_execution_results()`, `successful_code_output()`
   - New helper functions: `code_execution_call_content()`, `code_execution_result_content()`, `code_execution_success()`, `code_execution_error()`
   - Backward-compatible deserialization for old API response format
+  - **Breaking (serialization)**: `CodeExecutionCall` now serializes `language` and `code` as top-level fields instead of nested in `arguments`. Deserialization remains backward-compatible with both formats.
 
 ### Changed
 - **`InteractionContent` is now `#[non_exhaustive]`** (#44): Match statements must include a wildcard arm (`_ => {}`). This allows adding new variants in minor version updates without breaking downstream code.
