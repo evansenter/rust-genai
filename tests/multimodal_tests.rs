@@ -492,8 +492,11 @@ async fn test_multimodal_comparison() {
 
 /// Tests combining multiple media types (image + audio) in a single interaction.
 ///
+/// This is an **enforcing test** that expects the API to successfully process
+/// image + audio together. It asserts on the response content when successful,
+/// but allows known format errors from the minimal test files.
+///
 /// Note: Video is excluded because the minimal MP4 test file often fails validation.
-/// This test verifies the model can process multiple distinct media types together.
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_mixed_image_and_audio() {
