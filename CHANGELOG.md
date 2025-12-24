@@ -46,6 +46,9 @@ match chunk {
 if let Some(text) = delta.text() { /* ... */ }
 ```
 
+### Changed
+- **`InteractionContent` is now `#[non_exhaustive]`** (#44): Match statements must include a wildcard arm (`_ => {}`). This allows adding new variants in minor version updates without breaking downstream code.
+
 ### Fixed
 - **Streaming with function calls now works** (#27): Function call deltas are now properly parsed instead of causing errors
 - **Streaming now properly yields content chunks** (#17): The streaming API was returning 0 chunks because the code expected all SSE events to have an `interaction` field, but the API sends different event types (`content.delta` and `interaction.complete`)
