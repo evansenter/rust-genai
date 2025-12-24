@@ -534,7 +534,7 @@ async fn test_structured_output_with_google_search() {
     assert!(json.get("answer").is_some(), "Should have answer field");
 
     // Verify grounding metadata is present (Google Search was used)
-    if let Some(metadata) = response.grounding_metadata() {
+    if let Some(metadata) = response.google_search_metadata() {
         println!("Grounding chunks: {:?}", metadata.grounding_chunks.len());
     }
 }
