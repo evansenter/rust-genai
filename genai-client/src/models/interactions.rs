@@ -721,6 +721,10 @@ impl<'de> Deserialize<'de> for InteractionContent {
                             .to_string();
                         (lang, source)
                     } else {
+                        log::warn!(
+                            "CodeExecutionCall missing both direct fields and arguments for id: {}",
+                            id
+                        );
                         (String::from("PYTHON"), String::new())
                     };
 

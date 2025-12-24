@@ -216,11 +216,23 @@ async fn test_code_execution() {
                 println!("Output: {}", &output[..output.len().min(100)]);
             }
 
-            // Test the convenience helper
+            // Test the convenience helper and verify the code output directly
+            // This is more robust than checking LLM text response
             if let Some(output) = response.successful_code_output() {
                 println!(
                     "First successful output: {}",
                     &output[..output.len().min(100)]
+                );
+                assert!(
+                    output.contains("3628800"),
+                    "Code output should contain correct factorial result (3628800), got: {}",
+                    output
+                );
+            } else {
+                // If no successful code output, check that code was at least executed
+                assert!(
+                    !response.code_execution_results().is_empty(),
+                    "Expected code execution results but found none"
                 );
             }
 
