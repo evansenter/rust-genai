@@ -923,6 +923,7 @@ pub struct UsageMetadata {
 
 impl UsageMetadata {
     /// Returns true if any usage data is present
+    #[must_use]
     pub fn has_data(&self) -> bool {
         self.total_tokens.is_some()
             || self.total_input_tokens.is_some()
@@ -1095,6 +1096,10 @@ pub enum UrlRetrievalStatus {
 /// Returned by [`InteractionResponse::function_calls()`] for convenient access
 /// to function call details.
 ///
+/// This is a **view type** that borrows data from the underlying [`InteractionResponse`].
+/// It implements [`Serialize`] for logging and debugging purposes, but not `Deserialize`
+/// since it's not meant to be constructed directly—use the response helper methods instead.
+///
 /// # Example
 ///
 /// ```no_run
@@ -1123,6 +1128,10 @@ pub struct FunctionCallInfo<'a> {
 ///
 /// Returned by [`InteractionResponse::function_results()`] for convenient access
 /// to function result details.
+///
+/// This is a **view type** that borrows data from the underlying [`InteractionResponse`].
+/// It implements [`Serialize`] for logging and debugging purposes, but not `Deserialize`
+/// since it's not meant to be constructed directly—use the response helper methods instead.
 ///
 /// # Example
 ///
@@ -1285,6 +1294,7 @@ impl InteractionResponse {
     /// Check if response contains text
     ///
     /// Returns true if any output contains text content.
+    #[must_use]
     pub fn has_text(&self) -> bool {
         self.outputs
             .iter()
@@ -1294,6 +1304,7 @@ impl InteractionResponse {
     /// Check if response contains function calls
     ///
     /// Returns true if any output contains a function call.
+    #[must_use]
     pub fn has_function_calls(&self) -> bool {
         self.outputs
             .iter()
@@ -1315,6 +1326,7 @@ impl InteractionResponse {
     ///     }
     /// }
     /// ```
+    #[must_use]
     pub fn has_function_results(&self) -> bool {
         self.outputs
             .iter()
@@ -1361,6 +1373,7 @@ impl InteractionResponse {
     /// Check if response contains thoughts (internal reasoning)
     ///
     /// Returns true if any output contains thought content.
+    #[must_use]
     pub fn has_thoughts(&self) -> bool {
         self.outputs
             .iter()
@@ -1387,6 +1400,7 @@ impl InteractionResponse {
     ///     }
     /// }
     /// ```
+    #[must_use]
     pub fn has_unknown(&self) -> bool {
         self.outputs
             .iter()
@@ -1433,6 +1447,7 @@ impl InteractionResponse {
     ///     println!("Response is grounded with web sources");
     /// }
     /// ```
+    #[must_use]
     pub fn has_google_search_metadata(&self) -> bool {
         self.grounding_metadata.is_some()
     }
@@ -1471,6 +1486,7 @@ impl InteractionResponse {
     ///     println!("Response includes URL context");
     /// }
     /// ```
+    #[must_use]
     pub fn has_url_context_metadata(&self) -> bool {
         self.url_context_metadata.is_some()
     }
@@ -1496,6 +1512,7 @@ impl InteractionResponse {
     }
 
     /// Check if response contains code execution calls
+    #[must_use]
     pub fn has_code_execution_calls(&self) -> bool {
         self.outputs
             .iter()
@@ -1530,6 +1547,7 @@ impl InteractionResponse {
     }
 
     /// Check if response contains code execution results
+    #[must_use]
     pub fn has_code_execution_results(&self) -> bool {
         self.outputs
             .iter()
@@ -1614,6 +1632,7 @@ impl InteractionResponse {
     ///     println!("Model searched: {:?}", response.google_search_calls());
     /// }
     /// ```
+    #[must_use]
     pub fn has_google_search_calls(&self) -> bool {
         self.outputs
             .iter()
@@ -1647,6 +1666,7 @@ impl InteractionResponse {
     }
 
     /// Check if response contains Google Search results
+    #[must_use]
     pub fn has_google_search_results(&self) -> bool {
         self.outputs
             .iter()
@@ -1682,6 +1702,7 @@ impl InteractionResponse {
     ///     println!("Model fetched: {:?}", response.url_context_calls());
     /// }
     /// ```
+    #[must_use]
     pub fn has_url_context_calls(&self) -> bool {
         self.outputs
             .iter()
@@ -1715,6 +1736,7 @@ impl InteractionResponse {
     }
 
     /// Check if response contains URL context results
+    #[must_use]
     pub fn has_url_context_results(&self) -> bool {
         self.outputs
             .iter()
@@ -2204,6 +2226,42 @@ mod tests {
         assert_eq!(calls[1].thought_signature, None);
         assert!(response.has_function_calls());
         assert!(!response.has_text());
+    }
+
+    #[test]
+    fn test_function_call_missing_id() {
+        // Test that function calls with missing id are correctly captured as None.
+        // This scenario should not normally occur (API contract requires call_id),
+        // but if it does, the auto-function loop will return an error.
+        let response = InteractionResponse {
+            id: "test_id".to_string(),
+            model: Some("gemini-3-flash".to_string()),
+            agent: None,
+            input: vec![],
+            outputs: vec![InteractionContent::FunctionCall {
+                id: None, // Missing call_id - should be captured correctly
+                name: "get_weather".to_string(),
+                args: serde_json::json!({"location": "Tokyo"}),
+                thought_signature: None,
+            }],
+            status: InteractionStatus::RequiresAction,
+            usage: None,
+            tools: None,
+            previous_interaction_id: None,
+            grounding_metadata: None,
+            url_context_metadata: None,
+        };
+
+        let calls = response.function_calls();
+        assert_eq!(calls.len(), 1);
+        // Verify that missing id is correctly captured as None
+        assert_eq!(calls[0].id, None);
+        assert_eq!(calls[0].name, "get_weather");
+        assert_eq!(calls[0].args["location"], "Tokyo");
+
+        // The auto-function loop in request_builder.rs will return an error
+        // when it encounters a function call with None id, since call_id is
+        // required to send function results back to the API.
     }
 
     #[test]
