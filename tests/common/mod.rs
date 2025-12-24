@@ -14,6 +14,7 @@
 
 use rust_genai::{Client, GenaiError, InteractionResponse, InteractionStatus};
 use std::env;
+use std::future::Future;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
@@ -23,6 +24,71 @@ pub fn get_client() -> Option<Client> {
     env::var("GEMINI_API_KEY")
         .ok()
         .map(|key| Client::builder(key).build())
+}
+
+// =============================================================================
+// Timeout Utilities
+// =============================================================================
+
+/// Default timeout for long-running integration tests (60 seconds).
+///
+/// This provides a safety net to prevent tests from hanging indefinitely
+/// when interacting with external APIs.
+#[allow(dead_code)]
+pub const TEST_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Extended timeout for tests that make many sequential API calls (120 seconds).
+///
+/// Use this for tests like multi-turn conversations that make 10+ API calls.
+#[allow(dead_code)]
+pub const EXTENDED_TEST_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// Wraps a future with a timeout, panicking if the timeout is exceeded.
+///
+/// Use this to prevent integration tests from hanging indefinitely when
+/// interacting with external APIs.
+///
+/// # Arguments
+///
+/// * `duration` - Maximum time to wait for the future to complete
+/// * `future` - The async operation to wrap with a timeout
+///
+/// # Panics
+///
+/// Panics with a descriptive message if the timeout is exceeded.
+///
+/// # Example
+///
+/// ```ignore
+/// use common::{TEST_TIMEOUT, get_client, with_timeout};
+///
+/// #[tokio::test]
+/// #[ignore = "Requires API key"]
+/// async fn test_something() {
+///     let Some(client) = get_client() else {
+///         println!("Skipping: GEMINI_API_KEY not set");
+///         return;
+///     };
+///
+///     with_timeout(TEST_TIMEOUT, async {
+///         // test logic that might hang
+///         let response = client.interaction()
+///             .with_model("gemini-3-flash-preview")
+///             .with_text("Hello")
+///             .create()
+///             .await
+///             .expect("Request failed");
+///     }).await;
+/// }
+/// ```
+#[allow(dead_code)]
+pub async fn with_timeout<F, T>(duration: Duration, future: F) -> T
+where
+    F: Future<Output = T>,
+{
+    tokio::time::timeout(duration, future)
+        .await
+        .unwrap_or_else(|_| panic!("Test timed out after {:?}", duration))
 }
 
 // =============================================================================
