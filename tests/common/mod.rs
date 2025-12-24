@@ -59,12 +59,24 @@ pub const EXTENDED_TEST_TIMEOUT: Duration = Duration::from_secs(120);
 /// # Example
 ///
 /// ```ignore
-/// use common::{TEST_TIMEOUT, with_timeout};
+/// use common::{TEST_TIMEOUT, get_client, with_timeout};
 ///
 /// #[tokio::test]
+/// #[ignore = "Requires API key"]
 /// async fn test_something() {
+///     let Some(client) = get_client() else {
+///         println!("Skipping: GEMINI_API_KEY not set");
+///         return;
+///     };
+///
 ///     with_timeout(TEST_TIMEOUT, async {
 ///         // test logic that might hang
+///         let response = client.interaction()
+///             .with_model("gemini-3-flash-preview")
+///             .with_text("Hello")
+///             .create()
+///             .await
+///             .expect("Request failed");
 ///     }).await;
 /// }
 /// ```
