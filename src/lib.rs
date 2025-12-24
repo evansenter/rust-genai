@@ -29,7 +29,7 @@ pub mod client;
 pub use client::{Client, ClientBuilder};
 
 pub mod request_builder;
-pub use request_builder::InteractionBuilder;
+pub use request_builder::{DEFAULT_MAX_FUNCTION_CALL_LOOPS, InteractionBuilder};
 
 pub mod function_calling;
 // Re-export public types from function_calling module
