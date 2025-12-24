@@ -132,10 +132,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 StreamChunk::Complete(response) => {
                     println!();
                     if response.has_function_calls() {
-                        let calls = response.function_calls();
                         println!("\nFunction calls in final response:");
-                        for (id, name, args, _) in &calls {
-                            println!("  - {}({}) [id: {:?}]", name, args, id);
+                        for call in response.function_calls() {
+                            println!("  - {}({}) [id: {:?}]", call.name, call.args, call.id);
                         }
                         println!("\nNote: To complete the conversation, you would execute");
                         println!("the function and send results back to the model.");

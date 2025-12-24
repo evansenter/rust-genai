@@ -134,7 +134,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
                 StreamChunk::Complete(response) => {
                     println!("\n");
-                    if let Some(metadata) = response.grounding_metadata() {
+                    if let Some(metadata) = response.google_search_metadata() {
                         println!("Sources ({} total):", metadata.grounding_chunks.len());
                         for chunk in metadata.grounding_chunks.iter().take(3) {
                             println!("  - {} [{}]", chunk.web.title, chunk.web.domain);
