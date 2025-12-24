@@ -9,12 +9,20 @@
 //!
 //! The Unknown variant ensures the library doesn't break, but we want to know
 //! when new types appear so we can add first-class support.
+//!
+//! # Test Execution Time
+//!
+//! These tests make 6 API calls and typically complete in 12-60 seconds total.
+//! Consider using `--test-threads=1` to avoid rate limiting.
 
 mod common;
 
 use common::get_client;
 use futures_util::StreamExt;
 use rust_genai::interactions_api::text_input;
+
+/// Model used for all canary tests - update if model availability changes
+const CANARY_MODEL: &str = "gemini-3-flash-preview";
 
 /// Helper to check a response for unknown content types and panic with details if found
 fn assert_no_unknown_content(response: &rust_genai::InteractionResponse, context: &str) {
@@ -42,7 +50,7 @@ async fn canary_basic_text_interaction() {
 
     let response = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(CANARY_MODEL)
         .with_input(text_input("Say 'hello' and nothing else."))
         .create()
         .await
@@ -61,13 +69,15 @@ async fn canary_streaming_interaction() {
 
     let mut stream = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(CANARY_MODEL)
         .with_input(text_input("Count from 1 to 3."))
         .create_stream();
 
     let mut unknown_types_found = Vec::new();
+    let mut chunk_count = 0;
 
     while let Some(result) = stream.next().await {
+        chunk_count += 1;
         let chunk = result.expect("Stream chunk should be valid");
         match chunk {
             rust_genai::StreamChunk::Delta(content) => {
@@ -82,6 +92,8 @@ async fn canary_streaming_interaction() {
             }
         }
     }
+
+    assert!(chunk_count > 0, "Streaming should yield at least one chunk");
 
     if !unknown_types_found.is_empty() {
         panic!(
@@ -112,7 +124,7 @@ async fn canary_function_calling_interaction() {
 
     let response = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(CANARY_MODEL)
         .with_input(text_input("What time is it?"))
         .with_functions(vec![get_time])
         .create()
@@ -121,7 +133,9 @@ async fn canary_function_calling_interaction() {
 
     assert_no_unknown_content(&response, "function calling interaction");
 
-    // If there's a function call, respond to it and check that response too
+    // Also check the follow-up response after providing function results.
+    // This tests for unknown types in the model's response to function results,
+    // which may differ from the initial function call response.
     if !response.function_calls().is_empty() {
         // function_calls() returns (id, name, args, thought_signature)
         let (id, name, _args, _thought_sig) = &response.function_calls()[0];
@@ -140,7 +154,7 @@ async fn canary_function_calling_interaction() {
 
         let followup = client
             .interaction()
-            .with_model("gemini-3-flash-preview")
+            .with_model(CANARY_MODEL)
             .with_input(history)
             .create()
             .await
@@ -162,7 +176,7 @@ async fn canary_code_execution_interaction() {
 
     let response = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(CANARY_MODEL)
         .with_input(text_input("Use code execution to calculate 2 + 2"))
         .with_tools(vec![Tool::CodeExecution])
         .create()
@@ -190,7 +204,7 @@ async fn canary_multimodal_interaction() {
 
     let response = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(CANARY_MODEL)
         .with_input(input)
         .create()
         .await
@@ -217,7 +231,7 @@ async fn canary_thinking_model_interaction() {
 
     let response = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(CANARY_MODEL)
         .with_input(text_input("What is 15 * 23?"))
         .with_generation_config(config)
         .create()
