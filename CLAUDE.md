@@ -309,10 +309,18 @@ At the `debug` level, the library logs:
 
 See `CHANGELOG.md` for full details. Key changes pending for next release:
 
-**Streaming API Improved**:
-- `create_stream()` now returns `Stream<StreamChunk>` instead of `Stream<InteractionResponse>`
-- `StreamChunk::Delta(StreamDelta)` for incremental content, `StreamChunk::Complete(InteractionResponse)` for final
-- New helpers: `StreamDelta::text()`, `is_text()`, `is_thought()`
+**Unified Streaming Content Types** (#52):
+- `StreamDelta` enum removed - streaming now uses `InteractionContent` directly
+- `StreamChunk::Delta(InteractionContent)` for incremental content
+- `StreamChunk::Complete(InteractionResponse)` for final response
+- New `InteractionContent::ThoughtSignature` variant for streaming thought signatures
+- Streaming with function calls now works (fixes #27)
+
+**UsageMetadata Field Names Updated** (#53):
+- `prompt_tokens` → `total_input_tokens`
+- `candidates_tokens` → `total_output_tokens`
+- New fields: `total_cached_tokens`, `total_reasoning_tokens`, `total_tool_use_tokens`
+- Token usage now works (previously always returned `None`)
 
 **Client API Simplified**:
 - `Client::new(api_key)` no longer takes `api_version` parameter
@@ -325,9 +333,7 @@ See `CHANGELOG.md` for full details. Key changes pending for next release:
 ## Known Issues & Gaps
 
 Active issues to be aware of (see GitHub issues for current status):
-- **#27**: Streaming parser doesn't support `function_call` delta type (streaming + function calling is broken)
 - **#28**: Response parser doesn't support built-in tool call types (code execution, Google Search)
-- **#24**: UsageMetadata field names don't match Interactions API response
 - **#25, #26**: Google Search grounding and code execution not yet supported in Interactions API
 
 ## Backlog & Roadmap

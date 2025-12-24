@@ -1006,6 +1006,33 @@ mod tests {
     }
 
     #[test]
+    fn test_deserialize_usage_metadata_partial() {
+        // Test that partial usage responses deserialize correctly with #[serde(default)]
+        let partial_json = r#"{"total_tokens": 42}"#;
+        let usage: UsageMetadata =
+            serde_json::from_str(partial_json).expect("Deserialization failed");
+
+        assert_eq!(usage.total_tokens, Some(42));
+        assert_eq!(usage.total_input_tokens, None);
+        assert_eq!(usage.total_output_tokens, None);
+        assert_eq!(usage.total_cached_tokens, None);
+        assert_eq!(usage.total_reasoning_tokens, None);
+        assert_eq!(usage.total_tool_use_tokens, None);
+    }
+
+    #[test]
+    fn test_deserialize_usage_metadata_empty() {
+        // Test that empty usage object deserializes to defaults
+        let empty_json = r#"{}"#;
+        let usage: UsageMetadata =
+            serde_json::from_str(empty_json).expect("Deserialization failed");
+
+        assert_eq!(usage.total_tokens, None);
+        assert_eq!(usage.total_input_tokens, None);
+        assert_eq!(usage.total_output_tokens, None);
+    }
+
+    #[test]
     fn test_deserialize_function_call_content() {
         let content_json = r#"{"type": "function_call", "name": "get_weather", "arguments": {"location": "Paris"}}"#;
 
