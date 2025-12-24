@@ -42,6 +42,20 @@ const POLLING_MAX_ATTEMPTS: usize = 30;
 const POLLING_INTERVAL_SECS: u64 = 2;
 
 // =============================================================================
+// Helper Functions
+// =============================================================================
+
+/// Checks if an error is a known API limitation for long conversation chains.
+/// These errors (UTF-8 encoding issues, spanner errors, truncation) can occur
+/// when the conversation context becomes too large.
+fn is_long_conversation_api_error(error: &rust_genai::GenaiError) -> bool {
+    let error_str = format!("{:?}", error);
+    error_str.contains("UTF-8")
+        || error_str.contains("spanner")
+        || error_str.contains("truncated")
+}
+
+// =============================================================================
 // Multi-turn: Very Long Conversations
 // =============================================================================
 
@@ -90,12 +104,7 @@ async fn test_very_long_conversation() {
                 successful_turns += 1;
             }
             Err(e) => {
-                let error_str = format!("{:?}", e);
-                // API may have issues with very long conversation chains (UTF-8 errors, etc.)
-                if error_str.contains("UTF-8")
-                    || error_str.contains("spanner")
-                    || error_str.contains("truncated")
-                {
+                if is_long_conversation_api_error(&e) {
                     println!(
                         "Turn {} encountered API limitation (expected for long conversations): {:?}",
                         i + 1,
@@ -132,11 +141,7 @@ async fn test_very_long_conversation() {
     let final_response = match final_result {
         Ok(response) => response,
         Err(e) => {
-            let error_str = format!("{:?}", e);
-            if error_str.contains("UTF-8")
-                || error_str.contains("spanner")
-                || error_str.contains("truncated")
-            {
+            if is_long_conversation_api_error(&e) {
                 println!(
                     "Final turn encountered API limitation (expected for long conversations): {:?}",
                     e
