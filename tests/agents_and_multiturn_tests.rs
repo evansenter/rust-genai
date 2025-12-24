@@ -18,11 +18,10 @@
 
 mod common;
 
-use common::{EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, get_client, with_timeout};
+use common::{PollError, get_client, poll_until_complete};
 use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 use std::time::Duration;
-use tokio::time::sleep;
 
 // =============================================================================
 // Test Configuration Constants
@@ -35,11 +34,8 @@ const MIN_SUCCESSFUL_TURNS: usize = 3;
 /// Minimum facts the model should remember out of 10 in the recall test.
 const MIN_REMEMBERED_FACTS: usize = 5;
 
-/// Maximum polling attempts for background mode tests (e.g., deep research agent).
-const POLLING_MAX_ATTEMPTS: usize = 30;
-
-/// Seconds to wait between polling attempts.
-const POLLING_INTERVAL_SECS: u64 = 2;
+/// Maximum time to wait for background tasks to complete.
+const BACKGROUND_TASK_TIMEOUT: Duration = Duration::from_secs(60);
 
 // =============================================================================
 // Helper Functions
@@ -67,89 +63,52 @@ async fn test_very_long_conversation() {
         return;
     };
 
-    // Use extended timeout since this test makes 10+ sequential API calls
-    with_timeout(EXTENDED_TEST_TIMEOUT, async {
-        let facts = [
-            "My name is Alice.",
-            "I live in Seattle.",
-            "I work as a software engineer.",
-            "My favorite programming language is Rust.",
-            "I have a dog named Max.",
-            "My birthday is in March.",
-            "I enjoy hiking on weekends.",
-            "My favorite food is sushi.",
-            "I drive a blue car.",
-            "I went to Stanford for college.",
-        ];
+    let facts = [
+        "My name is Alice.",
+        "I live in Seattle.",
+        "I work as a software engineer.",
+        "My favorite programming language is Rust.",
+        "I have a dog named Max.",
+        "My birthday is in March.",
+        "I enjoy hiking on weekends.",
+        "My favorite food is sushi.",
+        "I drive a blue car.",
+        "I went to Stanford for college.",
+    ];
 
-        let mut previous_id: Option<String> = None;
-        let mut successful_turns = 0;
+    let mut previous_id: Option<String> = None;
+    let mut successful_turns = 0;
 
-        // Build up context over 10 turns
-        for (i, fact) in facts.iter().enumerate() {
-            let mut builder = client
-                .interaction()
-                .with_model("gemini-3-flash-preview")
-                .with_text(*fact)
-                .with_store(true);
-
-            if let Some(ref prev_id) = previous_id {
-                builder = builder.with_previous_interaction(prev_id);
-            }
-
-            match builder.create().await {
-                Ok(response) => {
-                    println!("Turn {}: {}", i + 1, fact);
-                    previous_id = Some(response.id);
-                    successful_turns += 1;
-                }
-                Err(e) => {
-                    if is_long_conversation_api_error(&e) {
-                        println!(
-                            "Turn {} encountered API limitation (expected for long conversations): {:?}",
-                            i + 1,
-                            e
-                        );
-                        println!(
-                            "Completed {} turns before hitting API limitation",
-                            successful_turns
-                        );
-                        // Still pass if we got the minimum successful turns
-                        assert!(
-                            successful_turns >= MIN_SUCCESSFUL_TURNS,
-                            "Should complete at least {} turns, got {}",
-                            MIN_SUCCESSFUL_TURNS,
-                            successful_turns
-                        );
-                        return;
-                    }
-                    panic!("Turn {} failed: {:?}", i + 1, e);
-                }
-            }
-        }
-
-        // Final turn: ask about everything
-        let final_result = client
+    // Build up context over 10 turns
+    for (i, fact) in facts.iter().enumerate() {
+        let mut builder = client
             .interaction()
             .with_model("gemini-3-flash-preview")
-            .with_previous_interaction(previous_id.as_ref().unwrap())
-            .with_text("What do you know about me? List everything you can remember.")
-            .with_store(true)
-            .create()
-            .await;
+            .with_text(*fact)
+            .with_store(true);
 
-        let final_response = match final_result {
-            Ok(response) => response,
+        if let Some(ref prev_id) = previous_id {
+            builder = builder.with_previous_interaction(prev_id);
+        }
+
+        match builder.create().await {
+            Ok(response) => {
+                println!("Turn {}: {}", i + 1, fact);
+                previous_id = Some(response.id);
+                successful_turns += 1;
+            }
             Err(e) => {
                 if is_long_conversation_api_error(&e) {
                     println!(
-                        "Final turn encountered API limitation (expected for long conversations): {:?}",
+                        "Turn {} encountered API limitation (expected for long conversations): {:?}",
+                        i + 1,
                         e
                     );
                     println!(
                         "Completed {} turns before hitting API limitation",
                         successful_turns
                     );
+                    // Still pass if we got the minimum successful turns
                     assert!(
                         successful_turns >= MIN_SUCCESSFUL_TURNS,
                         "Should complete at least {} turns, got {}",
@@ -158,50 +117,83 @@ async fn test_very_long_conversation() {
                     );
                     return;
                 }
-                panic!("Final turn failed: {:?}", e);
-            }
-        };
-
-        assert_eq!(final_response.status, InteractionStatus::Completed);
-        assert!(final_response.has_text(), "Should have text response");
-
-        let text = final_response.text().unwrap().to_lowercase();
-        println!("Final response: {}", text);
-
-        // Count how many facts the model remembers
-        let fact_checks = [
-            ("alice", "name"),
-            ("seattle", "city"),
-            ("software", "job"),
-            ("rust", "language"),
-            ("max", "dog"),
-            ("march", "birthday"),
-            ("hiking", "hobby"),
-            ("sushi", "food"),
-            ("blue", "car"),
-            ("stanford", "college"),
-        ];
-
-        let mut remembered = 0;
-        for (keyword, label) in fact_checks.iter() {
-            if text.contains(*keyword) {
-                remembered += 1;
-                println!("  ✓ Remembered: {} ({})", keyword, label);
+                panic!("Turn {} failed: {:?}", i + 1, e);
             }
         }
+    }
 
-        println!("Facts remembered: {}/{}", remembered, fact_checks.len());
+    // Final turn: ask about everything
+    let final_result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_previous_interaction(previous_id.as_ref().unwrap())
+        .with_text("What do you know about me? List everything you can remember.")
+        .with_store(true)
+        .create()
+        .await;
 
-        // Should remember at least the minimum number of facts
-        assert!(
-            remembered >= MIN_REMEMBERED_FACTS,
-            "Model should remember at least {} out of {} facts, got {}",
-            MIN_REMEMBERED_FACTS,
-            fact_checks.len(),
-            remembered
-        );
-    })
-    .await;
+    let final_response = match final_result {
+        Ok(response) => response,
+        Err(e) => {
+            if is_long_conversation_api_error(&e) {
+                println!(
+                    "Final turn encountered API limitation (expected for long conversations): {:?}",
+                    e
+                );
+                println!(
+                    "Completed {} turns before hitting API limitation",
+                    successful_turns
+                );
+                assert!(
+                    successful_turns >= MIN_SUCCESSFUL_TURNS,
+                    "Should complete at least {} turns, got {}",
+                    MIN_SUCCESSFUL_TURNS,
+                    successful_turns
+                );
+                return;
+            }
+            panic!("Final turn failed: {:?}", e);
+        }
+    };
+
+    assert_eq!(final_response.status, InteractionStatus::Completed);
+    assert!(final_response.has_text(), "Should have text response");
+
+    let text = final_response.text().unwrap().to_lowercase();
+    println!("Final response: {}", text);
+
+    // Count how many facts the model remembers
+    let fact_checks = [
+        ("alice", "name"),
+        ("seattle", "city"),
+        ("software", "job"),
+        ("rust", "language"),
+        ("max", "dog"),
+        ("march", "birthday"),
+        ("hiking", "hobby"),
+        ("sushi", "food"),
+        ("blue", "car"),
+        ("stanford", "college"),
+    ];
+
+    let mut remembered = 0;
+    for (keyword, label) in fact_checks.iter() {
+        if text.contains(*keyword) {
+            remembered += 1;
+            println!("  ✓ Remembered: {} ({})", keyword, label);
+        }
+    }
+
+    println!("Facts remembered: {}/{}", remembered, fact_checks.len());
+
+    // Should remember at least the minimum number of facts
+    assert!(
+        remembered >= MIN_REMEMBERED_FACTS,
+        "Model should remember at least {} out of {} facts, got {}",
+        MIN_REMEMBERED_FACTS,
+        fact_checks.len(),
+        remembered
+    );
 }
 
 // =============================================================================
@@ -405,46 +397,43 @@ async fn test_deep_research_agent() {
         return;
     };
 
-    with_timeout(TEST_TIMEOUT, async {
-        let result = client
-            .interaction()
-            .with_agent("deep-research-pro-preview-12-2025")
-            .with_text("What are the main differences between Rust and Go programming languages?")
-            .with_store(true)
-            .create()
-            .await;
+    let result = client
+        .interaction()
+        .with_agent("deep-research-pro-preview-12-2025")
+        .with_text("What are the main differences between Rust and Go programming languages?")
+        .with_store(true)
+        .create()
+        .await;
 
-        match result {
-            Ok(response) => {
-                println!("Deep research status: {:?}", response.status);
-                if response.has_text() {
-                    let text = response.text().unwrap();
-                    println!(
-                        "Research response (truncated): {}...",
-                        &text[..text.len().min(500)]
-                    );
+    match result {
+        Ok(response) => {
+            println!("Deep research status: {:?}", response.status);
+            if response.has_text() {
+                let text = response.text().unwrap();
+                println!(
+                    "Research response (truncated): {}...",
+                    &text[..text.len().min(500)]
+                );
 
-                    // Should mention both languages
-                    let text_lower = text.to_lowercase();
-                    assert!(
-                        text_lower.contains("rust") || text_lower.contains("go"),
-                        "Response should discuss programming languages"
-                    );
-                }
-            }
-            Err(e) => {
-                let error_str = format!("{:?}", e);
-                println!("Deep research error (may be expected): {}", error_str);
-                if error_str.contains("not found")
-                    || error_str.contains("not available")
-                    || error_str.contains("agent")
-                {
-                    println!("Deep research agent not available - skipping test");
-                }
+                // Should mention both languages
+                let text_lower = text.to_lowercase();
+                assert!(
+                    text_lower.contains("rust") || text_lower.contains("go"),
+                    "Response should discuss programming languages"
+                );
             }
         }
-    })
-    .await;
+        Err(e) => {
+            let error_str = format!("{:?}", e);
+            println!("Deep research error (may be expected): {}", error_str);
+            if error_str.contains("not found")
+                || error_str.contains("not available")
+                || error_str.contains("agent")
+            {
+                println!("Deep research agent not available - skipping test");
+            }
+        }
+    }
 }
 
 // =============================================================================
@@ -454,93 +443,72 @@ async fn test_deep_research_agent() {
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_background_mode_polling() {
-    // Test background mode with polling
+    // Test background mode with polling using exponential backoff
     // Note: This requires an agent that supports background mode
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
     };
 
-    // Use extended timeout since this test includes polling with sleep intervals
-    with_timeout(EXTENDED_TEST_TIMEOUT, async {
-        // Start background task
-        let result = client
-            .interaction()
-            .with_agent("deep-research-pro-preview-12-2025")
-            .with_text("Briefly explain what machine learning is.")
-            .with_background(true)
-            .with_store(true)
-            .create()
-            .await;
+    // Start background task
+    let result = client
+        .interaction()
+        .with_agent("deep-research-pro-preview-12-2025")
+        .with_text("Briefly explain what machine learning is.")
+        .with_background(true)
+        .with_store(true)
+        .create()
+        .await;
 
-        match result {
-            Ok(initial_response) => {
-                println!("Initial status: {:?}", initial_response.status);
-                println!("Interaction ID: {}", initial_response.id);
+    match result {
+        Ok(initial_response) => {
+            println!("Initial status: {:?}", initial_response.status);
+            println!("Interaction ID: {}", initial_response.id);
 
-                // If still in progress, poll for completion
-                if initial_response.status == InteractionStatus::InProgress {
-                    let mut attempts = 0;
+            // If already completed, we're done
+            if initial_response.status == InteractionStatus::Completed {
+                println!("Task completed immediately (may not have used background mode)");
+                if initial_response.has_text() {
+                    println!("Result: {}", initial_response.text().unwrap());
+                }
+                return;
+            }
 
-                    loop {
-                        attempts += 1;
-                        if attempts > POLLING_MAX_ATTEMPTS {
-                            println!(
-                                "Reached max polling attempts ({}) - task may still be running",
-                                POLLING_MAX_ATTEMPTS
-                            );
-                            break;
-                        }
-
-                        sleep(Duration::from_secs(POLLING_INTERVAL_SECS)).await;
-
-                        let poll_result = client.get_interaction(&initial_response.id).await;
-
-                        match poll_result {
-                            Ok(polled) => {
-                                println!("Poll {}: status={:?}", attempts, polled.status);
-
-                                if polled.status == InteractionStatus::Completed {
-                                    println!("Task completed!");
-                                    if polled.has_text() {
-                                        println!(
-                                            "Result: {}...",
-                                            &polled.text().unwrap()
-                                                [..200.min(polled.text().unwrap().len())]
-                                        );
-                                    }
-                                    break;
-                                } else if polled.status == InteractionStatus::Failed {
-                                    println!("Task failed");
-                                    break;
-                                }
-                            }
-                            Err(e) => {
-                                println!("Poll error: {:?}", e);
-                                break;
-                            }
-                        }
-                    }
-                } else if initial_response.status == InteractionStatus::Completed {
-                    println!("Task completed immediately (may not have used background mode)");
-                    if initial_response.has_text() {
-                        println!("Result: {}", initial_response.text().unwrap());
+            // Poll for completion using exponential backoff
+            match poll_until_complete(&client, &initial_response.id, BACKGROUND_TASK_TIMEOUT).await
+            {
+                Ok(response) => {
+                    println!("Task completed!");
+                    if response.has_text() {
+                        let text = response.text().unwrap();
+                        println!("Result: {}...", &text[..200.min(text.len())]);
                     }
                 }
-            }
-            Err(e) => {
-                let error_str = format!("{:?}", e);
-                println!("Background mode error (may be expected): {}", error_str);
-                if error_str.contains("not found")
-                    || error_str.contains("not supported")
-                    || error_str.contains("background")
-                {
-                    println!("Background mode not available - skipping test");
+                Err(PollError::Timeout) => {
+                    println!(
+                        "Polling timed out after {:?} - task may still be running",
+                        BACKGROUND_TASK_TIMEOUT
+                    );
+                }
+                Err(PollError::Failed) => {
+                    println!("Task failed");
+                }
+                Err(PollError::Api(e)) => {
+                    println!("Poll error: {:?}", e);
                 }
             }
         }
-    })
-    .await;
+        Err(e) => {
+            let error_str = format!("{:?}", e);
+            println!("Background mode error (may be expected): {}", error_str);
+            if error_str.contains("not found")
+                || error_str.contains("not supported")
+                || error_str.contains("background")
+            {
+                println!("Background mode not available - skipping test");
+            }
+        }
+    }
 }
 
 // =============================================================================
