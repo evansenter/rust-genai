@@ -589,3 +589,55 @@ fn test_interaction_builder_with_google_search_and_functions() {
     assert!(matches!(tools[0], Tool::Function { .. }));
     assert!(matches!(tools[1], Tool::GoogleSearch));
 }
+
+#[test]
+fn test_interaction_builder_with_code_execution() {
+    use rust_genai::Tool;
+
+    // Test that with_code_execution adds the CodeExecution tool
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Calculate the factorial of 10")
+        .with_code_execution();
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+
+    // Verify CodeExecution tool was added
+    assert!(request.tools.is_some());
+    let tools = request.tools.unwrap();
+    assert_eq!(tools.len(), 1);
+    assert!(matches!(tools[0], Tool::CodeExecution));
+}
+
+#[test]
+fn test_interaction_builder_with_code_execution_and_google_search() {
+    use rust_genai::Tool;
+
+    // Test that with_code_execution can be combined with with_google_search
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Search for prime numbers and calculate the first 10")
+        .with_code_execution()
+        .with_google_search();
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+
+    // Verify both tools were added
+    assert!(request.tools.is_some());
+    let tools = request.tools.unwrap();
+    assert_eq!(tools.len(), 2);
+    assert!(matches!(tools[0], Tool::CodeExecution));
+    assert!(matches!(tools[1], Tool::GoogleSearch));
+}

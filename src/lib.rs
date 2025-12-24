@@ -5,9 +5,9 @@ pub use genai_client::{FunctionDeclaration, FunctionDeclarationBuilder, Function
 
 // Re-export Interactions API types for convenient access
 pub use genai_client::{
-    ContentSummary, CreateInteractionRequest, GenerationConfig, GroundingChunk, GroundingMetadata,
-    InteractionContent, InteractionInput, InteractionResponse, InteractionStatus, StreamChunk,
-    UsageMetadata, WebSource,
+    CodeExecutionOutcome, ContentSummary, CreateInteractionRequest, GenerationConfig,
+    GroundingChunk, GroundingMetadata, InteractionContent, InteractionInput, InteractionResponse,
+    InteractionStatus, StreamChunk, UsageMetadata, WebSource,
 };
 
 // Interactions API helper functions

@@ -87,13 +87,25 @@ pub enum InteractionContent {
     },
     /// Code execution call (model requesting code execution)
     ///
-    /// This variant appears when the model initiates a code execution
+    /// This variant appears when the model initiates code execution
     /// via the `CodeExecution` built-in tool.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionContent;
+    /// # let content: InteractionContent = todo!();
+    /// if let InteractionContent::CodeExecutionCall { id, language, code } = content {
+    ///     println!("Executing {} code (id: {}): {}", language, id, code);
+    /// }
+    /// ```
     CodeExecutionCall {
         /// Unique identifier for this code execution call
         id: String,
-        /// Arguments containing the code to execute (includes "code" and "language" fields)
-        arguments: serde_json::Value,
+        /// Programming language (e.g., "PYTHON")
+        language: String,
+        /// Source code to execute
+        code: String,
     },
     /// Code execution result (returned after code runs)
     ///
@@ -101,16 +113,31 @@ pub enum InteractionContent {
     ///
     /// # Security Note
     ///
-    /// When displaying results to end users, check `is_error` first. Error results
-    /// may contain stack traces or system information that shouldn't be exposed
+    /// When displaying results to end users, check `outcome.is_error()` first. Error
+    /// results may contain stack traces or system information that shouldn't be exposed
     /// directly to users without sanitization.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::{InteractionContent, CodeExecutionOutcome};
+    /// # let content: InteractionContent = todo!();
+    /// if let InteractionContent::CodeExecutionResult { outcome, output, .. } = content {
+    ///     match outcome {
+    ///         CodeExecutionOutcome::Ok => println!("Result: {}", output),
+    ///         CodeExecutionOutcome::Failed => eprintln!("Error: {}", output),
+    ///         CodeExecutionOutcome::DeadlineExceeded => eprintln!("Timeout!"),
+    ///         _ => {}
+    ///     }
+    /// }
+    /// ```
     CodeExecutionResult {
         /// The call_id matching the CodeExecutionCall this result is for
         call_id: String,
-        /// Whether the execution resulted in an error
-        is_error: bool,
-        /// The result/output of the code execution
-        result: String,
+        /// Execution outcome (OK, FAILED, DEADLINE_EXCEEDED, etc.)
+        outcome: CodeExecutionOutcome,
+        /// The output of the code execution (stdout for success, error message for failure)
+        output: String,
     },
     /// Google Search call (model requesting a search)
     ///
@@ -354,23 +381,24 @@ impl Serialize for InteractionContent {
                 map.serialize_entry("result", result)?;
                 map.end()
             }
-            Self::CodeExecutionCall { id, arguments } => {
+            Self::CodeExecutionCall { id, language, code } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "code_execution_call")?;
                 map.serialize_entry("id", id)?;
-                map.serialize_entry("arguments", arguments)?;
+                map.serialize_entry("language", language)?;
+                map.serialize_entry("code", code)?;
                 map.end()
             }
             Self::CodeExecutionResult {
                 call_id,
-                is_error,
-                result,
+                outcome,
+                output,
             } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "code_execution_result")?;
                 map.serialize_entry("call_id", call_id)?;
-                map.serialize_entry("is_error", is_error)?;
-                map.serialize_entry("result", result)?;
+                map.serialize_entry("outcome", outcome)?;
+                map.serialize_entry("output", output)?;
                 map.end()
             }
             Self::GoogleSearchCall { query } => {
@@ -577,12 +605,28 @@ impl<'de> Deserialize<'de> for InteractionContent {
             },
             CodeExecutionCall {
                 id: String,
-                arguments: serde_json::Value,
+                // API returns language/code in the arguments object
+                #[serde(default)]
+                language: Option<String>,
+                #[serde(default)]
+                code: Option<String>,
+                // Fallback for old API format
+                #[serde(default)]
+                arguments: Option<serde_json::Value>,
             },
             CodeExecutionResult {
                 call_id: String,
-                is_error: bool,
-                result: String,
+                // New typed outcome
+                #[serde(default)]
+                outcome: Option<CodeExecutionOutcome>,
+                // New output field
+                #[serde(default)]
+                output: Option<String>,
+                // Old API format fallback
+                #[serde(default)]
+                is_error: Option<bool>,
+                #[serde(default)]
+                result: Option<String>,
             },
             GoogleSearchCall {
                 query: String,
@@ -654,18 +698,63 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     call_id,
                     result,
                 },
-                KnownContent::CodeExecutionCall { id, arguments } => {
-                    InteractionContent::CodeExecutionCall { id, arguments }
+                KnownContent::CodeExecutionCall {
+                    id,
+                    language,
+                    code,
+                    arguments,
+                } => {
+                    // Prefer direct fields, fall back to parsing arguments
+                    let (lang, source) = if let (Some(l), Some(c)) = (language, code) {
+                        (l, c)
+                    } else if let Some(args) = arguments {
+                        // Parse old format: {"language": "PYTHON", "code": "..."}
+                        let lang = args
+                            .get("language")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("PYTHON")
+                            .to_string();
+                        let source = args
+                            .get("code")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        (lang, source)
+                    } else {
+                        (String::from("PYTHON"), String::new())
+                    };
+
+                    InteractionContent::CodeExecutionCall {
+                        id,
+                        language: lang,
+                        code: source,
+                    }
                 }
                 KnownContent::CodeExecutionResult {
                     call_id,
+                    outcome,
+                    output,
                     is_error,
                     result,
-                } => InteractionContent::CodeExecutionResult {
-                    call_id,
-                    is_error,
-                    result,
-                },
+                } => {
+                    // Prefer new fields, fall back to old fields
+                    let exec_outcome = outcome.unwrap_or(
+                        // Convert old is_error boolean to outcome
+                        match is_error {
+                            Some(true) => CodeExecutionOutcome::Failed,
+                            Some(false) => CodeExecutionOutcome::Ok,
+                            None => CodeExecutionOutcome::Unspecified,
+                        }
+                    );
+
+                    let exec_output = output.or(result).unwrap_or_default();
+
+                    InteractionContent::CodeExecutionResult {
+                        call_id,
+                        outcome: exec_outcome,
+                        output: exec_output,
+                    }
+                }
                 KnownContent::GoogleSearchCall { query } => {
                     InteractionContent::GoogleSearchCall { query }
                 }
@@ -886,6 +975,69 @@ pub struct WebSource {
     /// Domain of the web page (e.g., "wikipedia.org")
     pub domain: String,
 }
+
+/// Outcome of a code execution operation.
+///
+/// This enum represents the result status of code executed via the CodeExecution tool.
+/// The API returns these as strings like "OUTCOME_OK", which are deserialized into
+/// this enum.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::{InteractionResponse, CodeExecutionOutcome};
+/// # let response: InteractionResponse = todo!();
+/// for (outcome, output) in response.code_execution_results() {
+///     match outcome {
+///         CodeExecutionOutcome::Ok => println!("Success: {}", output),
+///         CodeExecutionOutcome::Failed => eprintln!("Error: {}", output),
+///         CodeExecutionOutcome::DeadlineExceeded => eprintln!("Timeout!"),
+///         _ => eprintln!("Unknown outcome"),
+///     }
+/// }
+/// ```
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[non_exhaustive]
+pub enum CodeExecutionOutcome {
+    /// Code executed successfully
+    #[serde(rename = "OUTCOME_OK")]
+    Ok,
+    /// Code execution failed (e.g., syntax error, runtime error)
+    #[serde(rename = "OUTCOME_FAILED")]
+    Failed,
+    /// Code execution exceeded the 30-second timeout
+    #[serde(rename = "OUTCOME_DEADLINE_EXCEEDED")]
+    DeadlineExceeded,
+    /// Unrecognized outcome for forward compatibility
+    #[serde(other)]
+    #[default]
+    Unspecified,
+}
+
+impl CodeExecutionOutcome {
+    /// Returns true if the execution was successful.
+    pub const fn is_success(&self) -> bool {
+        matches!(self, Self::Ok)
+    }
+
+    /// Returns true if the execution failed (any error type).
+    pub const fn is_error(&self) -> bool {
+        !self.is_success()
+    }
+}
+
+impl fmt::Display for CodeExecutionOutcome {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ok => write!(f, "OK"),
+            Self::Failed => write!(f, "FAILED"),
+            Self::DeadlineExceeded => write!(f, "DEADLINE_EXCEEDED"),
+            Self::Unspecified => write!(f, "UNSPECIFIED"),
+        }
+    }
+}
+
 
 /// Response from creating or retrieving an interaction
 #[derive(Clone, Deserialize, Debug)]
@@ -1144,13 +1296,27 @@ impl InteractionResponse {
 
     /// Extract all code execution calls from outputs
     ///
-    /// Returns a vector of (id, arguments) tuples where arguments contains the code and language.
-    pub fn code_execution_calls(&self) -> Vec<(&str, &serde_json::Value)> {
+    /// Returns a vector of (language, code) tuples representing code the model
+    /// wants to execute.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// for (language, code) in response.executable_code() {
+    ///     println!("Language: {}, Code:\n{}", language, code);
+    /// }
+    /// ```
+    pub fn executable_code(&self) -> Vec<(&str, &str)> {
         self.outputs
             .iter()
             .filter_map(|content| {
-                if let InteractionContent::CodeExecutionCall { id, arguments } = content {
-                    Some((id.as_str(), arguments))
+                if let InteractionContent::CodeExecutionCall {
+                    language, code, ..
+                } = content
+                {
+                    Some((language.as_str(), code.as_str()))
                 } else {
                     None
                 }
@@ -1167,23 +1333,64 @@ impl InteractionResponse {
 
     /// Extract code execution results from outputs
     ///
-    /// Returns a vector of (call_id, is_error, result) tuples.
-    pub fn code_execution_results(&self) -> Vec<(&str, bool, &str)> {
+    /// Returns a vector of (outcome, output) tuples representing the results
+    /// of executed code.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::{InteractionResponse, CodeExecutionOutcome};
+    /// # let response: InteractionResponse = todo!();
+    /// for (outcome, output) in response.code_execution_results() {
+    ///     if outcome.is_success() {
+    ///         println!("Code output: {}", output);
+    ///     } else {
+    ///         eprintln!("Code failed ({}): {}", outcome, output);
+    ///     }
+    /// }
+    /// ```
+    pub fn code_execution_results(&self) -> Vec<(CodeExecutionOutcome, &str)> {
         self.outputs
             .iter()
             .filter_map(|content| {
                 if let InteractionContent::CodeExecutionResult {
-                    call_id,
-                    is_error,
-                    result,
+                    outcome, output, ..
                 } = content
                 {
-                    Some((call_id.as_str(), *is_error, result.as_str()))
+                    Some((*outcome, output.as_str()))
                 } else {
                     None
                 }
             })
             .collect()
+    }
+
+    /// Get the first successful code execution output, if any.
+    ///
+    /// This is a convenience method for the common case where you just want the
+    /// output from successful code execution without handling errors.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(output) = response.successful_code_output() {
+    ///     println!("Result: {}", output);
+    /// }
+    /// ```
+    pub fn successful_code_output(&self) -> Option<&str> {
+        self.outputs.iter().find_map(|content| {
+            if let InteractionContent::CodeExecutionResult { outcome, output, .. } = content {
+                if outcome.is_success() {
+                    Some(output.as_str())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
     }
 
     /// Check if response contains Google Search results
@@ -2420,14 +2627,15 @@ mod tests {
 
     #[test]
     fn test_deserialize_code_execution_call() {
+        // Test deserialization from the API format (arguments object)
         let json = r#"{"type": "code_execution_call", "id": "call_123", "arguments": {"code": "print(42)", "language": "python"}}"#;
         let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
 
         match &content {
-            InteractionContent::CodeExecutionCall { id, arguments } => {
+            InteractionContent::CodeExecutionCall { id, language, code } => {
                 assert_eq!(id, "call_123");
-                assert_eq!(arguments["language"], "python");
-                assert_eq!(arguments["code"], "print(42)");
+                assert_eq!(language, "python");
+                assert_eq!(code, "print(42)");
             }
             _ => panic!("Expected CodeExecutionCall variant, got {:?}", content),
         }
@@ -2437,25 +2645,62 @@ mod tests {
     }
 
     #[test]
+    fn test_deserialize_code_execution_call_direct_fields() {
+        // Test deserialization from direct fields (new format)
+        let json = r#"{"type": "code_execution_call", "id": "call_123", "language": "PYTHON", "code": "print(42)"}"#;
+        let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+        match &content {
+            InteractionContent::CodeExecutionCall { id, language, code } => {
+                assert_eq!(id, "call_123");
+                assert_eq!(language, "PYTHON");
+                assert_eq!(code, "print(42)");
+            }
+            _ => panic!("Expected CodeExecutionCall variant, got {:?}", content),
+        }
+    }
+
+    #[test]
     fn test_deserialize_code_execution_result() {
+        // Test deserialization from old API format (is_error + result)
         let json = r#"{"type": "code_execution_result", "call_id": "call_123", "is_error": false, "result": "42\n"}"#;
         let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
 
         match &content {
             InteractionContent::CodeExecutionResult {
                 call_id,
-                is_error,
-                result,
+                outcome,
+                output,
             } => {
                 assert_eq!(call_id, "call_123");
-                assert!(!is_error);
-                assert_eq!(result, "42\n");
+                assert!(outcome.is_success());
+                assert_eq!(output, "42\n");
             }
             _ => panic!("Expected CodeExecutionResult variant, got {:?}", content),
         }
 
         assert!(content.is_code_execution_result());
         assert!(!content.is_unknown());
+    }
+
+    #[test]
+    fn test_deserialize_code_execution_result_with_outcome() {
+        // Test deserialization from new format (outcome + output)
+        let json = r#"{"type": "code_execution_result", "call_id": "call_123", "outcome": "OUTCOME_OK", "output": "42\n"}"#;
+        let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+        match &content {
+            InteractionContent::CodeExecutionResult {
+                call_id,
+                outcome,
+                output,
+            } => {
+                assert_eq!(call_id, "call_123");
+                assert_eq!(*outcome, CodeExecutionOutcome::Ok);
+                assert_eq!(output, "42\n");
+            }
+            _ => panic!("Expected CodeExecutionResult variant, got {:?}", content),
+        }
     }
 
     #[test]
@@ -2466,15 +2711,30 @@ mod tests {
         match &content {
             InteractionContent::CodeExecutionResult {
                 call_id,
-                is_error,
-                result,
+                outcome,
+                output,
             } => {
                 assert_eq!(call_id, "call_456");
-                assert!(is_error);
-                assert!(result.contains("NameError"));
+                assert!(outcome.is_error());
+                assert!(output.contains("NameError"));
             }
             _ => panic!("Expected CodeExecutionResult variant, got {:?}", content),
         }
+    }
+
+    #[test]
+    fn test_code_execution_outcome_enum() {
+        assert!(CodeExecutionOutcome::Ok.is_success());
+        assert!(!CodeExecutionOutcome::Ok.is_error());
+
+        assert!(!CodeExecutionOutcome::Failed.is_success());
+        assert!(CodeExecutionOutcome::Failed.is_error());
+
+        assert!(!CodeExecutionOutcome::DeadlineExceeded.is_success());
+        assert!(CodeExecutionOutcome::DeadlineExceeded.is_error());
+
+        assert!(!CodeExecutionOutcome::Unspecified.is_success());
+        assert!(CodeExecutionOutcome::Unspecified.is_error());
     }
 
     #[test]
@@ -2580,7 +2840,8 @@ mod tests {
     fn test_serialize_code_execution_call() {
         let content = InteractionContent::CodeExecutionCall {
             id: "call_123".to_string(),
-            arguments: serde_json::json!({"language": "PYTHON", "code": "print(42)"}),
+            language: "PYTHON".to_string(),
+            code: "print(42)".to_string(),
         };
 
         let json = serde_json::to_string(&content).expect("Serialization should work");
@@ -2588,16 +2849,16 @@ mod tests {
 
         assert_eq!(value["type"], "code_execution_call");
         assert_eq!(value["id"], "call_123");
-        assert_eq!(value["arguments"]["language"], "PYTHON");
-        assert_eq!(value["arguments"]["code"], "print(42)");
+        assert_eq!(value["language"], "PYTHON");
+        assert_eq!(value["code"], "print(42)");
     }
 
     #[test]
     fn test_serialize_code_execution_result() {
         let content = InteractionContent::CodeExecutionResult {
             call_id: "call_123".to_string(),
-            is_error: false,
-            result: "42".to_string(),
+            outcome: CodeExecutionOutcome::Ok,
+            output: "42".to_string(),
         };
 
         let json = serde_json::to_string(&content).expect("Serialization should work");
@@ -2605,16 +2866,16 @@ mod tests {
 
         assert_eq!(value["type"], "code_execution_result");
         assert_eq!(value["call_id"], "call_123");
-        assert_eq!(value["is_error"], false);
-        assert_eq!(value["result"], "42");
+        assert_eq!(value["outcome"], "OUTCOME_OK");
+        assert_eq!(value["output"], "42");
     }
 
     #[test]
     fn test_serialize_code_execution_result_error() {
         let content = InteractionContent::CodeExecutionResult {
             call_id: "call_456".to_string(),
-            is_error: true,
-            result: "NameError: x not defined".to_string(),
+            outcome: CodeExecutionOutcome::Failed,
+            output: "NameError: x not defined".to_string(),
         };
 
         let json = serde_json::to_string(&content).expect("Serialization should work");
@@ -2622,8 +2883,8 @@ mod tests {
 
         assert_eq!(value["type"], "code_execution_result");
         assert_eq!(value["call_id"], "call_456");
-        assert_eq!(value["is_error"], true);
-        assert!(value["result"].as_str().unwrap().contains("NameError"));
+        assert_eq!(value["outcome"], "OUTCOME_FAILED");
+        assert!(value["output"].as_str().unwrap().contains("NameError"));
     }
 
     #[test]
@@ -2631,7 +2892,8 @@ mod tests {
         // CodeExecutionCall roundtrip
         let original = InteractionContent::CodeExecutionCall {
             id: "call_123".to_string(),
-            arguments: serde_json::json!({"language": "PYTHON", "code": "print('hello')"}),
+            language: "PYTHON".to_string(),
+            code: "print('hello')".to_string(),
         };
         let json = serde_json::to_string(&original).unwrap();
         let restored: InteractionContent = serde_json::from_str(&json).unwrap();
@@ -2643,8 +2905,8 @@ mod tests {
         // CodeExecutionResult roundtrip
         let original = InteractionContent::CodeExecutionResult {
             call_id: "call_123".to_string(),
-            is_error: false,
-            result: "hello\n".to_string(),
+            outcome: CodeExecutionOutcome::Ok,
+            output: "hello\n".to_string(),
         };
         let json = serde_json::to_string(&original).unwrap();
         let restored: InteractionContent = serde_json::from_str(&json).unwrap();
@@ -2701,17 +2963,19 @@ mod tests {
 
     #[test]
     fn test_edge_cases_empty_values() {
-        // Empty arguments in CodeExecutionCall
+        // Empty code in CodeExecutionCall
         let content = InteractionContent::CodeExecutionCall {
             id: "call_empty".to_string(),
-            arguments: serde_json::json!({}),
+            language: "PYTHON".to_string(),
+            code: "".to_string(),
         };
         let json = serde_json::to_string(&content).unwrap();
         let restored: InteractionContent = serde_json::from_str(&json).unwrap();
         match restored {
-            InteractionContent::CodeExecutionCall { id, arguments } => {
+            InteractionContent::CodeExecutionCall { id, language, code } => {
                 assert_eq!(id, "call_empty");
-                assert!(arguments.as_object().unwrap().is_empty());
+                assert_eq!(language, "PYTHON");
+                assert!(code.is_empty());
             }
             _ => panic!("Expected CodeExecutionCall"),
         }
@@ -2742,20 +3006,20 @@ mod tests {
             _ => panic!("Expected UrlContextResult"),
         }
 
-        // Empty result string in CodeExecutionResult
+        // Empty output string in CodeExecutionResult
         let content = InteractionContent::CodeExecutionResult {
             call_id: "call_no_output".to_string(),
-            is_error: false,
-            result: "".to_string(),
+            outcome: CodeExecutionOutcome::Ok,
+            output: "".to_string(),
         };
         let json = serde_json::to_string(&content).unwrap();
         let restored: InteractionContent = serde_json::from_str(&json).unwrap();
         match restored {
             InteractionContent::CodeExecutionResult {
-                call_id, result, ..
+                call_id, output, ..
             } => {
                 assert_eq!(call_id, "call_no_output");
-                assert!(result.is_empty());
+                assert!(output.is_empty());
             }
             _ => panic!("Expected CodeExecutionResult"),
         }
@@ -2774,12 +3038,13 @@ mod tests {
                 },
                 InteractionContent::CodeExecutionCall {
                     id: "call_123".to_string(),
-                    arguments: serde_json::json!({"language": "PYTHON", "code": "print(42)"}),
+                    language: "PYTHON".to_string(),
+                    code: "print(42)".to_string(),
                 },
                 InteractionContent::CodeExecutionResult {
                     call_id: "call_123".to_string(),
-                    is_error: false,
-                    result: "42\n".to_string(),
+                    outcome: CodeExecutionOutcome::Ok,
+                    output: "42\n".to_string(),
                 },
             ],
             status: InteractionStatus::Completed,
@@ -2793,15 +3058,20 @@ mod tests {
         assert!(response.has_code_execution_results());
         assert!(!response.has_unknown());
 
-        let code_blocks = response.code_execution_calls();
+        // Test executable_code helper
+        let code_blocks = response.executable_code();
         assert_eq!(code_blocks.len(), 1);
-        assert_eq!(code_blocks[0].0, "call_123");
-        assert_eq!(code_blocks[0].1["language"], "PYTHON");
-        assert_eq!(code_blocks[0].1["code"], "print(42)");
+        assert_eq!(code_blocks[0].0, "PYTHON");
+        assert_eq!(code_blocks[0].1, "print(42)");
 
+        // Test code_execution_results helper
         let results = response.code_execution_results();
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0], ("call_123", false, "42\n"));
+        assert_eq!(results[0].0, CodeExecutionOutcome::Ok);
+        assert_eq!(results[0].1, "42\n");
+
+        // Test successful_code_output helper
+        assert_eq!(response.successful_code_output(), Some("42\n"));
     }
 
     #[test]
@@ -2871,16 +3141,18 @@ mod tests {
             outputs: vec![
                 InteractionContent::CodeExecutionCall {
                     id: "call_1".to_string(),
-                    arguments: serde_json::json!({"language": "PYTHON", "code": "print(1)"}),
+                    language: "PYTHON".to_string(),
+                    code: "print(1)".to_string(),
                 },
                 InteractionContent::CodeExecutionCall {
                     id: "call_2".to_string(),
-                    arguments: serde_json::json!({"language": "PYTHON", "code": "print(2)"}),
+                    language: "PYTHON".to_string(),
+                    code: "print(2)".to_string(),
                 },
                 InteractionContent::CodeExecutionResult {
                     call_id: "call_1".to_string(),
-                    is_error: false,
-                    result: "1\n2\n".to_string(),
+                    outcome: CodeExecutionOutcome::Ok,
+                    output: "1\n2\n".to_string(),
                 },
                 InteractionContent::GoogleSearchCall {
                     query: "test".to_string(),

@@ -53,6 +53,15 @@ if let Some(text) = delta.text() { /* ... */ }
   - New helper methods: `has_grounding()`, `grounding_metadata()` on `InteractionResponse`
   - Full streaming support via `StreamChunk::Complete`
 
+- **Code execution support** (#26): Enable Python code execution via Gemini's built-in sandbox
+  - New `with_code_execution()` builder method on `InteractionBuilder`
+  - New `CodeExecutionOutcome` enum with `Ok`, `Failed`, `DeadlineExceeded`, `Unspecified` variants
+  - Updated `InteractionContent::CodeExecutionCall` with typed fields: `id`, `language`, `code`
+  - Updated `InteractionContent::CodeExecutionResult` with typed fields: `call_id`, `outcome`, `output`
+  - New helper methods on `InteractionResponse`: `executable_code()`, `code_execution_results()`, `successful_code_output()`
+  - New helper functions: `code_execution_call_content()`, `code_execution_result_content()`, `code_execution_success()`, `code_execution_error()`
+  - Backward-compatible deserialization for old API response format
+
 ### Changed
 - **`InteractionContent` is now `#[non_exhaustive]`** (#44): Match statements must include a wildcard arm (`_ => {}`). This allows adding new variants in minor version updates without breaking downstream code.
 

@@ -266,6 +266,53 @@ impl<'a> InteractionBuilder<'a> {
         self
     }
 
+    /// Enables code execution for this interaction.
+    ///
+    /// This adds the built-in `CodeExecution` tool which allows the model to
+    /// write and execute Python code to help answer questions. The code runs
+    /// in a sandboxed environment on Google's servers.
+    ///
+    /// # Security Considerations
+    ///
+    /// Code execution runs in a sandboxed environment with the following
+    /// limitations:
+    /// - Maximum execution time: 30 seconds
+    /// - No network access
+    /// - Limited file I/O capabilities
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Calculate the factorial of 50")
+    ///     .with_code_execution()
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // Access code execution results
+    /// for (outcome, output) in response.code_execution_results() {
+    ///     if outcome.is_success() {
+    ///         println!("Code output: {}", output);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_code_execution(mut self) -> Self {
+        self.tools
+            .get_or_insert_with(Vec::new)
+            .push(InternalTool::CodeExecution);
+        self
+    }
+
     /// Sets response modalities (e.g., ["IMAGE"]).
     pub fn with_response_modalities(mut self, modalities: Vec<String>) -> Self {
         self.response_modalities = Some(modalities);
