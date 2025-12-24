@@ -50,10 +50,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
 
             // 5. Check if response is grounded and display sources
-            if response.has_grounding() {
+            if response.has_google_search_metadata() {
                 println!("--- Grounding Information ---");
 
-                if let Some(metadata) = response.grounding_metadata() {
+                if let Some(metadata) = response.google_search_metadata() {
                     // Display search queries used
                     if !metadata.web_search_queries.is_empty() {
                         println!("Search Queries:");

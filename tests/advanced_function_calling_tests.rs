@@ -144,32 +144,32 @@ async fn test_parallel_function_calls() {
     let function_calls = response.function_calls();
     println!("Number of function calls: {}", function_calls.len());
 
-    for (call_id, name, args, signature) in &function_calls {
+    for call in &function_calls {
         println!(
             "  Function: {} (id: {:?}, has_signature: {})",
-            name,
-            call_id,
-            signature.is_some()
+            call.name,
+            call.id,
+            call.thought_signature.is_some()
         );
-        println!("    Args: {}", args);
+        println!("    Args: {}", call.args);
     }
 
     // Model may call one or both functions
     if function_calls.len() >= 2 {
         println!("Model made parallel function calls!");
         // Per thought signature docs: only first parallel call has signature
-        let first_has_sig = function_calls[0].3.is_some();
+        let first_has_sig = function_calls[0].thought_signature.is_some();
         println!("First call has signature: {}", first_has_sig);
     } else if function_calls.len() == 1 {
         println!("Model called one function (may call second in next turn)");
     }
 
     // Verify all calls have IDs
-    for (call_id, name, _, _) in &function_calls {
+    for call in &function_calls {
         assert!(
-            call_id.is_some(),
+            call.id.is_some(),
             "Function call '{}' should have an ID",
-            name
+            call.name
         );
     }
 }
@@ -214,15 +214,23 @@ async fn test_thought_signature_parallel_only_first() {
 
     if function_calls.len() >= 2 {
         // Check signature pattern
-        let (_, name1, _, sig1) = &function_calls[0];
-        let (_, name2, _, sig2) = &function_calls[1];
+        let call1 = &function_calls[0];
+        let call2 = &function_calls[1];
 
-        println!("First call: {} (has_signature: {})", name1, sig1.is_some());
-        println!("Second call: {} (has_signature: {})", name2, sig2.is_some());
+        println!(
+            "First call: {} (has_signature: {})",
+            call1.name,
+            call1.thought_signature.is_some()
+        );
+        println!(
+            "Second call: {} (has_signature: {})",
+            call2.name,
+            call2.thought_signature.is_some()
+        );
 
         // According to docs, only first should have signature
         // But this behavior may vary - log for investigation
-        if sig1.is_some() && sig2.is_none() {
+        if call1.thought_signature.is_some() && call2.thought_signature.is_none() {
             println!("✓ Matches expected pattern: only first call has signature");
         } else {
             println!(
@@ -292,16 +300,16 @@ async fn test_sequential_function_chain() {
     }
 
     // Step 2: Provide first function result
-    let (call_id1, name1, _, sig1) = &calls1[0];
+    let call1 = &calls1[0];
     println!(
         "Providing result for: {} (signature: {:?})",
-        name1,
-        sig1.is_some()
+        call1.name,
+        call1.thought_signature.is_some()
     );
 
     let result1 = function_result_content(
-        name1.to_string(),
-        call_id1.unwrap().to_string(),
+        call1.name.to_string(),
+        call1.id.unwrap().to_string(),
         json!({"city": "Tokyo", "temperature": 22.0, "unit": "celsius"}),
     );
 
@@ -321,18 +329,18 @@ async fn test_sequential_function_chain() {
 
     if !calls2.is_empty() {
         // Model is requesting another function (probably convert_temperature)
-        let (call_id2, name2, args2, sig2) = &calls2[0];
+        let call2 = &calls2[0];
         println!(
             "Step 2 function call: {} (signature: {:?})",
-            name2,
-            sig2.is_some()
+            call2.name,
+            call2.thought_signature.is_some()
         );
-        println!("  Args: {}", args2);
+        println!("  Args: {}", call2.args);
 
         // Step 3: Provide second function result
         let result2 = function_result_content(
-            name2.to_string(),
-            call_id2.unwrap().to_string(),
+            call2.name.to_string(),
+            call2.id.unwrap().to_string(),
             json!({"value": 71.6, "unit": "fahrenheit"}),
         );
 
@@ -396,13 +404,16 @@ async fn test_thought_signature_sequential_each_step() {
         return;
     }
 
-    let (call_id1, _, _, sig1) = &calls1[0];
-    println!("Step 1 signature present: {}", sig1.is_some());
+    let call1 = &calls1[0];
+    println!(
+        "Step 1 signature present: {}",
+        call1.thought_signature.is_some()
+    );
 
     // Provide result
     let result1 = function_result_content(
         "get_weather",
-        call_id1.unwrap().to_string(),
+        call1.id.unwrap().to_string(),
         json!({"temperature": "22°C"}),
     );
 
@@ -420,11 +431,14 @@ async fn test_thought_signature_sequential_each_step() {
 
     let calls2 = response2.function_calls();
     if !calls2.is_empty() {
-        let (_, _, _, sig2) = &calls2[0];
-        println!("Step 2 signature present: {}", sig2.is_some());
+        let call2 = &calls2[0];
+        println!(
+            "Step 2 signature present: {}",
+            call2.thought_signature.is_some()
+        );
 
         // Both steps should have their own signatures
-        if sig1.is_some() && sig2.is_some() {
+        if call1.thought_signature.is_some() && call2.thought_signature.is_some() {
             println!("✓ Both sequential calls have signatures as expected");
         }
     }
@@ -604,12 +618,12 @@ async fn test_function_call_error_response() {
         return;
     }
 
-    let (call_id, _, _, _) = &calls[0];
+    let call = &calls[0];
 
     // Step 2: Return an error result
     let error_result = function_result_content(
         "get_secret_data",
-        call_id.unwrap().to_string(),
+        call.id.unwrap().to_string(),
         json!({"error": "Access denied: insufficient permissions"}),
     );
 
@@ -672,15 +686,15 @@ async fn test_function_call_no_args() {
 
     let calls = response.function_calls();
     if !calls.is_empty() {
-        let (call_id, name, args, _) = &calls[0];
-        println!("Function called: {} with args: {}", name, args);
-        assert_eq!(*name, "get_server_status");
-        assert!(call_id.is_some(), "Should have call ID");
+        let call = &calls[0];
+        println!("Function called: {} with args: {}", call.name, call.args);
+        assert_eq!(call.name, "get_server_status");
+        assert!(call.id.is_some(), "Should have call ID");
 
         // Provide result
         let result = function_result_content(
             "get_server_status",
-            call_id.unwrap().to_string(),
+            call.id.unwrap().to_string(),
             json!({"status": "online", "uptime": "99.9%"}),
         );
 
@@ -744,14 +758,14 @@ async fn test_function_call_complex_args() {
 
     let calls = response.function_calls();
     if !calls.is_empty() {
-        let (_, name, args, _) = &calls[0];
-        println!("Function: {} with args: {}", name, args);
+        let call = &calls[0];
+        println!("Function: {} with args: {}", call.name, call.args);
 
         // Verify complex arguments are parsed correctly
-        assert!(args.get("user_id").is_some(), "Should have user_id");
+        assert!(call.args.get("user_id").is_some(), "Should have user_id");
 
         // Filters may be present if model included them
-        if let Some(filters) = args.get("filters") {
+        if let Some(filters) = call.args.get("filters") {
             println!("Filters provided: {}", filters);
         }
     }

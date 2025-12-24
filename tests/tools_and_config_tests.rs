@@ -65,7 +65,7 @@ async fn test_google_search() {
             }
 
             // Verify grounding metadata is available
-            if let Some(metadata) = response.grounding_metadata() {
+            if let Some(metadata) = response.google_search_metadata() {
                 println!("Grounding metadata found:");
                 println!("  Search queries: {:?}", metadata.web_search_queries);
                 println!("  Grounding chunks: {}", metadata.grounding_chunks.len());
@@ -126,7 +126,7 @@ async fn test_google_search_streaming() {
                     StreamChunk::Complete(response) => {
                         println!("Complete response received");
                         // Check for grounding metadata in the final response
-                        if let Some(metadata) = response.grounding_metadata() {
+                        if let Some(metadata) = response.google_search_metadata() {
                             println!("Streaming grounding metadata:");
                             println!("  Search queries: {:?}", metadata.web_search_queries);
                             println!("  Chunks: {}", metadata.grounding_chunks.len());
@@ -203,7 +203,7 @@ async fn test_code_execution() {
             );
 
             // Test the new typed helper methods
-            for (language, code) in response.executable_code() {
+            for (language, code) in response.code_execution_calls() {
                 println!(
                     "Executed {} code: {}",
                     language,
@@ -654,7 +654,7 @@ async fn test_structured_output_with_google_search() {
     assert!(json.get("answer").is_some(), "Should have answer field");
 
     // Verify grounding metadata is present (Google Search was used)
-    if let Some(metadata) = response.grounding_metadata() {
+    if let Some(metadata) = response.google_search_metadata() {
         println!("Grounding chunks: {:?}", metadata.grounding_chunks.len());
     }
 }
