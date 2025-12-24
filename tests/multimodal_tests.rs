@@ -564,8 +564,11 @@ async fn test_mixed_image_and_audio() {
 
 /// Tests combining all three media types: image, audio, and video.
 ///
-/// Note: This test is more likely to fail due to the minimal test files not being
-/// fully valid media. It documents the API's ability to accept all three types.
+/// This is an **exploratory test** that documents API behavior rather than enforcing
+/// specific outcomes. It may fail due to the minimal test files not being fully valid.
+///
+/// - **Success**: Indicates the API accepts all three media types together
+/// - **Failure**: Documents which media types cause issues (helps debugging)
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_mixed_image_audio_video() {
