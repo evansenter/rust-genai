@@ -31,6 +31,8 @@ A Rust client library for interacting with Google's Generative AI (Gemini) API u
 - Stateful conversations with automatic context management via `previous_interaction_id`
 - Function calling with both manual and automatic execution
 - Automatic function discovery at compile time using procedural macros
+- Structured output with JSON schema enforcement via `with_response_format()`
+- Built-in tool support: Google Search grounding, URL context, and code execution
 - Helper functions for building multi-turn conversations
 - Comprehensive error handling with detailed error types
 - Async/await support with Tokio
