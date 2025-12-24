@@ -1,7 +1,5 @@
 use thiserror::Error;
 
-pub use genai_client::ApiVersion;
-
 // Re-export unified function declaration types from genai_client
 pub use genai_client::{FunctionDeclaration, FunctionDeclarationBuilder, FunctionParameters, Tool};
 
@@ -13,23 +11,18 @@ pub use genai_client::{
 
 // Interactions API helper functions
 pub mod interactions_api;
-#[allow(deprecated)]
 pub use interactions_api::{
     audio_data_content, audio_uri_content, build_interaction_input, function_call_content,
-    function_call_content_with_signature, function_response_content, function_result_content,
-    image_data_content, image_uri_content, text_content, text_input, thought_content,
-    video_data_content, video_uri_content,
+    function_call_content_with_signature, function_result_content, image_data_content,
+    image_uri_content, text_content, text_input, thought_content, video_data_content,
+    video_uri_content,
 };
-
-// Builder traits module - provides shared builder functionality
-pub mod builder_traits;
-pub use builder_traits::WithFunctionCalling;
 
 pub mod client;
 pub use client::{Client, ClientBuilder};
 
 pub mod request_builder;
-pub use request_builder::InteractionBuilder;
+pub use request_builder::{DEFAULT_MAX_FUNCTION_CALL_LOOPS, InteractionBuilder};
 
 pub mod function_calling;
 // Re-export public types from function_calling module
@@ -69,7 +62,7 @@ impl From<genai_client::InternalError> for GenaiError {
 
 #[cfg(test)]
 mod tests {
-    use super::*; // This will bring in Client, GenerateContentResponse, etc.
+    use super::*; // This will bring in Client, InteractionResponse, etc.
     use genai_client::InternalError;
 
     #[test]

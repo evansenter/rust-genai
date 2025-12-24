@@ -5,7 +5,7 @@
 //! - InteractionBuilder edge cases and validation
 
 use genai_client::{GenerationConfig, InteractionContent, InteractionInput};
-use rust_genai::{Client, FunctionDeclaration, WithFunctionCalling};
+use rust_genai::{Client, FunctionDeclaration};
 use serde_json::json;
 
 // =============================================================================
@@ -255,7 +255,7 @@ fn test_function_builder_very_long_description() {
 #[test]
 fn test_interaction_builder_with_complex_content_input() {
     // Test using InteractionInput::Content variant with multiple content items
-    let client = Client::new("test-api-key".to_string(), None);
+    let client = Client::new("test-api-key".to_string());
 
     let complex_input = InteractionInput::Content(vec![
         InteractionContent::Text {
@@ -291,7 +291,7 @@ fn test_interaction_builder_with_complex_content_input() {
 #[test]
 fn test_interaction_builder_with_both_model_and_agent_set() {
     // Test that setting both model AND agent is allowed (builder doesn't validate this)
-    let client = Client::new("test-api-key".to_string(), None);
+    let client = Client::new("test-api-key".to_string());
 
     let _builder = client
         .interaction()
@@ -306,7 +306,7 @@ fn test_interaction_builder_with_both_model_and_agent_set() {
 #[test]
 fn test_interaction_builder_with_very_long_text() {
     // Test with very long input text (10KB)
-    let client = Client::new("test-api-key".to_string(), None);
+    let client = Client::new("test-api-key".to_string());
     let long_text = "Lorem ipsum ".repeat(1000); // ~12KB
 
     let _builder = client
@@ -320,7 +320,7 @@ fn test_interaction_builder_with_very_long_text() {
 #[test]
 fn test_interaction_builder_with_unicode_and_emojis() {
     // Test with unicode, emojis, and special characters
-    let client = Client::new("test-api-key".to_string(), None);
+    let client = Client::new("test-api-key".to_string());
 
     let unicode_text = "Hello 世界 🌍 مرحبا Здравствуй \u{1F600} \u{1F44D}";
 
@@ -335,7 +335,7 @@ fn test_interaction_builder_with_unicode_and_emojis() {
 #[test]
 fn test_interaction_builder_with_empty_text() {
     // Test with empty string input
-    let client = Client::new("test-api-key".to_string(), None);
+    let client = Client::new("test-api-key".to_string());
 
     let _builder = client
         .interaction()
@@ -348,7 +348,7 @@ fn test_interaction_builder_with_empty_text() {
 #[test]
 fn test_interaction_builder_with_multiple_functions() {
     // Test adding many functions
-    let client = Client::new("test-api-key".to_string(), None);
+    let client = Client::new("test-api-key".to_string());
 
     let mut builder = client
         .interaction()
@@ -371,7 +371,7 @@ fn test_interaction_builder_with_multiple_functions() {
 #[test]
 fn test_interaction_builder_with_complex_generation_config() {
     // Test with generation config at boundary values
-    let client = Client::new("test-api-key".to_string(), None);
+    let client = Client::new("test-api-key".to_string());
 
     let config = GenerationConfig {
         temperature: Some(2.0),        // Max value
@@ -393,7 +393,7 @@ fn test_interaction_builder_with_complex_generation_config() {
 #[test]
 fn test_interaction_builder_with_response_format_json_schema() {
     // Test with complex JSON schema for structured output
-    let client = Client::new("test-api-key".to_string(), None);
+    let client = Client::new("test-api-key".to_string());
 
     let complex_schema = json!({
         "type": "object",
@@ -428,7 +428,7 @@ fn test_interaction_builder_with_response_format_json_schema() {
 #[test]
 fn test_interaction_builder_with_all_features_combined() {
     // Test combining many features simultaneously
-    let client = Client::new("test-api-key".to_string(), None);
+    let client = Client::new("test-api-key".to_string());
 
     let func = FunctionDeclaration::builder("get_weather")
         .description("Get weather")
@@ -459,7 +459,7 @@ fn test_interaction_builder_with_all_features_combined() {
 #[test]
 fn test_interaction_builder_method_chaining() {
     // Verify fluent API / method chaining works correctly
-    let client = Client::new("test-api-key".to_string(), None);
+    let client = Client::new("test-api-key".to_string());
 
     let _builder = client
         .interaction()
@@ -481,7 +481,7 @@ fn test_interaction_builder_method_chaining() {
 #[test]
 fn test_interaction_builder_validation_missing_input() {
     // Verify that build_request fails when no input is provided
-    let client = Client::new("test-api-key".to_string(), None);
+    let client = Client::new("test-api-key".to_string());
 
     let builder = client.interaction().with_model("gemini-3-flash-preview");
 
@@ -500,7 +500,7 @@ fn test_interaction_builder_validation_missing_input() {
 #[test]
 fn test_interaction_builder_validation_missing_model_and_agent() {
     // Verify that build_request fails when neither model nor agent is specified
-    let client = Client::new("test-api-key".to_string(), None);
+    let client = Client::new("test-api-key".to_string());
 
     let builder = client.interaction().with_text("Hello"); // Has input but no model/agent
 
@@ -519,7 +519,7 @@ fn test_interaction_builder_validation_missing_model_and_agent() {
 #[test]
 fn test_interaction_builder_validation_success_with_model() {
     // Verify that build_request succeeds when model and input are provided
-    let client = Client::new("test-api-key".to_string(), None);
+    let client = Client::new("test-api-key".to_string());
 
     let builder = client
         .interaction()

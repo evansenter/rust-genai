@@ -1,14 +1,14 @@
 use crate::GenaiError;
-use crate::builder_traits::HasToolsField;
 use crate::client::Client;
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
-    self, CreateInteractionRequest, GenerationConfig, InteractionContent, InteractionInput,
-    InteractionResponse, StreamChunk, Tool as InternalTool,
+    self, CreateInteractionRequest, FunctionDeclaration, GenerationConfig, InteractionContent,
+    InteractionInput, InteractionResponse, StreamChunk, Tool as InternalTool,
 };
 
-const MAX_FUNCTION_CALL_LOOPS: usize = 5; // Max iterations for auto function calling
+/// Default maximum iterations for auto function calling
+pub const DEFAULT_MAX_FUNCTION_CALL_LOOPS: usize = 5;
 
 /// Builder for creating interactions with the Gemini Interactions API.
 ///
@@ -65,6 +65,8 @@ pub struct InteractionBuilder<'a> {
     background: Option<bool>,
     store: Option<bool>,
     system_instruction: Option<InteractionInput>,
+    /// Maximum iterations for auto function calling loop
+    max_function_call_loops: usize,
 }
 
 impl<'a> InteractionBuilder<'a> {
@@ -83,6 +85,7 @@ impl<'a> InteractionBuilder<'a> {
             background: None,
             store: None,
             system_instruction: None,
+            max_function_call_loops: DEFAULT_MAX_FUNCTION_CALL_LOOPS,
         }
     }
 
@@ -159,6 +162,67 @@ impl<'a> InteractionBuilder<'a> {
         self
     }
 
+    /// Adds a single function declaration to the request.
+    ///
+    /// This method can be called multiple times to add several functions.
+    /// Each function is converted into a [`Tool`] and added to the request.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, FunctionDeclaration};
+    /// use serde_json::json;
+    ///
+    /// let client = Client::new("api-key".to_string(), None);
+    ///
+    /// let func = FunctionDeclaration::builder("get_temperature")
+    ///     .description("Get the temperature for a location")
+    ///     .parameter("location", json!({"type": "string"}))
+    ///     .required(vec!["location".to_string()])
+    ///     .build();
+    ///
+    /// let builder = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What's the temperature in Paris?")
+    ///     .with_function(func);
+    /// ```
+    pub fn with_function(mut self, function: FunctionDeclaration) -> Self {
+        let tool = function.into_tool();
+        self.tools.get_or_insert_with(Vec::new).push(tool);
+        self
+    }
+
+    /// Adds multiple function declarations to the request at once.
+    ///
+    /// This is a convenience method equivalent to calling [`with_function`] multiple times.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, FunctionDeclaration};
+    ///
+    /// let client = Client::new("api-key".to_string(), None);
+    ///
+    /// let functions = vec![
+    ///     FunctionDeclaration::builder("get_weather").build(),
+    ///     FunctionDeclaration::builder("get_time").build(),
+    /// ];
+    ///
+    /// let builder = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What's the weather and time?")
+    ///     .with_functions(functions);
+    /// ```
+    ///
+    /// [`with_function`]: InteractionBuilder::with_function
+    pub fn with_functions(self, functions: Vec<FunctionDeclaration>) -> Self {
+        functions
+            .into_iter()
+            .fold(self, |builder, func| builder.with_function(func))
+    }
+
     /// Sets response modalities (e.g., ["IMAGE"]).
     pub fn with_response_modalities(mut self, modalities: Vec<String>) -> Self {
         self.response_modalities = Some(modalities);
@@ -192,6 +256,32 @@ impl<'a> InteractionBuilder<'a> {
     /// Sets a system instruction for the model.
     pub fn with_system_instruction(mut self, instruction: impl Into<String>) -> Self {
         self.system_instruction = Some(InteractionInput::Text(instruction.into()));
+        self
+    }
+
+    /// Sets the maximum number of function call loops for `create_with_auto_functions()`.
+    ///
+    /// Default is 5. Increase for complex multi-step function calling scenarios,
+    /// or decrease to fail faster if the model is stuck in a loop.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api_key".to_string()).build();
+    ///
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Complex multi-step task")
+    ///     .with_max_function_call_loops(10)  // Allow up to 10 iterations
+    ///     .create_with_auto_functions()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_max_function_call_loops(mut self, max_loops: usize) -> Self {
+        self.max_function_call_loops = max_loops;
         self
     }
 
@@ -277,7 +367,7 @@ impl<'a> InteractionBuilder<'a> {
     /// The loop automatically stops when:
     /// - Model returns text without function calls
     /// - Function calls array is empty
-    /// - Maximum iterations (5) is reached
+    /// - Maximum iterations is reached (default 5, configurable via `with_max_function_call_loops()`)
     ///
     /// # Example
     /// ```no_run
@@ -304,7 +394,7 @@ impl<'a> InteractionBuilder<'a> {
     /// - No input was provided
     /// - Neither model nor agent was specified
     /// - The API request fails
-    /// - Maximum function call loops (5) is exceeded
+    /// - Maximum function call loops is exceeded (default 5, configurable via `with_max_function_call_loops()`)
     pub async fn create_with_auto_functions(self) -> Result<InteractionResponse, GenaiError> {
         use crate::function_calling::get_global_function_registry;
         use crate::interactions_api::function_result_content;
@@ -312,6 +402,7 @@ impl<'a> InteractionBuilder<'a> {
         use serde_json::json;
 
         let client = self.client;
+        let max_loops = self.max_function_call_loops;
         let mut request = self.build_request()?;
 
         // Auto-discover functions from registry if not explicitly provided
@@ -328,8 +419,8 @@ impl<'a> InteractionBuilder<'a> {
             }
         }
 
-        // Main auto-function loop (max 5 iterations to prevent infinite loops)
-        for _loop_count in 0..MAX_FUNCTION_CALL_LOOPS {
+        // Main auto-function loop (configurable iterations to prevent infinite loops)
+        for _loop_count in 0..max_loops {
             let response = client.create_interaction(request.clone()).await?;
 
             // Extract function calls using convenience method
@@ -391,8 +482,9 @@ impl<'a> InteractionBuilder<'a> {
         }
 
         Err(GenaiError::Internal(format!(
-            "Exceeded maximum function call loops ({MAX_FUNCTION_CALL_LOOPS}). \
-             The model may be stuck in a loop. Check your function implementations \
+            "Exceeded maximum function call loops ({max_loops}). \
+             The model may be stuck in a loop. Check your function implementations, \
+             increase the limit using with_max_function_call_loops(), \
              or use manual function calling for more control."
         )))
     }
@@ -432,17 +524,9 @@ impl<'a> InteractionBuilder<'a> {
     }
 }
 
-// Implement trait for function calling support
-impl HasToolsField for InteractionBuilder<'_> {
-    fn get_tools_mut(&mut self) -> &mut Option<Vec<InternalTool>> {
-        &mut self.tools
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder_traits::WithFunctionCalling;
     use crate::{Client, FunctionDeclaration};
     use genai_client::Tool;
     use serde_json::json;
@@ -676,5 +760,36 @@ mod tests {
             builder.response_modalities.as_ref().unwrap(),
             &vec!["IMAGE".to_string()]
         );
+    }
+
+    #[test]
+    fn test_interaction_builder_with_max_function_call_loops() {
+        let client = create_test_client();
+
+        // Test default value
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Test");
+        assert_eq!(
+            builder.max_function_call_loops,
+            crate::request_builder::DEFAULT_MAX_FUNCTION_CALL_LOOPS
+        );
+
+        // Test custom value
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Test")
+            .with_max_function_call_loops(10);
+        assert_eq!(builder.max_function_call_loops, 10);
+
+        // Test setting to minimum (1)
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Test")
+            .with_max_function_call_loops(1);
+        assert_eq!(builder.max_function_call_loops, 1);
     }
 }

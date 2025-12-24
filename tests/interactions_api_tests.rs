@@ -228,7 +228,10 @@ async fn test_streaming_interaction() {
                 }
                 StreamChunk::Complete(response) => {
                     complete_count += 1;
-                    println!("\nComplete: status={:?}, id={}", response.status, response.id);
+                    println!(
+                        "\nComplete: status={:?}, id={}",
+                        response.status, response.id
+                    );
                     final_response = Some(response);
                 }
             },
@@ -239,7 +242,10 @@ async fn test_streaming_interaction() {
         }
     }
 
-    println!("\nTotal deltas: {}, complete events: {}", delta_count, complete_count);
+    println!(
+        "\nTotal deltas: {}, complete events: {}",
+        delta_count, complete_count
+    );
     println!("Collected text: {}", collected_text);
 
     // We should receive at least some delta chunks
@@ -250,7 +256,10 @@ async fn test_streaming_interaction() {
 
     // If we got a complete event, verify it has a valid ID
     if let Some(response) = final_response {
-        assert!(!response.id.is_empty(), "Complete response should have an ID");
+        assert!(
+            !response.id.is_empty(),
+            "Complete response should have an ID"
+        );
     }
 }
 

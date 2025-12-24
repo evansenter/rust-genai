@@ -1,30 +1,6 @@
-// Shared types used by multiple API endpoints (generateContent, interactions, etc.)
+// Shared types used by the Interactions API
 
 use serde::{Deserialize, Serialize};
-
-/// Represents a message in a conversation with role and content parts.
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Content {
-    pub parts: Vec<Part>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub role: Option<String>,
-}
-
-/// Represents a part of content (text, function call, function response, etc.)
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Part {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub text: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_call: Option<FunctionCall>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_response: Option<FunctionResponse>,
-    /// Thought signature for Gemini 3 reasoning continuity (required for function calling)
-    #[serde(rename = "thoughtSignature", skip_serializing_if = "Option::is_none")]
-    pub thought_signature: Option<String>,
-    // Add other part types later e.g.:
-    // pub inline_data: Option<Blob>,
-}
 
 /// Represents a tool that can be used by the model (Interactions API format).
 ///
@@ -233,13 +209,6 @@ pub struct FunctionCall {
     pub args: serde_json::Value,
 }
 
-/// Represents the response to a function call.
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct FunctionResponse {
-    pub name: String,
-    pub response: serde_json::Value,
-}
-
 /// Represents tool configuration for function calling.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ToolConfig {
@@ -269,26 +238,6 @@ pub enum FunctionCallingMode {
 mod tests {
     use super::*;
     use serde_json;
-
-    #[test]
-    fn test_serialize_content() {
-        let content = Content {
-            parts: vec![Part {
-                text: Some("Hello".to_string()),
-                function_call: None,
-                function_response: None,
-                thought_signature: None,
-            }],
-            role: Some("user".to_string()),
-        };
-
-        let json = serde_json::to_string(&content).expect("Serialization failed");
-        let parsed: Content = serde_json::from_str(&json).expect("Deserialization failed");
-
-        assert_eq!(parsed.role.as_deref(), Some("user"));
-        assert_eq!(parsed.parts.len(), 1);
-        assert_eq!(parsed.parts[0].text.as_deref(), Some("Hello"));
-    }
 
     #[test]
     fn test_serialize_function_declaration() {

@@ -1,5 +1,4 @@
 use crate::GenaiError;
-use genai_client::ApiVersion;
 use reqwest::Client as ReqwestClient;
 
 /// Logs a request body at debug level, preferring JSON format when possible.
@@ -16,34 +15,21 @@ pub struct Client {
     pub(crate) api_key: String,
     #[allow(clippy::struct_field_names)]
     pub(crate) http_client: ReqwestClient,
-    /// API version - currently unused by Interactions API but kept for potential future use
-    #[allow(dead_code)]
-    pub(crate) api_version: ApiVersion,
 }
 
 /// Builder for `Client` instances.
 #[derive(Debug)]
 pub struct ClientBuilder {
     api_key: String,
-    api_version: Option<ApiVersion>,
 }
 
 impl ClientBuilder {
-    /// Sets the API version for the client.
-    /// If not called, defaults to `ApiVersion::V1Beta`.
-    #[must_use]
-    pub const fn api_version(mut self, version: ApiVersion) -> Self {
-        self.api_version = Some(version);
-        self
-    }
-
     /// Builds the `Client`.
     #[must_use]
     pub fn build(self) -> Client {
         Client {
             api_key: self.api_key,
             http_client: ReqwestClient::new(),
-            api_version: self.api_version.unwrap_or(ApiVersion::V1Beta),
         }
     }
 }
@@ -56,24 +42,19 @@ impl Client {
     /// * `api_key` - Your Google AI API key.
     #[must_use]
     pub const fn builder(api_key: String) -> ClientBuilder {
-        ClientBuilder {
-            api_key,
-            api_version: None,
-        }
+        ClientBuilder { api_key }
     }
 
-    /// Creates a new `GenAI` client with specified or default API version.
+    /// Creates a new `GenAI` client.
     ///
     /// # Arguments
     ///
     /// * `api_key` - Your Google AI API key.
-    /// * `api_version` - Optional API version to use. Defaults to `V1Beta`.
     #[must_use]
-    pub fn new(api_key: String, api_version: Option<ApiVersion>) -> Self {
+    pub fn new(api_key: String) -> Self {
         Self {
             api_key,
             http_client: ReqwestClient::new(),
-            api_version: api_version.unwrap_or(ApiVersion::V1Beta),
         }
     }
 
@@ -134,11 +115,11 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::{Client, ApiVersion};
+    /// use rust_genai::Client;
     /// use genai_client::{CreateInteractionRequest, InteractionInput};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::new("your-api-key".to_string(), Some(ApiVersion::V1Beta));
+    /// let client = Client::new("your-api-key".to_string());
     ///
     /// let request = CreateInteractionRequest {
     ///     model: Some("gemini-3-flash-preview".to_string()),

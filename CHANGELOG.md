@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### BREAKING CHANGES
+
+#### Simplified Client API
+- **`Client::new()` signature simplified**: No longer takes `api_version` parameter
+  - Before: `Client::new(api_key, None)`
+  - After: `Client::new(api_key)`
+  - The `api_version` was stored but never used; the library defaults to V1Beta internally
+- **`ApiVersion` no longer re-exported** from rust-genai (still available in genai-client for internal use)
+
+#### Removed deprecated function calling helpers
+- **`function_response_content()` helper removed**: Use `function_result_content()` instead
+  - Before: `function_response_content("get_weather", json!({"temp": 72}))`
+  - After: `function_result_content("get_weather", "call_123", json!({"temp": 72}))`
+  - The `call_id` parameter is required for proper API response matching
+- **`InteractionContent::FunctionResponse` variant removed**: Use `FunctionResult` variant instead
+
 ## [0.2.0] - 2025-12-23
 
 ### BREAKING CHANGES

@@ -151,27 +151,6 @@ pub fn function_result_content(
     }
 }
 
-/// Creates a function response content (legacy - prefer function_result_content)
-///
-/// # Example
-/// ```
-/// use rust_genai::interactions_api::function_response_content;
-/// use serde_json::json;
-///
-/// let response = function_response_content(
-///     "get_weather",
-///     json!({"temperature": "72F", "conditions": "sunny"})
-/// );
-/// ```
-#[deprecated(note = "Use function_result_content instead for correct API compatibility")]
-pub fn function_response_content(name: impl Into<String>, response: Value) -> InteractionContent {
-    #[allow(deprecated)]
-    InteractionContent::FunctionResponse {
-        name: name.into(),
-        response,
-    }
-}
-
 /// Creates image content from base64-encoded data
 ///
 /// # Example
@@ -370,19 +349,6 @@ mod tests {
                 assert_eq!(result, json!({"result": "ok"}));
             }
             _ => panic!("Expected FunctionResult variant"),
-        }
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn test_function_response_content() {
-        let content = function_response_content("test", json!({"result": "ok"}));
-        match content {
-            InteractionContent::FunctionResponse { name, response } => {
-                assert_eq!(name, "test");
-                assert_eq!(response, json!({"result": "ok"}));
-            }
-            _ => panic!("Expected FunctionResponse variant"),
         }
     }
 
