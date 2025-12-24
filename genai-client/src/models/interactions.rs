@@ -78,6 +78,57 @@ pub enum InteractionContent {
         call_id: String,
         result: serde_json::Value,
     },
+    /// Code execution call (model requesting code execution)
+    ///
+    /// This variant appears when the model initiates a code execution
+    /// via the `CodeExecution` built-in tool.
+    CodeExecutionCall {
+        /// Unique identifier for this code execution call
+        id: String,
+        /// Arguments containing the code to execute (includes "code" and "language" fields)
+        arguments: serde_json::Value,
+    },
+    /// Code execution result (returned after code runs)
+    ///
+    /// Contains the outcome and output of executed code from the `CodeExecution` tool.
+    CodeExecutionResult {
+        /// The call_id matching the CodeExecutionCall this result is for
+        call_id: String,
+        /// Whether the execution resulted in an error
+        is_error: bool,
+        /// The result/output of the code execution
+        result: String,
+    },
+    /// Google Search call (model requesting a search)
+    ///
+    /// Appears when the model initiates a Google Search via the `GoogleSearch` tool.
+    GoogleSearchCall {
+        /// Search query
+        query: String,
+    },
+    /// Google Search result (grounding data from search)
+    ///
+    /// Contains the results returned by the `GoogleSearch` built-in tool.
+    GoogleSearchResult {
+        /// Search result data (flexible structure as API evolves)
+        results: serde_json::Value,
+    },
+    /// URL Context call (model requesting URL content)
+    ///
+    /// Appears when the model requests URL content via the `UrlContext` tool.
+    UrlContextCall {
+        /// URL to fetch
+        url: String,
+    },
+    /// URL Context result (fetched content from URL)
+    ///
+    /// Contains the content retrieved by the `UrlContext` built-in tool.
+    UrlContextResult {
+        /// The URL that was fetched
+        url: String,
+        /// The fetched content
+        content: Option<String>,
+    },
     /// Unknown content type for forward compatibility.
     ///
     /// This variant captures content types that the library doesn't recognize yet.
@@ -89,8 +140,8 @@ pub enum InteractionContent {
     ///
     /// # When This Occurs
     ///
-    /// - New API features (e.g., `code_execution_result`, `google_search_result`)
-    /// - Beta features not yet supported by this library
+    /// - New API features not yet supported by this library
+    /// - Beta features in testing
     /// - Region-specific content types
     ///
     /// # Example
@@ -108,7 +159,7 @@ pub enum InteractionContent {
     /// Unknown variants can be serialized back to JSON, preserving the original
     /// structure. This enables round-trip in multi-turn conversations.
     Unknown {
-        /// The unrecognized type name from the API (e.g., "code_execution_result")
+        /// The unrecognized type name from the API
         type_name: String,
         /// The full JSON data for this content, preserved for debugging
         data: serde_json::Value,
@@ -231,6 +282,52 @@ impl Serialize for InteractionContent {
                 map.serialize_entry("result", result)?;
                 map.end()
             }
+            Self::CodeExecutionCall { id, arguments } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "code_execution_call")?;
+                map.serialize_entry("id", id)?;
+                map.serialize_entry("arguments", arguments)?;
+                map.end()
+            }
+            Self::CodeExecutionResult {
+                call_id,
+                is_error,
+                result,
+            } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "code_execution_result")?;
+                map.serialize_entry("call_id", call_id)?;
+                map.serialize_entry("is_error", is_error)?;
+                map.serialize_entry("result", result)?;
+                map.end()
+            }
+            Self::GoogleSearchCall { query } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "google_search_call")?;
+                map.serialize_entry("query", query)?;
+                map.end()
+            }
+            Self::GoogleSearchResult { results } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "google_search_result")?;
+                map.serialize_entry("results", results)?;
+                map.end()
+            }
+            Self::UrlContextCall { url } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "url_context_call")?;
+                map.serialize_entry("url", url)?;
+                map.end()
+            }
+            Self::UrlContextResult { url, content } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "url_context_result")?;
+                map.serialize_entry("url", url)?;
+                if let Some(c) = content {
+                    map.serialize_entry("content", c)?;
+                }
+                map.end()
+            }
             Self::Unknown { type_name, data } => {
                 // For Unknown, merge the type_name into the data object
                 let mut map = serializer.serialize_map(None)?;
@@ -295,6 +392,36 @@ impl InteractionContent {
     /// See [`InteractionContent::Unknown`] for more details.
     pub const fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown { .. })
+    }
+
+    /// Check if this is a CodeExecutionCall content type.
+    pub const fn is_code_execution_call(&self) -> bool {
+        matches!(self, Self::CodeExecutionCall { .. })
+    }
+
+    /// Check if this is a CodeExecutionResult content type.
+    pub const fn is_code_execution_result(&self) -> bool {
+        matches!(self, Self::CodeExecutionResult { .. })
+    }
+
+    /// Check if this is a GoogleSearchCall content type.
+    pub const fn is_google_search_call(&self) -> bool {
+        matches!(self, Self::GoogleSearchCall { .. })
+    }
+
+    /// Check if this is a GoogleSearchResult content type.
+    pub const fn is_google_search_result(&self) -> bool {
+        matches!(self, Self::GoogleSearchResult { .. })
+    }
+
+    /// Check if this is a UrlContextCall content type.
+    pub const fn is_url_context_call(&self) -> bool {
+        matches!(self, Self::UrlContextCall { .. })
+    }
+
+    /// Check if this is a UrlContextResult content type.
+    pub const fn is_url_context_result(&self) -> bool {
+        matches!(self, Self::UrlContextResult { .. })
     }
 
     /// Returns the type name if this is an unknown content type.
@@ -376,6 +503,28 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 call_id: String,
                 result: serde_json::Value,
             },
+            CodeExecutionCall {
+                id: String,
+                arguments: serde_json::Value,
+            },
+            CodeExecutionResult {
+                call_id: String,
+                is_error: bool,
+                result: String,
+            },
+            GoogleSearchCall {
+                query: String,
+            },
+            GoogleSearchResult {
+                results: serde_json::Value,
+            },
+            UrlContextCall {
+                url: String,
+            },
+            UrlContextResult {
+                url: String,
+                content: Option<String>,
+            },
         }
 
         // Try to deserialize as a known type
@@ -433,6 +582,28 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     call_id,
                     result,
                 },
+                KnownContent::CodeExecutionCall { id, arguments } => {
+                    InteractionContent::CodeExecutionCall { id, arguments }
+                }
+                KnownContent::CodeExecutionResult {
+                    call_id,
+                    is_error,
+                    result,
+                } => InteractionContent::CodeExecutionResult {
+                    call_id,
+                    is_error,
+                    result,
+                },
+                KnownContent::GoogleSearchCall { query } => {
+                    InteractionContent::GoogleSearchCall { query }
+                }
+                KnownContent::GoogleSearchResult { results } => {
+                    InteractionContent::GoogleSearchResult { results }
+                }
+                KnownContent::UrlContextCall { url } => InteractionContent::UrlContextCall { url },
+                KnownContent::UrlContextResult { url, content } => {
+                    InteractionContent::UrlContextResult { url, content }
+                }
             }),
             Err(_) => {
                 // Unknown type - extract type name and preserve data
@@ -803,6 +974,103 @@ impl InteractionResponse {
             .collect()
     }
 
+    /// Check if response contains code execution calls
+    pub fn has_code_execution_calls(&self) -> bool {
+        self.outputs
+            .iter()
+            .any(|c| matches!(c, InteractionContent::CodeExecutionCall { .. }))
+    }
+
+    /// Extract all code execution calls from outputs
+    ///
+    /// Returns a vector of (id, arguments) tuples where arguments contains the code and language.
+    pub fn code_execution_calls(&self) -> Vec<(&str, &serde_json::Value)> {
+        self.outputs
+            .iter()
+            .filter_map(|content| {
+                if let InteractionContent::CodeExecutionCall { id, arguments } = content {
+                    Some((id.as_str(), arguments))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Check if response contains code execution results
+    pub fn has_code_execution_results(&self) -> bool {
+        self.outputs
+            .iter()
+            .any(|c| matches!(c, InteractionContent::CodeExecutionResult { .. }))
+    }
+
+    /// Extract code execution results from outputs
+    ///
+    /// Returns a vector of (call_id, is_error, result) tuples.
+    pub fn code_execution_results(&self) -> Vec<(&str, bool, &str)> {
+        self.outputs
+            .iter()
+            .filter_map(|content| {
+                if let InteractionContent::CodeExecutionResult {
+                    call_id,
+                    is_error,
+                    result,
+                } = content
+                {
+                    Some((call_id.as_str(), *is_error, result.as_str()))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Check if response contains Google Search results
+    pub fn has_google_search_results(&self) -> bool {
+        self.outputs
+            .iter()
+            .any(|c| matches!(c, InteractionContent::GoogleSearchResult { .. }))
+    }
+
+    /// Extract Google Search results from outputs
+    ///
+    /// Returns a vector of references to the search result JSON data.
+    pub fn google_search_results(&self) -> Vec<&serde_json::Value> {
+        self.outputs
+            .iter()
+            .filter_map(|content| {
+                if let InteractionContent::GoogleSearchResult { results } = content {
+                    Some(results)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Check if response contains URL context results
+    pub fn has_url_context_results(&self) -> bool {
+        self.outputs
+            .iter()
+            .any(|c| matches!(c, InteractionContent::UrlContextResult { .. }))
+    }
+
+    /// Extract URL context results from outputs
+    ///
+    /// Returns a vector of (url, content) tuples.
+    pub fn url_context_results(&self) -> Vec<(&str, Option<&str>)> {
+        self.outputs
+            .iter()
+            .filter_map(|content| {
+                if let InteractionContent::UrlContextResult { url, content } = content {
+                    Some((url.as_str(), content.as_deref()))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     /// Get a summary of content types present in outputs.
     ///
     /// Returns a [`ContentSummary`] with counts for each content type.
@@ -840,6 +1108,22 @@ impl InteractionResponse {
                 InteractionContent::Video { .. } => summary.video_count += 1,
                 InteractionContent::FunctionCall { .. } => summary.function_call_count += 1,
                 InteractionContent::FunctionResult { .. } => summary.function_result_count += 1,
+                InteractionContent::CodeExecutionCall { .. } => {
+                    summary.code_execution_call_count += 1
+                }
+                InteractionContent::CodeExecutionResult { .. } => {
+                    summary.code_execution_result_count += 1
+                }
+                InteractionContent::GoogleSearchCall { .. } => {
+                    summary.google_search_call_count += 1
+                }
+                InteractionContent::GoogleSearchResult { .. } => {
+                    summary.google_search_result_count += 1
+                }
+                InteractionContent::UrlContextCall { .. } => summary.url_context_call_count += 1,
+                InteractionContent::UrlContextResult { .. } => {
+                    summary.url_context_result_count += 1
+                }
                 InteractionContent::Unknown { type_name, .. } => {
                     summary.unknown_count += 1;
                     unknown_types_set.insert(type_name.clone());
@@ -898,6 +1182,18 @@ pub struct ContentSummary {
     pub function_call_count: usize,
     /// Number of function result content items
     pub function_result_count: usize,
+    /// Number of code execution call content items
+    pub code_execution_call_count: usize,
+    /// Number of code execution result content items
+    pub code_execution_result_count: usize,
+    /// Number of Google Search call content items
+    pub google_search_call_count: usize,
+    /// Number of Google Search result content items
+    pub google_search_result_count: usize,
+    /// Number of URL context call content items
+    pub url_context_call_count: usize,
+    /// Number of URL context result content items
+    pub url_context_result_count: usize,
     /// Number of unknown content items
     pub unknown_count: usize,
     /// List of unique unknown type names encountered (sorted alphabetically)
@@ -1360,23 +1656,24 @@ mod tests {
     #[test]
     fn test_deserialize_unknown_interaction_content() {
         // Simulate a new API content type that this library doesn't know about
+        // Note: code_execution_result is now a known type, so use a truly unknown type
         let unknown_json =
-            r#"{"type": "code_execution_result", "outcome": "success", "output": "42"}"#;
+            r#"{"type": "future_api_feature", "data_field": "some_value", "count": 42}"#;
 
         let content: InteractionContent =
             serde_json::from_str(unknown_json).expect("Should deserialize as Unknown");
 
         match &content {
             InteractionContent::Unknown { type_name, data } => {
-                assert_eq!(type_name, "code_execution_result");
-                assert_eq!(data["outcome"], "success");
-                assert_eq!(data["output"], "42");
+                assert_eq!(type_name, "future_api_feature");
+                assert_eq!(data["data_field"], "some_value");
+                assert_eq!(data["count"], 42);
             }
             _ => panic!("Expected Unknown variant, got {:?}", content),
         }
 
         assert!(content.is_unknown());
-        assert_eq!(content.unknown_type(), Some("code_execution_result"));
+        assert_eq!(content.unknown_type(), Some("future_api_feature"));
         assert!(content.unknown_data().is_some());
     }
 
@@ -1578,16 +1875,49 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_response_with_unknown_in_outputs() {
-        // Test deserializing a full response that contains unknown content
+    fn test_deserialize_response_with_built_in_tool_outputs() {
+        // Test deserializing a full response that contains built-in tool content
+        // Note: code_execution_call and code_execution_result are now known types
         let response_json = r#"{
             "id": "interaction_789",
             "model": "gemini-3-flash-preview",
             "input": [{"type": "text", "text": "Execute some code"}],
             "outputs": [
                 {"type": "text", "text": "Here's the result:"},
-                {"type": "executable_code", "language": "python", "code": "print(42)"},
-                {"type": "code_execution_result", "outcome": "success", "output": "42"}
+                {"type": "code_execution_call", "id": "call_abc", "arguments": {"code": "print(42)", "language": "python"}},
+                {"type": "code_execution_result", "call_id": "call_abc", "is_error": false, "result": "42"}
+            ],
+            "status": "completed"
+        }"#;
+
+        let response: InteractionResponse = serde_json::from_str(response_json)
+            .expect("Should deserialize with built-in tool types");
+
+        assert_eq!(response.id, "interaction_789");
+        assert_eq!(response.outputs.len(), 3);
+        assert!(response.has_text());
+        assert!(response.has_code_execution_calls());
+        assert!(response.has_code_execution_results());
+        assert!(!response.has_unknown()); // These are now known types
+
+        let summary = response.content_summary();
+        assert_eq!(summary.text_count, 1);
+        assert_eq!(summary.code_execution_call_count, 1);
+        assert_eq!(summary.code_execution_result_count, 1);
+        assert_eq!(summary.unknown_count, 0);
+    }
+
+    #[test]
+    fn test_deserialize_response_with_unknown_in_outputs() {
+        // Test deserializing a full response that contains truly unknown content
+        let response_json = r#"{
+            "id": "interaction_789",
+            "model": "gemini-3-flash-preview",
+            "input": [{"type": "text", "text": "Do something"}],
+            "outputs": [
+                {"type": "text", "text": "Result:"},
+                {"type": "future_tool_result", "data": "some_data"},
+                {"type": "another_unknown_type", "value": 123}
             ],
             "status": "completed"
         }"#;
@@ -1606,12 +1936,12 @@ mod tests {
         assert!(
             summary
                 .unknown_types
-                .contains(&"executable_code".to_string())
+                .contains(&"future_tool_result".to_string())
         );
         assert!(
             summary
                 .unknown_types
-                .contains(&"code_execution_result".to_string())
+                .contains(&"another_unknown_type".to_string())
         );
     }
 
@@ -1709,5 +2039,404 @@ mod tests {
             }
             _ => panic!("Expected Unknown variant"),
         }
+    }
+
+    // --- Built-in Tool Content Tests ---
+
+    #[test]
+    fn test_deserialize_code_execution_call() {
+        let json = r#"{"type": "code_execution_call", "id": "call_123", "arguments": {"code": "print(42)", "language": "python"}}"#;
+        let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+        match &content {
+            InteractionContent::CodeExecutionCall { id, arguments } => {
+                assert_eq!(id, "call_123");
+                assert_eq!(arguments["language"], "python");
+                assert_eq!(arguments["code"], "print(42)");
+            }
+            _ => panic!("Expected CodeExecutionCall variant, got {:?}", content),
+        }
+
+        assert!(content.is_code_execution_call());
+        assert!(!content.is_unknown());
+    }
+
+    #[test]
+    fn test_deserialize_code_execution_result() {
+        let json = r#"{"type": "code_execution_result", "call_id": "call_123", "is_error": false, "result": "42\n"}"#;
+        let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+        match &content {
+            InteractionContent::CodeExecutionResult {
+                call_id,
+                is_error,
+                result,
+            } => {
+                assert_eq!(call_id, "call_123");
+                assert!(!is_error);
+                assert_eq!(result, "42\n");
+            }
+            _ => panic!("Expected CodeExecutionResult variant, got {:?}", content),
+        }
+
+        assert!(content.is_code_execution_result());
+        assert!(!content.is_unknown());
+    }
+
+    #[test]
+    fn test_deserialize_code_execution_result_error() {
+        let json = r#"{"type": "code_execution_result", "call_id": "call_456", "is_error": true, "result": "NameError: x not defined"}"#;
+        let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+        match &content {
+            InteractionContent::CodeExecutionResult {
+                call_id,
+                is_error,
+                result,
+            } => {
+                assert_eq!(call_id, "call_456");
+                assert!(is_error);
+                assert!(result.contains("NameError"));
+            }
+            _ => panic!("Expected CodeExecutionResult variant, got {:?}", content),
+        }
+    }
+
+    #[test]
+    fn test_deserialize_google_search_call() {
+        let json = r#"{"type": "google_search_call", "query": "Rust programming"}"#;
+        let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+        match &content {
+            InteractionContent::GoogleSearchCall { query } => {
+                assert_eq!(query, "Rust programming");
+            }
+            _ => panic!("Expected GoogleSearchCall variant, got {:?}", content),
+        }
+
+        assert!(content.is_google_search_call());
+        assert!(!content.is_unknown());
+    }
+
+    #[test]
+    fn test_deserialize_google_search_result() {
+        let json = r#"{"type": "google_search_result", "results": {"items": [{"title": "Rust", "url": "https://rust-lang.org"}]}}"#;
+        let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+        match &content {
+            InteractionContent::GoogleSearchResult { results } => {
+                assert!(results["items"].is_array());
+                assert_eq!(results["items"][0]["title"], "Rust");
+            }
+            _ => panic!("Expected GoogleSearchResult variant, got {:?}", content),
+        }
+
+        assert!(content.is_google_search_result());
+        assert!(!content.is_unknown());
+    }
+
+    #[test]
+    fn test_deserialize_url_context_call() {
+        let json = r#"{"type": "url_context_call", "url": "https://example.com"}"#;
+        let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+        match &content {
+            InteractionContent::UrlContextCall { url } => {
+                assert_eq!(url, "https://example.com");
+            }
+            _ => panic!("Expected UrlContextCall variant, got {:?}", content),
+        }
+
+        assert!(content.is_url_context_call());
+        assert!(!content.is_unknown());
+    }
+
+    #[test]
+    fn test_deserialize_url_context_result() {
+        let json = r#"{"type": "url_context_result", "url": "https://example.com", "content": "<html>...</html>"}"#;
+        let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+        match &content {
+            InteractionContent::UrlContextResult { url, content } => {
+                assert_eq!(url, "https://example.com");
+                assert_eq!(content.as_deref(), Some("<html>...</html>"));
+            }
+            _ => panic!("Expected UrlContextResult variant, got {:?}", content),
+        }
+
+        assert!(content.is_url_context_result());
+        assert!(!content.is_unknown());
+    }
+
+    #[test]
+    fn test_serialize_code_execution_call() {
+        let content = InteractionContent::CodeExecutionCall {
+            id: "call_123".to_string(),
+            arguments: serde_json::json!({"language": "PYTHON", "code": "print(42)"}),
+        };
+
+        let json = serde_json::to_string(&content).expect("Serialization should work");
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(value["type"], "code_execution_call");
+        assert_eq!(value["id"], "call_123");
+        assert_eq!(value["arguments"]["language"], "PYTHON");
+        assert_eq!(value["arguments"]["code"], "print(42)");
+    }
+
+    #[test]
+    fn test_serialize_code_execution_result() {
+        let content = InteractionContent::CodeExecutionResult {
+            call_id: "call_123".to_string(),
+            is_error: false,
+            result: "42".to_string(),
+        };
+
+        let json = serde_json::to_string(&content).expect("Serialization should work");
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(value["type"], "code_execution_result");
+        assert_eq!(value["call_id"], "call_123");
+        assert_eq!(value["is_error"], false);
+        assert_eq!(value["result"], "42");
+    }
+
+    #[test]
+    fn test_serialize_code_execution_result_error() {
+        let content = InteractionContent::CodeExecutionResult {
+            call_id: "call_456".to_string(),
+            is_error: true,
+            result: "NameError: x not defined".to_string(),
+        };
+
+        let json = serde_json::to_string(&content).expect("Serialization should work");
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(value["type"], "code_execution_result");
+        assert_eq!(value["call_id"], "call_456");
+        assert_eq!(value["is_error"], true);
+        assert!(value["result"].as_str().unwrap().contains("NameError"));
+    }
+
+    #[test]
+    fn test_roundtrip_built_in_tool_content() {
+        // CodeExecutionCall roundtrip
+        let original = InteractionContent::CodeExecutionCall {
+            id: "call_123".to_string(),
+            arguments: serde_json::json!({"language": "PYTHON", "code": "print('hello')"}),
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+        assert!(matches!(
+            restored,
+            InteractionContent::CodeExecutionCall { .. }
+        ));
+
+        // CodeExecutionResult roundtrip
+        let original = InteractionContent::CodeExecutionResult {
+            call_id: "call_123".to_string(),
+            is_error: false,
+            result: "hello\n".to_string(),
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+        assert!(matches!(
+            restored,
+            InteractionContent::CodeExecutionResult { .. }
+        ));
+
+        // GoogleSearchCall roundtrip
+        let original = InteractionContent::GoogleSearchCall {
+            query: "test query".to_string(),
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+        assert!(matches!(
+            restored,
+            InteractionContent::GoogleSearchCall { .. }
+        ));
+
+        // GoogleSearchResult roundtrip
+        let original = InteractionContent::GoogleSearchResult {
+            results: serde_json::json!({"items": []}),
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+        assert!(matches!(
+            restored,
+            InteractionContent::GoogleSearchResult { .. }
+        ));
+
+        // UrlContextCall roundtrip
+        let original = InteractionContent::UrlContextCall {
+            url: "https://example.com".to_string(),
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+        assert!(matches!(
+            restored,
+            InteractionContent::UrlContextCall { .. }
+        ));
+
+        // UrlContextResult roundtrip
+        let original = InteractionContent::UrlContextResult {
+            url: "https://example.com".to_string(),
+            content: Some("content".to_string()),
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+        assert!(matches!(
+            restored,
+            InteractionContent::UrlContextResult { .. }
+        ));
+    }
+
+    #[test]
+    fn test_interaction_response_code_execution_helpers() {
+        let response = InteractionResponse {
+            id: "test_id".to_string(),
+            model: Some("gemini-3-flash".to_string()),
+            agent: None,
+            input: vec![],
+            outputs: vec![
+                InteractionContent::Text {
+                    text: Some("Here's the code:".to_string()),
+                },
+                InteractionContent::CodeExecutionCall {
+                    id: "call_123".to_string(),
+                    arguments: serde_json::json!({"language": "PYTHON", "code": "print(42)"}),
+                },
+                InteractionContent::CodeExecutionResult {
+                    call_id: "call_123".to_string(),
+                    is_error: false,
+                    result: "42\n".to_string(),
+                },
+            ],
+            status: InteractionStatus::Completed,
+            usage: None,
+            tools: None,
+            previous_interaction_id: None,
+        };
+
+        assert!(response.has_code_execution_calls());
+        assert!(response.has_code_execution_results());
+        assert!(!response.has_unknown());
+
+        let code_blocks = response.code_execution_calls();
+        assert_eq!(code_blocks.len(), 1);
+        assert_eq!(code_blocks[0].0, "call_123");
+        assert_eq!(code_blocks[0].1["language"], "PYTHON");
+        assert_eq!(code_blocks[0].1["code"], "print(42)");
+
+        let results = response.code_execution_results();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], ("call_123", false, "42\n"));
+    }
+
+    #[test]
+    fn test_interaction_response_google_search_helpers() {
+        let response = InteractionResponse {
+            id: "test_id".to_string(),
+            model: Some("gemini-3-flash".to_string()),
+            agent: None,
+            input: vec![],
+            outputs: vec![
+                InteractionContent::GoogleSearchResult {
+                    results: serde_json::json!({"items": [{"title": "Test"}]}),
+                },
+                InteractionContent::Text {
+                    text: Some("Based on search results...".to_string()),
+                },
+            ],
+            status: InteractionStatus::Completed,
+            usage: None,
+            tools: None,
+            previous_interaction_id: None,
+        };
+
+        assert!(response.has_google_search_results());
+
+        let search_results = response.google_search_results();
+        assert_eq!(search_results.len(), 1);
+        assert_eq!(search_results[0]["items"][0]["title"], "Test");
+    }
+
+    #[test]
+    fn test_interaction_response_url_context_helpers() {
+        let response = InteractionResponse {
+            id: "test_id".to_string(),
+            model: Some("gemini-3-flash".to_string()),
+            agent: None,
+            input: vec![],
+            outputs: vec![InteractionContent::UrlContextResult {
+                url: "https://example.com".to_string(),
+                content: Some("Example content".to_string()),
+            }],
+            status: InteractionStatus::Completed,
+            usage: None,
+            tools: None,
+            previous_interaction_id: None,
+        };
+
+        assert!(response.has_url_context_results());
+
+        let url_results = response.url_context_results();
+        assert_eq!(url_results.len(), 1);
+        assert_eq!(
+            url_results[0],
+            ("https://example.com", Some("Example content"))
+        );
+    }
+
+    #[test]
+    fn test_content_summary_with_built_in_tools() {
+        let response = InteractionResponse {
+            id: "test_id".to_string(),
+            model: Some("gemini-3-flash".to_string()),
+            agent: None,
+            input: vec![],
+            outputs: vec![
+                InteractionContent::CodeExecutionCall {
+                    id: "call_1".to_string(),
+                    arguments: serde_json::json!({"language": "PYTHON", "code": "print(1)"}),
+                },
+                InteractionContent::CodeExecutionCall {
+                    id: "call_2".to_string(),
+                    arguments: serde_json::json!({"language": "PYTHON", "code": "print(2)"}),
+                },
+                InteractionContent::CodeExecutionResult {
+                    call_id: "call_1".to_string(),
+                    is_error: false,
+                    result: "1\n2\n".to_string(),
+                },
+                InteractionContent::GoogleSearchCall {
+                    query: "test".to_string(),
+                },
+                InteractionContent::GoogleSearchResult {
+                    results: serde_json::json!({}),
+                },
+                InteractionContent::UrlContextCall {
+                    url: "https://example.com".to_string(),
+                },
+                InteractionContent::UrlContextResult {
+                    url: "https://example.com".to_string(),
+                    content: None,
+                },
+            ],
+            status: InteractionStatus::Completed,
+            usage: None,
+            tools: None,
+            previous_interaction_id: None,
+        };
+
+        let summary = response.content_summary();
+
+        assert_eq!(summary.code_execution_call_count, 2);
+        assert_eq!(summary.code_execution_result_count, 1);
+        assert_eq!(summary.google_search_call_count, 1);
+        assert_eq!(summary.google_search_result_count, 1);
+        assert_eq!(summary.url_context_call_count, 1);
+        assert_eq!(summary.url_context_result_count, 1);
+        assert_eq!(summary.unknown_count, 0);
     }
 }

@@ -113,6 +113,22 @@ async fn test_code_execution() {
                     text
                 );
             }
+
+            // Check for typed built-in tool content using new helpers
+            let summary = response.content_summary();
+            println!(
+                "Content summary: {} text, {} code_execution_call, {} code_execution_result, {} unknown",
+                summary.text_count,
+                summary.code_execution_call_count,
+                summary.code_execution_result_count,
+                summary.unknown_count
+            );
+
+            // Verify the response doesn't contain unknown content types for code execution
+            // (they should all be recognized as known types now)
+            if !summary.unknown_types.is_empty() {
+                println!("Unknown types found: {:?}", summary.unknown_types);
+            }
         }
         Err(e) => {
             let error_str = format!("{:?}", e);
