@@ -49,9 +49,10 @@ impl From<GenaiError> for PollError {
 
 /// Polls an interaction until it completes or times out, using exponential backoff.
 ///
-/// Starts with a 1-second delay and doubles each iteration up to a maximum of 10 seconds.
-/// This is more efficient than fixed-interval polling: faster initial detection of
-/// quick completions, fewer API calls for long-running tasks.
+/// Checks the status immediately on first call (no initial delay), then uses exponential
+/// backoff starting at 1 second and doubling up to a maximum of 10 seconds. This is more
+/// efficient than fixed-interval polling: instant detection of already-completed tasks,
+/// faster initial detection of quick completions, and fewer API calls for long-running tasks.
 ///
 /// # Arguments
 ///
@@ -81,6 +82,7 @@ pub async fn poll_until_complete(
     const MAX_DELAY: Duration = Duration::from_secs(10);
 
     let mut delay = INITIAL_DELAY;
+    let mut first_poll = true;
     let start = Instant::now();
 
     loop {
@@ -88,7 +90,13 @@ pub async fn poll_until_complete(
             return Err(PollError::Timeout);
         }
 
-        sleep(delay).await;
+        // Skip delay on first poll to detect instant completions
+        if first_poll {
+            first_poll = false;
+        } else {
+            sleep(delay).await;
+            delay = (delay * 2).min(MAX_DELAY);
+        }
 
         let response = client.get_interaction(interaction_id).await?;
         println!(
@@ -102,7 +110,6 @@ pub async fn poll_until_complete(
             InteractionStatus::Failed => return Err(PollError::Failed),
             _ => {
                 // Continue polling with exponential backoff
-                delay = (delay * 2).min(MAX_DELAY);
             }
         }
     }
