@@ -91,6 +91,12 @@ pub enum InteractionContent {
     /// Code execution result (returned after code runs)
     ///
     /// Contains the outcome and output of executed code from the `CodeExecution` tool.
+    ///
+    /// # Security Note
+    ///
+    /// When displaying results to end users, check `is_error` first. Error results
+    /// may contain stack traces or system information that shouldn't be exposed
+    /// directly to users without sanitization.
     CodeExecutionResult {
         /// The call_id matching the CodeExecutionCall this result is for
         call_id: String,
@@ -123,10 +129,13 @@ pub enum InteractionContent {
     /// URL Context result (fetched content from URL)
     ///
     /// Contains the content retrieved by the `UrlContext` built-in tool.
+    ///
+    /// The `content` field may be `None` if the URL could not be fetched
+    /// (e.g., network errors, blocked URLs, timeouts, or access restrictions).
     UrlContextResult {
         /// The URL that was fetched
         url: String,
-        /// The fetched content
+        /// The fetched content, or `None` if the fetch failed
         content: Option<String>,
     },
     /// Unknown content type for forward compatibility.
@@ -2289,6 +2298,68 @@ mod tests {
             restored,
             InteractionContent::UrlContextResult { .. }
         ));
+    }
+
+    #[test]
+    fn test_edge_cases_empty_values() {
+        // Empty arguments in CodeExecutionCall
+        let content = InteractionContent::CodeExecutionCall {
+            id: "call_empty".to_string(),
+            arguments: serde_json::json!({}),
+        };
+        let json = serde_json::to_string(&content).unwrap();
+        let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+        match restored {
+            InteractionContent::CodeExecutionCall { id, arguments } => {
+                assert_eq!(id, "call_empty");
+                assert!(arguments.as_object().unwrap().is_empty());
+            }
+            _ => panic!("Expected CodeExecutionCall"),
+        }
+
+        // Empty results in GoogleSearchResult
+        let content = InteractionContent::GoogleSearchResult {
+            results: serde_json::json!({}),
+        };
+        let json = serde_json::to_string(&content).unwrap();
+        let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+        assert!(matches!(
+            restored,
+            InteractionContent::GoogleSearchResult { .. }
+        ));
+
+        // UrlContextResult with None content (failed fetch)
+        let content = InteractionContent::UrlContextResult {
+            url: "https://blocked.example.com".to_string(),
+            content: None,
+        };
+        let json = serde_json::to_string(&content).unwrap();
+        let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+        match restored {
+            InteractionContent::UrlContextResult { url, content } => {
+                assert_eq!(url, "https://blocked.example.com");
+                assert!(content.is_none());
+            }
+            _ => panic!("Expected UrlContextResult"),
+        }
+
+        // Empty result string in CodeExecutionResult
+        let content = InteractionContent::CodeExecutionResult {
+            call_id: "call_no_output".to_string(),
+            is_error: false,
+            result: "".to_string(),
+        };
+        let json = serde_json::to_string(&content).unwrap();
+        let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+        match restored {
+            InteractionContent::CodeExecutionResult {
+                call_id, result, ..
+            } => {
+                assert_eq!(call_id, "call_no_output");
+                assert!(result.is_empty());
+            }
+            _ => panic!("Expected CodeExecutionResult"),
+        }
     }
 
     #[test]
