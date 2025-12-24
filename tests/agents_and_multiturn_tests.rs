@@ -25,6 +25,23 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 // =============================================================================
+// Test Configuration Constants
+// =============================================================================
+
+/// Minimum number of successful conversation turns to consider long conversation test valid.
+/// API may encounter limitations (UTF-8 errors, etc.) with very long chains.
+const MIN_SUCCESSFUL_TURNS: usize = 3;
+
+/// Minimum facts the model should remember out of 10 in the recall test.
+const MIN_REMEMBERED_FACTS: usize = 5;
+
+/// Maximum polling attempts for background mode tests (e.g., deep research agent).
+const POLLING_MAX_ATTEMPTS: usize = 30;
+
+/// Seconds to wait between polling attempts.
+const POLLING_INTERVAL_SECS: u64 = 2;
+
+// =============================================================================
 // Multi-turn: Very Long Conversations
 // =============================================================================
 
@@ -88,10 +105,11 @@ async fn test_very_long_conversation() {
                         "Completed {} turns before hitting API limitation",
                         successful_turns
                     );
-                    // Still pass if we got at least 3 turns
+                    // Still pass if we got the minimum successful turns
                     assert!(
-                        successful_turns >= 3,
-                        "Should complete at least 3 turns, got {}",
+                        successful_turns >= MIN_SUCCESSFUL_TURNS,
+                        "Should complete at least {} turns, got {}",
+                        MIN_SUCCESSFUL_TURNS,
                         successful_turns
                     );
                     return;
@@ -128,8 +146,9 @@ async fn test_very_long_conversation() {
                     successful_turns
                 );
                 assert!(
-                    successful_turns >= 3,
-                    "Should complete at least 3 turns, got {}",
+                    successful_turns >= MIN_SUCCESSFUL_TURNS,
+                    "Should complete at least {} turns, got {}",
+                    MIN_SUCCESSFUL_TURNS,
                     successful_turns
                 );
                 return;
@@ -168,10 +187,12 @@ async fn test_very_long_conversation() {
 
     println!("Facts remembered: {}/{}", remembered, fact_checks.len());
 
-    // Should remember at least half of the facts
+    // Should remember at least the minimum number of facts
     assert!(
-        remembered >= 5,
-        "Model should remember at least 5 out of 10 facts, got {}",
+        remembered >= MIN_REMEMBERED_FACTS,
+        "Model should remember at least {} out of {} facts, got {}",
+        MIN_REMEMBERED_FACTS,
+        fact_checks.len(),
         remembered
     );
 }
@@ -448,16 +469,15 @@ async fn test_background_mode_polling() {
             // If still in progress, poll for completion
             if initial_response.status == InteractionStatus::InProgress {
                 let mut attempts = 0;
-                let max_attempts = 30; // 30 * 2 seconds = 60 seconds max
 
                 loop {
                     attempts += 1;
-                    if attempts > max_attempts {
-                        println!("Reached max polling attempts - task may still be running");
+                    if attempts > POLLING_MAX_ATTEMPTS {
+                        println!("Reached max polling attempts ({}) - task may still be running", POLLING_MAX_ATTEMPTS);
                         break;
                     }
 
-                    sleep(Duration::from_secs(2)).await;
+                    sleep(Duration::from_secs(POLLING_INTERVAL_SECS)).await;
 
                     let poll_result = client.get_interaction(&initial_response.id).await;
 
