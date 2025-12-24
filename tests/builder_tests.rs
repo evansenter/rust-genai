@@ -533,3 +533,59 @@ fn test_interaction_builder_validation_success_with_model() {
     assert_eq!(request.model.as_deref(), Some("gemini-3-flash-preview"));
     assert!(request.agent.is_none());
 }
+
+#[test]
+fn test_interaction_builder_with_google_search() {
+    use rust_genai::Tool;
+
+    // Test that with_google_search adds the GoogleSearch tool
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What's the weather today?")
+        .with_google_search();
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+
+    // Verify GoogleSearch tool was added
+    assert!(request.tools.is_some());
+    let tools = request.tools.unwrap();
+    assert_eq!(tools.len(), 1);
+    assert!(matches!(tools[0], Tool::GoogleSearch));
+}
+
+#[test]
+fn test_interaction_builder_with_google_search_and_functions() {
+    use rust_genai::Tool;
+
+    // Test that with_google_search can be combined with function declarations
+    let client = Client::new("test-api-key".to_string());
+
+    let func = FunctionDeclaration::builder("get_temperature")
+        .description("Get temperature")
+        .build();
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What's the weather today?")
+        .with_function(func)
+        .with_google_search();
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+
+    // Verify both tools were added
+    assert!(request.tools.is_some());
+    let tools = request.tools.unwrap();
+    assert_eq!(tools.len(), 2);
+    assert!(matches!(tools[0], Tool::Function { .. }));
+    assert!(matches!(tools[1], Tool::GoogleSearch));
+}

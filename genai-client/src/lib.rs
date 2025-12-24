@@ -22,12 +22,15 @@ pub use models::shared::ToolConfig;
 pub use models::interactions::ContentSummary;
 pub use models::interactions::CreateInteractionRequest;
 pub use models::interactions::GenerationConfig;
+pub use models::interactions::GroundingChunk;
+pub use models::interactions::GroundingMetadata;
 pub use models::interactions::InteractionContent;
 pub use models::interactions::InteractionInput;
 pub use models::interactions::InteractionResponse;
 pub use models::interactions::InteractionStatus;
 pub use models::interactions::StreamChunk;
 pub use models::interactions::UsageMetadata;
+pub use models::interactions::WebSource;
 
 // Re-export InternalError from the errors module
 pub use errors::InternalError;
