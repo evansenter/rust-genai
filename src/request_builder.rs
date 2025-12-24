@@ -404,7 +404,7 @@ impl<'a> InteractionBuilder<'a> {
         Err(GenaiError::Internal(format!(
             "Exceeded maximum function call loops ({max_loops}). \
              The model may be stuck in a loop. Check your function implementations, \
-             increase the limit with with_max_function_call_loops(), \
+             increase the limit using with_max_function_call_loops(), \
              or use manual function calling for more control."
         )))
     }
@@ -688,5 +688,36 @@ mod tests {
             builder.response_modalities.as_ref().unwrap(),
             &vec!["IMAGE".to_string()]
         );
+    }
+
+    #[test]
+    fn test_interaction_builder_with_max_function_call_loops() {
+        let client = create_test_client();
+
+        // Test default value
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Test");
+        assert_eq!(
+            builder.max_function_call_loops,
+            crate::request_builder::DEFAULT_MAX_FUNCTION_CALL_LOOPS
+        );
+
+        // Test custom value
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Test")
+            .with_max_function_call_loops(10);
+        assert_eq!(builder.max_function_call_loops, 10);
+
+        // Test setting to minimum (1)
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Test")
+            .with_max_function_call_loops(1);
+        assert_eq!(builder.max_function_call_loops, 1);
     }
 }
