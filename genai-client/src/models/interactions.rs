@@ -224,14 +224,21 @@ impl Serialize for InteractionContent {
                 // For Unknown, merge the type_name into the data object
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", type_name)?;
-                // Flatten the data fields into the map
-                if let serde_json::Value::Object(obj) = data {
-                    for (key, value) in obj {
-                        if key != "type" {
-                            // Don't duplicate the type field
-                            map.serialize_entry(key, value)?;
+                // Flatten the data fields into the map if it's an object
+                match data {
+                    serde_json::Value::Object(obj) => {
+                        for (key, value) in obj {
+                            if key != "type" {
+                                // Don't duplicate the type field
+                                map.serialize_entry(key, value)?;
+                            }
                         }
                     }
+                    // For non-object data (unlikely but possible), preserve under "data" key
+                    other if !other.is_null() => {
+                        map.serialize_entry("data", other)?;
+                    }
+                    _ => {} // Null data is omitted
                 }
                 map.end()
             }
@@ -741,10 +748,10 @@ impl InteractionResponse {
     /// }
     /// ```
     pub fn content_summary(&self) -> ContentSummary {
-        use std::collections::HashSet;
+        use std::collections::BTreeSet;
 
         let mut summary = ContentSummary::default();
-        let mut unknown_types_set = HashSet::new();
+        let mut unknown_types_set = BTreeSet::new();
 
         for content in &self.outputs {
             match content {
@@ -762,8 +769,8 @@ impl InteractionResponse {
             }
         }
 
+        // BTreeSet maintains sorted order, so no need to sort
         summary.unknown_types = unknown_types_set.into_iter().collect();
-        summary.unknown_types.sort();
         summary
     }
 }
@@ -823,6 +830,13 @@ pub struct ContentSummary {
 ///
 /// Contains incremental content updates during streaming.
 /// Used with "content.delta" event types.
+///
+/// # Response-Only Type
+///
+/// This type is only received from the API during streaming responses and is
+/// never sent back to the API. Therefore, it does not implement `Serialize`.
+/// If you need to persist streaming data, convert it to [`InteractionContent`]
+/// or a custom type first.
 ///
 /// # Forward Compatibility
 ///
@@ -1628,5 +1642,101 @@ mod tests {
                 .unknown_types
                 .contains(&"code_execution_result".to_string())
         );
+    }
+
+    #[test]
+    fn test_serialize_known_variant_with_none_fields() {
+        // Test that known variants with None fields serialize correctly (omit None fields)
+        let text = InteractionContent::Text { text: None };
+        let json = serde_json::to_string(&text).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["type"], "text");
+        assert!(value.get("text").is_none());
+
+        let image = InteractionContent::Image {
+            data: Some("base64data".to_string()),
+            uri: None,
+            mime_type: None,
+        };
+        let json = serde_json::to_string(&image).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["type"], "image");
+        assert_eq!(value["data"], "base64data");
+        assert!(value.get("uri").is_none());
+        assert!(value.get("mime_type").is_none());
+
+        let fc = InteractionContent::FunctionCall {
+            id: None,
+            name: "test_fn".to_string(),
+            args: serde_json::json!({"arg": "value"}),
+            thought_signature: None,
+        };
+        let json = serde_json::to_string(&fc).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["type"], "function_call");
+        assert_eq!(value["name"], "test_fn");
+        assert!(value.get("id").is_none());
+        assert!(value.get("thoughtSignature").is_none());
+    }
+
+    #[test]
+    fn test_serialize_unknown_with_non_object_data() {
+        // Test that Unknown with non-object data (array, string, number) is preserved
+        let unknown_array = InteractionContent::Unknown {
+            type_name: "weird_type".to_string(),
+            data: serde_json::json!([1, 2, 3]),
+        };
+        let json = serde_json::to_string(&unknown_array).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["type"], "weird_type");
+        assert_eq!(value["data"], serde_json::json!([1, 2, 3]));
+
+        let unknown_string = InteractionContent::Unknown {
+            type_name: "string_type".to_string(),
+            data: serde_json::json!("just a string"),
+        };
+        let json = serde_json::to_string(&unknown_string).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["type"], "string_type");
+        assert_eq!(value["data"], "just a string");
+
+        let unknown_null = InteractionContent::Unknown {
+            type_name: "null_type".to_string(),
+            data: serde_json::Value::Null,
+        };
+        let json = serde_json::to_string(&unknown_null).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["type"], "null_type");
+        // Null data should be omitted
+        assert!(value.get("data").is_none());
+    }
+
+    #[test]
+    fn test_deserialize_unknown_with_missing_type() {
+        // Edge case: JSON object without a type field
+        let malformed_json = r#"{"foo": "bar", "baz": 42}"#;
+        let content: InteractionContent = serde_json::from_str(malformed_json).unwrap();
+        match content {
+            InteractionContent::Unknown { type_name, data } => {
+                assert_eq!(type_name, "<missing type>");
+                assert_eq!(data["foo"], "bar");
+                assert_eq!(data["baz"], 42);
+            }
+            _ => panic!("Expected Unknown variant"),
+        }
+    }
+
+    #[test]
+    fn test_deserialize_unknown_with_null_type() {
+        // Edge case: JSON object with null type field
+        let null_type_json = r#"{"type": null, "content": "test"}"#;
+        let content: InteractionContent = serde_json::from_str(null_type_json).unwrap();
+        match content {
+            InteractionContent::Unknown { type_name, data } => {
+                assert_eq!(type_name, "<missing type>");
+                assert_eq!(data["content"], "test");
+            }
+            _ => panic!("Expected Unknown variant"),
+        }
     }
 }
