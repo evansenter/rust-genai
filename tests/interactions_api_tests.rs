@@ -33,8 +33,8 @@
 use futures_util::StreamExt;
 use rust_genai::{
     CallableFunction, Client, CreateInteractionRequest, FunctionDeclaration, GenerationConfig,
-    InteractionInput, InteractionStatus, StreamChunk, WithFunctionCalling, function_result_content,
-    image_uri_content, text_content,
+    InteractionInput, InteractionStatus, StreamChunk, function_result_content, image_uri_content,
+    text_content,
 };
 use rust_genai_macros::generate_function_declaration;
 use serde_json::json;

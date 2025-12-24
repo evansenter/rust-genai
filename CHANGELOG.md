@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING CHANGES
 
+#### Improved Streaming API
+- **`create_stream()` return type changed**: Now returns `Stream<StreamChunk>` instead of `Stream<InteractionResponse>`
+  - `StreamChunk::Delta(StreamDelta)` contains incremental text/thought content during streaming
+  - `StreamChunk::Complete(InteractionResponse)` contains the final complete response
+  - New helper methods: `StreamDelta::text()`, `is_text()`, `is_thought()`
+- **New types exported**: `StreamChunk`, `StreamDelta`
+
+### Fixed
+- **Streaming now properly yields content chunks** (#17): The streaming API was returning 0 chunks because the code expected all SSE events to have an `interaction` field, but the API sends different event types (`content.delta` and `interaction.complete`)
+
 #### Simplified Client API
 - **`Client::new()` signature simplified**: No longer takes `api_version` parameter
   - Before: `Client::new(api_key, None)`
