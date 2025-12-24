@@ -12,8 +12,10 @@
 //! Tests that need external media should use base64-encoded data or
 //! gracefully handle the unsupported URI error.
 
-use rust_genai::Client;
+use rust_genai::{Client, GenaiError, InteractionResponse, InteractionStatus};
 use std::env;
+use std::time::{Duration, Instant};
+use tokio::time::sleep;
 
 /// Creates a client from the GEMINI_API_KEY environment variable.
 /// Returns None if the API key is not set.
@@ -21,6 +23,89 @@ pub fn get_client() -> Option<Client> {
     env::var("GEMINI_API_KEY")
         .ok()
         .map(|key| Client::builder(key).build())
+}
+
+// =============================================================================
+// Polling Utilities
+// =============================================================================
+
+/// Error type for polling operations.
+#[derive(Debug)]
+#[allow(dead_code)]
+pub enum PollError {
+    /// Polling timed out before the interaction completed.
+    Timeout,
+    /// The interaction failed.
+    Failed,
+    /// An API error occurred during polling.
+    Api(GenaiError),
+}
+
+impl From<GenaiError> for PollError {
+    fn from(err: GenaiError) -> Self {
+        PollError::Api(err)
+    }
+}
+
+/// Polls an interaction until it completes or times out, using exponential backoff.
+///
+/// Starts with a 1-second delay and doubles each iteration up to a maximum of 10 seconds.
+/// This is more efficient than fixed-interval polling: faster initial detection of
+/// quick completions, fewer API calls for long-running tasks.
+///
+/// # Arguments
+///
+/// * `client` - The API client to use for polling
+/// * `interaction_id` - The ID of the interaction to poll
+/// * `max_wait` - Maximum duration to wait before timing out
+///
+/// # Returns
+///
+/// * `Ok(InteractionResponse)` - The completed (or failed) interaction
+/// * `Err(PollError::Timeout)` - If max_wait elapsed without completion
+/// * `Err(PollError::Failed)` - If the interaction status became Failed
+/// * `Err(PollError::Api(_))` - If an API error occurred
+///
+/// # Example
+///
+/// ```ignore
+/// let response = poll_until_complete(&client, &interaction_id, Duration::from_secs(60)).await?;
+/// ```
+#[allow(dead_code)]
+pub async fn poll_until_complete(
+    client: &Client,
+    interaction_id: &str,
+    max_wait: Duration,
+) -> Result<InteractionResponse, PollError> {
+    const INITIAL_DELAY: Duration = Duration::from_secs(1);
+    const MAX_DELAY: Duration = Duration::from_secs(10);
+
+    let mut delay = INITIAL_DELAY;
+    let start = Instant::now();
+
+    loop {
+        if start.elapsed() > max_wait {
+            return Err(PollError::Timeout);
+        }
+
+        sleep(delay).await;
+
+        let response = client.get_interaction(interaction_id).await?;
+        println!(
+            "Poll after {:?}: status={:?}",
+            start.elapsed(),
+            response.status
+        );
+
+        match response.status {
+            InteractionStatus::Completed => return Ok(response),
+            InteractionStatus::Failed => return Err(PollError::Failed),
+            _ => {
+                // Continue polling with exponential backoff
+                delay = (delay * 2).min(MAX_DELAY);
+            }
+        }
+    }
 }
 
 // =============================================================================
