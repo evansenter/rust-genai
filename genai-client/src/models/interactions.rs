@@ -321,19 +321,78 @@ impl InteractionResponse {
     }
 }
 
-/// Wrapper for SSE streaming events from the Interactions API
-/// The API returns events with this structure rather than bare InteractionResponse objects
+/// Delta content for streaming events
+///
+/// Contains incremental content updates during streaming.
+/// Used with "content.delta" event types.
 #[derive(Clone, Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum StreamDelta {
+    /// Text content delta
+    Text {
+        #[serde(default)]
+        text: String,
+    },
+    /// Thought content delta (internal reasoning)
+    Thought {
+        #[serde(default)]
+        text: String,
+    },
+}
+
+impl StreamDelta {
+    /// Extract the text content from this delta, if any
+    pub fn text(&self) -> Option<&str> {
+        match self {
+            StreamDelta::Text { text } if !text.is_empty() => Some(text),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a text delta
+    pub const fn is_text(&self) -> bool {
+        matches!(self, StreamDelta::Text { .. })
+    }
+
+    /// Check if this is a thought delta
+    pub const fn is_thought(&self) -> bool {
+        matches!(self, StreamDelta::Thought { .. })
+    }
+}
+
+/// A chunk from the streaming API
+///
+/// During streaming, the API sends different types of events:
+/// - `Delta`: Incremental content updates (text or thought)
+/// - `Complete`: The final complete interaction response
+#[derive(Clone, Debug)]
+pub enum StreamChunk {
+    /// Incremental content update
+    Delta(StreamDelta),
+    /// Complete interaction response (final event)
+    Complete(InteractionResponse),
+}
+
+/// Wrapper for SSE streaming events from the Interactions API
+///
+/// The API returns different event types during streaming:
+/// - `content.delta`: Contains incremental content in the `delta` field
+/// - `interaction.complete`: Contains the full interaction in the `interaction` field
+#[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct InteractionStreamEvent {
-    /// Event type (e.g., "interaction.start", "interaction.update", "interaction.complete")
+    /// Event type (e.g., "content.delta", "interaction.complete")
     pub event_type: String,
 
-    /// The full interaction data (present in start/complete events)
+    /// The full interaction data (present in "interaction.complete" events)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interaction: Option<InteractionResponse>,
 
-    /// Interaction ID (present in status update events)
+    /// Incremental content delta (present in "content.delta" events)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<StreamDelta>,
+
+    /// Interaction ID (present in various events)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interaction_id: Option<String>,
 
@@ -566,5 +625,96 @@ mod tests {
         assert_eq!(response.function_calls().len(), 0);
         assert!(!response.has_text());
         assert!(!response.has_function_calls());
+    }
+
+    // --- Streaming Event Tests ---
+
+    #[test]
+    fn test_deserialize_stream_delta_text() {
+        let delta_json = r#"{"type": "text", "text": "Hello world"}"#;
+        let delta: StreamDelta = serde_json::from_str(delta_json).expect("Deserialization failed");
+
+        match &delta {
+            StreamDelta::Text { text } => {
+                assert_eq!(text, "Hello world");
+            }
+            _ => panic!("Expected Text delta"),
+        }
+
+        assert!(delta.is_text());
+        assert!(!delta.is_thought());
+        assert_eq!(delta.text(), Some("Hello world"));
+    }
+
+    #[test]
+    fn test_deserialize_stream_delta_thought() {
+        let delta_json = r#"{"type": "thought", "text": "I'm thinking..."}"#;
+        let delta: StreamDelta = serde_json::from_str(delta_json).expect("Deserialization failed");
+
+        match &delta {
+            StreamDelta::Thought { text } => {
+                assert_eq!(text, "I'm thinking...");
+            }
+            _ => panic!("Expected Thought delta"),
+        }
+
+        assert!(!delta.is_text());
+        assert!(delta.is_thought());
+        // text() returns None for thoughts
+        assert_eq!(delta.text(), None);
+    }
+
+    #[test]
+    fn test_deserialize_content_delta_event() {
+        let event_json = r#"{
+            "eventType": "content.delta",
+            "interactionId": "test_123",
+            "delta": {"type": "text", "text": "Hello"}
+        }"#;
+
+        let event: InteractionStreamEvent =
+            serde_json::from_str(event_json).expect("Deserialization failed");
+
+        assert_eq!(event.event_type, "content.delta");
+        assert_eq!(event.interaction_id.as_deref(), Some("test_123"));
+        assert!(event.delta.is_some());
+        assert!(event.interaction.is_none());
+
+        let delta = event.delta.unwrap();
+        assert!(delta.is_text());
+        assert_eq!(delta.text(), Some("Hello"));
+    }
+
+    #[test]
+    fn test_deserialize_interaction_complete_event() {
+        let event_json = r#"{
+            "eventType": "interaction.complete",
+            "interaction": {
+                "id": "interaction_456",
+                "model": "gemini-3-flash-preview",
+                "input": [{"type": "text", "text": "Count to 3"}],
+                "outputs": [{"type": "text", "text": "1, 2, 3"}],
+                "status": "completed"
+            }
+        }"#;
+
+        let event: InteractionStreamEvent =
+            serde_json::from_str(event_json).expect("Deserialization failed");
+
+        assert_eq!(event.event_type, "interaction.complete");
+        assert!(event.interaction.is_some());
+        assert!(event.delta.is_none());
+
+        let interaction = event.interaction.unwrap();
+        assert_eq!(interaction.id, "interaction_456");
+        assert_eq!(interaction.text(), Some("1, 2, 3"));
+    }
+
+    #[test]
+    fn test_stream_delta_empty_text_returns_none() {
+        let delta = StreamDelta::Text {
+            text: String::new(),
+        };
+        assert_eq!(delta.text(), None);
     }
 }

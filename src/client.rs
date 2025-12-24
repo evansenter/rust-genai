@@ -158,20 +158,61 @@ impl Client {
 
     /// Creates a new interaction with streaming responses.
     ///
-    /// Returns a stream of `InteractionResponse` updates as they arrive from the server.
-    /// Useful for long-running interactions or agents where you want incremental updates.
+    /// Returns a stream of `StreamChunk` items as they arrive from the server.
+    /// Each chunk can be either:
+    /// - `StreamChunk::Delta`: Incremental content (text or thought)
+    /// - `StreamChunk::Complete`: The final complete interaction response
     ///
     /// # Arguments
     ///
     /// * `request` - The interaction request with streaming enabled.
     ///
     /// # Returns
-    /// A boxed stream that yields `InteractionResponse` items.
+    /// A boxed stream that yields `StreamChunk` items.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use rust_genai::{Client, StreamChunk};
+    /// use genai_client::{CreateInteractionRequest, InteractionInput};
+    /// use futures_util::StreamExt;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api_key".to_string()).build();
+    /// let request = CreateInteractionRequest {
+    ///     model: Some("gemini-3-flash-preview".to_string()),
+    ///     agent: None,
+    ///     input: InteractionInput::Text("Count to 5".to_string()),
+    ///     previous_interaction_id: None,
+    ///     tools: None,
+    ///     response_modalities: None,
+    ///     response_format: None,
+    ///     generation_config: None,
+    ///     stream: Some(true),
+    ///     background: None,
+    ///     store: None,
+    ///     system_instruction: None,
+    /// };
+    ///
+    /// let mut stream = client.create_interaction_stream(request);
+    /// while let Some(chunk) = stream.next().await {
+    ///     match chunk? {
+    ///         StreamChunk::Delta(delta) => {
+    ///             if let Some(text) = delta.text() {
+    ///                 print!("{}", text);
+    ///             }
+    ///         }
+    ///         StreamChunk::Complete(response) => {
+    ///             println!("\nDone! ID: {}", response.id);
+    ///         }
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn create_interaction_stream(
         &self,
         request: genai_client::CreateInteractionRequest,
-    ) -> futures_util::stream::BoxStream<'_, Result<genai_client::InteractionResponse, GenaiError>>
-    {
+    ) -> futures_util::stream::BoxStream<'_, Result<genai_client::StreamChunk, GenaiError>> {
         use futures_util::StreamExt;
 
         log::debug!("Creating streaming interaction");
@@ -183,8 +224,8 @@ impl Client {
         stream
             .map(move |result| {
                 result
-                    .inspect(|response| {
-                        log::debug!("Received interaction update: status={:?}", response.status);
+                    .inspect(|chunk| {
+                        log::debug!("Received stream chunk: {:?}", chunk);
                     })
                     .map_err(GenaiError::from)
             })

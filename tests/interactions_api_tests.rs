@@ -33,7 +33,8 @@
 use futures_util::StreamExt;
 use rust_genai::{
     CallableFunction, Client, CreateInteractionRequest, FunctionDeclaration, GenerationConfig,
-    InteractionInput, InteractionStatus, function_result_content, image_uri_content, text_content,
+    InteractionInput, InteractionStatus, StreamChunk, function_result_content, image_uri_content,
+    text_content,
 };
 use rust_genai_macros::generate_function_declaration;
 use serde_json::json;
@@ -210,21 +211,30 @@ async fn test_streaming_interaction() {
         .with_store(true)
         .create_stream();
 
-    let mut chunk_count = 0;
-    let mut final_status = None;
+    let mut delta_count = 0;
+    let mut complete_count = 0;
+    let mut collected_text = String::new();
+    let mut final_response = None;
 
     while let Some(result) = stream.next().await {
         match result {
-            Ok(response) => {
-                chunk_count += 1;
-                println!(
-                    "Chunk {}: status={:?}, outputs={}",
-                    chunk_count,
-                    response.status,
-                    response.outputs.len()
-                );
-                final_status = Some(response.status.clone());
-            }
+            Ok(chunk) => match chunk {
+                StreamChunk::Delta(delta) => {
+                    delta_count += 1;
+                    if let Some(text) = delta.text() {
+                        collected_text.push_str(text);
+                        print!("{}", text);
+                    }
+                }
+                StreamChunk::Complete(response) => {
+                    complete_count += 1;
+                    println!(
+                        "\nComplete: status={:?}, id={}",
+                        response.status, response.id
+                    );
+                    final_response = Some(response);
+                }
+            },
             Err(e) => {
                 println!("Stream error: {:?}", e);
                 break;
@@ -232,13 +242,24 @@ async fn test_streaming_interaction() {
         }
     }
 
-    println!("Total chunks: {}", chunk_count);
-    println!("Final status: {:?}", final_status);
+    println!(
+        "\nTotal deltas: {}, complete events: {}",
+        delta_count, complete_count
+    );
+    println!("Collected text: {}", collected_text);
 
-    // Note: Streaming implementation may return 0 chunks if the API
-    // doesn't support SSE properly or returns all content in one response
-    if chunk_count == 0 {
-        println!("Warning: No chunks received - streaming may not be fully supported");
+    // We should receive at least some delta chunks
+    assert!(
+        delta_count > 0 || complete_count > 0,
+        "No streaming chunks received - streaming may not be working"
+    );
+
+    // If we got a complete event, verify it has a valid ID
+    if let Some(response) = final_response {
+        assert!(
+            !response.id.is_empty(),
+            "Complete response should have an ID"
+        );
     }
 }
 
@@ -267,15 +288,30 @@ async fn test_streaming_with_raw_request() {
 
     let mut stream = client.create_interaction_stream(request);
 
-    let mut chunk_count = 0;
+    let mut delta_count = 0;
+    let mut complete_count = 0;
+
     while let Some(result) = stream.next().await {
-        assert!(result.is_ok(), "Streaming chunk failed: {:?}", result.err());
-        chunk_count += 1;
+        match result {
+            Ok(chunk) => match chunk {
+                StreamChunk::Delta(_) => delta_count += 1,
+                StreamChunk::Complete(_) => complete_count += 1,
+            },
+            Err(e) => {
+                panic!("Streaming chunk failed: {:?}", e);
+            }
+        }
     }
 
-    if chunk_count > 0 {
-        println!("Received {} chunks from raw request stream", chunk_count);
-    }
+    println!(
+        "Received {} deltas and {} complete events from raw request stream",
+        delta_count, complete_count
+    );
+
+    assert!(
+        delta_count > 0 || complete_count > 0,
+        "No streaming chunks received"
+    );
 }
 
 // =============================================================================

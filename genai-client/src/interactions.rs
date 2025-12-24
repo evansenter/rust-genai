@@ -2,11 +2,12 @@ use crate::common::{Endpoint, construct_endpoint_url};
 use crate::error_helpers::check_response;
 use crate::errors::InternalError;
 use crate::models::interactions::{
-    CreateInteractionRequest, InteractionResponse, InteractionStreamEvent,
+    CreateInteractionRequest, InteractionResponse, InteractionStreamEvent, StreamChunk,
 };
 use crate::sse_parser::parse_sse_stream;
 use async_stream::try_stream;
 use futures_util::{Stream, StreamExt};
+use log::debug;
 use reqwest::Client as ReqwestClient;
 
 /// Creates a new interaction with the Gemini API.
@@ -38,13 +39,32 @@ pub async fn create_interaction(
 
 /// Creates a new interaction with streaming responses.
 ///
-/// Returns a stream of InteractionResponse chunks as they arrive from the server.
-/// Useful for long-running interactions or agents where you want incremental updates.
+/// Returns a stream of `StreamChunk` items as they arrive from the server.
+/// Each chunk can be either:
+/// - `StreamChunk::Delta`: Incremental content (text or thought)
+/// - `StreamChunk::Complete`: The final complete interaction response
+///
+/// # Example
+/// ```ignore
+/// let stream = create_interaction_stream(&client, &api_key, request);
+/// while let Some(chunk) = stream.next().await {
+///     match chunk? {
+///         StreamChunk::Delta(delta) => {
+///             if let Some(text) = delta.text() {
+///                 print!("{}", text);
+///             }
+///         }
+///         StreamChunk::Complete(response) => {
+///             println!("\nComplete: {} tokens", response.usage.map(|u| u.total_tokens).flatten().unwrap_or(0));
+///         }
+///     }
+/// }
+/// ```
 pub fn create_interaction_stream<'a>(
     http_client: &'a ReqwestClient,
     api_key: &'a str,
     request: CreateInteractionRequest,
-) -> impl Stream<Item = Result<InteractionResponse, InternalError>> + Send + 'a {
+) -> impl Stream<Item = Result<StreamChunk, InternalError>> + Send + 'a {
     let endpoint = Endpoint::CreateInteraction { stream: true };
     let url = construct_endpoint_url(endpoint, api_key);
 
@@ -61,10 +81,37 @@ pub fn create_interaction_stream<'a>(
 
         while let Some(result) = parsed_stream.next().await {
             let event = result?;
-            // Only yield events that have the full interaction data
-            // Status update events are skipped as they don't contain the full response
-            if let Some(interaction) = event.interaction {
-                yield interaction;
+            debug!(
+                "SSE event received: event_type={:?}, has_delta={}, has_interaction={}, interaction_id={:?}",
+                event.event_type,
+                event.delta.is_some(),
+                event.interaction.is_some(),
+                event.interaction_id
+            );
+
+            // Handle different event types
+            match event.event_type.as_str() {
+                "content.delta" => {
+                    // Incremental content update
+                    if let Some(delta) = event.delta {
+                        yield StreamChunk::Delta(delta);
+                    }
+                }
+                "interaction.complete" => {
+                    // Final complete response
+                    if let Some(interaction) = event.interaction {
+                        yield StreamChunk::Complete(interaction);
+                    }
+                }
+                _ => {
+                    // For other event types, check if they have useful data
+                    if let Some(delta) = event.delta {
+                        yield StreamChunk::Delta(delta);
+                    } else if let Some(interaction) = event.interaction {
+                        yield StreamChunk::Complete(interaction);
+                    }
+                    // Otherwise skip (e.g., status updates without content)
+                }
             }
         }
     }

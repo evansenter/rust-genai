@@ -25,6 +25,8 @@ pub use models::interactions::InteractionContent;
 pub use models::interactions::InteractionInput;
 pub use models::interactions::InteractionResponse;
 pub use models::interactions::InteractionStatus;
+pub use models::interactions::StreamChunk;
+pub use models::interactions::StreamDelta;
 pub use models::interactions::UsageMetadata;
 
 // Re-export InternalError from the errors module
