@@ -39,6 +39,11 @@ pub enum InteractionContent {
     Text { text: Option<String> },
     /// Thought content (internal reasoning)
     Thought { text: Option<String> },
+    /// Thought signature (cryptographic signature for thought verification)
+    ///
+    /// This variant typically appears only during streaming responses, providing
+    /// a cryptographic signature that verifies the authenticity of thought content.
+    ThoughtSignature { signature: String },
     /// Image content
     Image {
         data: Option<String>,
@@ -134,6 +139,12 @@ impl Serialize for InteractionContent {
                 if let Some(t) = text {
                     map.serialize_entry("text", t)?;
                 }
+                map.end()
+            }
+            Self::ThoughtSignature { signature } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "thought_signature")?;
+                map.serialize_entry("signature", signature)?;
                 map.end()
             }
             Self::Image {
@@ -247,6 +258,37 @@ impl Serialize for InteractionContent {
 }
 
 impl InteractionContent {
+    /// Extract the text content, if this is a Text variant with non-empty text.
+    ///
+    /// Returns `Some` only for `Text` variants with non-empty text.
+    /// Returns `None` for all other variants including `Thought`.
+    pub fn text(&self) -> Option<&str> {
+        match self {
+            Self::Text { text: Some(t) } if !t.is_empty() => Some(t),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a Text content type.
+    pub const fn is_text(&self) -> bool {
+        matches!(self, Self::Text { .. })
+    }
+
+    /// Check if this is a Thought content type.
+    pub const fn is_thought(&self) -> bool {
+        matches!(self, Self::Thought { .. })
+    }
+
+    /// Check if this is a ThoughtSignature content type.
+    pub const fn is_thought_signature(&self) -> bool {
+        matches!(self, Self::ThoughtSignature { .. })
+    }
+
+    /// Check if this is a FunctionCall content type.
+    pub const fn is_function_call(&self) -> bool {
+        matches!(self, Self::FunctionCall { .. })
+    }
+
     /// Returns `true` if this is an unknown content type.
     ///
     /// Use this to check for content types that the library doesn't recognize.
@@ -302,6 +344,10 @@ impl<'de> Deserialize<'de> for InteractionContent {
             Thought {
                 text: Option<String>,
             },
+            ThoughtSignature {
+                #[serde(default)]
+                signature: String,
+            },
             Image {
                 data: Option<String>,
                 uri: Option<String>,
@@ -337,6 +383,9 @@ impl<'de> Deserialize<'de> for InteractionContent {
             Ok(known) => Ok(match known {
                 KnownContent::Text { text } => InteractionContent::Text { text },
                 KnownContent::Thought { text } => InteractionContent::Thought { text },
+                KnownContent::ThoughtSignature { signature } => {
+                    InteractionContent::ThoughtSignature { signature }
+                }
                 KnownContent::Image {
                     data,
                     uri,
@@ -757,6 +806,11 @@ impl InteractionResponse {
             match content {
                 InteractionContent::Text { .. } => summary.text_count += 1,
                 InteractionContent::Thought { .. } => summary.thought_count += 1,
+                InteractionContent::ThoughtSignature { .. } => {
+                    // ThoughtSignature typically only appears during streaming,
+                    // not in final outputs. Count with thoughts if present.
+                    summary.thought_count += 1
+                }
                 InteractionContent::Image { .. } => summary.image_count += 1,
                 InteractionContent::Audio { .. } => summary.audio_count += 1,
                 InteractionContent::Video { .. } => summary.video_count += 1,
@@ -826,202 +880,15 @@ pub struct ContentSummary {
     pub unknown_types: Vec<String>,
 }
 
-/// Delta content for streaming events.
-///
-/// Contains incremental content updates during streaming.
-/// Used with "content.delta" event types.
-///
-/// # Response-Only Type
-///
-/// This type is only received from the API during streaming responses and is
-/// never sent back to the API. Therefore, it does not implement `Serialize`.
-/// If you need to persist streaming data, convert it to [`InteractionContent`]
-/// or a custom type first.
-///
-/// # Forward Compatibility
-///
-/// Like [`InteractionContent`], this enum includes an `Unknown` variant for
-/// delta types that this library doesn't recognize. This commonly occurs
-/// with new features like function call streaming.
-///
-/// # Example
-///
-/// ```no_run
-/// # use genai_client::models::interactions::StreamDelta;
-/// # let delta: StreamDelta = todo!();
-/// match &delta {
-///     StreamDelta::Text { text } => print!("{}", text),
-///     StreamDelta::Thought { text } => print!("[thinking: {}]", text),
-///     StreamDelta::Unknown { type_name, .. } => {
-///         log::debug!("Skipping unknown delta type: {}", type_name);
-///     }
-///     _ => {}
-/// }
-/// ```
-#[derive(Clone, Debug)]
-pub enum StreamDelta {
-    /// Text content delta
-    Text {
-        /// The incremental text content
-        text: String,
-    },
-    /// Thought content delta (internal reasoning)
-    Thought {
-        /// The incremental thought content
-        text: String,
-    },
-    /// Thought signature (cryptographic signature for thought verification)
-    ThoughtSignature {
-        /// The signature value
-        signature: String,
-    },
-    /// Unknown delta type for forward compatibility.
-    ///
-    /// Captures streaming delta types that the library doesn't recognize yet,
-    /// such as `function_call` deltas for streaming function calling.
-    Unknown {
-        /// The unrecognized type name from the API
-        type_name: String,
-        /// The full JSON data for this delta
-        data: serde_json::Value,
-    },
-}
-
-// Custom Deserialize for StreamDelta to handle unknown delta types gracefully.
-impl<'de> Deserialize<'de> for StreamDelta {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[cfg(feature = "strict-unknown")]
-        use serde::de::Error as _;
-
-        let value = serde_json::Value::deserialize(deserializer)?;
-
-        #[derive(Deserialize)]
-        #[serde(tag = "type", rename_all = "snake_case")]
-        enum KnownDelta {
-            Text {
-                #[serde(default)]
-                text: String,
-            },
-            Thought {
-                #[serde(default)]
-                text: String,
-            },
-            ThoughtSignature {
-                #[serde(default)]
-                signature: String,
-            },
-        }
-
-        match serde_json::from_value::<KnownDelta>(value.clone()) {
-            Ok(known) => Ok(match known {
-                KnownDelta::Text { text } => StreamDelta::Text { text },
-                KnownDelta::Thought { text } => StreamDelta::Thought { text },
-                KnownDelta::ThoughtSignature { signature } => {
-                    StreamDelta::ThoughtSignature { signature }
-                }
-            }),
-            Err(_) => {
-                let type_name = value
-                    .get("type")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("<missing type>")
-                    .to_string();
-
-                log::warn!(
-                    "Encountered unknown StreamDelta type '{}'. \
-                     This may indicate a new streaming feature (e.g., function call streaming) \
-                     not yet supported by this library.",
-                    type_name
-                );
-
-                #[cfg(feature = "strict-unknown")]
-                {
-                    Err(D::Error::custom(format!(
-                        "Unknown StreamDelta type '{}'. \
-                         Strict mode is enabled via the 'strict-unknown' feature flag.",
-                        type_name
-                    )))
-                }
-
-                #[cfg(not(feature = "strict-unknown"))]
-                {
-                    Ok(StreamDelta::Unknown {
-                        type_name,
-                        data: value,
-                    })
-                }
-            }
-        }
-    }
-}
-
-impl StreamDelta {
-    /// Extract the text content from this delta, if any.
-    ///
-    /// Returns `Some` only for non-empty text deltas. Returns `None` for
-    /// thought deltas, signatures, unknown types, and empty text.
-    pub fn text(&self) -> Option<&str> {
-        match self {
-            StreamDelta::Text { text } if !text.is_empty() => Some(text),
-            _ => None,
-        }
-    }
-
-    /// Check if this is a text delta.
-    pub const fn is_text(&self) -> bool {
-        matches!(self, StreamDelta::Text { .. })
-    }
-
-    /// Check if this is a thought delta.
-    pub const fn is_thought(&self) -> bool {
-        matches!(self, StreamDelta::Thought { .. })
-    }
-
-    /// Check if this is an unknown delta type.
-    ///
-    /// Returns `true` for delta types that this library doesn't recognize.
-    /// Use this to detect streaming features that aren't yet supported.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use genai_client::models::interactions::StreamDelta;
-    /// # let delta: StreamDelta = todo!();
-    /// if delta.is_unknown() {
-    ///     if let StreamDelta::Unknown { type_name, .. } = &delta {
-    ///         log::debug!("Skipping unknown delta: {}", type_name);
-    ///     }
-    /// }
-    /// ```
-    pub const fn is_unknown(&self) -> bool {
-        matches!(self, StreamDelta::Unknown { .. })
-    }
-
-    /// Returns the type name of this delta.
-    ///
-    /// Useful for logging or debugging, especially with unknown types.
-    pub fn type_name(&self) -> &str {
-        match self {
-            StreamDelta::Text { .. } => "text",
-            StreamDelta::Thought { .. } => "thought",
-            StreamDelta::ThoughtSignature { .. } => "thought_signature",
-            StreamDelta::Unknown { type_name, .. } => type_name,
-        }
-    }
-}
-
 /// A chunk from the streaming API
 ///
 /// During streaming, the API sends different types of events:
-/// - `Delta`: Incremental content updates (text or thought)
+/// - `Delta`: Incremental content updates (text, thought, function_call, etc.)
 /// - `Complete`: The final complete interaction response
 #[derive(Clone, Debug)]
 pub enum StreamChunk {
     /// Incremental content update
-    Delta(StreamDelta),
+    Delta(InteractionContent),
     /// Complete interaction response (final event)
     Complete(InteractionResponse),
 }
@@ -1043,7 +910,7 @@ pub struct InteractionStreamEvent {
 
     /// Incremental content delta (present in "content.delta" events)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub delta: Option<StreamDelta>,
+    pub delta: Option<InteractionContent>,
 
     /// Interaction ID (present in various events)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1283,15 +1150,17 @@ mod tests {
     // --- Streaming Event Tests ---
 
     #[test]
-    fn test_deserialize_stream_delta_text() {
+    fn test_deserialize_streaming_text_content() {
+        // Streaming deltas now use InteractionContent directly
         let delta_json = r#"{"type": "text", "text": "Hello world"}"#;
-        let delta: StreamDelta = serde_json::from_str(delta_json).expect("Deserialization failed");
+        let delta: InteractionContent =
+            serde_json::from_str(delta_json).expect("Deserialization failed");
 
         match &delta {
-            StreamDelta::Text { text } => {
-                assert_eq!(text, "Hello world");
+            InteractionContent::Text { text } => {
+                assert_eq!(text.as_deref(), Some("Hello world"));
             }
-            _ => panic!("Expected Text delta"),
+            _ => panic!("Expected Text content"),
         }
 
         assert!(delta.is_text());
@@ -1300,21 +1169,58 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_stream_delta_thought() {
+    fn test_deserialize_streaming_thought_content() {
         let delta_json = r#"{"type": "thought", "text": "I'm thinking..."}"#;
-        let delta: StreamDelta = serde_json::from_str(delta_json).expect("Deserialization failed");
+        let delta: InteractionContent =
+            serde_json::from_str(delta_json).expect("Deserialization failed");
 
         match &delta {
-            StreamDelta::Thought { text } => {
-                assert_eq!(text, "I'm thinking...");
+            InteractionContent::Thought { text } => {
+                assert_eq!(text.as_deref(), Some("I'm thinking..."));
             }
-            _ => panic!("Expected Thought delta"),
+            _ => panic!("Expected Thought content"),
         }
 
         assert!(!delta.is_text());
         assert!(delta.is_thought());
-        // text() returns None for thoughts
+        // text() returns None for thoughts (only returns text for Text variant)
         assert_eq!(delta.text(), None);
+    }
+
+    #[test]
+    fn test_deserialize_streaming_function_call() {
+        // Function calls can now be streamed - this was issue #27
+        let delta_json =
+            r#"{"type": "function_call", "name": "get_weather", "arguments": {"city": "Paris"}}"#;
+        let delta: InteractionContent =
+            serde_json::from_str(delta_json).expect("Deserialization failed");
+
+        match &delta {
+            InteractionContent::FunctionCall { name, args, .. } => {
+                assert_eq!(name, "get_weather");
+                assert_eq!(args["city"], "Paris");
+            }
+            _ => panic!("Expected FunctionCall content"),
+        }
+
+        assert!(delta.is_function_call());
+        assert!(!delta.is_unknown()); // function_call is now a KNOWN type!
+    }
+
+    #[test]
+    fn test_deserialize_streaming_thought_signature() {
+        let delta_json = r#"{"type": "thought_signature", "signature": "abc123"}"#;
+        let delta: InteractionContent =
+            serde_json::from_str(delta_json).expect("Deserialization failed");
+
+        match &delta {
+            InteractionContent::ThoughtSignature { signature } => {
+                assert_eq!(signature, "abc123");
+            }
+            _ => panic!("Expected ThoughtSignature content"),
+        }
+
+        assert!(delta.is_thought_signature());
     }
 
     #[test]
@@ -1364,11 +1270,14 @@ mod tests {
     }
 
     #[test]
-    fn test_stream_delta_empty_text_returns_none() {
-        let delta = StreamDelta::Text {
-            text: String::new(),
+    fn test_content_empty_text_returns_none() {
+        let content = InteractionContent::Text {
+            text: Some(String::new()),
         };
-        assert_eq!(delta.text(), None);
+        assert_eq!(content.text(), None);
+
+        let content_none = InteractionContent::Text { text: None };
+        assert_eq!(content_none.text(), None);
     }
 
     // --- Unknown Variant Tests ---
@@ -1397,22 +1306,20 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_unknown_stream_delta() {
-        // Simulate a function_call delta that's not yet supported
-        let unknown_json =
-            r#"{"type": "function_call", "name": "get_weather", "arguments": {"city": "Paris"}}"#;
+    fn test_deserialize_unknown_streaming_content() {
+        // Simulate a new streaming content type that this library doesn't know about
+        let unknown_json = r#"{"type": "new_feature_delta", "data": "some_value"}"#;
 
-        let delta: StreamDelta =
+        let content: InteractionContent =
             serde_json::from_str(unknown_json).expect("Should deserialize as Unknown");
 
-        assert!(delta.is_unknown());
-        assert_eq!(delta.type_name(), "function_call");
+        assert!(content.is_unknown());
+        assert_eq!(content.unknown_type(), Some("new_feature_delta"));
 
-        match &delta {
-            StreamDelta::Unknown { type_name, data } => {
-                assert_eq!(type_name, "function_call");
-                assert_eq!(data["name"], "get_weather");
-                assert_eq!(data["arguments"]["city"], "Paris");
+        match &content {
+            InteractionContent::Unknown { type_name, data } => {
+                assert_eq!(type_name, "new_feature_delta");
+                assert_eq!(data["data"], "some_value");
             }
             _ => panic!("Expected Unknown variant"),
         }
@@ -1431,10 +1338,18 @@ mod tests {
         assert!(matches!(content, InteractionContent::Thought { .. }));
         assert!(!content.is_unknown());
 
-        let delta_json = r#"{"type": "text", "text": "Delta text"}"#;
-        let delta: StreamDelta = serde_json::from_str(delta_json).unwrap();
-        assert!(delta.is_text());
-        assert!(!delta.is_unknown());
+        let signature_json = r#"{"type": "thought_signature", "signature": "sig123"}"#;
+        let content: InteractionContent = serde_json::from_str(signature_json).unwrap();
+        assert!(matches!(
+            content,
+            InteractionContent::ThoughtSignature { .. }
+        ));
+        assert!(!content.is_unknown());
+
+        let function_json = r#"{"type": "function_call", "name": "test", "arguments": {}}"#;
+        let content: InteractionContent = serde_json::from_str(function_json).unwrap();
+        assert!(matches!(content, InteractionContent::FunctionCall { .. }));
+        assert!(!content.is_unknown());
     }
 
     #[test]
@@ -1564,25 +1479,6 @@ mod tests {
         assert_eq!(summary.text_count, 0);
         assert_eq!(summary.unknown_count, 0);
         assert!(summary.unknown_types.is_empty());
-    }
-
-    #[test]
-    fn test_stream_delta_type_name() {
-        let text = StreamDelta::Text {
-            text: "hello".to_string(),
-        };
-        assert_eq!(text.type_name(), "text");
-
-        let thought = StreamDelta::Thought {
-            text: "thinking".to_string(),
-        };
-        assert_eq!(thought.type_name(), "thought");
-
-        let unknown = StreamDelta::Unknown {
-            type_name: "function_call".to_string(),
-            data: serde_json::json!({}),
-        };
-        assert_eq!(unknown.type_name(), "function_call");
     }
 
     #[test]
