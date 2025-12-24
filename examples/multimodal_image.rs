@@ -1,0 +1,109 @@
+//! Multimodal Image Input Example
+//!
+//! This example demonstrates sending an image to the Gemini API for analysis
+//! using base64-encoded image data.
+//!
+//! # Running
+//!
+//! ```bash
+//! cargo run --example multimodal_image
+//! ```
+//!
+//! # Prerequisites
+//!
+//! Set the `GEMINI_API_KEY` environment variable with your API key.
+
+use rust_genai::{Client, InteractionInput, image_data_content, text_content};
+use std::env;
+
+// A tiny red PNG image (1x1 pixel) encoded as base64
+const TINY_RED_PNG_BASE64: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+
+// A tiny blue PNG image (1x1 pixel) encoded as base64
+const TINY_BLUE_PNG_BASE64: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Get API key from environment
+    let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY environment variable not set");
+
+    let client = Client::builder(api_key).build();
+
+    println!("=== MULTIMODAL IMAGE INPUT EXAMPLE ===\n");
+
+    // Build multimodal content with text and base64 image
+    let contents = vec![
+        text_content("What color is this image? Describe it."),
+        image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+    ];
+
+    println!("Sending image to Gemini for analysis...\n");
+
+    let response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_input(InteractionInput::Content(contents))
+        .with_store(true)
+        .create()
+        .await?;
+
+    println!("--- Response ---");
+    println!("Status: {:?}", response.status);
+    println!();
+
+    if let Some(text) = response.text() {
+        println!("Image Description:");
+        println!("{}", text);
+    }
+
+    if let Some(usage) = response.usage {
+        println!();
+        if let Some(total) = usage.total_tokens {
+            println!("Total tokens: {}", total);
+        }
+    }
+
+    println!("\n--- End ---");
+
+    // Demonstrate comparing two images
+    println!("\n=== IMAGE COMPARISON ===\n");
+
+    let comparison_contents = vec![
+        text_content("Compare these two colored images. What are their colors?"),
+        image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+        image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
+    ];
+
+    let comparison = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_input(InteractionInput::Content(comparison_contents))
+        .with_store(true)
+        .create()
+        .await?;
+
+    if let Some(text) = comparison.text() {
+        println!("Comparison: {}", text);
+    }
+
+    // Demonstrate a follow-up question using conversation context
+    println!("\n=== FOLLOW-UP QUESTION ===\n");
+    println!("User: Which of those colors is warmer?\n");
+
+    let follow_up = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_previous_interaction(&comparison.id)
+        .with_text("Which of those colors is warmer?")
+        .with_store(true)
+        .create()
+        .await?;
+
+    if let Some(text) = follow_up.text() {
+        println!("Assistant: {}", text);
+    }
+
+    println!("\n--- End ---");
+
+    Ok(())
+}
