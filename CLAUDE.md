@@ -158,7 +158,7 @@ The Interactions API provides a unified interface for both models and agents. Ke
 - Support for stateful conversations via `previous_interaction_id`
 
 **Content Structure** (`genai-client/src/models/interactions.rs`):
-- Uses flat `InteractionContent` enum with type-tagged variants (Text, Thought, Image, Audio, Video, FunctionCall, FunctionResponse)
+- Uses flat `InteractionContent` enum with type-tagged variants (Text, Thought, Image, Audio, Video, FunctionCall, FunctionResult)
 - Fields are often optional as API doesn't always return all data
 - Helper functions in `src/interactions_api.rs` provide ergonomic content builders
 
@@ -192,11 +192,9 @@ Tests are organized into two categories:
 
 Integration tests that require a real API key use `#[ignore]` attribute and must be run with `cargo test -- --include-ignored`.
 
-## API Version Support
+## API Version
 
-The library supports different API versions via the `ApiVersion` enum in `genai-client`:
-- Currently defaults to `V1Beta`
-- API version affects URL construction in `genai-client/src/common.rs`
+The library uses the Gemini V1Beta API internally. The API version is configured in `genai-client/src/common.rs` and is not user-configurable.
 
 ## Claude Code Configuration
 
