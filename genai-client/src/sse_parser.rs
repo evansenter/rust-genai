@@ -7,6 +7,7 @@ use crate::errors::InternalError;
 use async_stream::try_stream;
 use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
+use log::debug;
 use serde::de::DeserializeOwned;
 use std::str;
 
@@ -67,6 +68,7 @@ where
 
                     // Skip empty data lines and [DONE] markers (used by some SSE endpoints)
                     if !json_data.is_empty() && json_data != "[DONE]" {
+                        debug!("SSE raw data: {}", json_data);
                         let parsed: T = serde_json::from_str(json_data).map_err(|e| {
                             let context_msg = format_json_parse_error(json_data, e);
                             InternalError::Parse(context_msg)

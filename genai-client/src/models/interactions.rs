@@ -327,19 +327,78 @@ impl InteractionResponse {
     }
 }
 
-/// Wrapper for SSE streaming events from the Interactions API
-/// The API returns events with this structure rather than bare InteractionResponse objects
+/// Delta content for streaming events
+///
+/// Contains incremental content updates during streaming.
+/// Used with "content.delta" event types.
 #[derive(Clone, Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum StreamDelta {
+    /// Text content delta
+    Text {
+        #[serde(default)]
+        text: String,
+    },
+    /// Thought content delta (internal reasoning)
+    Thought {
+        #[serde(default)]
+        text: String,
+    },
+}
+
+impl StreamDelta {
+    /// Extract the text content from this delta, if any
+    pub fn text(&self) -> Option<&str> {
+        match self {
+            StreamDelta::Text { text } if !text.is_empty() => Some(text),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a text delta
+    pub const fn is_text(&self) -> bool {
+        matches!(self, StreamDelta::Text { .. })
+    }
+
+    /// Check if this is a thought delta
+    pub const fn is_thought(&self) -> bool {
+        matches!(self, StreamDelta::Thought { .. })
+    }
+}
+
+/// A chunk from the streaming API
+///
+/// During streaming, the API sends different types of events:
+/// - `Delta`: Incremental content updates (text or thought)
+/// - `Complete`: The final complete interaction response
+#[derive(Clone, Debug)]
+pub enum StreamChunk {
+    /// Incremental content update
+    Delta(StreamDelta),
+    /// Complete interaction response (final event)
+    Complete(InteractionResponse),
+}
+
+/// Wrapper for SSE streaming events from the Interactions API
+///
+/// The API returns different event types during streaming:
+/// - `content.delta`: Contains incremental content in the `delta` field
+/// - `interaction.complete`: Contains the full interaction in the `interaction` field
+#[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct InteractionStreamEvent {
-    /// Event type (e.g., "interaction.start", "interaction.update", "interaction.complete")
+    /// Event type (e.g., "content.delta", "interaction.complete")
     pub event_type: String,
 
-    /// The full interaction data (present in start/complete events)
+    /// The full interaction data (present in "interaction.complete" events)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interaction: Option<InteractionResponse>,
 
-    /// Interaction ID (present in status update events)
+    /// Incremental content delta (present in "content.delta" events)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<StreamDelta>,
+
+    /// Interaction ID (present in various events)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interaction_id: Option<String>,
 

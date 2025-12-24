@@ -5,7 +5,7 @@ use crate::client::Client;
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
     self, CreateInteractionRequest, GenerationConfig, InteractionContent, InteractionInput,
-    InteractionResponse, Tool as InternalTool,
+    InteractionResponse, StreamChunk, Tool as InternalTool,
 };
 
 const MAX_FUNCTION_CALL_LOOPS: usize = 5; // Max iterations for auto function calling
@@ -17,7 +17,7 @@ const MAX_FUNCTION_CALL_LOOPS: usize = 5; // Max iterations for auto function ca
 /// # Examples
 ///
 /// ```no_run
-/// # use rust_genai::Client;
+/// # use rust_genai::{Client, StreamChunk};
 /// # use futures_util::StreamExt;
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -30,15 +30,23 @@ const MAX_FUNCTION_CALL_LOOPS: usize = 5; // Max iterations for auto function ca
 ///     .create()
 ///     .await?;
 ///
-/// // Streaming interaction with tools
+/// // Streaming interaction
 /// let mut stream = client.interaction()
 ///     .with_model("gemini-3-flash-preview")
-///     .with_text("Calculate 2 + 2")
-///     .with_tools(vec![/* tools */])
+///     .with_text("Count to 5")
 ///     .create_stream();
 ///
 /// while let Some(chunk) = stream.next().await {
-///     println!("{:?}", chunk?);
+///     match chunk? {
+///         StreamChunk::Delta(delta) => {
+///             if let Some(text) = delta.text() {
+///                 print!("{}", text);
+///             }
+///         }
+///         StreamChunk::Complete(response) => {
+///             println!("\nDone!");
+///         }
+///     }
 /// }
 /// # Ok(())
 /// # }
@@ -203,6 +211,10 @@ impl<'a> InteractionBuilder<'a> {
 
     /// Creates a streaming interaction that yields chunks as they arrive.
     ///
+    /// Returns a stream of `StreamChunk` items:
+    /// - `StreamChunk::Delta`: Incremental content (text or thought)
+    /// - `StreamChunk::Complete`: The final complete interaction response
+    ///
     /// # Errors
     ///
     /// Returns errors if:
@@ -213,7 +225,7 @@ impl<'a> InteractionBuilder<'a> {
     /// # Examples
     ///
     /// ```no_run
-    /// # use rust_genai::Client;
+    /// # use rust_genai::{Client, StreamChunk};
     /// # use futures_util::StreamExt;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -225,13 +237,21 @@ impl<'a> InteractionBuilder<'a> {
     ///     .create_stream();
     ///
     /// while let Some(chunk) = stream.next().await {
-    ///     let response = chunk?;
-    ///     println!("{:?}", response);
+    ///     match chunk? {
+    ///         StreamChunk::Delta(delta) => {
+    ///             if let Some(text) = delta.text() {
+    ///                 print!("{}", text);
+    ///             }
+    ///         }
+    ///         StreamChunk::Complete(response) => {
+    ///             println!("\nFinal response ID: {}", response.id);
+    ///         }
+    ///     }
     /// }
     /// # Ok(())
     /// # }
     /// ```
-    pub fn create_stream(self) -> BoxStream<'a, Result<InteractionResponse, GenaiError>> {
+    pub fn create_stream(self) -> BoxStream<'a, Result<StreamChunk, GenaiError>> {
         let client = self.client;
         Box::pin(async_stream::try_stream! {
             let request = self.build_request()?;
