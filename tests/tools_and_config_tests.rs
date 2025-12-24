@@ -405,7 +405,10 @@ async fn test_structured_output_json_schema() {
     // Parse as JSON - should be valid JSON matching our schema
     let json: serde_json::Value =
         serde_json::from_str(text).expect("Response should be valid JSON");
-    println!("Parsed JSON: {}", serde_json::to_string_pretty(&json).unwrap());
+    println!(
+        "Parsed JSON: {}",
+        serde_json::to_string_pretty(&json).unwrap()
+    );
 
     assert!(json.get("name").is_some(), "Should have name field");
     assert!(json.get("age").is_some(), "Should have age field");
@@ -457,7 +460,10 @@ async fn test_structured_output_enum_constraint() {
     // Parse as JSON
     let json: serde_json::Value =
         serde_json::from_str(text).expect("Response should be valid JSON");
-    println!("Parsed JSON: {}", serde_json::to_string_pretty(&json).unwrap());
+    println!(
+        "Parsed JSON: {}",
+        serde_json::to_string_pretty(&json).unwrap()
+    );
 
     // Verify sentiment is one of the enum values
     let sentiment = json

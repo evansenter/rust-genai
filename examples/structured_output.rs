@@ -153,9 +153,18 @@ async fn complex_nested_schema(client: &Client) -> Result<(), Box<dyn Error>> {
     if let Some(recipe) = json.get("recipe") {
         println!(
             "\nRecipe: {} ({} cuisine, {} difficulty)",
-            recipe.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown"),
-            recipe.get("cuisine").and_then(|v| v.as_str()).unwrap_or("Unknown"),
-            recipe.get("difficulty").and_then(|v| v.as_str()).unwrap_or("Unknown")
+            recipe
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown"),
+            recipe
+                .get("cuisine")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown"),
+            recipe
+                .get("difficulty")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown")
         );
     }
 
