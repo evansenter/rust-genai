@@ -1,7 +1,7 @@
 /// Helper functions for building Interactions API content
 ///
 /// This module provides ergonomic builders for InteractionContent and InteractionInput.
-use genai_client::{InteractionContent, InteractionInput};
+use genai_client::{CodeExecutionOutcome, InteractionContent, InteractionInput};
 use serde_json::Value;
 
 /// Creates a simple text input from a string
@@ -297,17 +297,18 @@ pub fn build_interaction_input(contents: Vec<InteractionContent>) -> Interaction
 /// # Example
 /// ```
 /// use rust_genai::interactions_api::code_execution_call_content;
-/// use serde_json::json;
 ///
-/// let call = code_execution_call_content("call_123", json!({"code": "print('Hello')", "language": "python"}));
+/// let call = code_execution_call_content("call_123", "PYTHON", "print('Hello, World!')");
 /// ```
 pub fn code_execution_call_content(
     id: impl Into<String>,
-    arguments: serde_json::Value,
+    language: impl Into<String>,
+    code: impl Into<String>,
 ) -> InteractionContent {
     InteractionContent::CodeExecutionCall {
         id: id.into(),
-        arguments,
+        language: language.into(),
+        code: code.into(),
     }
 }
 
@@ -318,19 +319,54 @@ pub fn code_execution_call_content(
 /// # Example
 /// ```
 /// use rust_genai::interactions_api::code_execution_result_content;
+/// use rust_genai::CodeExecutionOutcome;
 ///
-/// let result = code_execution_result_content("call_123", false, "42");
+/// let result = code_execution_result_content("call_123", CodeExecutionOutcome::Ok, "42");
 /// ```
 pub fn code_execution_result_content(
     call_id: impl Into<String>,
-    is_error: bool,
-    result: impl Into<String>,
+    outcome: CodeExecutionOutcome,
+    output: impl Into<String>,
 ) -> InteractionContent {
     InteractionContent::CodeExecutionResult {
         call_id: call_id.into(),
-        is_error,
-        result: result.into(),
+        outcome,
+        output: output.into(),
     }
+}
+
+/// Creates a successful code execution result (convenience helper)
+///
+/// Shorthand for creating an `OUTCOME_OK` result.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::code_execution_success;
+///
+/// let result = code_execution_success("call_123", "42\n");
+/// ```
+pub fn code_execution_success(
+    call_id: impl Into<String>,
+    output: impl Into<String>,
+) -> InteractionContent {
+    code_execution_result_content(call_id, CodeExecutionOutcome::Ok, output)
+}
+
+/// Creates a failed code execution result (convenience helper)
+///
+/// Shorthand for creating an `OUTCOME_FAILED` result.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::code_execution_error;
+///
+/// let result = code_execution_error("call_123", "NameError: name 'x' is not defined");
+/// ```
+pub fn code_execution_error(
+    call_id: impl Into<String>,
+    error_output: impl Into<String>,
+) -> InteractionContent {
+    code_execution_result_content(call_id, CodeExecutionOutcome::Failed, error_output)
 }
 
 /// Creates Google Search call content

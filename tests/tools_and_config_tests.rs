@@ -173,7 +173,7 @@ async fn test_code_execution() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Calculate the factorial of 10 using Python code execution.")
-        .with_tools(vec![Tool::CodeExecution])
+        .with_code_execution() // Use the new convenience method
         .with_store(true)
         .create()
         .await;
@@ -201,6 +201,40 @@ async fn test_code_execution() {
                 summary.code_execution_result_count,
                 summary.unknown_count
             );
+
+            // Test the new typed helper methods
+            for (language, code) in response.executable_code() {
+                println!(
+                    "Executed {} code: {}",
+                    language,
+                    &code[..code.len().min(100)]
+                );
+            }
+
+            for (outcome, output) in response.code_execution_results() {
+                println!("Outcome: {} (success: {})", outcome, outcome.is_success());
+                println!("Output: {}", &output[..output.len().min(100)]);
+            }
+
+            // Test the convenience helper and verify the code output directly
+            // This is more robust than checking LLM text response
+            if let Some(output) = response.successful_code_output() {
+                println!(
+                    "First successful output: {}",
+                    &output[..output.len().min(100)]
+                );
+                assert!(
+                    output.contains("3628800"),
+                    "Code output should contain correct factorial result (3628800), got: {}",
+                    output
+                );
+            } else {
+                // If no successful code output, check that code was at least executed
+                assert!(
+                    !response.code_execution_results().is_empty(),
+                    "Expected code execution results but found none"
+                );
+            }
 
             // Verify the response doesn't contain unknown content types for code execution
             // (they should all be recognized as known types now)
@@ -245,12 +279,11 @@ async fn test_code_execution_complex_calculation() {
                 let text = response.text().unwrap();
                 println!("Prime sum response: {}", text);
                 // Sum of first 100 primes is 24133
-                // Model might express this differently, so just check it's a number
+                // Model might express this with or without comma formatting
                 assert!(
-                    text.contains("24133")
-                        || text.contains("24,133")
-                        || text.chars().any(|c| c.is_ascii_digit()),
-                    "Response should contain a numeric result"
+                    text.contains("24133") || text.contains("24,133"),
+                    "Response should contain the sum of first 100 primes (24133), got: {}",
+                    text
                 );
             }
         }
