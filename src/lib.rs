@@ -69,7 +69,7 @@ impl From<genai_client::InternalError> for GenaiError {
 
 #[cfg(test)]
 mod tests {
-    use super::*; // This will bring in Client, GenerateContentResponse, etc.
+    use super::*; // This will bring in Client, InteractionResponse, etc.
     use genai_client::InternalError;
 
     #[test]
