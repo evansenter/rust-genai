@@ -58,3 +58,8 @@ pub const TINY_WAV_BASE64: &str = "UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACA
 /// This is a minimal valid MP4 container header - the model may report it's empty/corrupt
 #[allow(dead_code)]
 pub const TINY_MP4_BASE64: &str = "AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDE=";
+
+/// Small 1x1 blue PNG image encoded as base64
+/// This is a minimal valid PNG for testing multi-image comparisons
+#[allow(dead_code)]
+pub const TINY_BLUE_PNG_BASE64: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";

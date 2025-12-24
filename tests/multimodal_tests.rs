@@ -19,8 +19,8 @@
 mod common;
 
 use common::{
-    SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TINY_MP4_BASE64, TINY_RED_PNG_BASE64,
-    TINY_WAV_BASE64, get_client,
+    SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TINY_BLUE_PNG_BASE64, TINY_MP4_BASE64,
+    TINY_RED_PNG_BASE64, TINY_WAV_BASE64, get_client,
 };
 use rust_genai::{
     InteractionInput, InteractionStatus, audio_uri_content, image_data_content, image_uri_content,
@@ -125,14 +125,11 @@ async fn test_multiple_images_single_request() {
         return;
     };
 
-    // Create a tiny blue PNG (1x1 pixel)
-    let tiny_blue_png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
-
     // Send two images in a single request (both base64)
     let contents = vec![
         text_content("I'm showing you two small colored images. What colors are they? List both."),
         image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-        image_data_content(tiny_blue_png, "image/png"),
+        image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
     ];
 
     let response = client
@@ -452,16 +449,13 @@ async fn test_multimodal_comparison() {
         return;
     };
 
-    // Create a tiny blue PNG for comparison
-    let tiny_blue_png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
-
     // Ask model to compare two base64 images
     let contents = vec![
         text_content(
             "Compare these two colored squares. What are their colors and how do they differ?",
         ),
         image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-        image_data_content(tiny_blue_png, "image/png"),
+        image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
     ];
 
     let response = client
