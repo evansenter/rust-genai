@@ -63,12 +63,6 @@ pub enum InteractionContent {
         call_id: String,
         result: serde_json::Value,
     },
-    /// Function response (legacy - prefer FunctionResult for new code)
-    #[deprecated(note = "Use FunctionResult instead for correct API compatibility")]
-    FunctionResponse {
-        name: String,
-        response: serde_json::Value,
-    },
 }
 
 /// Input for an interaction - can be a simple string or array of content
