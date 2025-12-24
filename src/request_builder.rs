@@ -228,7 +228,7 @@ impl<'a> InteractionBuilder<'a> {
     /// This adds the built-in `GoogleSearch` tool which allows the model to
     /// search the web and ground its responses in real-time information.
     /// Grounding metadata will be available in the response via
-    /// [`InteractionResponse::grounding_metadata`].
+    /// [`InteractionResponse::google_search_metadata`].
     ///
     /// # Example
     ///
@@ -248,7 +248,7 @@ impl<'a> InteractionBuilder<'a> {
     ///     .await?;
     ///
     /// // Access grounding metadata
-    /// if let Some(metadata) = response.grounding_metadata() {
+    /// if let Some(metadata) = response.google_search_metadata() {
     ///     println!("Search queries: {:?}", metadata.web_search_queries);
     ///     for chunk in &metadata.grounding_chunks {
     ///         println!("Source: {}", chunk.web.uri);
@@ -258,7 +258,7 @@ impl<'a> InteractionBuilder<'a> {
     /// # }
     /// ```
     ///
-    /// [`InteractionResponse::grounding_metadata`]: crate::InteractionResponse::grounding_metadata
+    /// [`InteractionResponse::google_search_metadata`]: crate::InteractionResponse::google_search_metadata
     pub fn with_google_search(mut self) -> Self {
         self.tools
             .get_or_insert_with(Vec::new)
@@ -654,27 +654,27 @@ impl<'a> InteractionBuilder<'a> {
             // Build function results for next iteration
             let mut function_results = Vec::new();
 
-            for (call_id, name, args, _thought_signature) in function_calls {
+            for call in function_calls {
                 // Validate that we have a call_id (required by API)
-                let call_id = match call_id {
+                let call_id = match call.id {
                     Some(id) => id,
                     None => {
                         warn!(
                             "Function call '{}' missing call_id. Using fallback value.",
-                            name
+                            call.name
                         );
                         "unknown"
                     }
                 };
 
                 // Execute the function
-                let result = if let Some(function) = function_registry.get(name) {
-                    match function.call(args.clone()).await {
+                let result = if let Some(function) = function_registry.get(call.name) {
+                    match function.call(call.args.clone()).await {
                         Ok(result) => result,
                         Err(e) => {
                             error!(
                                 "Function execution failed: function='{}', error='{}'",
-                                name, e
+                                call.name, e
                             );
                             json!({ "error": e.to_string() })
                         }
@@ -682,14 +682,14 @@ impl<'a> InteractionBuilder<'a> {
                 } else {
                     warn!(
                         "Function not found in registry: function='{}'. Informing model.",
-                        name
+                        call.name
                     );
-                    json!({ "error": format!("Function '{}' is not available or not found.", name) })
+                    json!({ "error": format!("Function '{}' is not available or not found.", call.name) })
                 };
 
                 // Add function result (only the result, not the call - server has it via previous_interaction_id)
                 function_results.push(function_result_content(
-                    name.to_string(),
+                    call.name.to_string(),
                     call_id.to_string(),
                     result,
                 ));

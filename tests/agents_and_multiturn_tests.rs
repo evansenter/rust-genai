@@ -234,12 +234,12 @@ async fn test_conversation_function_then_text() {
         return;
     }
 
-    let (call_id, _, _, _) = &calls[0];
+    let call = &calls[0];
 
     // Turn 2: Provide function result
     let result = function_result_content(
         "get_weather",
-        call_id.unwrap().to_string(),
+        call.id.unwrap().to_string(),
         json!({"temperature": "25°C", "conditions": "sunny"}),
     );
 

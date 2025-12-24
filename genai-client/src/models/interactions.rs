@@ -943,7 +943,7 @@ impl UsageMetadata {
 /// ```no_run
 /// # use genai_client::models::interactions::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
-/// if let Some(metadata) = response.grounding_metadata() {
+/// if let Some(metadata) = response.google_search_metadata() {
 ///     println!("Search queries: {:?}", metadata.web_search_queries);
 ///     for chunk in &metadata.grounding_chunks {
 ///         println!("Source: {} - {}", chunk.web.title, chunk.web.uri);
@@ -1090,6 +1090,59 @@ pub enum UrlRetrievalStatus {
     UrlRetrievalStatusError,
 }
 
+/// Information about a function call requested by the model.
+///
+/// Returned by [`InteractionResponse::function_calls()`] for convenient access
+/// to function call details.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::InteractionResponse;
+/// # let response: InteractionResponse = todo!();
+/// for call in response.function_calls() {
+///     println!("Function: {} with args: {}", call.name, call.args);
+///     if let Some(id) = call.id {
+///         println!("  Call ID: {}", id);
+///     }
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionCallInfo<'a> {
+    /// Unique identifier for this function call (used when sending results back)
+    pub id: Option<&'a str>,
+    /// Name of the function to call
+    pub name: &'a str,
+    /// Arguments to pass to the function
+    pub args: &'a serde_json::Value,
+    /// Thought signature for Gemini 3 reasoning continuity
+    pub thought_signature: Option<&'a str>,
+}
+
+/// Information about a function result in the response.
+///
+/// Returned by [`InteractionResponse::function_results()`] for convenient access
+/// to function result details.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::InteractionResponse;
+/// # let response: InteractionResponse = todo!();
+/// for result in response.function_results() {
+///     println!("Function {} returned: {}", result.name, result.result);
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionResultInfo<'a> {
+    /// Name of the function that was called
+    pub name: &'a str,
+    /// The call_id from the FunctionCall this result responds to
+    pub call_id: &'a str,
+    /// The result returned by the function
+    pub result: &'a serde_json::Value,
+}
+
 /// Response from creating or retrieving an interaction
 #[derive(Clone, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -1189,18 +1242,23 @@ impl InteractionResponse {
 
     /// Extract function calls from outputs
     ///
-    /// Returns a vector of (call_id, function_name, arguments, thought_signature) tuples.
-    /// The call_id should be used when sending function results back to the model.
+    /// Returns a vector of [`FunctionCallInfo`] structs with named fields for
+    /// convenient access to function call details.
     ///
     /// # Example
+    ///
     /// ```no_run
     /// # use genai_client::models::interactions::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
-    /// for (call_id, name, args, signature) in response.function_calls() {
-    ///     println!("Call ID: {:?}, Function: {} with args: {}", call_id, name, args);
+    /// for call in response.function_calls() {
+    ///     println!("Function: {} with args: {}", call.name, call.args);
+    ///     if let Some(id) = call.id {
+    ///         // Use call.id when sending results back to the model
+    ///         println!("  Call ID: {}", id);
+    ///     }
     /// }
     /// ```
-    pub fn function_calls(&self) -> Vec<(Option<&str>, &str, &serde_json::Value, Option<&str>)> {
+    pub fn function_calls(&self) -> Vec<FunctionCallInfo<'_>> {
         self.outputs
             .iter()
             .filter_map(|content| {
@@ -1211,12 +1269,12 @@ impl InteractionResponse {
                     thought_signature,
                 } = content
                 {
-                    Some((
-                        id.as_ref().map(|s| s.as_str()),
-                        name.as_str(),
+                    Some(FunctionCallInfo {
+                        id: id.as_ref().map(|s| s.as_str()),
+                        name: name.as_str(),
                         args,
-                        thought_signature.as_ref().map(|s| s.as_str()),
-                    ))
+                        thought_signature: thought_signature.as_ref().map(|s| s.as_str()),
+                    })
                 } else {
                     None
                 }
@@ -1240,6 +1298,52 @@ impl InteractionResponse {
         self.outputs
             .iter()
             .any(|c| matches!(c, InteractionContent::FunctionCall { .. }))
+    }
+
+    /// Check if response contains function results
+    ///
+    /// Returns true if any output contains a function result.
+    pub fn has_function_results(&self) -> bool {
+        self.outputs
+            .iter()
+            .any(|c| matches!(c, InteractionContent::FunctionResult { .. }))
+    }
+
+    /// Extract function results from outputs
+    ///
+    /// Returns a vector of [`FunctionResultInfo`] structs with named fields for
+    /// convenient access to function result details.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// for result in response.function_results() {
+    ///     println!("Function {} (call_id: {}) returned: {}",
+    ///         result.name, result.call_id, result.result);
+    /// }
+    /// ```
+    pub fn function_results(&self) -> Vec<FunctionResultInfo<'_>> {
+        self.outputs
+            .iter()
+            .filter_map(|content| {
+                if let InteractionContent::FunctionResult {
+                    name,
+                    call_id,
+                    result,
+                } = content
+                {
+                    Some(FunctionResultInfo {
+                        name: name.as_str(),
+                        call_id: call_id.as_str(),
+                        result,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// Check if response contains thoughts (internal reasoning)
@@ -1313,15 +1417,15 @@ impl InteractionResponse {
     /// ```no_run
     /// # use genai_client::models::interactions::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
-    /// if response.has_grounding() {
+    /// if response.has_google_search_metadata() {
     ///     println!("Response is grounded with web sources");
     /// }
     /// ```
-    pub fn has_grounding(&self) -> bool {
+    pub fn has_google_search_metadata(&self) -> bool {
         self.grounding_metadata.is_some()
     }
 
-    /// Get grounding metadata if present.
+    /// Get Google Search grounding metadata if present.
     ///
     /// Returns the grounding metadata containing search queries and web sources
     /// when the GoogleSearch tool was used.
@@ -1331,14 +1435,14 @@ impl InteractionResponse {
     /// ```no_run
     /// # use genai_client::models::interactions::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
-    /// if let Some(metadata) = response.grounding_metadata() {
+    /// if let Some(metadata) = response.google_search_metadata() {
     ///     println!("Search queries: {:?}", metadata.web_search_queries);
     ///     for chunk in &metadata.grounding_chunks {
     ///         println!("Source: {} - {}", chunk.web.title, chunk.web.uri);
     ///     }
     /// }
     /// ```
-    pub fn grounding_metadata(&self) -> Option<&GroundingMetadata> {
+    pub fn google_search_metadata(&self) -> Option<&GroundingMetadata> {
         self.grounding_metadata.as_ref()
     }
 
@@ -1396,11 +1500,11 @@ impl InteractionResponse {
     /// ```no_run
     /// # use genai_client::models::interactions::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
-    /// for (language, code) in response.executable_code() {
+    /// for (language, code) in response.code_execution_calls() {
     ///     println!("Language: {}, Code:\n{}", language, code);
     /// }
     /// ```
-    pub fn executable_code(&self) -> Vec<(&str, &str)> {
+    pub fn code_execution_calls(&self) -> Vec<(&str, &str)> {
         self.outputs
             .iter()
             .filter_map(|content| {
@@ -1485,6 +1589,39 @@ impl InteractionResponse {
         })
     }
 
+    /// Check if response contains Google Search calls
+    pub fn has_google_search_calls(&self) -> bool {
+        self.outputs
+            .iter()
+            .any(|c| matches!(c, InteractionContent::GoogleSearchCall { .. }))
+    }
+
+    /// Extract Google Search calls (queries) from outputs
+    ///
+    /// Returns a vector of search query strings.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// for query in response.google_search_calls() {
+    ///     println!("Searched for: {}", query);
+    /// }
+    /// ```
+    pub fn google_search_calls(&self) -> Vec<&str> {
+        self.outputs
+            .iter()
+            .filter_map(|content| {
+                if let InteractionContent::GoogleSearchCall { query } = content {
+                    Some(query.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     /// Check if response contains Google Search results
     pub fn has_google_search_results(&self) -> bool {
         self.outputs
@@ -1501,6 +1638,39 @@ impl InteractionResponse {
             .filter_map(|content| {
                 if let InteractionContent::GoogleSearchResult { results } = content {
                     Some(results)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Check if response contains URL context calls
+    pub fn has_url_context_calls(&self) -> bool {
+        self.outputs
+            .iter()
+            .any(|c| matches!(c, InteractionContent::UrlContextCall { .. }))
+    }
+
+    /// Extract URL context calls (URLs) from outputs
+    ///
+    /// Returns a vector of URL strings that were requested for fetching.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// for url in response.url_context_calls() {
+    ///     println!("Fetched: {}", url);
+    /// }
+    /// ```
+    pub fn url_context_calls(&self) -> Vec<&str> {
+        self.outputs
+            .iter()
+            .filter_map(|content| {
+                if let InteractionContent::UrlContextCall { url } = content {
+                    Some(url.as_str())
                 } else {
                     None
                 }
@@ -1988,14 +2158,14 @@ mod tests {
 
         let calls = response.function_calls();
         assert_eq!(calls.len(), 2);
-        // Tuple is (call_id, name, args, signature)
-        assert_eq!(calls[0].0, Some("call_001")); // call_id at index 0
-        assert_eq!(calls[0].1, "get_weather"); // name at index 1
-        assert_eq!(calls[0].2["location"], "Paris"); // args at index 2
-        assert_eq!(calls[0].3, Some("sig123")); // signature at index 3
-        assert_eq!(calls[1].0, Some("call_002")); // call_id at index 0
-        assert_eq!(calls[1].1, "get_time"); // name at index 1
-        assert_eq!(calls[1].3, None); // signature at index 3
+        // FunctionCallInfo struct fields
+        assert_eq!(calls[0].id, Some("call_001"));
+        assert_eq!(calls[0].name, "get_weather");
+        assert_eq!(calls[0].args["location"], "Paris");
+        assert_eq!(calls[0].thought_signature, Some("sig123"));
+        assert_eq!(calls[1].id, Some("call_002"));
+        assert_eq!(calls[1].name, "get_time");
+        assert_eq!(calls[1].thought_signature, None);
         assert!(response.has_function_calls());
         assert!(!response.has_text());
     }
@@ -3181,8 +3351,8 @@ mod tests {
         assert!(response.has_code_execution_results());
         assert!(!response.has_unknown());
 
-        // Test executable_code helper
-        let code_blocks = response.executable_code();
+        // Test code_execution_calls helper
+        let code_blocks = response.code_execution_calls();
         assert_eq!(code_blocks.len(), 1);
         assert_eq!(code_blocks[0].0, "PYTHON");
         assert_eq!(code_blocks[0].1, "print(42)");
