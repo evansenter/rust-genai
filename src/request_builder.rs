@@ -7,7 +7,8 @@ use genai_client::{
     InteractionInput, InteractionResponse, Tool as InternalTool,
 };
 
-const MAX_FUNCTION_CALL_LOOPS: usize = 5; // Max iterations for auto function calling
+/// Default maximum iterations for auto function calling
+pub const DEFAULT_MAX_FUNCTION_CALL_LOOPS: usize = 5;
 
 /// Builder for creating interactions with the Gemini Interactions API.
 ///
@@ -56,6 +57,8 @@ pub struct InteractionBuilder<'a> {
     background: Option<bool>,
     store: Option<bool>,
     system_instruction: Option<InteractionInput>,
+    /// Maximum iterations for auto function calling loop
+    max_function_call_loops: usize,
 }
 
 impl<'a> InteractionBuilder<'a> {
@@ -74,6 +77,7 @@ impl<'a> InteractionBuilder<'a> {
             background: None,
             store: None,
             system_instruction: None,
+            max_function_call_loops: DEFAULT_MAX_FUNCTION_CALL_LOOPS,
         }
     }
 
@@ -247,6 +251,32 @@ impl<'a> InteractionBuilder<'a> {
         self
     }
 
+    /// Sets the maximum number of function call loops for `create_with_auto_functions()`.
+    ///
+    /// Default is 5. Increase for complex multi-step function calling scenarios,
+    /// or decrease to fail faster if the model is stuck in a loop.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api_key".to_string()).build();
+    ///
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Complex multi-step task")
+    ///     .with_max_function_call_loops(10)  // Allow up to 10 iterations
+    ///     .create_with_auto_functions()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_max_function_call_loops(mut self, max_loops: usize) -> Self {
+        self.max_function_call_loops = max_loops;
+        self
+    }
+
     /// Creates the interaction and returns the response.
     ///
     /// # Errors
@@ -317,7 +347,7 @@ impl<'a> InteractionBuilder<'a> {
     /// The loop automatically stops when:
     /// - Model returns text without function calls
     /// - Function calls array is empty
-    /// - Maximum iterations (5) is reached
+    /// - Maximum iterations is reached (default 5, configurable via `with_max_function_call_loops()`)
     ///
     /// # Example
     /// ```no_run
@@ -344,7 +374,7 @@ impl<'a> InteractionBuilder<'a> {
     /// - No input was provided
     /// - Neither model nor agent was specified
     /// - The API request fails
-    /// - Maximum function call loops (5) is exceeded
+    /// - Maximum function call loops is exceeded (default 5, configurable via `with_max_function_call_loops()`)
     pub async fn create_with_auto_functions(self) -> Result<InteractionResponse, GenaiError> {
         use crate::function_calling::get_global_function_registry;
         use crate::interactions_api::function_result_content;
@@ -352,6 +382,7 @@ impl<'a> InteractionBuilder<'a> {
         use serde_json::json;
 
         let client = self.client;
+        let max_loops = self.max_function_call_loops;
         let mut request = self.build_request()?;
 
         // Auto-discover functions from registry if not explicitly provided
@@ -368,8 +399,8 @@ impl<'a> InteractionBuilder<'a> {
             }
         }
 
-        // Main auto-function loop (max 5 iterations to prevent infinite loops)
-        for _loop_count in 0..MAX_FUNCTION_CALL_LOOPS {
+        // Main auto-function loop (configurable iterations to prevent infinite loops)
+        for _loop_count in 0..max_loops {
             let response = client.create_interaction(request.clone()).await?;
 
             // Extract function calls using convenience method
@@ -431,8 +462,9 @@ impl<'a> InteractionBuilder<'a> {
         }
 
         Err(GenaiError::Internal(format!(
-            "Exceeded maximum function call loops ({MAX_FUNCTION_CALL_LOOPS}). \
-             The model may be stuck in a loop. Check your function implementations \
+            "Exceeded maximum function call loops ({max_loops}). \
+             The model may be stuck in a loop. Check your function implementations, \
+             increase the limit using with_max_function_call_loops(), \
              or use manual function calling for more control."
         )))
     }
@@ -708,5 +740,36 @@ mod tests {
             builder.response_modalities.as_ref().unwrap(),
             &vec!["IMAGE".to_string()]
         );
+    }
+
+    #[test]
+    fn test_interaction_builder_with_max_function_call_loops() {
+        let client = create_test_client();
+
+        // Test default value
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Test");
+        assert_eq!(
+            builder.max_function_call_loops,
+            crate::request_builder::DEFAULT_MAX_FUNCTION_CALL_LOOPS
+        );
+
+        // Test custom value
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Test")
+            .with_max_function_call_loops(10);
+        assert_eq!(builder.max_function_call_loops, 10);
+
+        // Test setting to minimum (1)
+        let builder = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Test")
+            .with_max_function_call_loops(1);
+        assert_eq!(builder.max_function_call_loops, 1);
     }
 }
