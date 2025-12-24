@@ -289,6 +289,120 @@ pub fn build_interaction_input(contents: Vec<InteractionContent>) -> Interaction
     InteractionInput::Content(contents)
 }
 
+/// Creates code execution call content
+///
+/// This variant appears when the model initiates code execution
+/// via the `CodeExecution` built-in tool.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::code_execution_call_content;
+/// use serde_json::json;
+///
+/// let call = code_execution_call_content("call_123", json!({"code": "print('Hello')", "language": "python"}));
+/// ```
+pub fn code_execution_call_content(
+    id: impl Into<String>,
+    arguments: serde_json::Value,
+) -> InteractionContent {
+    InteractionContent::CodeExecutionCall {
+        id: id.into(),
+        arguments,
+    }
+}
+
+/// Creates code execution result content
+///
+/// Contains the outcome and output of executed code from the `CodeExecution` tool.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::code_execution_result_content;
+///
+/// let result = code_execution_result_content("call_123", false, "42");
+/// ```
+pub fn code_execution_result_content(
+    call_id: impl Into<String>,
+    is_error: bool,
+    result: impl Into<String>,
+) -> InteractionContent {
+    InteractionContent::CodeExecutionResult {
+        call_id: call_id.into(),
+        is_error,
+        result: result.into(),
+    }
+}
+
+/// Creates Google Search call content
+///
+/// Appears when the model initiates a Google Search via the `GoogleSearch` tool.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::google_search_call_content;
+///
+/// let search = google_search_call_content("Rust programming language");
+/// ```
+pub fn google_search_call_content(query: impl Into<String>) -> InteractionContent {
+    InteractionContent::GoogleSearchCall {
+        query: query.into(),
+    }
+}
+
+/// Creates Google Search result content
+///
+/// Contains the results returned by the `GoogleSearch` built-in tool.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::google_search_result_content;
+/// use serde_json::json;
+///
+/// let results = google_search_result_content(json!({
+///     "results": [{"title": "Rust", "url": "https://rust-lang.org"}]
+/// }));
+/// ```
+pub fn google_search_result_content(results: serde_json::Value) -> InteractionContent {
+    InteractionContent::GoogleSearchResult { results }
+}
+
+/// Creates URL context call content
+///
+/// Appears when the model requests URL content via the `UrlContext` tool.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::url_context_call_content;
+///
+/// let fetch = url_context_call_content("https://example.com");
+/// ```
+pub fn url_context_call_content(url: impl Into<String>) -> InteractionContent {
+    InteractionContent::UrlContextCall { url: url.into() }
+}
+
+/// Creates URL context result content
+///
+/// Contains the content retrieved by the `UrlContext` built-in tool.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::url_context_result_content;
+///
+/// let result = url_context_result_content(
+///     "https://example.com",
+///     Some("<html>...</html>".to_string())
+/// );
+/// ```
+pub fn url_context_result_content(
+    url: impl Into<String>,
+    content: Option<String>,
+) -> InteractionContent {
+    InteractionContent::UrlContextResult {
+        url: url.into(),
+        content,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
