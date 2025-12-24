@@ -17,11 +17,9 @@ impl ApiVersion {
 // --- URL Construction ---
 const BASE_URL_PREFIX: &str = "https://generativelanguage.googleapis.com";
 
-/// Represents different API endpoints
+/// Represents different API endpoints for the Interactions API
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Endpoint<'a> {
-    /// Generate content with a specific model
-    GenerateContent { model: &'a str, stream: bool },
     /// Create a new interaction
     CreateInteraction { stream: bool },
     /// Retrieve an interaction by ID
@@ -34,15 +32,7 @@ impl Endpoint<'_> {
     /// Constructs the URL path for this endpoint
     fn to_path(&self, version: ApiVersion) -> String {
         match self {
-            Self::GenerateContent { model, stream } => {
-                let action = if *stream {
-                    "streamGenerateContent"
-                } else {
-                    "generateContent"
-                };
-                format!("/{}/models/{}:{}", version.as_str(), model, action)
-            }
-            Self::CreateInteraction { stream: _ } => {
+            Self::CreateInteraction { .. } => {
                 format!("/{}/interactions", version.as_str())
             }
             Self::GetInteraction { id } => {
@@ -57,8 +47,8 @@ impl Endpoint<'_> {
     /// Returns whether this endpoint requires SSE parameters
     const fn requires_sse(&self) -> bool {
         match self {
-            Self::GenerateContent { stream, .. } | Self::CreateInteraction { stream } => *stream,
-            _ => false,
+            Self::CreateInteraction { stream } => *stream,
+            Self::GetInteraction { .. } | Self::DeleteInteraction { .. } => false,
         }
     }
 }
@@ -77,20 +67,6 @@ pub fn construct_endpoint_url(endpoint: Endpoint, api_key: &str) -> String {
     format!("{BASE_URL_PREFIX}{path}?key={api_key}{sse_param}")
 }
 
-#[must_use]
-pub fn construct_url(model_name: &str, api_key: &str, stream: bool, version: ApiVersion) -> String {
-    let action = if stream {
-        "streamGenerateContent"
-    } else {
-        "generateContent"
-    };
-    let sse_param = if stream { "&alt=sse" } else { "" };
-    format!(
-        "{BASE_URL_PREFIX}/{version_str}/models/{model_name}:{action}?key={api_key}{sse_param}",
-        version_str = version.as_str()
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -101,112 +77,7 @@ mod tests {
         assert_eq!(ApiVersion::V1Beta.as_str(), "v1beta");
     }
 
-    #[test]
-    fn test_construct_url_non_streaming() {
-        let url = construct_url(
-            "gemini-3-flash-preview",
-            "test-key",
-            false,
-            ApiVersion::V1Alpha,
-        );
-        assert_eq!(
-            url,
-            "https://generativelanguage.googleapis.com/v1alpha/models/gemini-3-flash-preview:generateContent?key=test-key"
-        );
-
-        let url = construct_url(
-            "gemini-3-flash-preview",
-            "test-key",
-            false,
-            ApiVersion::V1Beta,
-        );
-        assert_eq!(
-            url,
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=test-key"
-        );
-    }
-
-    #[test]
-    fn test_construct_url_streaming() {
-        let url = construct_url(
-            "gemini-3-flash-preview",
-            "test-key",
-            true,
-            ApiVersion::V1Alpha,
-        );
-        assert_eq!(
-            url,
-            "https://generativelanguage.googleapis.com/v1alpha/models/gemini-3-flash-preview:streamGenerateContent?key=test-key&alt=sse"
-        );
-
-        let url = construct_url(
-            "gemini-3-flash-preview",
-            "test-key",
-            true,
-            ApiVersion::V1Beta,
-        );
-        assert_eq!(
-            url,
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:streamGenerateContent?key=test-key&alt=sse"
-        );
-    }
-
-    #[test]
-    fn test_construct_url_different_models() {
-        let models = vec!["gemini-3-flash-preview", "test-model-123"];
-
-        for model in models {
-            let url = construct_url(model, "api-key", false, ApiVersion::V1Alpha);
-            assert!(url.contains(model));
-            assert!(url.contains("generateContent"));
-            assert!(!url.contains("&alt=sse"));
-        }
-    }
-
-    #[test]
-    fn test_construct_url_special_characters_in_model_name() {
-        // Test URL encoding is handled by the HTTP client, not this function
-        let url = construct_url(
-            "model-with-special_chars.v1",
-            "key",
-            false,
-            ApiVersion::V1Beta,
-        );
-        assert!(url.contains("model-with-special_chars.v1"));
-    }
-
-    // --- Tests for new Endpoint-based URL construction ---
-
-    #[test]
-    fn test_endpoint_generate_content_non_streaming() {
-        let endpoint = Endpoint::GenerateContent {
-            model: "gemini-3-flash",
-            stream: false,
-        };
-        let url = construct_endpoint_url(endpoint, "test-api-key");
-
-        assert_eq!(
-            url,
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=test-api-key"
-        );
-        assert!(!url.contains("&alt=sse"));
-    }
-
-    #[test]
-    fn test_endpoint_generate_content_streaming() {
-        let endpoint = Endpoint::GenerateContent {
-            model: "gemini-3-flash",
-            stream: true,
-        };
-        let url = construct_endpoint_url(endpoint, "test-api-key");
-
-        assert_eq!(
-            url,
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:streamGenerateContent?key=test-api-key&alt=sse"
-        );
-        assert!(url.contains("streamGenerateContent"));
-        assert!(url.contains("&alt=sse"));
-    }
+    // --- Tests for Endpoint-based URL construction ---
 
     #[test]
     fn test_endpoint_create_interaction_non_streaming() {
@@ -264,20 +135,6 @@ mod tests {
 
     #[test]
     fn test_endpoint_requires_sse() {
-        assert!(
-            Endpoint::GenerateContent {
-                model: "test",
-                stream: true
-            }
-            .requires_sse()
-        );
-        assert!(
-            !Endpoint::GenerateContent {
-                model: "test",
-                stream: false
-            }
-            .requires_sse()
-        );
         assert!(Endpoint::CreateInteraction { stream: true }.requires_sse());
         assert!(!Endpoint::CreateInteraction { stream: false }.requires_sse());
         assert!(!Endpoint::GetInteraction { id: "test" }.requires_sse());
@@ -286,22 +143,13 @@ mod tests {
 
     #[test]
     fn test_endpoint_to_path_with_different_versions() {
-        let endpoint = Endpoint::GenerateContent {
-            model: "gemini-3-flash-preview",
-            stream: false,
-        };
+        let endpoint = Endpoint::CreateInteraction { stream: false };
 
         let path_v1alpha = endpoint.to_path(ApiVersion::V1Alpha);
-        assert_eq!(
-            path_v1alpha,
-            "/v1alpha/models/gemini-3-flash-preview:generateContent"
-        );
+        assert_eq!(path_v1alpha, "/v1alpha/interactions");
 
         let path_v1beta = endpoint.to_path(ApiVersion::V1Beta);
-        assert_eq!(
-            path_v1beta,
-            "/v1beta/models/gemini-3-flash-preview:generateContent"
-        );
+        assert_eq!(path_v1beta, "/v1beta/interactions");
     }
 
     #[test]
