@@ -656,16 +656,17 @@ impl<'a> InteractionBuilder<'a> {
 
             for call in function_calls {
                 // Validate that we have a call_id (required by API)
-                let call_id = match call.id {
-                    Some(id) => id,
-                    None => {
-                        warn!(
-                            "Function call '{}' missing call_id. Using fallback value.",
-                            call.name
-                        );
-                        "unknown"
-                    }
-                };
+                let call_id = call.id.ok_or_else(|| {
+                    error!(
+                        "Function call '{}' is missing required call_id field.",
+                        call.name
+                    );
+                    GenaiError::Api(format!(
+                        "Function call '{}' is missing required call_id field. \
+                         This may indicate an API response format change.",
+                        call.name
+                    ))
+                })?;
 
                 // Execute the function
                 let result = if let Some(function) = function_registry.get(call.name) {

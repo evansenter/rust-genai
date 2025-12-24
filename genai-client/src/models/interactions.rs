@@ -1107,7 +1107,7 @@ pub enum UrlRetrievalStatus {
 ///     }
 /// }
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct FunctionCallInfo<'a> {
     /// Unique identifier for this function call (used when sending results back)
     pub id: Option<&'a str>,
@@ -1133,7 +1133,7 @@ pub struct FunctionCallInfo<'a> {
 ///     println!("Function {} returned: {}", result.name, result.result);
 /// }
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct FunctionResultInfo<'a> {
     /// Name of the function that was called
     pub name: &'a str,
@@ -1303,6 +1303,18 @@ impl InteractionResponse {
     /// Check if response contains function results
     ///
     /// Returns true if any output contains a function result.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if response.has_function_results() {
+    ///     for result in response.function_results() {
+    ///         println!("Function {} returned data", result.name);
+    ///     }
+    /// }
+    /// ```
     pub fn has_function_results(&self) -> bool {
         self.outputs
             .iter()
@@ -1590,6 +1602,18 @@ impl InteractionResponse {
     }
 
     /// Check if response contains Google Search calls
+    ///
+    /// Returns true if the model performed any Google Search queries.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if response.has_google_search_calls() {
+    ///     println!("Model searched: {:?}", response.google_search_calls());
+    /// }
+    /// ```
     pub fn has_google_search_calls(&self) -> bool {
         self.outputs
             .iter()
@@ -1646,6 +1670,18 @@ impl InteractionResponse {
     }
 
     /// Check if response contains URL context calls
+    ///
+    /// Returns true if the model requested any URLs for context.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if response.has_url_context_calls() {
+    ///     println!("Model fetched: {:?}", response.url_context_calls());
+    /// }
+    /// ```
     pub fn has_url_context_calls(&self) -> bool {
         self.outputs
             .iter()
