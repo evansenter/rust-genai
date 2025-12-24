@@ -190,7 +190,8 @@ pub enum InteractionContent {
     ///
     /// ## Example: Duplicate Type Field
     ///
-    /// If `data` contains a `"type"` field, it's ignored (the `type_name` takes precedence):
+    /// If `data` contains a `"type"` field, it's excluded during serialization
+    /// (the `type_name` takes precedence):
     ///
     /// ```
     /// # use genai_client::models::interactions::InteractionContent;
@@ -2276,8 +2277,8 @@ mod tests {
             assert_eq!(data["array"], serde_json::json!([1, 2, 3]));
             assert_eq!(data["number"], 42);
             assert_eq!(data["boolean"], true);
-            // null_field should be present
-            assert!(data.get("null_field").is_some());
+            // null_field should be present with null value (not stripped during serialization)
+            assert_eq!(data.get("null_field"), Some(&serde_json::Value::Null));
         } else {
             panic!("Expected Unknown variant");
         }
