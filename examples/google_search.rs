@@ -11,7 +11,7 @@ use futures_util::StreamExt;
 use rust_genai::{Client, GenaiError, StreamChunk};
 use std::env;
 use std::error::Error;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

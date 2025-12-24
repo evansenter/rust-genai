@@ -11,7 +11,7 @@ use futures_util::StreamExt;
 use rust_genai::{Client, GenaiError, StreamChunk, UrlRetrievalStatus};
 use std::env;
 use std::error::Error;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -133,7 +133,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Show URL context metadata from final response
-    if let Some(metadata) = final_response.as_ref().and_then(|r| r.url_context_metadata()) {
+    if let Some(metadata) = final_response
+        .as_ref()
+        .and_then(|r| r.url_context_metadata())
+    {
         println!("URLs fetched:");
         for entry in &metadata.url_metadata {
             let status = match entry.url_retrieval_status {

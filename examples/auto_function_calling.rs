@@ -19,7 +19,7 @@ use futures_util::StreamExt;
 use rust_genai::{CallableFunction, Client, StreamChunk};
 use rust_genai_macros::generate_function_declaration;
 use std::env;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 // Define a function using the macro - this automatically registers it
 // in the global function registry for auto-calling.

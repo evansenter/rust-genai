@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::env;
 use std::error::Error;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 /// A struct representing the structured output we want from the model.
 /// Using serde, we can easily parse the JSON response into this type.

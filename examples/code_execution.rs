@@ -11,7 +11,7 @@ use futures_util::StreamExt;
 use rust_genai::{Client, CodeExecutionOutcome, GenaiError, StreamChunk};
 use std::env;
 use std::error::Error;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -164,7 +164,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Display code execution details from final response
-    if let Some(output) = final_response.as_ref().and_then(|r| r.successful_code_output()) {
+    if let Some(output) = final_response
+        .as_ref()
+        .and_then(|r| r.successful_code_output())
+    {
         println!("Code Output: {output}");
     }
 
