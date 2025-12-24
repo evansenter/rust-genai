@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The `api_version` was stored but never used; the library defaults to V1Beta internally
 - **`ApiVersion` no longer re-exported** from rust-genai (still available in genai-client for internal use)
 
+#### Removed deprecated function calling helpers
+- **`function_response_content()` helper removed**: Use `function_result_content()` instead
+  - Before: `function_response_content("get_weather", json!({"temp": 72}))`
+  - After: `function_result_content("get_weather", "call_123", json!({"temp": 72}))`
+  - The `call_id` parameter is required for proper API response matching
+- **`InteractionContent::FunctionResponse` variant removed**: Use `FunctionResult` variant instead
+
 ## [0.2.0] - 2025-12-23
 
 ### BREAKING CHANGES
