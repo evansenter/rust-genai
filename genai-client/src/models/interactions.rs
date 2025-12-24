@@ -11,6 +11,10 @@ use super::shared::Tool;
 ///
 /// # Forward Compatibility
 ///
+/// This enum is marked `#[non_exhaustive]`, which means:
+/// - Match statements must include a wildcard arm (`_ => ...`)
+/// - New variants may be added in minor version updates without breaking your code
+///
 /// When the API returns a content type that this library doesn't recognize, it will be
 /// captured as `InteractionContent::Unknown` rather than causing a deserialization error.
 /// This allows your code to continue working even when Google adds new content types.
@@ -30,11 +34,13 @@ use super::shared::Tool;
 ///         InteractionContent::Unknown { type_name, .. } => {
 ///             println!("Unknown content type: {}", type_name);
 ///         }
+///         // Required due to #[non_exhaustive] - handles future variants
 ///         _ => {}
 ///     }
 /// }
 /// ```
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub enum InteractionContent {
     /// Text content
     Text { text: Option<String> },
