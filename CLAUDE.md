@@ -65,6 +65,9 @@ All examples require the `GEMINI_API_KEY` environment variable:
 # Interactions API examples
 cargo run --example simple_interaction
 cargo run --example stateful_interaction
+cargo run --example streaming
+cargo run --example auto_function_calling
+cargo run --example multimodal_image
 ```
 
 ### Linting and Formatting
@@ -127,6 +130,8 @@ The function calling system is implemented across:
 - `rust-genai-macros/src/lib.rs`: Procedural macro for function declaration generation
 - `src/request_builder.rs`: The `create_with_auto_functions()` method that orchestrates automatic execution
 
+**Configurable Max Loops**: Use `with_max_function_call_loops(n)` to control the maximum iterations for automatic function calling (default: 5).
+
 **Streaming Architecture**: SSE streaming is implemented using:
 - `async-stream` for async generators
 - `futures-util::Stream` trait for composable streaming
@@ -181,14 +186,12 @@ Tests are organized into two categories:
 - **Integration tests**: In `tests/` directory:
   - `builder_tests.rs`: Unit tests for FunctionDeclaration and InteractionBuilder (no API key required)
   - `macro_tests.rs`: Procedural macro functionality (no API key required)
-  - `interactions_api_tests.rs`: Comprehensive API integration tests including:
-    - Basic CRUD operations (create, get, delete interactions)
-    - Stateful conversations with `previous_interaction_id`
-    - Streaming responses
-    - Manual and automatic function calling
-    - Thought signatures for multi-turn function calls
-    - Generation config and system instructions
-    - Error handling and edge cases
+  - `interactions_api_tests.rs`: Core API integration tests (CRUD, streaming, basic function calling)
+  - `advanced_function_calling_tests.rs`: Complex function calling scenarios (multi-function, parallel calls, error handling)
+  - `agents_and_multiturn_tests.rs`: Stateful conversations, multi-turn interactions, agent features
+  - `multimodal_tests.rs`: Image and other multimodal input handling
+  - `tools_and_config_tests.rs`: Built-in tools, generation config, system instructions
+  - `common/`: Shared test utilities and fixtures
 
 Integration tests that require a real API key use `#[ignore]` attribute and must be run with `cargo test -- --include-ignored`.
 
@@ -301,6 +304,51 @@ At the `debug` level, the library logs:
 - Response content (success and error cases)
 - Streaming events and chunks
 - Interaction lifecycle events (create, retrieve, delete)
+
+## Unreleased Breaking Changes
+
+See `CHANGELOG.md` for full details. Key changes pending for next release:
+
+**Streaming API Improved**:
+- `create_stream()` now returns `Stream<StreamChunk>` instead of `Stream<InteractionResponse>`
+- `StreamChunk::Delta(StreamDelta)` for incremental content, `StreamChunk::Complete(InteractionResponse)` for final
+- New helpers: `StreamDelta::text()`, `is_text()`, `is_thought()`
+
+**Client API Simplified**:
+- `Client::new(api_key)` no longer takes `api_version` parameter
+- `ApiVersion` no longer re-exported from rust-genai
+
+**Deprecated Helpers Removed**:
+- `function_response_content()` removed - use `function_result_content()` with `call_id`
+- `InteractionContent::FunctionResponse` removed - use `FunctionResult`
+
+## Known Issues & Gaps
+
+Active issues to be aware of (see GitHub issues for current status):
+- **#27**: Streaming parser doesn't support `function_call` delta type (streaming + function calling is broken)
+- **#28**: Response parser doesn't support built-in tool call types (code execution, Google Search)
+- **#24**: UsageMetadata field names don't match Interactions API response
+- **#25, #26**: Google Search grounding and code execution not yet supported in Interactions API
+
+## Backlog & Roadmap
+
+See `BACKLOG.md` for detailed feature planning. High priority items:
+- **MCP Support**: Model Context Protocol for tool interoperability
+- **ReAct Pattern**: Reasoning + Acting agent loop
+- **Google Search Grounding**: Real-time web grounding (Gemini-specific)
+- **Rate Limiting & Retry Logic**: Production-ready retry with exponential backoff
+
+## CI/CD
+
+The project uses GitHub Actions (`.github/workflows/rust.yml`) with 6 parallel jobs:
+- **check**: `cargo check --workspace --all-targets --all-features`
+- **test**: Unit tests only (`cargo test --workspace`)
+- **test-integration**: Full tests with API key (`cargo test --workspace -- --include-ignored`)
+- **fmt**: `cargo fmt --all -- --check`
+- **clippy**: `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- **doc**: `cargo doc --workspace --no-deps --document-private-items` with `-D warnings`
+
+Integration tests only run on pushes or PRs from the same repository (not external forks) to protect the API key.
 
 ## Development Notes
 

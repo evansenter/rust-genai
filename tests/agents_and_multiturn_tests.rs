@@ -50,9 +50,7 @@ const POLLING_INTERVAL_SECS: u64 = 2;
 /// when the conversation context becomes too large.
 fn is_long_conversation_api_error(error: &rust_genai::GenaiError) -> bool {
     let error_str = format!("{:?}", error);
-    error_str.contains("UTF-8")
-        || error_str.contains("spanner")
-        || error_str.contains("truncated")
+    error_str.contains("UTF-8") || error_str.contains("spanner") || error_str.contains("truncated")
 }
 
 // =============================================================================
@@ -478,7 +476,10 @@ async fn test_background_mode_polling() {
                 loop {
                     attempts += 1;
                     if attempts > POLLING_MAX_ATTEMPTS {
-                        println!("Reached max polling attempts ({}) - task may still be running", POLLING_MAX_ATTEMPTS);
+                        println!(
+                            "Reached max polling attempts ({}) - task may still be running",
+                            POLLING_MAX_ATTEMPTS
+                        );
                         break;
                     }
 
