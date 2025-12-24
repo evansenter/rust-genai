@@ -32,7 +32,7 @@ impl Endpoint<'_> {
     /// Constructs the URL path for this endpoint
     fn to_path(&self, version: ApiVersion) -> String {
         match self {
-            Self::CreateInteraction { stream: _ } => {
+            Self::CreateInteraction { .. } => {
                 format!("/{}/interactions", version.as_str())
             }
             Self::GetInteraction { id } => {
