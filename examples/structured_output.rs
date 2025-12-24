@@ -78,7 +78,8 @@ async fn basic_structured_output(client: &Client) -> Result<(), Box<dyn Error>> 
         .create()
         .await?;
 
-    // The response is guaranteed to be valid JSON matching our schema
+    // The response is guaranteed to be valid JSON matching our schema.
+    // Note: In production code, handle the Option properly instead of using expect().
     let text = response.text().expect("Should have text response");
     println!("Raw JSON response:\n{}\n", text);
 
@@ -143,6 +144,7 @@ async fn complex_nested_schema(client: &Client) -> Result<(), Box<dyn Error>> {
         .create()
         .await?;
 
+    // Note: In production code, handle the Option properly instead of using expect().
     let text = response.text().expect("Should have text response");
 
     // Parse and pretty-print the JSON
@@ -197,6 +199,7 @@ async fn structured_with_search(client: &Client) -> Result<(), Box<dyn Error>> {
         .create()
         .await?;
 
+    // Note: In production code, handle the Option properly instead of using expect().
     let text = response.text().expect("Should have text response");
     let json: serde_json::Value = serde_json::from_str(text)?;
     println!("Stock Info JSON:\n{}", serde_json::to_string_pretty(&json)?);

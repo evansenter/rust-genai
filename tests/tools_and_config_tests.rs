@@ -389,7 +389,7 @@ async fn test_structured_output_json_schema() {
     let result = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("Generate a fake user profile with name John Smith, age 30, and email john@example.com. Return ONLY the JSON object, no other text.")
+        .with_text("Generate a fake user profile with a name, age, and email address.")
         .with_response_format(schema)
         .with_store(true)
         .create()
