@@ -18,11 +18,10 @@
 
 mod common;
 
-use common::get_client;
+use common::{PollError, get_client, poll_until_complete};
 use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 use std::time::Duration;
-use tokio::time::sleep;
 
 // =============================================================================
 // Test Configuration Constants
@@ -35,11 +34,8 @@ const MIN_SUCCESSFUL_TURNS: usize = 3;
 /// Minimum facts the model should remember out of 10 in the recall test.
 const MIN_REMEMBERED_FACTS: usize = 5;
 
-/// Maximum polling attempts for background mode tests (e.g., deep research agent).
-const POLLING_MAX_ATTEMPTS: usize = 30;
-
-/// Seconds to wait between polling attempts.
-const POLLING_INTERVAL_SECS: u64 = 2;
+/// Maximum time to wait for background tasks to complete.
+const BACKGROUND_TASK_TIMEOUT: Duration = Duration::from_secs(60);
 
 // =============================================================================
 // Helper Functions
@@ -447,7 +443,7 @@ async fn test_deep_research_agent() {
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_background_mode_polling() {
-    // Test background mode with polling
+    // Test background mode with polling using exponential backoff
     // Note: This requires an agent that supports background mode
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
@@ -469,53 +465,36 @@ async fn test_background_mode_polling() {
             println!("Initial status: {:?}", initial_response.status);
             println!("Interaction ID: {}", initial_response.id);
 
-            // If still in progress, poll for completion
-            if initial_response.status == InteractionStatus::InProgress {
-                let mut attempts = 0;
-
-                loop {
-                    attempts += 1;
-                    if attempts > POLLING_MAX_ATTEMPTS {
-                        println!(
-                            "Reached max polling attempts ({}) - task may still be running",
-                            POLLING_MAX_ATTEMPTS
-                        );
-                        break;
-                    }
-
-                    sleep(Duration::from_secs(POLLING_INTERVAL_SECS)).await;
-
-                    let poll_result = client.get_interaction(&initial_response.id).await;
-
-                    match poll_result {
-                        Ok(polled) => {
-                            println!("Poll {}: status={:?}", attempts, polled.status);
-
-                            if polled.status == InteractionStatus::Completed {
-                                println!("Task completed!");
-                                if polled.has_text() {
-                                    println!(
-                                        "Result: {}...",
-                                        &polled.text().unwrap()
-                                            [..200.min(polled.text().unwrap().len())]
-                                    );
-                                }
-                                break;
-                            } else if polled.status == InteractionStatus::Failed {
-                                println!("Task failed");
-                                break;
-                            }
-                        }
-                        Err(e) => {
-                            println!("Poll error: {:?}", e);
-                            break;
-                        }
-                    }
-                }
-            } else if initial_response.status == InteractionStatus::Completed {
+            // If already completed, we're done
+            if initial_response.status == InteractionStatus::Completed {
                 println!("Task completed immediately (may not have used background mode)");
                 if initial_response.has_text() {
                     println!("Result: {}", initial_response.text().unwrap());
+                }
+                return;
+            }
+
+            // Poll for completion using exponential backoff
+            match poll_until_complete(&client, &initial_response.id, BACKGROUND_TASK_TIMEOUT).await
+            {
+                Ok(response) => {
+                    println!("Task completed!");
+                    if response.has_text() {
+                        let text = response.text().unwrap();
+                        println!("Result: {}...", &text[..200.min(text.len())]);
+                    }
+                }
+                Err(PollError::Timeout) => {
+                    println!(
+                        "Polling timed out after {:?} - task may still be running",
+                        BACKGROUND_TASK_TIMEOUT
+                    );
+                }
+                Err(PollError::Failed) => {
+                    println!("Task failed");
+                }
+                Err(PollError::Api(e)) => {
+                    println!("Poll error: {:?}", e);
                 }
             }
         }
