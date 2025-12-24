@@ -641,3 +641,58 @@ fn test_interaction_builder_with_code_execution_and_google_search() {
     assert!(matches!(tools[0], Tool::CodeExecution));
     assert!(matches!(tools[1], Tool::GoogleSearch));
 }
+
+#[test]
+fn test_interaction_builder_with_url_context() {
+    use rust_genai::Tool;
+
+    // Test that with_url_context adds the UrlContext tool
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Summarize the content from https://example.com")
+        .with_url_context();
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    assert!(request.tools.is_some());
+
+    let tools = request.tools.unwrap();
+    assert_eq!(tools.len(), 1);
+    assert!(matches!(tools[0], Tool::UrlContext));
+}
+
+#[test]
+fn test_interaction_builder_with_url_context_and_functions() {
+    use rust_genai::Tool;
+
+    // Test that with_url_context can be combined with function declarations
+    let client = Client::new("test-api-key".to_string());
+
+    let func = FunctionDeclaration::builder("analyze_page")
+        .description("Analyze web page content")
+        .build();
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Fetch and analyze https://example.com")
+        .with_function(func)
+        .with_url_context();
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+
+    // Verify both tools were added
+    assert!(request.tools.is_some());
+    let tools = request.tools.unwrap();
+    assert_eq!(tools.len(), 2);
+    assert!(matches!(tools[0], Tool::Function { .. }));
+    assert!(matches!(tools[1], Tool::UrlContext));
+}

@@ -63,6 +63,12 @@ if let Some(text) = delta.text() { /* ... */ }
   - Backward-compatible deserialization for old API response format
   - **Breaking (serialization)**: `CodeExecutionCall` now serializes `language` and `code` as top-level fields instead of nested in `arguments`. Deserialization remains backward-compatible with both formats.
 
+- **URL context support** (#63): Enable URL content fetching and analysis
+  - New `with_url_context()` builder method on `InteractionBuilder`
+  - New types: `UrlContextMetadata`, `UrlMetadataEntry`, `UrlRetrievalStatus`
+  - New helper methods: `has_url_context_metadata()`, `url_context_metadata()` on `InteractionResponse`
+  - Supports up to 20 URLs per request, max 34MB per URL
+
 ### Changed
 - **`InteractionContent` is now `#[non_exhaustive]`** (#44): Match statements must include a wildcard arm (`_ => {}`). This allows adding new variants in minor version updates without breaking downstream code.
 

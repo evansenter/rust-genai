@@ -30,6 +30,9 @@ pub use models::interactions::InteractionInput;
 pub use models::interactions::InteractionResponse;
 pub use models::interactions::InteractionStatus;
 pub use models::interactions::StreamChunk;
+pub use models::interactions::UrlContextMetadata;
+pub use models::interactions::UrlMetadataEntry;
+pub use models::interactions::UrlRetrievalStatus;
 pub use models::interactions::UsageMetadata;
 pub use models::interactions::WebSource;
 

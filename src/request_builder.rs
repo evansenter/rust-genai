@@ -313,6 +313,57 @@ impl<'a> InteractionBuilder<'a> {
         self
     }
 
+    /// Enables URL context fetching for this interaction.
+    ///
+    /// This adds the built-in `UrlContext` tool which allows the model to
+    /// fetch and analyze content from URLs provided in the prompt.
+    /// URL context metadata will be available in the response via
+    /// [`InteractionResponse::url_context_metadata`].
+    ///
+    /// # Limitations
+    ///
+    /// - Maximum 20 URLs per request
+    /// - Maximum 34MB content size per URL
+    /// - Unsupported: paywalled content, YouTube, Google Workspace files, video/audio
+    /// - Retrieved content counts toward input token usage
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Summarize the content from https://example.com")
+    ///     .with_url_context()
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // Access URL context metadata
+    /// if let Some(metadata) = response.url_context_metadata() {
+    ///     for entry in &metadata.url_metadata {
+    ///         println!("URL: {} - Status: {:?}",
+    ///             entry.retrieved_url,
+    ///             entry.url_retrieval_status);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`InteractionResponse::url_context_metadata`]: crate::InteractionResponse::url_context_metadata
+    pub fn with_url_context(mut self) -> Self {
+        self.tools
+            .get_or_insert_with(Vec::new)
+            .push(InternalTool::UrlContext);
+        self
+    }
+
     /// Sets response modalities (e.g., ["IMAGE"]).
     pub fn with_response_modalities(mut self, modalities: Vec<String>) -> Self {
         self.response_modalities = Some(modalities);
