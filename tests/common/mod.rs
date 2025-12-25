@@ -18,6 +18,94 @@ use std::future::Future;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
+// =============================================================================
+// Retry Utilities for Transient API Errors
+// =============================================================================
+
+/// Maximum number of retries for transient API errors.
+#[allow(dead_code)]
+pub const DEFAULT_MAX_RETRIES: u32 = 3;
+
+/// Checks if an error is a transient API error that should be retried.
+///
+/// Currently detects:
+/// - Spanner UTF-8 errors (Google backend issue with stateful conversations)
+///
+/// The detection is specific to avoid false positives - both "spanner" and "utf-8"
+/// must appear in the error message.
+#[allow(dead_code)]
+pub fn is_transient_error(err: &GenaiError) -> bool {
+    match err {
+        GenaiError::Api(msg) => {
+            // Spanner UTF-8 errors are transient backend issues
+            // See: https://github.com/evansenter/rust-genai/issues/60
+            // Check for both "spanner" and "utf-8" to avoid false positives
+            let lower = msg.to_lowercase();
+            lower.contains("spanner") && lower.contains("utf-8")
+        }
+        _ => false,
+    }
+}
+
+/// Retries an async operation on transient API errors with exponential backoff.
+///
+/// This is useful for working around transient Google API backend issues,
+/// such as the Spanner UTF-8 error that occasionally occurs with stateful
+/// conversations (see issue #60).
+///
+/// # Arguments
+///
+/// * `max_retries` - Maximum number of retry attempts (0 = no retries, just run once)
+/// * `operation` - A closure that returns a future producing `Result<T, GenaiError>`
+///
+/// # Returns
+///
+/// The result of the operation if it succeeds, or the last error if all retries fail.
+///
+/// # Example
+///
+/// ```ignore
+/// let response = retry_on_transient(3, || async {
+///     client
+///         .interaction()
+///         .with_model("gemini-3-flash-preview")
+///         .with_text("Hello")
+///         .with_store(true)
+///         .create()
+///         .await
+/// }).await.expect("Request failed after retries");
+/// ```
+#[allow(dead_code)]
+pub async fn retry_on_transient<F, Fut, T>(max_retries: u32, operation: F) -> Result<T, GenaiError>
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<T, GenaiError>>,
+{
+    let mut last_error = None;
+
+    for attempt in 0..=max_retries {
+        match operation().await {
+            Ok(result) => return Ok(result),
+            Err(err) if is_transient_error(&err) && attempt < max_retries => {
+                // Exponential backoff: 1s, 2s, 4s, ...
+                let delay = Duration::from_secs(1 << attempt);
+                println!(
+                    "Transient error on attempt {} of {}, retrying in {:?}: {:?}",
+                    attempt + 1,
+                    max_retries + 1,
+                    delay,
+                    err
+                );
+                last_error = Some(err);
+                sleep(delay).await;
+            }
+            Err(err) => return Err(err),
+        }
+    }
+
+    Err(last_error.expect("Should have an error if we exhausted retries"))
+}
+
 /// Creates a client from the GEMINI_API_KEY environment variable.
 /// Returns None if the API key is not set.
 pub fn get_client() -> Option<Client> {
