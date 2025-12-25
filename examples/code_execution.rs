@@ -110,9 +110,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         Err(e) => {
             match &e {
-                GenaiError::Api(api_err_msg) => {
-                    eprintln!("API Error: {api_err_msg}");
-                    if api_err_msg.contains("not supported") {
+                GenaiError::Api {
+                    status_code,
+                    message,
+                    request_id,
+                } => {
+                    eprintln!("API Error (HTTP {}): {}", status_code, message);
+                    if let Some(id) = request_id {
+                        eprintln!("  Request ID: {}", id);
+                    }
+                    if message.contains("not supported") {
                         eprintln!("Note: Code execution may not be available in all regions.");
                     }
                 }

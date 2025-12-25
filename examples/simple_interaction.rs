@@ -56,7 +56,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         Err(e) => {
             match &e {
-                GenaiError::Api(api_err_msg) => eprintln!("API Error: {api_err_msg}"),
+                GenaiError::Api {
+                    status_code,
+                    message,
+                    request_id,
+                } => {
+                    eprintln!("API Error (HTTP {}): {}", status_code, message);
+                    if let Some(id) = request_id {
+                        eprintln!("  Request ID: {}", id);
+                    }
+                }
                 GenaiError::Http(http_err) => eprintln!("HTTP Error: {http_err}"),
                 GenaiError::Json(json_err) => eprintln!("JSON Error: {json_err}"),
                 GenaiError::Parse(p_err) => eprintln!("Parse Error: {p_err}"),

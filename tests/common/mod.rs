@@ -36,11 +36,11 @@ pub const DEFAULT_MAX_RETRIES: u32 = 3;
 #[allow(dead_code)]
 pub fn is_transient_error(err: &GenaiError) -> bool {
     match err {
-        GenaiError::Api(msg) => {
+        GenaiError::Api { message, .. } => {
             // Spanner UTF-8 errors are transient backend issues
             // See: https://github.com/evansenter/rust-genai/issues/60
             // Check for both "spanner" and "utf-8" to avoid false positives
-            let lower = msg.to_lowercase();
+            let lower = message.to_lowercase();
             lower.contains("spanner") && lower.contains("utf-8")
         }
         _ => false,

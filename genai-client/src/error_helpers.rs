@@ -22,27 +22,46 @@ pub async fn check_response(response: Response) -> Result<Response, InternalErro
     }
 }
 
+/// Google's request ID header name.
+///
+/// This is a standard Google Cloud API header that uniquely identifies each request.
+/// The value can be used when contacting Google support or correlating with server logs.
+/// See: <https://cloud.google.com/apis/docs/system-parameters>
+const REQUEST_ID_HEADER: &str = "x-goog-request-id";
+
 /// Reads error response body and creates a detailed InternalError::Api with context.
 ///
-/// Includes:
-/// - HTTP status code
+/// Extracts:
+/// - HTTP status code for programmatic error handling
 /// - Truncated response body (first 200 chars)
+/// - Request ID from `x-goog-request-id` header for debugging/support
 ///
-/// # Errors
+/// # Returns
 ///
-/// Returns an error with status code and body preview on non-success status.
-/// If body cannot be read, includes error message about read failure.
+/// A structured `InternalError::Api` with status code, message, and optional request ID.
+/// If body cannot be read, the message describes the read failure.
 pub async fn read_error_with_context(response: Response) -> InternalError {
-    let status = response.status();
+    let status_code = response.status().as_u16();
+
+    // Extract request ID from response headers before consuming the body
+    let request_id = response
+        .headers()
+        .get(REQUEST_ID_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .map(String::from);
 
     let error_body = response
         .text()
         .await
         .unwrap_or_else(|e| format!("Failed to read error body: {}", e));
 
-    let truncated = truncate_for_context(&error_body, ERROR_BODY_PREVIEW_LENGTH);
+    let message = truncate_for_context(&error_body, ERROR_BODY_PREVIEW_LENGTH);
 
-    InternalError::Api(format!("HTTP {}: {}", status.as_u16(), truncated))
+    InternalError::Api {
+        status_code,
+        message,
+        request_id,
+    }
 }
 
 /// Formats JSON parsing context by including a preview of the raw JSON.
