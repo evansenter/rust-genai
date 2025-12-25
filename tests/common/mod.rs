@@ -30,13 +30,18 @@ pub const DEFAULT_MAX_RETRIES: u32 = 3;
 ///
 /// Currently detects:
 /// - Spanner UTF-8 errors (Google backend issue with stateful conversations)
+///
+/// The detection is specific to avoid false positives - both "spanner" and "utf-8"
+/// must appear in the error message.
 #[allow(dead_code)]
 pub fn is_transient_error(err: &GenaiError) -> bool {
     match err {
         GenaiError::Api(msg) => {
             // Spanner UTF-8 errors are transient backend issues
             // See: https://github.com/evansenter/rust-genai/issues/60
-            msg.to_lowercase().contains("spanner")
+            // Check for both "spanner" and "utf-8" to avoid false positives
+            let lower = msg.to_lowercase();
+            lower.contains("spanner") && lower.contains("utf-8")
         }
         _ => false,
     }
@@ -82,15 +87,16 @@ where
         match operation().await {
             Ok(result) => return Ok(result),
             Err(err) if is_transient_error(&err) && attempt < max_retries => {
+                // Exponential backoff: 1s, 2s, 4s, ...
+                let delay = Duration::from_secs(1 << attempt);
                 println!(
-                    "Transient error on attempt {} of {}: {:?}",
+                    "Transient error on attempt {} of {}, retrying in {:?}: {:?}",
                     attempt + 1,
                     max_retries + 1,
+                    delay,
                     err
                 );
                 last_error = Some(err);
-                // Exponential backoff: 1s, 2s, 4s, ...
-                let delay = Duration::from_secs(1 << attempt);
                 sleep(delay).await;
             }
             Err(err) => return Err(err),
