@@ -172,6 +172,12 @@ pub enum InteractionContent {
         uri: Option<String>,
         mime_type: Option<String>,
     },
+    /// Document content (PDF files)
+    Document {
+        data: Option<String>,
+        uri: Option<String>,
+        mime_type: Option<String>,
+    },
     /// Function call (output from model)
     FunctionCall {
         /// Unique identifier for this function call
@@ -454,6 +460,24 @@ impl Serialize for InteractionContent {
                 }
                 map.end()
             }
+            Self::Document {
+                data,
+                uri,
+                mime_type,
+            } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "document")?;
+                if let Some(d) = data {
+                    map.serialize_entry("data", d)?;
+                }
+                if let Some(u) = uri {
+                    map.serialize_entry("uri", u)?;
+                }
+                if let Some(m) = mime_type {
+                    map.serialize_entry("mime_type", m)?;
+                }
+                map.end()
+            }
             Self::FunctionCall {
                 id,
                 name,
@@ -693,6 +717,11 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 uri: Option<String>,
                 mime_type: Option<String>,
             },
+            Document {
+                data: Option<String>,
+                uri: Option<String>,
+                mime_type: Option<String>,
+            },
             FunctionCall {
                 id: Option<String>,
                 name: String,
@@ -777,6 +806,15 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     uri,
                     mime_type,
                 } => InteractionContent::Video {
+                    data,
+                    uri,
+                    mime_type,
+                },
+                KnownContent::Document {
+                    data,
+                    uri,
+                    mime_type,
+                } => InteractionContent::Document {
                     data,
                     uri,
                     mime_type,

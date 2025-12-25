@@ -784,6 +784,7 @@ impl InteractionResponse {
                 InteractionContent::Image { .. } => summary.image_count += 1,
                 InteractionContent::Audio { .. } => summary.audio_count += 1,
                 InteractionContent::Video { .. } => summary.video_count += 1,
+                InteractionContent::Document { .. } => summary.document_count += 1,
                 InteractionContent::FunctionCall { .. } => summary.function_call_count += 1,
                 InteractionContent::FunctionResult { .. } => summary.function_result_count += 1,
                 InteractionContent::CodeExecutionCall { .. } => {
@@ -856,6 +857,8 @@ pub struct ContentSummary {
     pub audio_count: usize,
     /// Number of video content items
     pub video_count: usize,
+    /// Number of document content items (PDF files)
+    pub document_count: usize,
     /// Number of function call content items
     pub function_call_count: usize,
     /// Number of function result content items

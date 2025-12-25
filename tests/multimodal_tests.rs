@@ -20,11 +20,12 @@ mod common;
 
 use common::{
     SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TINY_BLUE_PNG_BASE64, TINY_MP4_BASE64,
-    TINY_RED_PNG_BASE64, TINY_WAV_BASE64, get_client,
+    TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, get_client,
 };
 use rust_genai::{
-    InteractionInput, InteractionStatus, audio_data_content, audio_uri_content, image_data_content,
-    image_uri_content, text_content, video_data_content, video_uri_content,
+    InteractionInput, InteractionStatus, audio_data_content, audio_uri_content,
+    document_data_content, image_data_content, image_uri_content, text_content, video_data_content,
+    video_uri_content,
 };
 
 // =============================================================================
@@ -627,6 +628,104 @@ async fn test_mixed_image_audio_video() {
             );
             // This test documents the API behavior with minimal files
             // A passing result would indicate the API accepted the format
+        }
+    }
+}
+
+// =============================================================================
+// Document/PDF Input Tests
+// =============================================================================
+
+/// Tests PDF document input from base64.
+/// This tests the ability to send PDF documents to the model for analysis.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_pdf_document_input_from_base64() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Use minimal PDF containing "Hello World" text
+    let contents = vec![
+        text_content(
+            "What text does this PDF document contain? Answer with just the text you find.",
+        ),
+        document_data_content(TINY_PDF_BASE64, "application/pdf"),
+    ];
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_input(InteractionInput::Content(contents))
+        .with_store(true)
+        .create()
+        .await;
+
+    match result {
+        Ok(response) => {
+            println!("PDF document response status: {:?}", response.status);
+            if response.has_text() {
+                let text = response.text().unwrap();
+                println!("PDF response: {}", text);
+                // The minimal PDF contains "Hello World"
+                let lower = text.to_lowercase();
+                assert!(
+                    lower.contains("hello") || lower.contains("world"),
+                    "Response should mention the PDF content: {}",
+                    text
+                );
+            }
+            assert_eq!(response.status, InteractionStatus::Completed);
+        }
+        Err(e) => {
+            // The minimal PDF might not be fully valid or the API might have restrictions
+            println!(
+                "PDF document error (may be expected for minimal PDF): {:?}",
+                e
+            );
+        }
+    }
+}
+
+/// Tests combining PDF document with text question.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_pdf_with_question() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let contents = vec![
+        text_content("I'm sending you a PDF document."),
+        document_data_content(TINY_PDF_BASE64, "application/pdf"),
+        text_content("Is this a valid PDF? What can you tell me about its structure?"),
+    ];
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_input(InteractionInput::Content(contents))
+        .with_store(true)
+        .create()
+        .await;
+
+    match result {
+        Ok(response) => {
+            assert_eq!(response.status, InteractionStatus::Completed);
+            assert!(response.has_text(), "Should have text response");
+            let text = response.text().unwrap().to_lowercase();
+            println!("PDF question response: {}", text);
+            // Should mention something about the PDF
+            assert!(
+                text.contains("pdf") || text.contains("document") || text.contains("page"),
+                "Response should address the PDF: {}",
+                text
+            );
+        }
+        Err(e) => {
+            println!("PDF with question error (may be expected): {:?}", e);
         }
     }
 }

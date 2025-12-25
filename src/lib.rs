@@ -27,10 +27,10 @@ pub use genai_client::{
 // These are still accessible via `rust_genai::interactions_api::*` if needed.
 pub mod interactions_api;
 pub use interactions_api::{
-    audio_data_content, audio_uri_content, build_interaction_input, function_call_content,
-    function_call_content_with_signature, function_result_content, image_data_content,
-    image_uri_content, text_content, text_input, thought_content, video_data_content,
-    video_uri_content,
+    audio_data_content, audio_uri_content, build_interaction_input, document_data_content,
+    document_uri_content, function_call_content, function_call_content_with_signature,
+    function_result_content, image_data_content, image_uri_content, text_content, text_input,
+    thought_content, video_data_content, video_uri_content,
 };
 
 pub mod client;
