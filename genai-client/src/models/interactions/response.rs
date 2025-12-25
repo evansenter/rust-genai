@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fmt;
 
-use super::content::{CodeExecutionOutcome, InteractionContent};
+use super::content::{CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
 use super::metadata::{GroundingMetadata, UrlContextMetadata};
 use crate::models::shared::Tool;
 
@@ -516,18 +516,21 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use genai_client::models::interactions::{InteractionResponse, CodeExecutionLanguage};
     /// # let response: InteractionResponse = todo!();
     /// for (language, code) in response.code_execution_calls() {
-    ///     println!("Language: {}, Code:\n{}", language, code);
+    ///     match language {
+    ///         CodeExecutionLanguage::Python => println!("Python:\n{}", code),
+    ///         _ => println!("Other:\n{}", code),
+    ///     }
     /// }
     /// ```
-    pub fn code_execution_calls(&self) -> Vec<(&str, &str)> {
+    pub fn code_execution_calls(&self) -> Vec<(CodeExecutionLanguage, &str)> {
         self.outputs
             .iter()
             .filter_map(|content| {
                 if let InteractionContent::CodeExecutionCall { language, code, .. } = content {
-                    Some((language.as_str(), code.as_str()))
+                    Some((*language, code.as_str()))
                 } else {
                     None
                 }

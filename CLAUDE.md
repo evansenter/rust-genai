@@ -69,6 +69,7 @@ cargo run --example streaming
 cargo run --example auto_function_calling
 cargo run --example multimodal_image
 cargo run --example url_context
+cargo run --example thinking
 ```
 
 ### Linting and Formatting

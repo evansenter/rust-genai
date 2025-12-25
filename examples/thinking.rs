@@ -23,7 +23,7 @@
 //! Higher levels produce more detailed reasoning but consume more tokens.
 
 use futures_util::StreamExt;
-use rust_genai::{Client, InteractionContent, StreamChunk};
+use rust_genai::{Client, InteractionContent, StreamChunk, ThinkingLevel};
 use std::env;
 use std::io::{Write, stdout};
 
@@ -51,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(prompt)
-        .with_thinking_level("medium")
+        .with_thinking_level(ThinkingLevel::Medium)
         .with_store(true)
         .create()
         .await?;
@@ -101,8 +101,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Prompt: {}\n", complex_prompt);
 
-    for level in ["low", "high"] {
-        println!(">>> Thinking Level: {} <<<\n", level.to_uppercase());
+    for level in [ThinkingLevel::Low, ThinkingLevel::High] {
+        println!(">>> Thinking Level: {:?} <<<\n", level);
 
         let response = client
             .interaction()
@@ -164,7 +164,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(stream_prompt)
-        .with_thinking_level("medium")
+        .with_thinking_level(ThinkingLevel::Medium)
         .create_stream();
 
     let mut in_thought = false;

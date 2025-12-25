@@ -19,6 +19,7 @@ pub use models::shared::Tool;
 pub use models::shared::ToolConfig;
 
 // Interactions API types
+pub use models::interactions::CodeExecutionLanguage;
 pub use models::interactions::CodeExecutionOutcome;
 pub use models::interactions::ContentSummary;
 pub use models::interactions::CreateInteractionRequest;
@@ -32,6 +33,7 @@ pub use models::interactions::InteractionInput;
 pub use models::interactions::InteractionResponse;
 pub use models::interactions::InteractionStatus;
 pub use models::interactions::StreamChunk;
+pub use models::interactions::ThinkingLevel;
 pub use models::interactions::UrlContextMetadata;
 pub use models::interactions::UrlMetadataEntry;
 pub use models::interactions::UrlRetrievalStatus;

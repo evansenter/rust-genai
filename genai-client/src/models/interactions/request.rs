@@ -15,6 +15,23 @@ pub enum InteractionInput {
     Content(Vec<InteractionContent>),
 }
 
+/// Thinking level for chain-of-thought reasoning.
+///
+/// Controls the depth of reasoning the model performs before generating a response.
+/// Higher levels produce more detailed reasoning but consume more tokens.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ThinkingLevel {
+    /// Minimal reasoning, fastest responses
+    Minimal,
+    /// Light reasoning for simple problems
+    Low,
+    /// Balanced reasoning for moderate complexity
+    Medium,
+    /// Extensive reasoning for complex problems
+    High,
+}
+
 /// Generation configuration for model behavior
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
@@ -27,9 +44,9 @@ pub struct GenerationConfig {
     pub top_p: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_k: Option<i32>,
-    /// Thinking level: "minimal", "low", "medium", "high"
+    /// Thinking level for chain-of-thought reasoning
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub thinking_level: Option<String>,
+    pub thinking_level: Option<ThinkingLevel>,
 }
 
 /// Request body for the Interactions API endpoint

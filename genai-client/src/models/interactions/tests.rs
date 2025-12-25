@@ -140,7 +140,7 @@ fn test_generation_config_serialization() {
         max_output_tokens: Some(500),
         top_p: Some(0.9),
         top_k: Some(40),
-        thinking_level: Some("medium".to_string()),
+        thinking_level: Some(ThinkingLevel::Medium),
     };
 
     let json = serde_json::to_string(&config).expect("Serialization failed");
@@ -178,6 +178,68 @@ fn test_interaction_response_text() {
     assert_eq!(response.all_text(), "HelloWorld");
     assert!(response.has_text());
     assert!(!response.has_function_calls());
+}
+
+#[test]
+fn test_interaction_response_thoughts() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::Thought {
+                text: Some("Let me think about this...".to_string()),
+            },
+            InteractionContent::Thought {
+                text: Some("The answer is 42.".to_string()),
+            },
+            InteractionContent::Text {
+                text: Some("The answer is 42.".to_string()),
+            },
+            // Thought with None text should be filtered out
+            InteractionContent::Thought { text: None },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(response.has_thoughts());
+
+    let thoughts: Vec<_> = response.thoughts().collect();
+    assert_eq!(thoughts.len(), 2);
+    assert_eq!(thoughts[0], "Let me think about this...");
+    assert_eq!(thoughts[1], "The answer is 42.");
+
+    // Verify text() still works (only returns Text content)
+    assert_eq!(response.text(), Some("The answer is 42."));
+}
+
+#[test]
+fn test_interaction_response_no_thoughts() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("Just text, no thoughts.".to_string()),
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(!response.has_thoughts());
+    let thoughts: Vec<_> = response.thoughts().collect();
+    assert!(thoughts.is_empty());
 }
 
 #[test]
@@ -986,13 +1048,13 @@ fn test_deserialize_unknown_with_null_type() {
 #[test]
 fn test_deserialize_code_execution_call() {
     // Test deserialization from the API format (arguments object)
-    let json = r#"{"type": "code_execution_call", "id": "call_123", "arguments": {"code": "print(42)", "language": "python"}}"#;
+    let json = r#"{"type": "code_execution_call", "id": "call_123", "arguments": {"code": "print(42)", "language": "PYTHON"}}"#;
     let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
         InteractionContent::CodeExecutionCall { id, language, code } => {
             assert_eq!(id, "call_123");
-            assert_eq!(language, "python");
+            assert_eq!(*language, CodeExecutionLanguage::Python);
             assert_eq!(code, "print(42)");
         }
         _ => panic!("Expected CodeExecutionCall variant, got {:?}", content),
@@ -1011,7 +1073,7 @@ fn test_deserialize_code_execution_call_direct_fields() {
     match &content {
         InteractionContent::CodeExecutionCall { id, language, code } => {
             assert_eq!(id, "call_123");
-            assert_eq!(language, "PYTHON");
+            assert_eq!(*language, CodeExecutionLanguage::Python);
             assert_eq!(code, "print(42)");
         }
         _ => panic!("Expected CodeExecutionCall variant, got {:?}", content),
@@ -1220,7 +1282,7 @@ fn test_url_context_result_with_none_content() {
 fn test_serialize_code_execution_call() {
     let content = InteractionContent::CodeExecutionCall {
         id: "call_123".to_string(),
-        language: "PYTHON".to_string(),
+        language: CodeExecutionLanguage::Python,
         code: "print(42)".to_string(),
     };
 
@@ -1272,7 +1334,7 @@ fn test_roundtrip_built_in_tool_content() {
     // CodeExecutionCall roundtrip
     let original = InteractionContent::CodeExecutionCall {
         id: "call_123".to_string(),
-        language: "PYTHON".to_string(),
+        language: CodeExecutionLanguage::Python,
         code: "print('hello')".to_string(),
     };
     let json = serde_json::to_string(&original).unwrap();
@@ -1346,7 +1408,7 @@ fn test_edge_cases_empty_values() {
     // Empty code in CodeExecutionCall
     let content = InteractionContent::CodeExecutionCall {
         id: "call_empty".to_string(),
-        language: "PYTHON".to_string(),
+        language: CodeExecutionLanguage::Python,
         code: "".to_string(),
     };
     let json = serde_json::to_string(&content).unwrap();
@@ -1354,7 +1416,7 @@ fn test_edge_cases_empty_values() {
     match restored {
         InteractionContent::CodeExecutionCall { id, language, code } => {
             assert_eq!(id, "call_empty");
-            assert_eq!(language, "PYTHON");
+            assert_eq!(language, CodeExecutionLanguage::Python);
             assert!(code.is_empty());
         }
         _ => panic!("Expected CodeExecutionCall"),
@@ -1418,7 +1480,7 @@ fn test_interaction_response_code_execution_helpers() {
             },
             InteractionContent::CodeExecutionCall {
                 id: "call_123".to_string(),
-                language: "PYTHON".to_string(),
+                language: CodeExecutionLanguage::Python,
                 code: "print(42)".to_string(),
             },
             InteractionContent::CodeExecutionResult {
@@ -1442,7 +1504,7 @@ fn test_interaction_response_code_execution_helpers() {
     // Test code_execution_calls helper
     let code_blocks = response.code_execution_calls();
     assert_eq!(code_blocks.len(), 1);
-    assert_eq!(code_blocks[0].0, "PYTHON");
+    assert_eq!(code_blocks[0].0, CodeExecutionLanguage::Python);
     assert_eq!(code_blocks[0].1, "print(42)");
 
     // Test code_execution_results helper
@@ -1524,12 +1586,12 @@ fn test_content_summary_with_built_in_tools() {
         outputs: vec![
             InteractionContent::CodeExecutionCall {
                 id: "call_1".to_string(),
-                language: "PYTHON".to_string(),
+                language: CodeExecutionLanguage::Python,
                 code: "print(1)".to_string(),
             },
             InteractionContent::CodeExecutionCall {
                 id: "call_2".to_string(),
-                language: "PYTHON".to_string(),
+                language: CodeExecutionLanguage::Python,
                 code: "print(2)".to_string(),
             },
             InteractionContent::CodeExecutionResult {

@@ -13,12 +13,12 @@ mod streaming;
 mod tests;
 
 // Re-export all public types at module root for backwards compatibility
-pub use content::{CodeExecutionOutcome, InteractionContent};
+pub use content::{CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
 pub use metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
     WebSource,
 };
-pub use request::{CreateInteractionRequest, GenerationConfig, InteractionInput};
+pub use request::{CreateInteractionRequest, GenerationConfig, InteractionInput, ThinkingLevel};
 pub use response::{
     ContentSummary, FunctionCallInfo, FunctionResultInfo, InteractionResponse, InteractionStatus,
     UsageMetadata,

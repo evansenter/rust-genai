@@ -4,7 +4,7 @@ use crate::client::Client;
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
     self, CreateInteractionRequest, FunctionDeclaration, GenerationConfig, InteractionContent,
-    InteractionInput, InteractionResponse, StreamChunk, Tool as InternalTool,
+    InteractionInput, InteractionResponse, StreamChunk, ThinkingLevel, Tool as InternalTool,
 };
 
 /// Default maximum iterations for auto function calling
@@ -462,22 +462,20 @@ impl<'a> InteractionBuilder<'a> {
 
     /// Sets the thinking level for reasoning/chain-of-thought output.
     ///
-    /// Valid levels: `"minimal"`, `"low"`, `"medium"`, `"high"`
-    ///
     /// Higher levels produce more detailed reasoning but consume more tokens.
     /// When thinking is enabled, the model's reasoning process is exposed
     /// in the response as `Thought` content.
     ///
     /// # Example
     /// ```no_run
-    /// # use rust_genai::Client;
+    /// # use rust_genai::{Client, ThinkingLevel};
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api-key".to_string()).build();
     /// let response = client
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("Solve this step by step: 15 * 23")
-    ///     .with_thinking_level("medium")
+    ///     .with_thinking_level(ThinkingLevel::Medium)
     ///     .create()
     ///     .await?;
     ///
@@ -489,11 +487,11 @@ impl<'a> InteractionBuilder<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn with_thinking_level(mut self, level: impl Into<String>) -> Self {
+    pub fn with_thinking_level(mut self, level: ThinkingLevel) -> Self {
         let config = self
             .generation_config
             .get_or_insert_with(GenerationConfig::default);
-        config.thinking_level = Some(level.into());
+        config.thinking_level = Some(level);
         self
     }
 
@@ -901,7 +899,7 @@ mod tests {
             max_output_tokens: Some(1000),
             top_p: Some(0.9),
             top_k: Some(40),
-            thinking_level: Some("medium".to_string()),
+            thinking_level: Some(ThinkingLevel::Medium),
         };
 
         let builder = client

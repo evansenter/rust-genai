@@ -4,7 +4,7 @@
 //! - FunctionDeclarationBuilder edge cases
 //! - InteractionBuilder edge cases and validation
 
-use genai_client::{GenerationConfig, InteractionContent, InteractionInput};
+use genai_client::{GenerationConfig, InteractionContent, InteractionInput, ThinkingLevel};
 use rust_genai::{Client, FunctionDeclaration};
 use serde_json::json;
 
@@ -439,7 +439,7 @@ fn test_interaction_builder_with_all_features_combined() {
         max_output_tokens: Some(1024),
         top_p: Some(0.95),
         top_k: Some(40),
-        thinking_level: Some("1".to_string()),
+        thinking_level: Some(ThinkingLevel::Low),
     };
 
     let _builder = client

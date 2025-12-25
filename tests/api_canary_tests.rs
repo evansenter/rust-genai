@@ -218,13 +218,13 @@ async fn canary_multimodal_interaction() {
 #[tokio::test]
 #[ignore] // Requires GEMINI_API_KEY
 async fn canary_thinking_model_interaction() {
-    use rust_genai::GenerationConfig;
+    use rust_genai::{GenerationConfig, ThinkingLevel};
 
     let client = get_client().expect("GEMINI_API_KEY must be set");
 
     // Use generation config with thinking level enabled
     let config = GenerationConfig {
-        thinking_level: Some("medium".to_string()),
+        thinking_level: Some(ThinkingLevel::Medium),
         ..Default::default()
     };
 
