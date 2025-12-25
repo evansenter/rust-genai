@@ -1,5 +1,6 @@
 use crate::GenaiError;
 use reqwest::Client as ReqwestClient;
+use std::time::Duration;
 
 /// Logs a request body at debug level, preferring JSON format when possible.
 fn log_request_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
@@ -18,18 +19,94 @@ pub struct Client {
 }
 
 /// Builder for `Client` instances.
+///
+/// # Example
+///
+/// ```
+/// use rust_genai::Client;
+/// use std::time::Duration;
+///
+/// let client = Client::builder("api_key".to_string())
+///     .timeout(Duration::from_secs(120))
+///     .connect_timeout(Duration::from_secs(10))
+///     .build();
+/// ```
 #[derive(Debug)]
 pub struct ClientBuilder {
     api_key: String,
+    timeout: Option<Duration>,
+    connect_timeout: Option<Duration>,
 }
 
 impl ClientBuilder {
+    /// Sets the total request timeout.
+    ///
+    /// This is the maximum time a request can take from start to finish,
+    /// including connection time, sending the request, and receiving the response.
+    ///
+    /// For LLM requests that may take a long time to generate responses,
+    /// consider setting a longer timeout (e.g., 120-300 seconds).
+    ///
+    /// If not set, uses reqwest's default (no timeout).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::Client;
+    /// use std::time::Duration;
+    ///
+    /// let client = Client::builder("api_key".to_string())
+    ///     .timeout(Duration::from_secs(120))
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub const fn timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    /// Sets the connection timeout.
+    ///
+    /// This is the maximum time to wait for establishing a connection to the server.
+    /// A shorter timeout here can help fail fast if the network is unavailable.
+    ///
+    /// If not set, uses reqwest's default.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::Client;
+    /// use std::time::Duration;
+    ///
+    /// let client = Client::builder("api_key".to_string())
+    ///     .connect_timeout(Duration::from_secs(10))
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub const fn connect_timeout(mut self, timeout: Duration) -> Self {
+        self.connect_timeout = Some(timeout);
+        self
+    }
+
     /// Builds the `Client`.
     #[must_use]
     pub fn build(self) -> Client {
+        let mut builder = ReqwestClient::builder();
+
+        if let Some(timeout) = self.timeout {
+            builder = builder.timeout(timeout);
+        }
+
+        if let Some(connect_timeout) = self.connect_timeout {
+            builder = builder.connect_timeout(connect_timeout);
+        }
+
+        // This should never fail with our configuration
+        let http_client = builder.build().expect("Failed to build HTTP client");
+
         Client {
             api_key: self.api_key,
-            http_client: ReqwestClient::new(),
+            http_client,
         }
     }
 }
@@ -42,7 +119,11 @@ impl Client {
     /// * `api_key` - Your Google AI API key.
     #[must_use]
     pub const fn builder(api_key: String) -> ClientBuilder {
-        ClientBuilder { api_key }
+        ClientBuilder {
+            api_key,
+            timeout: None,
+            connect_timeout: None,
+        }
     }
 
     /// Creates a new `GenAI` client.
@@ -283,5 +364,49 @@ impl Client {
         log::debug!("Interaction deleted successfully");
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_client_builder_default() {
+        let client = Client::builder("test_key".to_string()).build();
+        assert_eq!(client.api_key, "test_key");
+    }
+
+    #[test]
+    fn test_client_builder_with_timeout() {
+        let client = Client::builder("test_key".to_string())
+            .timeout(Duration::from_secs(120))
+            .build();
+        assert_eq!(client.api_key, "test_key");
+        // Note: We can't easily inspect the reqwest client's timeout,
+        // but this test verifies the builder chain works
+    }
+
+    #[test]
+    fn test_client_builder_with_connect_timeout() {
+        let client = Client::builder("test_key".to_string())
+            .connect_timeout(Duration::from_secs(10))
+            .build();
+        assert_eq!(client.api_key, "test_key");
+    }
+
+    #[test]
+    fn test_client_builder_with_both_timeouts() {
+        let client = Client::builder("test_key".to_string())
+            .timeout(Duration::from_secs(120))
+            .connect_timeout(Duration::from_secs(10))
+            .build();
+        assert_eq!(client.api_key, "test_key");
+    }
+
+    #[test]
+    fn test_client_new() {
+        let client = Client::new("test_key".to_string());
+        assert_eq!(client.api_key, "test_key");
     }
 }
