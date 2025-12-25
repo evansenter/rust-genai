@@ -3,13 +3,17 @@
 //! This example demonstrates how to use JSON schema to enforce structured output
 //! from the Gemini API. The model will return responses that conform to your schema.
 //!
+//! Shows both non-streaming and streaming usage.
+//!
 //! Run with: cargo run --example structured_output
 
-use rust_genai::Client;
+use futures_util::StreamExt;
+use rust_genai::{Client, StreamChunk};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::env;
 use std::error::Error;
+use std::io::{Write, stdout};
 
 /// A struct representing the structured output we want from the model.
 /// Using serde, we can easily parse the JSON response into this type.
@@ -43,6 +47,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Example 3: Structured output combined with Google Search
     println!("\n--- Example 3: Structured Output + Google Search ---");
     structured_with_search(&client).await?;
+
+    // Example 4: Streaming with structured output
+    println!("\n--- Example 4: Streaming Structured Output ---");
+    streaming_structured_output(&client).await?;
 
     Ok(())
 }
@@ -209,6 +217,82 @@ async fn structured_with_search(client: &Client) -> Result<(), Box<dyn Error>> {
         println!(
             "\nGrounded with {} sources from web search",
             metadata.grounding_chunks.len()
+        );
+    }
+
+    Ok(())
+}
+
+/// Streaming example: Watch structured JSON being generated in real-time
+async fn streaming_structured_output(client: &Client) -> Result<(), Box<dyn Error>> {
+    // Simple schema for a product review
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "product": {"type": "string"},
+            "rating": {"type": "integer"},
+            "pros": {
+                "type": "array",
+                "items": {"type": "string"}
+            },
+            "cons": {
+                "type": "array",
+                "items": {"type": "string"}
+            },
+            "verdict": {"type": "string"}
+        },
+        "required": ["product", "rating", "pros", "cons", "verdict"]
+    });
+
+    println!("Streaming structured JSON response:");
+    print!("  ");
+
+    let mut stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Write a brief review for a wireless mouse. Be concise.")
+        .with_response_format(schema)
+        .create_stream();
+
+    let mut final_response = None;
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(chunk) => match chunk {
+                StreamChunk::Delta(content) => {
+                    if let Some(text) = content.text() {
+                        print!("{}", text);
+                        stdout().flush()?;
+                    }
+                }
+                StreamChunk::Complete(response) => {
+                    final_response = Some(response);
+                }
+            },
+            Err(e) => {
+                eprintln!("\nStream error: {e}");
+                break;
+            }
+        }
+    }
+
+    println!("\n");
+
+    // Parse and display the final structured result
+    if let Some(text) = final_response.as_ref().and_then(|r| r.text()) {
+        let json: serde_json::Value = serde_json::from_str(text)?;
+        println!("Parsed result:");
+        println!(
+            "  Product: {}",
+            json.get("product").and_then(|v| v.as_str()).unwrap_or("?")
+        );
+        println!(
+            "  Rating: {}/5",
+            json.get("rating").and_then(|v| v.as_i64()).unwrap_or(0)
+        );
+        println!(
+            "  Verdict: {}",
+            json.get("verdict").and_then(|v| v.as_str()).unwrap_or("?")
         );
     }
 

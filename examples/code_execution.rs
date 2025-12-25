@@ -3,11 +3,15 @@
 //! This example demonstrates how to use Gemini's built-in code execution
 //! capability to run Python code in a sandboxed environment.
 //!
+//! Shows both non-streaming and streaming usage.
+//!
 //! Run with: cargo run --example code_execution
 
-use rust_genai::{Client, CodeExecutionOutcome, GenaiError};
+use futures_util::StreamExt;
+use rust_genai::{Client, CodeExecutionOutcome, GenaiError, StreamChunk};
 use std::env;
 use std::error::Error;
+use std::io::{Write, stdout};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -120,6 +124,53 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("\n--- End Response ---");
+    println!("\n--- End Non-Streaming Response ---");
+
+    // 9. Streaming example with Code Execution
+    println!("\n=== Streaming with Code Execution ===\n");
+
+    let stream_prompt = "Calculate the Fibonacci sequence up to 15 terms using Python.";
+    println!("Prompt: {stream_prompt}\n");
+    println!("Response (streaming):");
+
+    let mut stream = client
+        .interaction()
+        .with_model(model_name)
+        .with_text(stream_prompt)
+        .with_code_execution()
+        .create_stream();
+
+    let mut final_response = None;
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(chunk) => match chunk {
+                StreamChunk::Delta(content) => {
+                    if let Some(text) = content.text() {
+                        print!("{}", text);
+                        stdout().flush()?;
+                    }
+                }
+                StreamChunk::Complete(response) => {
+                    println!("\n");
+                    final_response = Some(response);
+                }
+            },
+            Err(e) => {
+                eprintln!("\nStream error: {e}");
+                break;
+            }
+        }
+    }
+
+    // Display code execution details from final response
+    if let Some(output) = final_response
+        .as_ref()
+        .and_then(|r| r.successful_code_output())
+    {
+        println!("Code Output: {output}");
+    }
+
+    println!("\n--- End Streaming Response ---");
     Ok(())
 }

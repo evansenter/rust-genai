@@ -3,11 +3,15 @@
 //! This example demonstrates how to use Gemini's built-in Google Search
 //! grounding capability to get responses informed by real-time web data.
 //!
+//! Shows both non-streaming and streaming usage.
+//!
 //! Run with: cargo run --example google_search
 
-use rust_genai::{Client, GenaiError};
+use futures_util::StreamExt;
+use rust_genai::{Client, GenaiError, StreamChunk};
 use std::env;
 use std::error::Error;
+use std::io::{Write, stdout};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -103,6 +107,48 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("\n--- End Response ---");
+    println!("\n--- End Non-Streaming Response ---");
+
+    // 7. Streaming example with Google Search
+    println!("\n=== Streaming with Google Search ===\n");
+
+    let stream_prompt = "What are the top 3 tech news stories today?";
+    println!("Prompt: {stream_prompt}\n");
+    println!("Response (streaming):");
+
+    let mut stream = client
+        .interaction()
+        .with_model(model_name)
+        .with_text(stream_prompt)
+        .with_google_search()
+        .create_stream();
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(chunk) => match chunk {
+                StreamChunk::Delta(content) => {
+                    if let Some(text) = content.text() {
+                        print!("{}", text);
+                        stdout().flush()?;
+                    }
+                }
+                StreamChunk::Complete(response) => {
+                    println!("\n");
+                    if let Some(metadata) = response.google_search_metadata() {
+                        println!("Sources ({} total):", metadata.grounding_chunks.len());
+                        for chunk in metadata.grounding_chunks.iter().take(3) {
+                            println!("  - {} [{}]", chunk.web.title, chunk.web.domain);
+                        }
+                    }
+                }
+            },
+            Err(e) => {
+                eprintln!("\nStream error: {e}");
+                break;
+            }
+        }
+    }
+
+    println!("\n--- End Streaming Response ---");
     Ok(())
 }

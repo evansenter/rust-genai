@@ -28,7 +28,7 @@ use serde_json::json;
 
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_google_search_grounding() {
+async fn test_google_search() {
     // Test using Google Search for grounding with current information
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
@@ -95,7 +95,7 @@ async fn test_google_search_grounding() {
 
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_google_search_grounding_streaming() {
+async fn test_google_search_streaming() {
     // Test Google Search with streaming
     use futures_util::StreamExt;
     use rust_genai::StreamChunk;
@@ -254,7 +254,7 @@ async fn test_code_execution() {
 
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_code_execution_complex_calculation() {
+async fn test_code_execution_complex() {
     // Test code execution with a more complex calculation
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
@@ -291,6 +291,76 @@ async fn test_code_execution_complex_calculation() {
             println!("Code Execution error (may be expected): {:?}", e);
         }
     }
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_code_execution_streaming() {
+    // Test code execution with streaming
+    use futures_util::StreamExt;
+    use rust_genai::StreamChunk;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let mut stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Calculate 15 factorial using Python code execution.")
+        .with_code_execution()
+        .create_stream();
+
+    let mut chunk_count = 0;
+    let mut final_response = None;
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(chunk) => {
+                chunk_count += 1;
+                match chunk {
+                    StreamChunk::Delta(content) => {
+                        println!("Delta chunk {}: {:?}", chunk_count, content);
+                    }
+                    StreamChunk::Complete(response) => {
+                        println!("Complete response received");
+                        // Check for code execution results
+                        let summary = response.content_summary();
+                        println!(
+                            "Code execution results: {}",
+                            summary.code_execution_result_count
+                        );
+                        final_response = Some(response);
+                    }
+                }
+            }
+            Err(e) => {
+                let error_str = format!("{:?}", e);
+                println!("Stream error: {}", error_str);
+                if error_str.contains("not supported") || error_str.contains("not available") {
+                    println!("Code Execution tool not available - skipping test");
+                }
+                break;
+            }
+        }
+    }
+
+    // Skip assertions if tool wasn't available
+    if final_response.is_none() {
+        return;
+    }
+
+    assert!(chunk_count > 0, "Should receive at least one chunk");
+
+    // Verify code execution happened
+    let response = final_response.expect("Should have final response");
+    let has_code_result = !response.code_execution_results().is_empty();
+    println!("Has code execution results: {}", has_code_result);
+    assert!(
+        has_code_result,
+        "Should have code execution results in streaming response"
+    );
 }
 
 // =============================================================================
@@ -359,6 +429,75 @@ async fn test_url_context() {
     }
 }
 
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_url_context_streaming() {
+    // Test URL context with streaming
+    use futures_util::StreamExt;
+    use rust_genai::StreamChunk;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let mut stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Fetch https://example.com and describe the page structure.")
+        .with_url_context()
+        .create_stream();
+
+    let mut chunk_count = 0;
+    let mut final_response = None;
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(chunk) => {
+                chunk_count += 1;
+                match chunk {
+                    StreamChunk::Delta(content) => {
+                        println!("Delta chunk {}: {:?}", chunk_count, content);
+                    }
+                    StreamChunk::Complete(response) => {
+                        println!("Complete response received");
+                        // Check for URL context metadata
+                        if let Some(metadata) = response.url_context_metadata() {
+                            println!("URL metadata entries: {}", metadata.url_metadata.len());
+                        }
+                        final_response = Some(response);
+                    }
+                }
+            }
+            Err(e) => {
+                let error_str = format!("{:?}", e);
+                println!("Stream error: {}", error_str);
+                if error_str.contains("not supported") || error_str.contains("not available") {
+                    println!("URL Context tool not available - skipping test");
+                }
+                break;
+            }
+        }
+    }
+
+    // Skip assertions if tool wasn't available
+    if final_response.is_none() {
+        return;
+    }
+
+    assert!(chunk_count > 0, "Should receive at least one chunk");
+
+    // Verify URL context metadata is present
+    let response = final_response.expect("Should have final response");
+    if let Some(metadata) = response.url_context_metadata() {
+        println!("URL metadata entries: {}", metadata.url_metadata.len());
+        assert!(
+            !metadata.url_metadata.is_empty(),
+            "Should have URL metadata entries in streaming response"
+        );
+    }
+}
+
 // =============================================================================
 // Response Formats: Structured Output
 // =============================================================================
@@ -369,7 +508,7 @@ async fn test_url_context() {
 /// structured output from the model.
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_structured_output_json_schema() {
+async fn test_structured_output() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -420,7 +559,7 @@ async fn test_structured_output_json_schema() {
 /// The response_format parameter enforces specific enum values for fields.
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_structured_output_enum_constraint() {
+async fn test_structured_output_enum() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -605,7 +744,7 @@ async fn test_structured_output_with_url_context() {
 /// This demonstrates more complex JSON schemas with nested objects and arrays.
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_structured_output_nested_schema() {
+async fn test_structured_output_nested() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -675,6 +814,92 @@ async fn test_structured_output_nested_schema() {
     for emp in employees {
         assert!(emp.get("name").is_some(), "Each employee should have name");
         assert!(emp.get("role").is_some(), "Each employee should have role");
+    }
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_structured_output_streaming() {
+    // Test structured output with streaming
+    use futures_util::StreamExt;
+    use rust_genai::StreamChunk;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "color": {"type": "string"},
+            "hex_code": {"type": "string"},
+            "rgb": {
+                "type": "object",
+                "properties": {
+                    "r": {"type": "integer"},
+                    "g": {"type": "integer"},
+                    "b": {"type": "integer"}
+                }
+            }
+        },
+        "required": ["color", "hex_code"]
+    });
+
+    let mut stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Describe the color blue with its hex code and RGB values.")
+        .with_response_format(schema)
+        .create_stream();
+
+    let mut chunk_count = 0;
+    let mut collected_text = String::new();
+    let mut final_response = None;
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(chunk) => {
+                chunk_count += 1;
+                match chunk {
+                    StreamChunk::Delta(content) => {
+                        if let Some(text) = content.text() {
+                            collected_text.push_str(text);
+                        }
+                        println!("Delta chunk {}: {:?}", chunk_count, content);
+                    }
+                    StreamChunk::Complete(response) => {
+                        println!("Complete response received");
+                        final_response = Some(response);
+                    }
+                }
+            }
+            Err(e) => {
+                println!("Stream error: {:?}", e);
+                break;
+            }
+        }
+    }
+
+    assert!(chunk_count > 0, "Should receive at least one chunk");
+    assert!(final_response.is_some(), "Should receive complete response");
+
+    // Verify the final response is valid JSON matching our schema
+    if let Some(text) = final_response.as_ref().and_then(|r| r.text()) {
+        // Verify streamed text matches final response
+        assert_eq!(
+            collected_text, text,
+            "Streamed chunks should match final response text"
+        );
+
+        let json: serde_json::Value =
+            serde_json::from_str(text).expect("Streaming response should be valid JSON");
+        println!(
+            "Parsed JSON: {}",
+            serde_json::to_string_pretty(&json).unwrap()
+        );
+        assert!(json.get("color").is_some(), "Should have color field");
+        assert!(json.get("hex_code").is_some(), "Should have hex_code field");
     }
 }
 

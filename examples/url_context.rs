@@ -3,11 +3,15 @@
 //! This example shows how to use Gemini's URL context tool to fetch web pages
 //! and have the model analyze their content.
 //!
+//! Shows both non-streaming and streaming usage.
+//!
 //! Run with: cargo run --example url_context
 
-use rust_genai::{Client, GenaiError, UrlRetrievalStatus};
+use futures_util::StreamExt;
+use rust_genai::{Client, GenaiError, StreamChunk, UrlRetrievalStatus};
 use std::env;
 use std::error::Error;
+use std::io::{Write, stdout};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -73,7 +77,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     println!("  Output tokens: {output}");
                 }
             }
-            println!("\n--- End Response ---");
+            println!("\n--- End Non-Streaming Response ---");
         }
         Err(e) => {
             match &e {
@@ -91,5 +95,58 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    // 7. Streaming example with URL Context
+    println!("\n=== Streaming with URL Context ===\n");
+
+    let stream_prompt = "Fetch https://httpbin.org/html and describe what you find on the page.";
+    println!("Prompt: {stream_prompt}\n");
+    println!("Response (streaming):");
+
+    let mut stream = client
+        .interaction()
+        .with_model(model_name)
+        .with_text(stream_prompt)
+        .with_url_context()
+        .create_stream();
+
+    let mut final_response = None;
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(chunk) => match chunk {
+                StreamChunk::Delta(content) => {
+                    if let Some(text) = content.text() {
+                        print!("{}", text);
+                        stdout().flush()?;
+                    }
+                }
+                StreamChunk::Complete(response) => {
+                    println!("\n");
+                    final_response = Some(response);
+                }
+            },
+            Err(e) => {
+                eprintln!("\nStream error: {e}");
+                break;
+            }
+        }
+    }
+
+    // Show URL context metadata from final response
+    if let Some(metadata) = final_response
+        .as_ref()
+        .and_then(|r| r.url_context_metadata())
+    {
+        println!("URLs fetched:");
+        for entry in &metadata.url_metadata {
+            let status = match entry.url_retrieval_status {
+                UrlRetrievalStatus::UrlRetrievalStatusSuccess => "Success",
+                _ => "Other",
+            };
+            println!("  {} - {}", entry.retrieved_url, status);
+        }
+    }
+
+    println!("\n--- End Streaming Response ---");
     Ok(())
 }

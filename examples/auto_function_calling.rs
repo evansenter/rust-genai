@@ -3,6 +3,8 @@
 //! This example demonstrates automatic function calling where the library
 //! handles the function execution loop for you.
 //!
+//! Shows both non-streaming (with auto-execution) and streaming usage.
+//!
 //! # Running
 //!
 //! ```bash
@@ -13,9 +15,11 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use rust_genai::{CallableFunction, Client};
+use futures_util::StreamExt;
+use rust_genai::{CallableFunction, Client, StreamChunk};
 use rust_genai_macros::generate_function_declaration;
 use std::env;
+use std::io::{Write, stdout};
 
 // Define a function using the macro - this automatically registers it
 // in the global function registry for auto-calling.
@@ -88,7 +92,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("\nAssistant: {}", text);
     }
 
-    println!("\n--- End ---");
+    println!("\n--- End Auto Function Calling ---");
+
+    // Streaming example with function calling
+    // Note: Streaming shows the response as it's generated, but function calls
+    // are typically returned as complete chunks rather than streamed piece by piece.
+    println!("\n=== STREAMING WITH FUNCTION CALLING ===\n");
+
+    let stream_prompt = "What's the weather in London right now?";
+    println!("User: {}\n", stream_prompt);
+    println!("Response (streaming):");
+
+    let weather_func_stream = GetWeatherCallable.declaration();
+
+    let mut stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text(stream_prompt)
+        .with_function(weather_func_stream)
+        .create_stream();
+
+    let mut saw_function_call = false;
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(chunk) => match chunk {
+                StreamChunk::Delta(content) => {
+                    // Check for text content
+                    if let Some(text) = content.text() {
+                        print!("{}", text);
+                        stdout().flush()?;
+                    }
+                    // Check for function calls
+                    if content.is_function_call() {
+                        saw_function_call = true;
+                        println!("\n  [Received function call in stream]");
+                    }
+                }
+                StreamChunk::Complete(response) => {
+                    println!();
+                    if response.has_function_calls() {
+                        println!("\nFunction calls in final response:");
+                        for call in response.function_calls() {
+                            println!("  - {}({}) [id: {:?}]", call.name, call.args, call.id);
+                        }
+                        println!("\nNote: To complete the conversation, you would execute");
+                        println!("the function and send results back to the model.");
+                    }
+                }
+            },
+            Err(e) => {
+                eprintln!("\nStream error: {e}");
+                break;
+            }
+        }
+    }
+
+    if saw_function_call {
+        println!("\n(Function call was streamed successfully)");
+    }
+
+    println!("\n--- End Streaming ---");
 
     Ok(())
 }
