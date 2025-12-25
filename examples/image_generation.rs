@@ -76,6 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("\nImage {} found:", i + 1);
 
                         if let Some(mime) = mime_type {
+                            // Common MIME types: image/png, image/jpeg, image/webp
                             println!("  MIME type: {}", mime);
                         }
 
@@ -152,13 +153,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(response) => {
             println!("Status: {:?}", response.status);
 
-            let summary = response.content_summary();
-            println!(
-                "Content: {} images, {} text blocks",
-                summary.image_count, summary.text_count
-            );
-
-            // Count and display generated images
+            // Count images with actual data (not just metadata)
             let image_count = response
                 .outputs
                 .iter()
@@ -166,7 +161,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .count();
 
             if image_count > 0 {
-                println!("\nGenerated {} image(s)!", image_count);
+                println!("Generated {} image(s)!", image_count);
+            } else {
+                println!("No images with data in response.");
             }
         }
         Err(e) => {
@@ -184,6 +181,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  3. Generated images are returned as base64-encoded data");
     println!("  4. Check MIME type to determine image format (PNG, JPEG, WebP)");
     println!("  5. Regional availability may affect access to image models");
+    println!("\nTo save generated images, add the `base64` crate and use:");
+    println!("  use base64::Engine;");
+    println!("  let bytes = base64::engine::general_purpose::STANDARD.decode(&base64_data)?;");
+    println!("  std::fs::write(\"image.png\", bytes)?;");
     println!("\nCommon Errors:");
     println!("  - 'model not found': Model not available in your region");
     println!("  - 'not supported': Feature not enabled for your API key");
