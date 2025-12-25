@@ -276,6 +276,54 @@ pub fn video_uri_content(uri: impl Into<String>, mime_type: Option<String>) -> I
     }
 }
 
+/// Creates document content from base64-encoded data
+///
+/// Use this for PDF files and other document formats.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::document_data_content;
+///
+/// let document = document_data_content(
+///     "base64encodeddata...",
+///     "application/pdf"
+/// );
+/// ```
+pub fn document_data_content(
+    data: impl Into<String>,
+    mime_type: impl Into<String>,
+) -> InteractionContent {
+    InteractionContent::Document {
+        data: Some(data.into()),
+        uri: None,
+        mime_type: Some(mime_type.into()),
+    }
+}
+
+/// Creates document content from a URI
+///
+/// Use this for PDF files and other document formats accessible via URI.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::document_uri_content;
+///
+/// let document = document_uri_content(
+///     "https://example.com/document.pdf",
+///     Some("application/pdf".to_string())
+/// );
+/// ```
+pub fn document_uri_content(
+    uri: impl Into<String>,
+    mime_type: Option<String>,
+) -> InteractionContent {
+    InteractionContent::Document {
+        data: None,
+        uri: Some(uri.into()),
+        mime_type,
+    }
+}
+
 /// Builds a complete interaction input from multiple content items
 ///
 /// # Example
