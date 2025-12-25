@@ -464,7 +464,8 @@ impl<'a> InteractionBuilder<'a> {
     ///
     /// Higher levels produce more detailed reasoning but consume more tokens.
     /// When thinking is enabled, the model's reasoning process is exposed
-    /// in the response as `Thought` content.
+    /// in the response as `Thought` content. Use `response.usage.total_reasoning_tokens`
+    /// to track reasoning token costs.
     ///
     /// # Example
     /// ```no_run
