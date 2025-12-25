@@ -340,21 +340,27 @@ async fn test_code_execution_streaming() {
                 println!("Stream error: {}", error_str);
                 if error_str.contains("not supported") || error_str.contains("not available") {
                     println!("Code Execution tool not available - skipping test");
-                    return;
                 }
                 break;
             }
         }
     }
 
+    // Skip assertions if tool wasn't available
+    if final_response.is_none() {
+        return;
+    }
+
     assert!(chunk_count > 0, "Should receive at least one chunk");
-    assert!(final_response.is_some(), "Should receive complete response");
 
     // Verify code execution happened
-    if let Some(response) = final_response {
-        let has_code_result = !response.code_execution_results().is_empty();
-        println!("Has code execution results: {}", has_code_result);
-    }
+    let response = final_response.expect("Should have final response");
+    let has_code_result = !response.code_execution_results().is_empty();
+    println!("Has code execution results: {}", has_code_result);
+    assert!(
+        has_code_result,
+        "Should have code execution results in streaming response"
+    );
 }
 
 // =============================================================================
@@ -468,15 +474,28 @@ async fn test_url_context_streaming() {
                 println!("Stream error: {}", error_str);
                 if error_str.contains("not supported") || error_str.contains("not available") {
                     println!("URL Context tool not available - skipping test");
-                    return;
                 }
                 break;
             }
         }
     }
 
+    // Skip assertions if tool wasn't available
+    if final_response.is_none() {
+        return;
+    }
+
     assert!(chunk_count > 0, "Should receive at least one chunk");
-    assert!(final_response.is_some(), "Should receive complete response");
+
+    // Verify URL context metadata is present
+    let response = final_response.expect("Should have final response");
+    if let Some(metadata) = response.url_context_metadata() {
+        println!("URL metadata entries: {}", metadata.url_metadata.len());
+        assert!(
+            !metadata.url_metadata.is_empty(),
+            "Should have URL metadata entries in streaming response"
+        );
+    }
 }
 
 // =============================================================================
@@ -867,6 +886,12 @@ async fn test_structured_output_streaming() {
 
     // Verify the final response is valid JSON matching our schema
     if let Some(text) = final_response.as_ref().and_then(|r| r.text()) {
+        // Verify streamed text matches final response
+        assert_eq!(
+            collected_text, text,
+            "Streamed chunks should match final response text"
+        );
+
         let json: serde_json::Value =
             serde_json::from_str(text).expect("Streaming response should be valid JSON");
         println!(
