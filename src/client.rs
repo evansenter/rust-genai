@@ -47,7 +47,8 @@ impl ClientBuilder {
     /// For LLM requests that may take a long time to generate responses,
     /// consider setting a longer timeout (e.g., 120-300 seconds).
     ///
-    /// If not set, uses reqwest's default (no timeout).
+    /// If not set, requests will wait indefinitely (no timeout).
+    /// Connection-level timeouts like TCP keepalive may still apply at the OS level.
     ///
     /// # Example
     ///
@@ -70,7 +71,7 @@ impl ClientBuilder {
     /// This is the maximum time to wait for establishing a connection to the server.
     /// A shorter timeout here can help fail fast if the network is unavailable.
     ///
-    /// If not set, uses reqwest's default.
+    /// If not set, the connection phase will wait indefinitely (no timeout).
     ///
     /// # Example
     ///
@@ -89,6 +90,11 @@ impl ClientBuilder {
     }
 
     /// Builds the `Client`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the underlying HTTP client cannot be constructed. This should only
+    /// happen in exceptional circumstances such as TLS backend initialization failures.
     #[must_use]
     pub fn build(self) -> Client {
         let mut builder = ReqwestClient::builder();
