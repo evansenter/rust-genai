@@ -348,6 +348,27 @@ impl InteractionResponse {
             .any(|c| matches!(c, InteractionContent::Thought { text: Some(_) }))
     }
 
+    /// Get an iterator over all thought content (internal reasoning).
+    ///
+    /// Returns the text content of each `Thought` variant in the outputs.
+    /// Thoughts represent the model's chain-of-thought reasoning when
+    /// thinking mode is enabled via `with_thinking_level()`.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// for thought in response.thoughts() {
+    ///     println!("Reasoning: {}", thought);
+    /// }
+    /// ```
+    pub fn thoughts(&self) -> impl Iterator<Item = &str> {
+        self.outputs.iter().filter_map(|c| match c {
+            InteractionContent::Thought { text: Some(t) } => Some(t.as_str()),
+            _ => None,
+        })
+    }
+
     /// Check if response contains unknown content types.
     ///
     /// Returns `true` if any output contains an [`InteractionContent::Unknown`] variant.

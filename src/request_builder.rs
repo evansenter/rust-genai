@@ -460,6 +460,43 @@ impl<'a> InteractionBuilder<'a> {
         self
     }
 
+    /// Sets the thinking level for reasoning/chain-of-thought output.
+    ///
+    /// Valid levels: `"minimal"`, `"low"`, `"medium"`, `"high"`
+    ///
+    /// Higher levels produce more detailed reasoning but consume more tokens.
+    /// When thinking is enabled, the model's reasoning process is exposed
+    /// in the response as `Thought` content.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api-key".to_string()).build();
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Solve this step by step: 15 * 23")
+    ///     .with_thinking_level("medium")
+    ///     .create()
+    ///     .await?;
+    ///
+    /// if response.has_thoughts() {
+    ///     for thought in response.thoughts() {
+    ///         println!("Reasoning: {}", thought);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_thinking_level(mut self, level: impl Into<String>) -> Self {
+        let config = self
+            .generation_config
+            .get_or_insert_with(GenerationConfig::default);
+        config.thinking_level = Some(level.into());
+        self
+    }
+
     /// Enables background execution mode (agents only).
     pub fn with_background(mut self, background: bool) -> Self {
         self.background = Some(background);
