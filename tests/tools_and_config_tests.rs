@@ -19,7 +19,7 @@
 mod common;
 
 use common::get_client;
-use rust_genai::{GenerationConfig, InteractionStatus, Tool};
+use rust_genai::{GenerationConfig, InteractionStatus, ThinkingLevel, Tool};
 use serde_json::json;
 
 // =============================================================================
@@ -1013,7 +1013,7 @@ async fn test_generation_config_thinking_level_minimal() {
         max_output_tokens: Some(500),
         top_p: None,
         top_k: None,
-        thinking_level: Some("minimal".to_string()),
+        thinking_level: Some(ThinkingLevel::Minimal),
     };
 
     let response = client
@@ -1047,7 +1047,7 @@ async fn test_generation_config_thinking_level_high() {
         max_output_tokens: Some(1000),
         top_p: None,
         top_k: None,
-        thinking_level: Some("high".to_string()),
+        thinking_level: Some(ThinkingLevel::High),
     };
 
     let response = client
@@ -1186,7 +1186,7 @@ async fn test_generation_config_combined() {
         max_output_tokens: Some(200),
         top_p: Some(0.9),
         top_k: None, // Not supported in Interactions API
-        thinking_level: Some("medium".to_string()),
+        thinking_level: Some(ThinkingLevel::Medium),
     };
 
     let response = client

@@ -69,6 +69,44 @@ impl fmt::Display for CodeExecutionOutcome {
     }
 }
 
+/// Programming language for code execution.
+///
+/// This enum represents the programming language used in code execution requests.
+/// Currently only Python is supported by the Gemini API.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::{InteractionContent, CodeExecutionLanguage};
+/// # let content: InteractionContent = todo!();
+/// if let InteractionContent::CodeExecutionCall { language, code, .. } = content {
+///     match language {
+///         CodeExecutionLanguage::Python => println!("Python code: {}", code),
+///         _ => println!("Other language: {}", code),
+///     }
+/// }
+/// ```
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[non_exhaustive]
+pub enum CodeExecutionLanguage {
+    /// Python programming language
+    #[default]
+    Python,
+    /// Unrecognized language for forward compatibility
+    #[serde(other)]
+    Unspecified,
+}
+
+impl fmt::Display for CodeExecutionLanguage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Python => write!(f, "PYTHON"),
+            Self::Unspecified => write!(f, "UNSPECIFIED"),
+        }
+    }
+}
+
 /// Content object for Interactions API - uses flat structure with type field.
 ///
 /// This enum represents all content types that can appear in API requests and responses.
@@ -158,17 +196,17 @@ pub enum InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionContent;
+    /// # use genai_client::models::interactions::{InteractionContent, CodeExecutionLanguage};
     /// # let content: InteractionContent = todo!();
     /// if let InteractionContent::CodeExecutionCall { id, language, code } = content {
-    ///     println!("Executing {} code (id: {}): {}", language, id, code);
+    ///     println!("Executing {:?} code (id: {}): {}", language, id, code);
     /// }
     /// ```
     CodeExecutionCall {
         /// Unique identifier for this code execution call
         id: String,
-        /// Programming language (e.g., "PYTHON")
-        language: String,
+        /// Programming language (currently only Python is supported)
+        language: CodeExecutionLanguage,
         /// Source code to execute
         code: String,
     },
@@ -672,7 +710,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 id: String,
                 // API returns language/code in the arguments object
                 #[serde(default)]
-                language: Option<String>,
+                language: Option<CodeExecutionLanguage>,
                 #[serde(default)]
                 code: Option<String>,
                 // Fallback for old API format
@@ -776,9 +814,10 @@ impl<'de> Deserialize<'de> for InteractionContent {
                         // Parse old format: {"language": "PYTHON", "code": "..."}
                         let lang = args
                             .get("language")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("PYTHON")
-                            .to_string();
+                            .and_then(|v| {
+                                serde_json::from_value::<CodeExecutionLanguage>(v.clone()).ok()
+                            })
+                            .unwrap_or(CodeExecutionLanguage::Python);
                         let source = args
                             .get("code")
                             .and_then(|v| v.as_str())
@@ -790,7 +829,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                             "CodeExecutionCall missing both direct fields and arguments for id: {}",
                             id
                         );
-                        (String::from("PYTHON"), String::new())
+                        (CodeExecutionLanguage::Python, String::new())
                     };
 
                     InteractionContent::CodeExecutionCall {

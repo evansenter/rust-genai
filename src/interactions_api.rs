@@ -1,7 +1,9 @@
 /// Helper functions for building Interactions API content
 ///
 /// This module provides ergonomic builders for InteractionContent and InteractionInput.
-use genai_client::{CodeExecutionOutcome, InteractionContent, InteractionInput};
+use genai_client::{
+    CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent, InteractionInput,
+};
 use serde_json::Value;
 
 /// Creates a simple text input from a string
@@ -297,17 +299,18 @@ pub fn build_interaction_input(contents: Vec<InteractionContent>) -> Interaction
 /// # Example
 /// ```
 /// use rust_genai::interactions_api::code_execution_call_content;
+/// use rust_genai::CodeExecutionLanguage;
 ///
-/// let call = code_execution_call_content("call_123", "PYTHON", "print('Hello, World!')");
+/// let call = code_execution_call_content("call_123", CodeExecutionLanguage::Python, "print('Hello, World!')");
 /// ```
 pub fn code_execution_call_content(
     id: impl Into<String>,
-    language: impl Into<String>,
+    language: CodeExecutionLanguage,
     code: impl Into<String>,
 ) -> InteractionContent {
     InteractionContent::CodeExecutionCall {
         id: id.into(),
-        language: language.into(),
+        language,
         code: code.into(),
     }
 }

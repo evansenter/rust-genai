@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fmt;
 
-use super::content::{CodeExecutionOutcome, InteractionContent};
+use super::content::{CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
 use super::metadata::{GroundingMetadata, UrlContextMetadata};
 use crate::models::shared::Tool;
 
@@ -348,6 +348,27 @@ impl InteractionResponse {
             .any(|c| matches!(c, InteractionContent::Thought { text: Some(_) }))
     }
 
+    /// Get an iterator over all thought content (internal reasoning).
+    ///
+    /// Returns the text content of each `Thought` variant in the outputs.
+    /// Thoughts represent the model's chain-of-thought reasoning when
+    /// thinking mode is enabled via `with_thinking_level()`.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// for thought in response.thoughts() {
+    ///     println!("Reasoning: {}", thought);
+    /// }
+    /// ```
+    pub fn thoughts(&self) -> impl Iterator<Item = &str> {
+        self.outputs.iter().filter_map(|c| match c {
+            InteractionContent::Thought { text: Some(t) } => Some(t.as_str()),
+            _ => None,
+        })
+    }
+
     /// Check if response contains unknown content types.
     ///
     /// Returns `true` if any output contains an [`InteractionContent::Unknown`] variant.
@@ -495,18 +516,21 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use genai_client::models::interactions::{InteractionResponse, CodeExecutionLanguage};
     /// # let response: InteractionResponse = todo!();
     /// for (language, code) in response.code_execution_calls() {
-    ///     println!("Language: {}, Code:\n{}", language, code);
+    ///     match language {
+    ///         CodeExecutionLanguage::Python => println!("Python:\n{}", code),
+    ///         _ => println!("Other:\n{}", code),
+    ///     }
     /// }
     /// ```
-    pub fn code_execution_calls(&self) -> Vec<(&str, &str)> {
+    pub fn code_execution_calls(&self) -> Vec<(CodeExecutionLanguage, &str)> {
         self.outputs
             .iter()
             .filter_map(|content| {
                 if let InteractionContent::CodeExecutionCall { language, code, .. } = content {
-                    Some((language.as_str(), code.as_str()))
+                    Some((*language, code.as_str()))
                 } else {
                     None
                 }
