@@ -298,6 +298,7 @@ async fn test_code_execution_complex() {
 async fn test_code_execution_streaming() {
     // Test code execution with streaming
     use futures_util::StreamExt;
+    use rust_genai::InteractionContent;
     use rust_genai::StreamChunk;
 
     let Some(client) = get_client() else {
@@ -313,7 +314,10 @@ async fn test_code_execution_streaming() {
         .create_stream();
 
     let mut chunk_count = 0;
-    let mut final_response = None;
+    let mut has_complete = false;
+    let mut has_code_execution_call = false;
+    let mut has_code_execution_result = false;
+    let mut tool_not_available = false;
 
     while let Some(result) = stream.next().await {
         match result {
@@ -322,16 +326,26 @@ async fn test_code_execution_streaming() {
                 match chunk {
                     StreamChunk::Delta(content) => {
                         println!("Delta chunk {}: {:?}", chunk_count, content);
+                        // Track code execution content in deltas.
+                        // NOTE: In streaming mode, built-in tool content (code execution,
+                        // Google Search, URL context) arrives via delta chunks, not in the
+                        // Complete response. The Complete event is a lifecycle signal that
+                        // may arrive before all content is streamed.
+                        if matches!(content, InteractionContent::CodeExecutionCall { .. }) {
+                            has_code_execution_call = true;
+                        }
+                        if matches!(content, InteractionContent::CodeExecutionResult { .. }) {
+                            has_code_execution_result = true;
+                        }
                     }
                     StreamChunk::Complete(response) => {
                         println!("Complete response received");
-                        // Check for code execution results
                         let summary = response.content_summary();
                         println!(
-                            "Code execution results: {}",
-                            summary.code_execution_result_count
+                            "Complete response code execution: {} calls, {} results",
+                            summary.code_execution_call_count, summary.code_execution_result_count
                         );
-                        final_response = Some(response);
+                        has_complete = true;
                     }
                 }
             }
@@ -340,6 +354,7 @@ async fn test_code_execution_streaming() {
                 println!("Stream error: {}", error_str);
                 if error_str.contains("not supported") || error_str.contains("not available") {
                     println!("Code Execution tool not available - skipping test");
+                    tool_not_available = true;
                 }
                 break;
             }
@@ -347,19 +362,36 @@ async fn test_code_execution_streaming() {
     }
 
     // Skip assertions if tool wasn't available
-    if final_response.is_none() {
+    if tool_not_available {
         return;
     }
 
     assert!(chunk_count > 0, "Should receive at least one chunk");
+    assert!(has_complete, "Should receive complete response");
 
-    // Verify code execution happened
-    let response = final_response.expect("Should have final response");
-    let has_code_result = !response.code_execution_results().is_empty();
-    println!("Has code execution results: {}", has_code_result);
+    // Verify code execution happened - check delta chunks since that's where
+    // code execution content arrives in streaming mode.
+    // We expect BOTH call and result for a successful code execution.
+    println!(
+        "Code execution in deltas: call={}, result={}",
+        has_code_execution_call, has_code_execution_result
+    );
+
+    // Log warnings for partial results (helps debug flaky tests)
+    if has_code_execution_call && !has_code_execution_result {
+        println!("Warning: CodeExecutionCall received but no CodeExecutionResult");
+    }
+    if !has_code_execution_call && has_code_execution_result {
+        println!("Warning: CodeExecutionResult received but no CodeExecutionCall");
+    }
+
     assert!(
-        has_code_result,
-        "Should have code execution results in streaming response"
+        has_code_execution_call,
+        "Should have code execution call in streaming response"
+    );
+    assert!(
+        has_code_execution_result,
+        "Should have code execution result in streaming response"
     );
 }
 

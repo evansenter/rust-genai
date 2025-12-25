@@ -7,7 +7,7 @@ use crate::models::interactions::{
 use crate::sse_parser::parse_sse_stream;
 use async_stream::try_stream;
 use futures_util::{Stream, StreamExt};
-use log::debug;
+use log::{debug, warn};
 use reqwest::Client as ReqwestClient;
 
 /// Creates a new interaction with the Gemini API.
@@ -90,6 +90,12 @@ pub fn create_interaction_stream<'a>(
             );
 
             // Handle different event types
+            // Known event types from the Interactions API:
+            // - content.delta: Incremental content updates (yields Delta)
+            // - interaction.complete: Final response with full content (yields Complete)
+            // - interaction.start: Lifecycle signal, has interaction but NOT final
+            // - interaction.status_update: Status changes (no content)
+            // - content.start/content.stop: Content block boundaries (no content)
             match event.event_type.as_str() {
                 "content.delta" => {
                     // Incremental content update
@@ -98,19 +104,32 @@ pub fn create_interaction_stream<'a>(
                     }
                 }
                 "interaction.complete" => {
-                    // Final complete response
+                    // Final complete response - only yield Complete for this event type
                     if let Some(interaction) = event.interaction {
                         yield StreamChunk::Complete(interaction);
                     }
                 }
+                "interaction.start" | "interaction.status_update" | "content.start" | "content.stop" => {
+                    // Known lifecycle events - skip silently (they don't contain useful content)
+                    // - interaction.start: Signals interaction has started (has interaction field but not final)
+                    // - interaction.status_update: Status changes during processing
+                    // - content.start/content.stop: Content block boundaries
+                }
                 _ => {
-                    // For other event types, check if they have useful data
+                    // For unknown event types, only yield if they have delta content.
+                    // Do NOT yield Complete for other event types that happen to have
+                    // an interaction field - only interaction.complete is the final response.
                     if let Some(delta) = event.delta {
                         yield StreamChunk::Delta(delta);
-                    } else if let Some(interaction) = event.interaction {
-                        yield StreamChunk::Complete(interaction);
+                    } else if event.interaction.is_some() {
+                        // Warn about unknown event types with interaction fields - this could
+                        // indicate API version drift that needs attention
+                        warn!(
+                            "Unknown event type '{}' has interaction field but is not 'interaction.complete' - skipping",
+                            event.event_type
+                        );
                     }
-                    // Otherwise skip (e.g., status updates without content)
+                    // Skip events without useful content
                 }
             }
         }
