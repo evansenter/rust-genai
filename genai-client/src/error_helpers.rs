@@ -26,7 +26,7 @@ pub async fn check_response(response: Response) -> Result<Response, InternalErro
 ///
 /// This is a standard Google Cloud API header that uniquely identifies each request.
 /// The value can be used when contacting Google support or correlating with server logs.
-/// See: https://cloud.google.com/apis/docs/system-parameters
+/// See: <https://cloud.google.com/apis/docs/system-parameters>
 const REQUEST_ID_HEADER: &str = "x-goog-request-id";
 
 /// Reads error response body and creates a detailed InternalError::Api with context.
