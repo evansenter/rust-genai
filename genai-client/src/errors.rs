@@ -11,6 +11,17 @@ pub enum InternalError {
     Json(#[from] serde_json::Error),
     #[error("UTF-8 decoding error: {0}")]
     Utf8(#[from] std::str::Utf8Error),
-    #[error("API Error: {0}")]
-    Api(String),
+    /// API error with structured context for debugging.
+    ///
+    /// Contains the HTTP status code, error message, and optional request ID
+    /// for correlation with Google API logs.
+    #[error("API error (HTTP {status_code}): {message}")]
+    Api {
+        /// HTTP status code (e.g., 400, 429, 500)
+        status_code: u16,
+        /// Error message from the API response body
+        message: String,
+        /// Request ID from `x-goog-request-id` header, if available
+        request_id: Option<String>,
+    },
 }

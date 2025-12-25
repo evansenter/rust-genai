@@ -661,11 +661,16 @@ impl<'a> InteractionBuilder<'a> {
                         "Function call '{}' is missing required call_id field.",
                         call.name
                     );
-                    GenaiError::Api(format!(
-                        "Function call '{}' is missing required call_id field. \
-                         This may indicate an API response format change.",
-                        call.name
-                    ))
+                    GenaiError::Api {
+                        // Use 0 to indicate this error was detected client-side, not from HTTP
+                        status_code: 0,
+                        message: format!(
+                            "Function call '{}' is missing required call_id field. \
+                             This may indicate an API response format change.",
+                            call.name
+                        ),
+                        request_id: None,
+                    }
                 })?;
 
                 // Execute the function

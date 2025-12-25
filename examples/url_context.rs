@@ -81,10 +81,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         Err(e) => {
             match &e {
-                GenaiError::Api(api_err_msg) => {
-                    eprintln!("API Error: {api_err_msg}");
+                GenaiError::Api {
+                    status_code,
+                    message,
+                    request_id,
+                } => {
+                    eprintln!("API Error (HTTP {}): {}", status_code, message);
+                    if let Some(id) = request_id {
+                        eprintln!("  Request ID: {}", id);
+                    }
                     // URL context may not be available for all models/regions
-                    if api_err_msg.contains("not supported") {
+                    if message.contains("not supported") {
                         eprintln!("Note: URL context may not be available for this model");
                     }
                 }

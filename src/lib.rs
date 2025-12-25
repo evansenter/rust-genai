@@ -43,6 +43,21 @@ pub mod function_calling;
 pub use function_calling::{CallableFunction, FunctionError};
 
 /// Defines errors that can occur when interacting with the `GenAI` API.
+///
+/// # Example: Handling API Errors
+///
+/// ```ignore
+/// match client.interaction().create().await {
+///     Err(GenaiError::Api { status_code: 429, request_id, .. }) => {
+///         log::warn!("Rate limited, request_id: {:?}", request_id);
+///         // Retry with backoff
+///     }
+///     Err(GenaiError::Api { status_code, message, request_id }) => {
+///         log::error!("API error {}: {} (request: {:?})", status_code, message, request_id);
+///     }
+///     // ...
+/// }
+/// ```
 #[derive(Debug, Error)]
 pub enum GenaiError {
     #[error("HTTP request error: {0}")]
@@ -53,8 +68,19 @@ pub enum GenaiError {
     Json(#[from] serde_json::Error),
     #[error("UTF-8 decoding error: {0}")]
     Utf8(#[from] std::str::Utf8Error),
-    #[error("API Error returned by Google: {0}")]
-    Api(String),
+    /// API error with structured context for debugging and automated handling.
+    ///
+    /// Contains the HTTP status code (for retry logic), error message, and
+    /// optional request ID (for correlation with Google API logs/support).
+    #[error("API error (HTTP {status_code}): {message}")]
+    Api {
+        /// HTTP status code (e.g., 400, 429, 500)
+        status_code: u16,
+        /// Error message from the API response body
+        message: String,
+        /// Request ID from `x-goog-request-id` header, if available
+        request_id: Option<String>,
+    },
     #[error("Internal client error: {0}")]
     Internal(String),
     #[error("Invalid input: {0}")]
@@ -69,7 +95,15 @@ impl From<genai_client::InternalError> for GenaiError {
             genai_client::InternalError::Parse(s) => Self::Parse(s),
             genai_client::InternalError::Json(e) => Self::Json(e),
             genai_client::InternalError::Utf8(e) => Self::Utf8(e),
-            genai_client::InternalError::Api(s) => Self::Api(s),
+            genai_client::InternalError::Api {
+                status_code,
+                message,
+                request_id,
+            } => Self::Api {
+                status_code,
+                message,
+                request_id,
+            },
         }
     }
 }
@@ -106,9 +140,36 @@ mod tests {
         let public_utf8: GenaiError = internal_utf8.into();
         assert!(matches!(public_utf8, GenaiError::Utf8(_)));
 
-        // Test Api variant
-        let internal_api = InternalError::Api("api error".to_string());
+        // Test Api variant with structured fields
+        let internal_api = InternalError::Api {
+            status_code: 429,
+            message: "rate limit exceeded".to_string(),
+            request_id: Some("req-123".to_string()),
+        };
         let public_api: GenaiError = internal_api.into();
-        assert!(matches!(public_api, GenaiError::Api(s) if s == "api error"));
+        assert!(matches!(
+            public_api,
+            GenaiError::Api {
+                status_code: 429,
+                ref message,
+                ref request_id,
+            } if message == "rate limit exceeded" && request_id == &Some("req-123".to_string())
+        ));
+
+        // Test Api variant without request_id
+        let internal_api_no_id = InternalError::Api {
+            status_code: 500,
+            message: "internal error".to_string(),
+            request_id: None,
+        };
+        let public_api_no_id: GenaiError = internal_api_no_id.into();
+        assert!(matches!(
+            public_api_no_id,
+            GenaiError::Api {
+                status_code: 500,
+                ref message,
+                request_id: None,
+            } if message == "internal error"
+        ));
     }
 }
