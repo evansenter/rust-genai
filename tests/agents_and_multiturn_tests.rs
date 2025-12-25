@@ -18,7 +18,7 @@
 
 mod common;
 
-use common::{PollError, get_client, poll_until_complete};
+use common::{DEFAULT_MAX_RETRIES, PollError, get_client, poll_until_complete, retry_on_transient};
 use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 use std::time::Duration;
@@ -297,51 +297,97 @@ async fn test_conversation_function_then_text() {
 #[ignore = "Requires API key"]
 async fn test_conversation_branch() {
     // Test starting a new conversation from a mid-point
+    //
+    // NOTE: This test uses retry_on_transient to handle intermittent Spanner UTF-8
+    // errors from the Google backend. See issue #60 for details.
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
     };
 
     // Build initial context
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("My favorite color is red.")
-        .with_store(true)
-        .create()
+    // Each call is wrapped with retry logic to handle transient Spanner errors
+    let response1 = {
+        let client = client.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_text("My favorite color is red.")
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
         .await
-        .expect("Turn 1 failed");
+        .expect("Turn 1 failed")
+    };
 
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_previous_interaction(&response1.id)
-        .with_text("My favorite number is 7.")
-        .with_store(true)
-        .create()
+    let response2 = {
+        let client = client.clone();
+        let prev_id = response1.id.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            let prev_id = prev_id.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_previous_interaction(&prev_id)
+                    .with_text("My favorite number is 7.")
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
         .await
-        .expect("Turn 2 failed");
+        .expect("Turn 2 failed")
+    };
 
-    let response3 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_previous_interaction(&response2.id)
-        .with_text("My favorite animal is a cat.")
-        .with_store(true)
-        .create()
+    let response3 = {
+        let client = client.clone();
+        let prev_id = response2.id.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            let prev_id = prev_id.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_previous_interaction(&prev_id)
+                    .with_text("My favorite animal is a cat.")
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
         .await
-        .expect("Turn 3 failed");
+        .expect("Turn 3 failed")
+    };
 
     // Branch from turn 2 (before the cat fact)
-    let branch_response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_previous_interaction(&response2.id) // Branch from turn 2
-        .with_text("What do you know about my favorites so far?")
-        .with_store(true)
-        .create()
+    let branch_response = {
+        let client = client.clone();
+        let prev_id = response2.id.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            let prev_id = prev_id.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_previous_interaction(&prev_id) // Branch from turn 2
+                    .with_text("What do you know about my favorites so far?")
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
         .await
-        .expect("Branch failed");
+        .expect("Branch failed")
+    };
 
     assert!(branch_response.has_text(), "Should have text response");
 
@@ -365,15 +411,26 @@ async fn test_conversation_branch() {
     );
 
     // Continue from turn 3 to verify it still works
-    let continue_response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_previous_interaction(&response3.id)
-        .with_text("And what's my favorite animal?")
-        .with_store(true)
-        .create()
+    let continue_response = {
+        let client = client.clone();
+        let prev_id = response3.id.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            let prev_id = prev_id.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_previous_interaction(&prev_id)
+                    .with_text("And what's my favorite animal?")
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
         .await
-        .expect("Continue failed");
+        .expect("Continue failed")
+    };
 
     let continue_text = continue_response.text().unwrap().to_lowercase();
     println!("Continue response (from turn 3): {}", continue_text);
