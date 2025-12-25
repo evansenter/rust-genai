@@ -172,7 +172,11 @@ pub enum InteractionContent {
         uri: Option<String>,
         mime_type: Option<String>,
     },
-    /// Document content (PDF files)
+    /// Document content for file-based inputs.
+    ///
+    /// PDF (`application/pdf`) is the primary supported format with full vision capabilities
+    /// for understanding text, images, charts, and tables. Other formats like TXT, Markdown,
+    /// HTML, and XML are processed as plain text only, losing visual structure.
     Document {
         data: Option<String>,
         uri: Option<String>,

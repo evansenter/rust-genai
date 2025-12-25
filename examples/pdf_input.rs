@@ -21,7 +21,8 @@
 //! - Document structure and layout
 //!
 //! PDFs can be up to 1000 pages and are tokenized at approximately
-//! 258 tokens per page.
+//! 258 tokens per page. Since each page is treated as an image, costs follow
+//! Gemini's image pricing (see <https://ai.google.dev/gemini-api/docs/document-processing>).
 
 use futures_util::StreamExt;
 use rust_genai::{Client, InteractionInput, StreamChunk, document_data_content, text_content};
@@ -104,6 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     print!("Streaming Response: ");
+    // Flush to ensure the prompt appears before streaming starts (stdout is line-buffered)
     stdout().flush()?;
 
     let mut stream = client
@@ -118,6 +120,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 StreamChunk::Delta(content) => {
                     if let Some(text) = content.text() {
                         print!("{}", text);
+                        // Flush each chunk immediately for real-time streaming effect
                         stdout().flush()?;
                     }
                 }
