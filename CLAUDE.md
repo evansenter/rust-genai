@@ -117,6 +117,10 @@ cargo run --example stateful_interaction
 
 GitHub Actions (`.github/workflows/rust.yml`) runs 6 parallel jobs: check, test, test-integration, fmt, clippy, doc. Integration tests require same-repo origin (protects API key).
 
+## Project Conventions
+
+- **Model name**: Always use `gemini-3-flash-preview` throughout the project (tests, examples, documentation). Do not reference other model names.
+
 ## Technical Notes
 
 - Rust edition 2024, minimum 1.75
