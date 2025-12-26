@@ -1210,3 +1210,152 @@ async fn test_generation_config_combined() {
     println!("Line count: {}", line_count);
     assert!(line_count >= 1, "Should have at least one line of text");
 }
+
+// =============================================================================
+// Structured Output: Multi-turn
+// =============================================================================
+
+/// Test structured output (JSON schema) across multiple conversation turns.
+///
+/// This validates that:
+/// - JSON schema enforcement works in stateful conversations
+/// - Schema can be different between turns
+/// - Context from Turn 1 influences structured output in Turn 2
+///
+/// Turn 1: Generate structured user profile
+/// Turn 2: Ask to extend the profile with additional fields
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_structured_output_multi_turn() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    println!("=== Structured Output + Multi-turn ===");
+
+    // Turn 1: Generate a user profile with name and age
+    println!("\n--- Turn 1: Generate initial profile ---");
+    let schema1 = json!({
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer"},
+            "city": {"type": "string"}
+        },
+        "required": ["name", "age", "city"]
+    });
+
+    let response1 = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Generate a fake user profile for someone named Alice who is 28 years old and lives in Seattle.")
+        .with_response_format(schema1)
+        .with_store(true)
+        .create()
+        .await
+        .expect("Turn 1 should succeed");
+
+    assert_eq!(
+        response1.status,
+        InteractionStatus::Completed,
+        "Turn 1 should complete successfully"
+    );
+
+    let text1 = response1.text().expect("Turn 1 should have text");
+    println!("Turn 1 response: {}", text1);
+
+    // Parse and validate Turn 1 JSON
+    let json1: serde_json::Value =
+        serde_json::from_str(text1).expect("Turn 1 should be valid JSON");
+    assert!(json1.get("name").is_some(), "Should have name field");
+    assert!(json1.get("age").is_some(), "Should have age field");
+    assert!(json1.get("city").is_some(), "Should have city field");
+
+    // Store original values for comparison
+    let original_name = json1.get("name").and_then(|v| v.as_str()).unwrap_or("");
+    let original_age = json1.get("age").and_then(|v| v.as_i64()).unwrap_or(0);
+    println!("Original name: {}, age: {}", original_name, original_age);
+
+    // Turn 2: Extend with more fields while preserving Turn 1 data
+    println!("\n--- Turn 2: Extend profile ---");
+    let schema2 = json!({
+        "type": "object",
+        "properties": {
+            "original_name": {"type": "string"},
+            "original_age": {"type": "integer"},
+            "email": {"type": "string"},
+            "occupation": {"type": "string"}
+        },
+        "required": ["original_name", "original_age", "email", "occupation"]
+    });
+
+    let response2 = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_previous_interaction(&response1.id)
+        .with_text("Based on the user profile you just created, output a new JSON with the original name and age, plus add an email address and occupation that fits the profile.")
+        .with_response_format(schema2)
+        .create()
+        .await
+        .expect("Turn 2 should succeed");
+
+    assert_eq!(
+        response2.status,
+        InteractionStatus::Completed,
+        "Turn 2 should complete successfully"
+    );
+
+    let text2 = response2.text().expect("Turn 2 should have text");
+    println!("Turn 2 response: {}", text2);
+
+    // Parse and validate Turn 2 JSON
+    let json2: serde_json::Value =
+        serde_json::from_str(text2).expect("Turn 2 should be valid JSON");
+
+    // Verify Turn 2 has all required fields
+    assert!(
+        json2.get("original_name").is_some(),
+        "Should have original_name field"
+    );
+    assert!(
+        json2.get("original_age").is_some(),
+        "Should have original_age field"
+    );
+    assert!(json2.get("email").is_some(), "Should have email field");
+    assert!(
+        json2.get("occupation").is_some(),
+        "Should have occupation field"
+    );
+
+    // Verify context was preserved (Turn 2 should reference Turn 1 data)
+    let turn2_name = json2
+        .get("original_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let turn2_age = json2
+        .get("original_age")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+
+    println!(
+        "Turn 2 references - name: {}, age: {}",
+        turn2_name, turn2_age
+    );
+
+    // Name should contain "Alice" (from our prompt)
+    assert!(
+        turn2_name.to_lowercase().contains("alice"),
+        "Turn 2 should preserve name from Turn 1. Expected 'Alice', got: {}",
+        turn2_name
+    );
+
+    // Age should be 28 (from our prompt)
+    assert!(
+        turn2_age == 28,
+        "Turn 2 should preserve age from Turn 1. Expected 28, got: {}",
+        turn2_age
+    );
+
+    println!("\n✓ Structured Output + multi-turn completed successfully");
+}
