@@ -1296,6 +1296,7 @@ async fn test_structured_output_multi_turn() {
         .with_previous_interaction(&response1.id)
         .with_text("Based on the user profile you just created, output a new JSON with the original name and age, plus add an email address and occupation that fits the profile.")
         .with_response_format(schema2)
+        .with_store(true)
         .create()
         .await
         .expect("Turn 2 should succeed");
@@ -1343,18 +1344,18 @@ async fn test_structured_output_multi_turn() {
         turn2_name, turn2_age
     );
 
-    // Name should contain "Alice" (from our prompt)
+    // Compare Turn 2 values against Turn 1 values for robust context preservation test
     assert!(
-        turn2_name.to_lowercase().contains("alice"),
-        "Turn 2 should preserve name from Turn 1. Expected 'Alice', got: {}",
+        turn2_name.to_lowercase() == original_name.to_lowercase(),
+        "Turn 2 should preserve name from Turn 1. Expected '{}', got: '{}'",
+        original_name,
         turn2_name
     );
 
-    // Age should be 28 (from our prompt)
-    assert!(
-        turn2_age == 28,
-        "Turn 2 should preserve age from Turn 1. Expected 28, got: {}",
-        turn2_age
+    assert_eq!(
+        turn2_age, original_age,
+        "Turn 2 should preserve age from Turn 1. Expected {}, got: {}",
+        original_age, turn2_age
     );
 
     println!("\n✓ Structured Output + multi-turn completed successfully");
