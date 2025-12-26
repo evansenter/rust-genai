@@ -1,3 +1,24 @@
+//! # genai-client
+//!
+//! Internal HTTP client and JSON models for the Gemini Interactions API.
+//!
+//! This crate provides the low-level building blocks used by `rust-genai`.
+//! Most users should use `rust-genai` directly rather than this crate.
+//!
+//! ## Crate Organization
+//!
+//! - [`models`]: JSON types for API requests/responses
+//! - [`interactions`]: HTTP client functions for the Interactions API
+//! - [`errors`]: Error types with structured API error information
+//! - [`sse_parser`]: Server-Sent Events parsing for streaming responses
+//!
+//! ## Forward Compatibility
+//!
+//! Types in this crate follow the Evergreen philosophy:
+//! - Enums like [`InteractionContent`] and [`Tool`] include `Unknown` variants
+//! - These capture unrecognized API types without deserialization failures
+//! - Use `#[non_exhaustive]` to ensure match statements handle future variants
+
 // Declare the models, errors, common, interactions, and sse_parser modules
 pub mod common;
 pub mod error_helpers;

@@ -434,3 +434,70 @@ pub const TINY_BLUE_PNG_BASE64: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAf
 /// This is a complete valid PDF for testing document input
 #[allow(dead_code)]
 pub const TINY_PDF_BASE64: &str = "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA3MiA3Ml0gL0NvbnRlbnRzIDQgMCBSIC9SZXNvdXJjZXMgPDwgPj4gPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCA0NCA+PgpzdHJlYW0KQlQgL0YxIDEyIFRmIDEwIDUwIFRkIChIZWxsbyBXb3JsZCkgVGogRVQKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNQowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyMjQgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA1IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgozMjAKJSVFT0Y=";
+
+// =============================================================================
+// Test Fixture Builders (Issue #82)
+// =============================================================================
+
+/// Default model used across all tests.
+#[allow(dead_code)]
+pub const DEFAULT_MODEL: &str = "gemini-3-flash-preview";
+
+/// Creates a pre-configured interaction builder with the default model.
+///
+/// This is the standard entry point for integration tests, reducing boilerplate.
+///
+/// # Example
+///
+/// ```ignore
+/// use common::{get_client, interaction_builder};
+///
+/// let client = get_client().unwrap();
+/// let response = interaction_builder(&client)
+///     .with_text("Hello!")
+///     .create()
+///     .await
+///     .expect("Request failed");
+/// ```
+#[allow(dead_code)]
+pub fn interaction_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
+    client.interaction().with_model(DEFAULT_MODEL)
+}
+
+/// Creates a stateful interaction builder with storage enabled.
+///
+/// Use this when testing multi-turn conversations that need server-side state.
+///
+/// # Example
+///
+/// ```ignore
+/// let response = stateful_builder(&client)
+///     .with_text("Remember my name is Alice")
+///     .create()
+///     .await?;
+/// ```
+#[allow(dead_code)]
+pub fn stateful_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
+    interaction_builder(client).with_store(true)
+}
+
+/// Creates an interaction builder with thinking enabled.
+///
+/// Use this for tests that need model reasoning. Note that thoughts may not
+/// always be visible in the response depending on API behavior.
+///
+/// # Example
+///
+/// ```ignore
+/// let response = thinking_builder(&client)
+///     .with_text("Solve this step by step: 2+2")
+///     .create()
+///     .await?;
+/// if response.has_thoughts() {
+///     println!("Model reasoning: {:?}", response.thoughts());
+/// }
+/// ```
+#[allow(dead_code)]
+pub fn thinking_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
+    interaction_builder(client).with_thinking_level(rust_genai::ThinkingLevel::Medium)
+}
