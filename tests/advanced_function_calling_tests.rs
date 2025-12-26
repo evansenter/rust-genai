@@ -13,9 +13,8 @@
 
 mod common;
 
-use common::get_client;
-use futures_util::StreamExt;
-use rust_genai::{CallableFunction, FunctionDeclaration, StreamChunk, function_result_content};
+use common::{consume_stream, get_client};
+use rust_genai::{CallableFunction, FunctionDeclaration, function_result_content};
 use rust_genai_macros::generate_function_declaration;
 use serde_json::json;
 
@@ -464,7 +463,7 @@ async fn test_streaming_with_function_calls() {
         .required(vec!["city".to_string()])
         .build();
 
-    let mut stream = client
+    let stream = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("What's the weather in London?")
@@ -472,41 +471,16 @@ async fn test_streaming_with_function_calls() {
         .with_store(true)
         .create_stream();
 
-    let mut delta_count = 0;
-    let mut complete_count = 0;
-    let mut final_response = None;
-    let mut saw_function_call_delta = false;
-
-    while let Some(result) = stream.next().await {
-        match result {
-            Ok(chunk) => match chunk {
-                StreamChunk::Delta(delta) => {
-                    delta_count += 1;
-                    if let Some(text) = delta.text() {
-                        print!("{}", text);
-                    }
-                    if delta.is_function_call() {
-                        saw_function_call_delta = true;
-                        println!("[Received function_call delta]");
-                    }
-                }
-                StreamChunk::Complete(response) => {
-                    complete_count += 1;
-                    final_response = Some(response);
-                }
-            },
-            Err(e) => {
-                panic!("Stream error: {:?}", e);
-            }
-        }
-    }
+    let result = consume_stream(stream).await;
 
     println!(
-        "\nDeltas: {}, Completes: {}, Saw function_call delta: {}",
-        delta_count, complete_count, saw_function_call_delta
+        "\nDeltas: {}, Saw function_call delta: {}",
+        result.delta_count, result.saw_function_call
     );
 
-    let response = final_response.expect("Should receive a complete response");
+    let response = result
+        .final_response
+        .expect("Should receive a complete response");
     println!("Final status: {:?}", response.status);
     let function_calls = response.function_calls();
     println!("Function calls in final response: {}", function_calls.len());
@@ -517,7 +491,7 @@ async fn test_streaming_with_function_calls() {
     // Verify that function_call deltas were successfully received during streaming
     // Note: The API sends function_call as a delta but may not populate the final
     // Complete response's outputs. This is API behavior, not a parsing issue.
-    if saw_function_call_delta {
+    if result.saw_function_call {
         println!("SUCCESS: Function call deltas were properly parsed during streaming");
         // If we received function_call deltas, the test passes regardless of final response
         return;
@@ -539,45 +513,29 @@ async fn test_streaming_long_response() {
         return;
     };
 
-    let mut stream = client
+    let stream = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Write a detailed 500-word essay about the history of the Internet.")
         .with_store(true)
         .create_stream();
 
-    let mut delta_count = 0;
-    let mut collected_text = String::new();
+    let result = consume_stream(stream).await;
 
-    while let Some(result) = stream.next().await {
-        match result {
-            Ok(chunk) => match chunk {
-                StreamChunk::Delta(delta) => {
-                    delta_count += 1;
-                    if let Some(text) = delta.text() {
-                        collected_text.push_str(text);
-                    }
-                }
-                StreamChunk::Complete(_) => {}
-            },
-            Err(e) => {
-                println!("Stream error: {:?}", e);
-                break;
-            }
-        }
-    }
-
-    println!("Total deltas received: {}", delta_count);
-    println!("Total text length: {} chars", collected_text.len());
-    println!("Word count: ~{}", collected_text.split_whitespace().count());
+    println!("Total deltas received: {}", result.delta_count);
+    println!("Total text length: {} chars", result.collected_text.len());
+    println!(
+        "Word count: ~{}",
+        result.collected_text.split_whitespace().count()
+    );
 
     // Should have received multiple deltas for a long response
     assert!(
-        delta_count > 5,
+        result.delta_count > 5,
         "Long response should produce many delta chunks"
     );
     assert!(
-        collected_text.len() > 500,
+        result.collected_text.len() > 500,
         "Response should be substantial length"
     );
 }

@@ -18,7 +18,10 @@
 
 mod common;
 
-use common::{DEFAULT_MAX_RETRIES, PollError, get_client, poll_until_complete, retry_on_transient};
+use common::{
+    DEFAULT_MAX_RETRIES, PollError, consume_stream, get_client, poll_until_complete,
+    retry_on_transient,
+};
 use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 use std::time::Duration;
@@ -670,5 +673,201 @@ async fn test_usage_longer_response() {
         );
     } else {
         println!("Token counts not available for comparison");
+    }
+}
+
+// =============================================================================
+// Multi-turn: Streaming
+// =============================================================================
+
+/// Test that streaming works correctly in a multi-turn conversation.
+/// Turn 1 establishes context, Turn 2 uses streaming to verify recall.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_streaming_multi_turn_basic() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Turn 1: Establish a fact (non-streaming)
+    let response1 = {
+        let client = client.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_text(
+                        "My favorite programming language is Python. Please acknowledge this.",
+                    )
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
+        .await
+        .expect("Turn 1 failed")
+    };
+
+    println!("Turn 1 completed: {}", response1.id);
+    assert_eq!(response1.status, InteractionStatus::Completed);
+
+    // Turn 2: Stream a question that requires context from Turn 1
+    let stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_previous_interaction(&response1.id)
+        .with_text("What is my favorite programming language? Answer in one word.")
+        .with_store(true)
+        .create_stream();
+
+    let result = consume_stream(stream).await;
+
+    println!("\nDeltas received: {}", result.delta_count);
+    println!("Collected text: {}", result.collected_text);
+
+    // Verify streaming worked
+    assert!(result.has_output(), "Should receive streaming chunks");
+
+    // Verify context was maintained - response should mention Python
+    let text_lower = result.collected_text.to_lowercase();
+    assert!(
+        text_lower.contains("python"),
+        "Streaming response should recall the fact from Turn 1. Got: {}",
+        result.collected_text
+    );
+
+    // Verify final response if received
+    if let Some(response) = result.final_response {
+        assert_eq!(response.status, InteractionStatus::Completed);
+    }
+}
+
+/// Test streaming in a multi-turn conversation with function calling.
+/// Turn 1: Trigger function call
+/// Turn 2: Provide function result
+/// Turn 3: Stream a follow-up question
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_streaming_multi_turn_function_calling() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let get_weather = FunctionDeclaration::builder("get_weather")
+        .description("Get the current weather for a city")
+        .parameter(
+            "city",
+            json!({"type": "string", "description": "The city name"}),
+        )
+        .required(vec!["city".to_string()])
+        .build();
+
+    // Turn 1: Trigger function call
+    let response1 = {
+        let client = client.clone();
+        let get_weather = get_weather.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            let get_weather = get_weather.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_text("What's the weather in Paris?")
+                    .with_function(get_weather)
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
+        .await
+        .expect("Turn 1 failed")
+    };
+
+    println!("Turn 1 status: {:?}", response1.status);
+
+    let calls = response1.function_calls();
+    if calls.is_empty() {
+        println!("Model chose not to call function - skipping rest of test");
+        return;
+    }
+
+    let call = &calls[0];
+    println!("Function call: {} with args: {:?}", call.name, call.args);
+
+    // Turn 2: Provide function result
+    let result = function_result_content(
+        "get_weather",
+        call.id.expect("Function call should have ID").to_string(),
+        json!({"temperature": "18°C", "conditions": "rainy", "humidity": "85%"}),
+    );
+
+    let response2 = {
+        let client = client.clone();
+        let prev_id = response1.id.clone();
+        let get_weather = get_weather.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            let prev_id = prev_id.clone();
+            let result = result.clone();
+            let get_weather = get_weather.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_previous_interaction(&prev_id)
+                    .with_content(vec![result])
+                    .with_function(get_weather)
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
+        .await
+        .expect("Turn 2 failed")
+    };
+
+    println!("Turn 2 status: {:?}", response2.status);
+    if response2.has_text() {
+        println!("Turn 2 text: {}", response2.text().unwrap());
+    }
+
+    // Turn 3: Stream a follow-up question about the weather context
+    let stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_previous_interaction(&response2.id)
+        .with_text("Should I bring an umbrella? Answer briefly.")
+        .with_function(get_weather)
+        .with_store(true)
+        .create_stream();
+
+    let result = consume_stream(stream).await;
+
+    println!("\nDeltas received: {}", result.delta_count);
+    println!("Collected text: {}", result.collected_text);
+
+    // Verify streaming worked
+    assert!(result.has_output(), "Should receive streaming chunks");
+
+    // Verify context was maintained - response should reference weather conditions
+    let text_lower = result.collected_text.to_lowercase();
+    assert!(
+        text_lower.contains("yes")
+            || text_lower.contains("umbrella")
+            || text_lower.contains("rain")
+            || text_lower.contains("18")
+            || text_lower.contains("humid"),
+        "Streaming response should reference weather context. Got: {}",
+        result.collected_text
+    );
+
+    // Verify final response if received
+    if let Some(response) = result.final_response {
+        assert_eq!(response.status, InteractionStatus::Completed);
     }
 }

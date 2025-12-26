@@ -12,7 +12,8 @@
 //! Tests that need external media should use base64-encoded data or
 //! gracefully handle the unsupported URI error.
 
-use rust_genai::{Client, GenaiError, InteractionResponse, InteractionStatus};
+use futures_util::StreamExt;
+use rust_genai::{Client, GenaiError, InteractionResponse, InteractionStatus, StreamChunk};
 use std::env;
 use std::future::Future;
 use std::time::{Duration, Instant};
@@ -108,6 +109,7 @@ where
 
 /// Creates a client from the GEMINI_API_KEY environment variable.
 /// Returns None if the API key is not set.
+#[allow(dead_code)]
 pub fn get_client() -> Option<Client> {
     env::var("GEMINI_API_KEY")
         .ok()
@@ -267,6 +269,100 @@ pub async fn poll_until_complete(
             }
         }
     }
+}
+
+// =============================================================================
+// Streaming Utilities
+// =============================================================================
+
+/// Result of consuming a stream, containing collected deltas and final response.
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct StreamResult {
+    /// Number of delta chunks received during streaming.
+    pub delta_count: usize,
+    /// All text content collected from delta chunks.
+    pub collected_text: String,
+    /// The final complete response, if received.
+    pub final_response: Option<InteractionResponse>,
+    /// Whether any function call deltas were received.
+    pub saw_function_call: bool,
+}
+
+impl StreamResult {
+    /// Returns true if streaming produced any output (deltas or complete response).
+    #[allow(dead_code)]
+    pub fn has_output(&self) -> bool {
+        self.delta_count > 0 || self.final_response.is_some()
+    }
+}
+
+/// Consumes a stream, collecting text deltas and the final response.
+///
+/// This helper standardizes stream consumption across tests, handling:
+/// - Counting delta chunks
+/// - Collecting text content from deltas
+/// - Capturing the final complete response
+/// - Detecting function call deltas
+/// - Graceful error handling (breaks on error, doesn't panic)
+///
+/// # Arguments
+///
+/// * `stream` - A boxed stream of `Result<StreamChunk, GenaiError>`
+///
+/// # Returns
+///
+/// A `StreamResult` containing the collected data from the stream.
+///
+/// # Example
+///
+/// ```ignore
+/// let stream = client.interaction()
+///     .with_model("gemini-3-flash-preview")
+///     .with_text("Hello")
+///     .create_stream();
+///
+/// let result = consume_stream(stream).await;
+/// assert!(result.has_output());
+/// assert!(result.collected_text.contains("hello"));
+/// ```
+#[allow(dead_code)]
+pub async fn consume_stream(
+    mut stream: futures_util::stream::BoxStream<'_, Result<StreamChunk, GenaiError>>,
+) -> StreamResult {
+    let mut result = StreamResult {
+        delta_count: 0,
+        collected_text: String::new(),
+        final_response: None,
+        saw_function_call: false,
+    };
+
+    while let Some(item) = stream.next().await {
+        match item {
+            Ok(chunk) => match chunk {
+                StreamChunk::Delta(delta) => {
+                    result.delta_count += 1;
+                    if let Some(text) = delta.text() {
+                        result.collected_text.push_str(text);
+                        print!("{}", text);
+                    }
+                    if delta.is_function_call() {
+                        result.saw_function_call = true;
+                    }
+                }
+                StreamChunk::Complete(response) => {
+                    println!("\nStream complete: {}", response.id);
+                    result.final_response = Some(response);
+                }
+            },
+            Err(e) => {
+                println!("Stream error: {:?}", e);
+                break;
+            }
+        }
+    }
+
+    result
 }
 
 // =============================================================================
