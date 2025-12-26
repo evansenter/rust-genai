@@ -311,7 +311,8 @@ impl StreamResult {
 ///
 /// # Arguments
 ///
-/// * `stream` - A boxed stream of `Result<StreamChunk, GenaiError>`
+/// * `stream` - A boxed stream of `Result<StreamChunk, GenaiError>` that will be
+///   fully consumed (ownership is taken)
 ///
 /// # Returns
 ///
