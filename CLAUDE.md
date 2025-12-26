@@ -76,7 +76,7 @@ cargo run --example stateful_interaction
 
 ### Error Types
 
-- `GenaiError`: API/network errors (thiserror-based), converted from `genai_client::InternalError` in `src/lib.rs:43`
+- `GenaiError`: API/network errors (thiserror-based), defined in `genai-client/src/errors.rs`, re-exported from `rust-genai`
 - `FunctionError`: Function execution errors
 
 ### Content Export Strategy
@@ -84,6 +84,61 @@ cargo run --example stateful_interaction
 **Re-exported** (user-constructed): `image_data_content`, `audio_uri_content`, `function_result_content`, `function_call_content`
 
 **Not re-exported** (model-generated): Built-in tool outputs accessed via response methods like `response.google_search_results()`, `response.code_execution_results()`
+
+## Core Design Philosophy: Evergreen-Inspired Soft-Typing
+
+This library follows the [Evergreen spec](https://github.com/google-deepmind/evergreen-spec) philosophy for graceful API evolution. The core principle: **unknown data should be preserved, not rejected**.
+
+### Key Principles
+
+1. **Graceful Unknown Handling**: Unrecognized API types deserialize into `Unknown` variants instead of failing
+2. **Non-Exhaustive Enums**: Use `#[non_exhaustive]` on enums that may grow (e.g., `InteractionContent`, `Tool`)
+3. **Soft-Typed Where Appropriate**: Use `serde_json::Value` for evolving structures (e.g., function args)
+4. **Preserve Data Roundtrip**: `Unknown` variants serialize back with their original data intact
+
+### DO:
+```rust
+// Use non_exhaustive for API-driven enums
+#[non_exhaustive]
+pub enum Tool {
+    GoogleSearch,
+    CodeExecution,
+    Unknown { tool_type: String, data: serde_json::Value },
+}
+
+// Handle unknown variants in match
+match tool {
+    Tool::GoogleSearch => ...,
+    Tool::CodeExecution => ...,
+    _ => log::warn!("Unknown tool type, ignoring"),
+}
+
+// Use serde_json::Value for flexible/evolving fields
+pub struct FunctionCall {
+    pub name: String,
+    pub args: serde_json::Value,  // Schema may change
+}
+```
+
+### DON'T:
+```rust
+// Don't use exhaustive enums for API types - breaks when API adds variants
+pub enum Tool {
+    GoogleSearch,
+    CodeExecution,
+    // API adds "NewTool" -> all client code breaks!
+}
+
+// Don't fail on unknown data
+let content: InteractionContent = serde_json::from_str(json)?;
+// If json has type "future_feature", this should NOT error
+```
+
+### Implementation Locations
+
+- `InteractionContent` (content.rs): Has `Unknown` variant, custom deserializer
+- `Tool` (shared.rs): Has `Unknown` variant with `#[non_exhaustive]`
+- `strict-unknown` feature flag: Optional strict mode for development/testing
 
 ## Test Organization
 

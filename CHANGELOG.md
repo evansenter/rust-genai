@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING CHANGES
 
+#### URI Content Helpers Require mime_type (#131)
+- **Changed signatures**: `image_uri_content()`, `audio_uri_content()`, `video_uri_content()`, `document_uri_content()` now require `mime_type` as a mandatory parameter instead of `Option<String>`
+- **Rationale**: Gemini API requires mime_type for URI-based content; making this compile-time enforced prevents runtime API errors
+
+**Migration guide:**
+```rust
+// Before:
+image_uri_content("https://example.com/image.png", Some("image/png".to_string()))
+
+// After:
+image_uri_content("https://example.com/image.png", "image/png")
+```
+
+#### Tool Enum is Now #[non_exhaustive] (#131)
+- **`Tool` enum now includes `#[non_exhaustive]`**: Match statements must include a wildcard arm
+- **New `Tool::Unknown` variant**: Captures unrecognized tool types from the API without failing deserialization
+- This follows [Evergreen principles](https://github.com/google-deepmind/evergreen-spec) for forward-compatible API design
+
+#### Error Type Consolidation (#131)
+- **`InternalError` renamed to `GenaiError`** in `genai-client` crate
+- New `Internal` and `InvalidInput` variants for better error categorization
+- Users of the public `rust-genai` crate are unaffected (uses the same `GenaiError`)
+
+### Added
+
+- **New convenience helpers on `InteractionResponse`** (#131):
+  - `google_search_call()` - returns first Google Search call (singular)
+  - `code_execution_call()` - returns first Code Execution call (singular)
+  - `url_context_call()` - returns first URL Context call (singular)
+
 #### Unified Streaming Content Types (#39, #27)
 - **`StreamDelta` enum removed**: Streaming deltas now use `InteractionContent` directly
   - `StreamChunk::Delta(InteractionContent)` contains incremental content during streaming

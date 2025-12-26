@@ -168,6 +168,10 @@ pub struct InteractionResponse {
 }
 
 impl InteractionResponse {
+    // =========================================================================
+    // Text Content Helpers
+    // =========================================================================
+
     /// Extract the first text content from outputs
     ///
     /// Returns the first text found in the outputs vector.
@@ -216,6 +220,10 @@ impl InteractionResponse {
             .collect::<Vec<_>>()
             .join("")
     }
+
+    // =========================================================================
+    // Function Calling Helpers
+    // =========================================================================
 
     /// Extract function calls from outputs
     ///
@@ -338,6 +346,10 @@ impl InteractionResponse {
             .collect()
     }
 
+    // =========================================================================
+    // Thinking/Reasoning Helpers
+    // =========================================================================
+
     /// Check if response contains thoughts (internal reasoning)
     ///
     /// Returns true if any output contains thought content.
@@ -368,6 +380,10 @@ impl InteractionResponse {
             _ => None,
         })
     }
+
+    // =========================================================================
+    // Unknown Content Helpers (Evergreen Forward Compatibility)
+    // =========================================================================
 
     /// Check if response contains unknown content types.
     ///
@@ -423,6 +439,10 @@ impl InteractionResponse {
             .collect()
     }
 
+    // =========================================================================
+    // Google Search Metadata Helpers
+    // =========================================================================
+
     /// Check if response has grounding metadata from Google Search.
     ///
     /// Returns true if the response was grounded using the GoogleSearch tool.
@@ -462,6 +482,10 @@ impl InteractionResponse {
         self.grounding_metadata.as_ref()
     }
 
+    // =========================================================================
+    // URL Context Metadata Helpers
+    // =========================================================================
+
     /// Check if response has URL context metadata.
     ///
     /// Returns true if the UrlContext tool was used and metadata is available.
@@ -500,12 +524,40 @@ impl InteractionResponse {
         self.url_context_metadata.as_ref()
     }
 
+    // =========================================================================
+    // Code Execution Tool Helpers
+    // =========================================================================
+
     /// Check if response contains code execution calls
     #[must_use]
     pub fn has_code_execution_calls(&self) -> bool {
         self.outputs
             .iter()
             .any(|c| matches!(c, InteractionContent::CodeExecutionCall { .. }))
+    }
+
+    /// Get the first code execution call, if any.
+    ///
+    /// Convenience method for the common case where you just want to see
+    /// the first code the model wants to execute.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some((language, code)) = response.code_execution_call() {
+    ///     println!("Model wants to run {} code:\n{}", language, code);
+    /// }
+    /// ```
+    pub fn code_execution_call(&self) -> Option<(CodeExecutionLanguage, &str)> {
+        self.outputs.iter().find_map(|content| {
+            if let InteractionContent::CodeExecutionCall { language, code, .. } = content {
+                Some((*language, code.as_str()))
+            } else {
+                None
+            }
+        })
     }
 
     /// Extract all code execution calls from outputs
@@ -611,6 +663,10 @@ impl InteractionResponse {
         })
     }
 
+    // =========================================================================
+    // Google Search Output Content Helpers
+    // =========================================================================
+
     /// Check if response contains Google Search calls
     ///
     /// Returns true if the model performed any Google Search queries.
@@ -629,6 +685,30 @@ impl InteractionResponse {
         self.outputs
             .iter()
             .any(|c| matches!(c, InteractionContent::GoogleSearchCall { .. }))
+    }
+
+    /// Get the first Google Search query, if any.
+    ///
+    /// Convenience method for the common case where you just want to see
+    /// the first search query performed by the model.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(query) = response.google_search_call() {
+    ///     println!("Model searched for: {}", query);
+    /// }
+    /// ```
+    pub fn google_search_call(&self) -> Option<&str> {
+        self.outputs.iter().find_map(|content| {
+            if let InteractionContent::GoogleSearchCall { query } = content {
+                Some(query.as_str())
+            } else {
+                None
+            }
+        })
     }
 
     /// Extract Google Search calls (queries) from outputs
@@ -681,6 +761,10 @@ impl InteractionResponse {
             .collect()
     }
 
+    // =========================================================================
+    // URL Context Output Content Helpers
+    // =========================================================================
+
     /// Check if response contains URL context calls
     ///
     /// Returns true if the model requested any URLs for context.
@@ -699,6 +783,30 @@ impl InteractionResponse {
         self.outputs
             .iter()
             .any(|c| matches!(c, InteractionContent::UrlContextCall { .. }))
+    }
+
+    /// Get the first URL context call, if any.
+    ///
+    /// Convenience method for the common case where you just want to see
+    /// the first URL the model requested.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(url) = response.url_context_call() {
+    ///     println!("Model fetched: {}", url);
+    /// }
+    /// ```
+    pub fn url_context_call(&self) -> Option<&str> {
+        self.outputs.iter().find_map(|content| {
+            if let InteractionContent::UrlContextCall { url } = content {
+                Some(url.as_str())
+            } else {
+                None
+            }
+        })
     }
 
     /// Extract URL context calls (URLs) from outputs
@@ -750,6 +858,10 @@ impl InteractionResponse {
             })
             .collect()
     }
+
+    // =========================================================================
+    // Summary and Diagnostics
+    // =========================================================================
 
     /// Get a summary of content types present in outputs.
     ///

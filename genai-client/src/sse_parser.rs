@@ -3,7 +3,7 @@
 /// This module provides generic utilities for parsing SSE streams from the Gemini API.
 /// SSE format consists of lines starting with "data: " followed by JSON payloads.
 use crate::error_helpers::format_json_parse_error;
-use crate::errors::InternalError;
+use crate::errors::GenaiError;
 use async_stream::try_stream;
 use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
@@ -44,7 +44,7 @@ use std::str;
 /// ```
 pub fn parse_sse_stream<T>(
     byte_stream: impl Stream<Item = Result<Bytes, reqwest::Error>> + Send,
-) -> impl Stream<Item = Result<T, InternalError>> + Send
+) -> impl Stream<Item = Result<T, GenaiError>> + Send
 where
     T: DeserializeOwned + Send,
 {
@@ -71,7 +71,7 @@ where
                         debug!("SSE raw data: {}", json_data);
                         let parsed: T = serde_json::from_str(json_data).map_err(|e| {
                             let context_msg = format_json_parse_error(json_data, e);
-                            InternalError::Parse(context_msg)
+                            GenaiError::Parse(context_msg)
                         })?;
                         yield parsed;
                     }

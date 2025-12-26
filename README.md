@@ -583,6 +583,29 @@ The project consists of three main components:
 
 Users of the `rust-genai` crate typically do not need to interact with `genai-client` directly, as its functionalities are exposed through the main `rust-genai` API.
 
+## Forward Compatibility
+
+This library follows the [Evergreen spec](https://github.com/google-deepmind/evergreen-spec) philosophy for graceful API evolution:
+
+- **Unknown types are preserved, not rejected**: When the API returns content types this library doesn't recognize yet, they're captured in `Unknown` variants rather than causing deserialization errors.
+- **Non-exhaustive enums**: Key types like `InteractionContent` and `Tool` use `#[non_exhaustive]`, so your match statements should include wildcard arms.
+- **Roundtrip preservation**: Unknown content can be serialized back without data loss.
+
+```rust
+// Handle unknown content gracefully
+for output in response.outputs {
+    match output {
+        InteractionContent::Text { text } => println!("{}", text.unwrap_or_default()),
+        InteractionContent::Unknown { content_type, .. } => {
+            log::warn!("Unknown content type '{}', skipping", content_type);
+        }
+        _ => {} // Future variants
+    }
+}
+```
+
+For strict validation during development, enable the `strict-unknown` feature flag - unknown types will error instead of being captured.
+
 ## Error Handling
 
 The library provides comprehensive error handling with two main error types:

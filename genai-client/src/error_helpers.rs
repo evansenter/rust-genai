@@ -1,6 +1,6 @@
 //! Error handling utilities for HTTP responses and error context formatting.
 
-use crate::errors::InternalError;
+use crate::errors::GenaiError;
 use reqwest::Response;
 
 /// Maximum characters to include from error body in context messages
@@ -14,7 +14,7 @@ const ERROR_BODY_PREVIEW_LENGTH: usize = 200;
 /// # Errors
 ///
 /// Returns an error with status code and body preview on non-success status.
-pub async fn check_response(response: Response) -> Result<Response, InternalError> {
+pub async fn check_response(response: Response) -> Result<Response, GenaiError> {
     if response.status().is_success() {
         Ok(response)
     } else {
@@ -29,7 +29,7 @@ pub async fn check_response(response: Response) -> Result<Response, InternalErro
 /// See: <https://cloud.google.com/apis/docs/system-parameters>
 const REQUEST_ID_HEADER: &str = "x-goog-request-id";
 
-/// Reads error response body and creates a detailed InternalError::Api with context.
+/// Reads error response body and creates a detailed GenaiError::Api with context.
 ///
 /// Extracts:
 /// - HTTP status code for programmatic error handling
@@ -38,9 +38,9 @@ const REQUEST_ID_HEADER: &str = "x-goog-request-id";
 ///
 /// # Returns
 ///
-/// A structured `InternalError::Api` with status code, message, and optional request ID.
+/// A structured `GenaiError::Api` with status code, message, and optional request ID.
 /// If body cannot be read, the message describes the read failure.
-pub async fn read_error_with_context(response: Response) -> InternalError {
+pub async fn read_error_with_context(response: Response) -> GenaiError {
     let status_code = response.status().as_u16();
 
     // Extract request ID from response headers before consuming the body
@@ -57,7 +57,7 @@ pub async fn read_error_with_context(response: Response) -> InternalError {
 
     let message = truncate_for_context(&error_body, ERROR_BODY_PREVIEW_LENGTH);
 
-    InternalError::Api {
+    GenaiError::Api {
         status_code,
         message,
         request_id,
