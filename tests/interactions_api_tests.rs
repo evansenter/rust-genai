@@ -30,11 +30,12 @@
 //! If a test fails intermittently, re-running usually succeeds. This is expected
 //! behavior for LLM integration tests.
 
-use futures_util::StreamExt;
+mod common;
+
+use common::consume_stream;
 use rust_genai::{
     CallableFunction, Client, CreateInteractionRequest, FunctionDeclaration, GenerationConfig,
-    InteractionInput, InteractionStatus, StreamChunk, function_result_content, image_uri_content,
-    text_content,
+    InteractionInput, InteractionStatus, function_result_content, image_uri_content, text_content,
 };
 use rust_genai_macros::generate_function_declaration;
 use serde_json::json;
@@ -204,58 +205,26 @@ async fn test_streaming_interaction() {
         return;
     };
 
-    let mut stream = client
+    let stream = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Count from 1 to 5.")
         .with_store(true)
         .create_stream();
 
-    let mut delta_count = 0;
-    let mut complete_count = 0;
-    let mut collected_text = String::new();
-    let mut final_response = None;
+    let result = consume_stream(stream).await;
 
-    while let Some(result) = stream.next().await {
-        match result {
-            Ok(chunk) => match chunk {
-                StreamChunk::Delta(delta) => {
-                    delta_count += 1;
-                    if let Some(text) = delta.text() {
-                        collected_text.push_str(text);
-                        print!("{}", text);
-                    }
-                }
-                StreamChunk::Complete(response) => {
-                    complete_count += 1;
-                    println!(
-                        "\nComplete: status={:?}, id={}",
-                        response.status, response.id
-                    );
-                    final_response = Some(response);
-                }
-            },
-            Err(e) => {
-                println!("Stream error: {:?}", e);
-                break;
-            }
-        }
-    }
-
-    println!(
-        "\nTotal deltas: {}, complete events: {}",
-        delta_count, complete_count
-    );
-    println!("Collected text: {}", collected_text);
+    println!("\nTotal deltas: {}", result.delta_count);
+    println!("Collected text: {}", result.collected_text);
 
     // We should receive at least some delta chunks
     assert!(
-        delta_count > 0 || complete_count > 0,
+        result.has_output(),
         "No streaming chunks received - streaming may not be working"
     );
 
     // If we got a complete event, verify it has a valid ID
-    if let Some(response) = final_response {
+    if let Some(response) = result.final_response {
         assert!(
             !response.id.is_empty(),
             "Complete response should have an ID"
@@ -286,32 +255,15 @@ async fn test_streaming_with_raw_request() {
         system_instruction: None,
     };
 
-    let mut stream = client.create_interaction_stream(request);
-
-    let mut delta_count = 0;
-    let mut complete_count = 0;
-
-    while let Some(result) = stream.next().await {
-        match result {
-            Ok(chunk) => match chunk {
-                StreamChunk::Delta(_) => delta_count += 1,
-                StreamChunk::Complete(_) => complete_count += 1,
-            },
-            Err(e) => {
-                panic!("Streaming chunk failed: {:?}", e);
-            }
-        }
-    }
+    let stream = client.create_interaction_stream(request);
+    let result = consume_stream(stream).await;
 
     println!(
-        "Received {} deltas and {} complete events from raw request stream",
-        delta_count, complete_count
+        "Received {} deltas from raw request stream",
+        result.delta_count
     );
 
-    assert!(
-        delta_count > 0 || complete_count > 0,
-        "No streaming chunks received"
-    );
+    assert!(result.has_output(), "No streaming chunks received");
 }
 
 // =============================================================================
