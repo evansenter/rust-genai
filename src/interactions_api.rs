@@ -542,6 +542,38 @@ pub fn url_context_result_content(
     }
 }
 
+/// Creates a successful URL context result (convenience helper)
+///
+/// Shorthand for creating a result where the URL content was successfully fetched.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::url_context_success;
+///
+/// let result = url_context_success("https://example.com", "<html>...</html>");
+/// ```
+pub fn url_context_success(
+    url: impl Into<String>,
+    content: impl Into<String>,
+) -> InteractionContent {
+    url_context_result_content(url, Some(content.into()))
+}
+
+/// Creates a failed URL context result (convenience helper)
+///
+/// Shorthand for creating a result where the URL content could not be fetched
+/// (e.g., network errors, blocked URLs, timeouts, or access restrictions).
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::url_context_failure;
+///
+/// let result = url_context_failure("https://example.com/blocked");
+/// ```
+pub fn url_context_failure(url: impl Into<String>) -> InteractionContent {
+    url_context_result_content(url, None)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

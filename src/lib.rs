@@ -1,3 +1,57 @@
+//! # rust-genai
+//!
+//! A Rust client library for Google's Generative AI (Gemini) API using the Interactions API.
+//!
+//! ## Quick Start
+//!
+//! ```no_run
+//! use rust_genai::Client;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), rust_genai::GenaiError> {
+//!     let client = Client::new(
+//!         std::env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not set")
+//!     );
+//!
+//!     let response = client
+//!         .interaction()
+//!         .with_model("gemini-3-flash-preview")
+//!         .with_text("Hello, Gemini!")
+//!         .create()
+//!         .await?;
+//!
+//!     println!("{}", response.text().unwrap_or("No response"));
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Features
+//!
+//! - **Fluent Builder API**: Chain methods for readable request construction
+//! - **Streaming**: Real-time response streaming with `create_stream()`
+//! - **Function Calling**: Automatic function discovery and execution via macros
+//! - **Built-in Tools**: Google Search, Code Execution, URL Context
+//! - **Multimodal**: Images, audio, video, and document inputs
+//! - **Thinking Mode**: Access model reasoning with configurable levels
+//!
+//! ## API Stability & Forward Compatibility
+//!
+//! This library is designed for forward compatibility with evolving APIs:
+//!
+//! - **`#[non_exhaustive]` enums**: Match statements require wildcard arms (`_ => ...`)
+//! - **`Unknown` variants**: Unrecognized API types are captured, not rejected
+//! - **Graceful degradation**: New API features won't break existing code
+//!
+//! When Google adds new features, your code continues to work. Unknown content types
+//! and tools are preserved for inspection via helper methods like `has_unknown()`.
+//!
+//! ## Module Organization
+//!
+//! - [`Client`]: Main entry point for API interactions
+//! - [`InteractionBuilder`]: Fluent builder for configuring requests
+//! - [`interactions_api`]: Helper functions for constructing content
+//! - [`function_calling`]: Function registration and execution
+
 // Re-export unified function declaration types from genai_client
 pub use genai_client::{FunctionDeclaration, FunctionDeclarationBuilder, FunctionParameters, Tool};
 
