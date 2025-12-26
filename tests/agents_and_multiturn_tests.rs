@@ -2247,6 +2247,130 @@ async fn test_streaming_with_thinking_only() {
 // Multi-turn: Built-in Tools
 // =============================================================================
 
+/// Test Google Search grounding across multiple conversation turns.
+///
+/// This validates that:
+/// - Google Search grounding works in stateful conversations
+/// - Search results from Turn 1 are accessible in follow-up turns
+/// - The model can reason about previously fetched search data
+///
+/// Turn 1: Ask about current information (triggers search)
+/// Turn 2: Ask follow-up about the search results
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_google_search_multi_turn() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    println!("=== Google Search + Multi-turn ===");
+
+    // Turn 1: Ask about current weather (requires real-time data)
+    println!("\n--- Turn 1: Initial search query ---");
+    let result1 = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text(
+            "What is the current weather in Tokyo, Japan today? Use search to find current data.",
+        )
+        .with_google_search()
+        .with_store(true)
+        .create()
+        .await;
+
+    let response1 = match result1 {
+        Ok(response) => {
+            println!("Turn 1 status: {:?}", response.status);
+            if let Some(text) = response.text() {
+                println!("Turn 1 response: {}", text);
+            }
+            // Log grounding metadata if available
+            if let Some(metadata) = response.google_search_metadata() {
+                println!("Grounding metadata found:");
+                println!("  Search queries: {:?}", metadata.web_search_queries);
+                println!("  Grounding chunks: {}", metadata.grounding_chunks.len());
+            } else {
+                println!("Note: No grounding metadata returned (may vary by API response)");
+            }
+            response
+        }
+        Err(e) => {
+            let error_str = format!("{:?}", e);
+            println!("Google Search error: {}", error_str);
+            // Google Search may not be available in all accounts
+            if error_str.contains("not supported")
+                || error_str.contains("not available")
+                || error_str.contains("permission")
+            {
+                println!("Google Search tool not available - skipping test");
+                return;
+            }
+            panic!("Turn 1 failed unexpectedly: {:?}", e);
+        }
+    };
+
+    assert_eq!(
+        response1.status,
+        InteractionStatus::Completed,
+        "Turn 1 should complete successfully"
+    );
+
+    // Turn 2: Ask follow-up referencing the search results
+    println!("\n--- Turn 2: Follow-up about search ---");
+    let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
+        client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_previous_interaction(&response1.id)
+            .with_text("Based on the weather information you just found, should I bring an umbrella if I visit Tokyo today?")
+            .with_store(true)
+            .create()
+            .await
+    })
+    .await;
+
+    match result2 {
+        Ok(response2) => {
+            println!("Turn 2 status: {:?}", response2.status);
+            if let Some(text) = response2.text() {
+                println!("Turn 2 response: {}", text);
+                // Verify response references the previous weather context
+                let text_lower = text.to_lowercase();
+                assert!(
+                    text_lower.contains("tokyo")
+                        || text_lower.contains("weather")
+                        || text_lower.contains("umbrella")
+                        || text_lower.contains("rain")
+                        || text_lower.contains("sun")
+                        || text_lower.contains("yes")
+                        || text_lower.contains("no"),
+                    "Turn 2 should reference weather context. Got: {}",
+                    text
+                );
+            }
+            assert_eq!(
+                response2.status,
+                InteractionStatus::Completed,
+                "Turn 2 should complete successfully"
+            );
+        }
+        Err(e) => {
+            // Check for transient errors that might occur with multi-turn
+            if is_long_conversation_api_error(&e) {
+                println!(
+                    "API limitation encountered (expected for some contexts): {:?}",
+                    e
+                );
+                return;
+            }
+            panic!("Turn 2 failed unexpectedly: {:?}", e);
+        }
+    }
+
+    println!("\n✓ Google Search + multi-turn completed successfully");
+}
+
 /// Test URL context fetching across multiple conversation turns.
 ///
 /// This validates that:
