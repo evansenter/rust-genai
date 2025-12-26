@@ -20,7 +20,7 @@ mod common;
 
 use common::{
     SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TINY_BLUE_PNG_BASE64, TINY_MP4_BASE64,
-    TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, get_client,
+    TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, consume_stream, get_client,
 };
 use rust_genai::{
     InteractionInput, InteractionStatus, audio_data_content, audio_uri_content,
@@ -743,9 +743,6 @@ async fn test_pdf_with_question() {
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_multimodal_streaming() {
-    use futures_util::StreamExt;
-    use rust_genai::StreamChunk;
-
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -760,74 +757,41 @@ async fn test_multimodal_streaming() {
     ];
 
     // Stream the response using with_input for multimodal content
-    let mut stream = client
+    let stream = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_input(InteractionInput::Content(contents))
         .with_store(true)
         .create_stream();
 
-    let mut delta_count = 0;
-    let mut collected_text = String::new();
-    let mut final_response = None;
-    let mut had_error = false;
+    let result = consume_stream(stream).await;
 
-    println!("Starting stream consumption...");
+    println!("\nDelta count: {}", result.delta_count);
+    println!("Collected text: {}", result.collected_text);
 
-    while let Some(result) = stream.next().await {
-        match result {
-            Ok(chunk) => match chunk {
-                StreamChunk::Delta(delta) => {
-                    delta_count += 1;
-                    if let Some(text) = delta.text() {
-                        collected_text.push_str(text);
-                        print!("{}", text);
-                    }
-                }
-                StreamChunk::Complete(response) => {
-                    println!("\nStream complete: {}", response.id);
-                    final_response = Some(response);
-                }
-            },
-            Err(e) => {
-                println!("Stream error: {:?}", e);
-                had_error = true;
-            }
-        }
-    }
-
-    println!("\nDelta count: {}", delta_count);
-    println!("Collected text: {}", collected_text);
-    println!("Had error: {}", had_error);
-
-    // Verify streaming worked - either we got deltas OR a final response
+    // Verify streaming worked
     assert!(
-        delta_count > 0 || final_response.is_some(),
+        result.has_output(),
         "Should receive streaming chunks or final response"
     );
 
-    // Verify content describes the red image (if we got text)
-    if !collected_text.is_empty() {
-        let text_lower = collected_text.to_lowercase();
-        assert!(
-            text_lower.contains("red"),
-            "Response should identify the red color. Got: {}",
-            collected_text
-        );
-    } else if let Some(ref response) = final_response {
-        // Check final response text if no deltas
-        if let Some(text) = response.text() {
-            let text_lower = text.to_lowercase();
-            assert!(
-                text_lower.contains("red"),
-                "Response should identify the red color. Got: {}",
-                text
-            );
-        }
-    }
+    // Verify content describes the red image
+    let text_to_check = if !result.collected_text.is_empty() {
+        result.collected_text.to_lowercase()
+    } else if let Some(ref response) = result.final_response {
+        response.text().unwrap_or_default().to_lowercase()
+    } else {
+        String::new()
+    };
+
+    assert!(
+        text_to_check.contains("red"),
+        "Response should identify the red color. Got: {}",
+        text_to_check
+    );
 
     // Verify final response if present
-    if let Some(response) = final_response {
+    if let Some(ref response) = result.final_response {
         assert_eq!(
             response.status,
             InteractionStatus::Completed,
