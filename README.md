@@ -7,17 +7,16 @@ A Rust client library for interacting with Google's Generative AI (Gemini) API u
 - [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
-  - [API Key](#api-key)
   - [Simple Interaction](#simple-interaction)
   - [Streaming Responses](#streaming-responses)
   - [System Instructions](#system-instructions)
   - [Stateful Conversations](#stateful-conversations)
   - [Function Calling](#function-calling)
   - [Automatic Function Calling](#automatic-function-calling)
-  - [Using the Procedural Macro](#using-the-procedural-macro)
+  - [Built-in Tools](#built-in-tools)
+  - [Thinking Mode](#thinking-mode)
 - [API Reference](#api-reference)
 - [Project Structure](#project-structure)
-- [Available Models](#available-models)
 - [Error Handling](#error-handling)
 - [Logging](#logging)
 - [Troubleshooting](#troubleshooting)
@@ -61,13 +60,21 @@ Note: `async-trait` and `inventory` are already included as dependencies of `rus
 
 ## Usage
 
-> **Note**: For complete, runnable examples, check out the `examples/` directory in the repository:
+> **Note**: For complete, runnable examples, check out the `examples/` directory:
 > - `simple_interaction.rs` - Basic text generation
+> - `streaming.rs` - Real-time streaming responses
 > - `stateful_interaction.rs` - Multi-turn conversations
+> - `auto_function_calling.rs` - Automatic function execution
+> - `structured_output.rs` - JSON schema enforcement
+> - `google_search.rs` - Web search grounding
+> - `code_execution.rs` - Python code execution
+> - `url_context.rs` - URL content fetching
+> - `thinking.rs` - Reasoning with thought content
+> - `multimodal_image.rs` - Image input handling
+> - `pdf_input.rs` - PDF document processing
+> - `image_generation.rs` - Image generation
 
-### API Key
-
-You'll need a Google API key with access to the Gemini models. You can get one from the [Google AI Studio](https://ai.dev/).
+You'll need a Google API key from [Google AI Studio](https://ai.dev/).
 
 ### Simple Interaction
 
@@ -350,6 +357,75 @@ The macro supports:
 - Proper handling of optional parameters (Option<T>)
 - Type mapping for common Rust types (String, i32, i64, f32, f64, bool, Vec<T>, serde_json::Value)
 
+### Built-in Tools
+
+The library supports Gemini's built-in tools for enhanced capabilities:
+
+```rust
+// Google Search grounding - real-time web search
+let response = client
+    .interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_google_search()
+    .with_text("What are today's top news stories?")
+    .create()
+    .await?;
+
+// Access grounding metadata
+if let Some(metadata) = response.google_search_metadata() {
+    for chunk in &metadata.grounding_chunks {
+        println!("Source: {:?}", chunk.web);
+    }
+}
+
+// Code execution - run Python in a sandbox
+let response = client
+    .interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_code_execution()
+    .with_text("Calculate the first 10 Fibonacci numbers")
+    .create()
+    .await?;
+
+// Get successful output
+if let Some(output) = response.successful_code_output() {
+    println!("Result: {}", output);
+}
+
+// URL context - fetch and analyze web content
+let response = client
+    .interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_url_context()
+    .with_text("Summarize https://example.com")
+    .create()
+    .await?;
+```
+
+### Thinking Mode
+
+Enable reasoning/thinking for complex problem-solving:
+
+```rust
+use rust_genai::ThinkingLevel;
+
+let response = client
+    .interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_thinking_level(ThinkingLevel::Medium)
+    .with_text("Solve this step by step: If a train travels 120 km in 2 hours...")
+    .create()
+    .await?;
+
+// Access the model's reasoning process
+for thought in response.thoughts() {
+    println!("Thinking: {}", thought);
+}
+
+// Get the final answer
+println!("Answer: {}", response.text().unwrap_or(""));
+```
+
 ## API Reference
 
 ### Client Builder
@@ -377,6 +453,10 @@ client
     .with_previous_interaction("id")            // Link to previous interaction
     .with_function(func_decl)                   // Add a function declaration
     .with_functions(vec![...])                  // Add multiple function declarations
+    .with_google_search()                       // Enable Google Search grounding
+    .with_code_execution()                      // Enable Python code execution
+    .with_url_context()                         // Enable URL content fetching
+    .with_thinking_level(ThinkingLevel::Medium) // Enable reasoning mode
     .with_generation_config(config)             // Set generation parameters
     .with_response_modalities(vec![...])        // Set response modalities
     .with_response_format(schema)               // Set JSON schema for output
@@ -392,13 +472,39 @@ client
 ```rust
 // InteractionResponse provides convenience methods
 impl InteractionResponse {
-    fn text(&self) -> Option<String>;           // Get first text output
+    // Text content
+    fn text(&self) -> Option<&str>;             // Get first text output
     fn all_text(&self) -> String;               // Concatenate all text outputs
-    fn has_text(&self) -> bool;                 // Check if response has text
-    fn has_function_calls(&self) -> bool;       // Check for function calls
-    fn has_thoughts(&self) -> bool;             // Check for thought content
-    fn function_calls(&self) -> Vec<(Option<String>, String, Value, Option<String>)>;
-    // Returns: (call_id, name, args, thought_signature)
+    fn has_text(&self) -> bool;
+
+    // Function calling
+    fn function_calls(&self) -> Vec<FunctionCallInfo>;
+    fn function_results(&self) -> Vec<FunctionResultInfo>;
+    fn has_function_calls(&self) -> bool;
+    fn has_function_results(&self) -> bool;
+
+    // Thinking/reasoning
+    fn thoughts(&self) -> impl Iterator<Item = &str>;
+    fn has_thoughts(&self) -> bool;
+
+    // Built-in tools
+    fn google_search_metadata(&self) -> Option<&GroundingMetadata>;
+    fn code_execution_results(&self) -> Vec<(CodeExecutionOutcome, &str)>;
+    fn url_context_metadata(&self) -> Option<&UrlContextMetadata>;
+}
+
+// Function call/result info structs with named fields
+pub struct FunctionCallInfo<'a> {
+    pub id: Option<&'a str>,                // Call ID for sending results back
+    pub name: &'a str,                      // Function name
+    pub args: &'a Value,                    // Function arguments
+    pub thought_signature: Option<&'a str>, // For reasoning continuity
+}
+
+pub struct FunctionResultInfo<'a> {
+    pub name: &'a str,                      // Function name
+    pub call_id: &'a str,                   // Matches the call's ID
+    pub result: &'a Value,                  // Function result
 }
 ```
 
@@ -477,14 +583,6 @@ The project consists of three main components:
 
 Users of the `rust-genai` crate typically do not need to interact with `genai-client` directly, as its functionalities are exposed through the main `rust-genai` API.
 
-## Available Models
-
-This library has been tested with the following Google Generative AI models:
-
-- `gemini-3-flash-preview`
-
-For the latest available models, check the [Google AI documentation](https://ai.google.dev/models).
-
 ## Error Handling
 
 The library provides comprehensive error handling with two main error types:
@@ -551,25 +649,9 @@ match result {
 - The free tier has request limits; wait and retry
 - Consider adding delays between requests in batch operations
 
-**Test failures (intermittent)**
-- LLM responses are non-deterministic; some tests may occasionally fail
-- Re-running the test usually succeeds
-- Use `--nocapture` to see test output: `cargo test test_name -- --include-ignored --nocapture`
-- This is expected behavior for integration tests with AI models
-
-### Debug Logging
-
-Enable debug logging to see request/response details:
-
-```bash
-RUST_LOG=rust_genai=debug cargo run --example simple_interaction
-```
-
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-The MIT License is a permissive license that is short and to the point. It lets people do anything they want with your code as long as they provide attribution back to you and don't hold you liable.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## Contributing
 
