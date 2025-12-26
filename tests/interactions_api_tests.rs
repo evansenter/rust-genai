@@ -1014,7 +1014,7 @@ async fn test_image_input_from_uri() {
 
     let contents = vec![
         text_content("What is in this image? Describe it briefly."),
-        image_uri_content(&image_url, Some("image/jpeg".to_string())),
+        image_uri_content(&image_url, "image/jpeg"),
     ];
 
     let result = client

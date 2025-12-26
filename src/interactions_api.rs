@@ -200,20 +200,28 @@ pub fn image_data_content(
 
 /// Creates image content from a URI
 ///
+/// # Arguments
+///
+/// * `uri` - The URI of the image
+/// * `mime_type` - The MIME type (required by the API for URI-based content)
+///
 /// # Example
 /// ```
 /// use rust_genai::interactions_api::image_uri_content;
 ///
 /// let image = image_uri_content(
 ///     "https://example.com/image.png",
-///     Some("image/png".to_string())
+///     "image/png"
 /// );
 /// ```
-pub fn image_uri_content(uri: impl Into<String>, mime_type: Option<String>) -> InteractionContent {
+pub fn image_uri_content(
+    uri: impl Into<String>,
+    mime_type: impl Into<String>,
+) -> InteractionContent {
     InteractionContent::Image {
         data: None,
         uri: Some(uri.into()),
-        mime_type,
+        mime_type: Some(mime_type.into()),
     }
 }
 
@@ -241,20 +249,28 @@ pub fn audio_data_content(
 
 /// Creates audio content from a URI
 ///
+/// # Arguments
+///
+/// * `uri` - The URI of the audio file
+/// * `mime_type` - The MIME type (required by the API for URI-based content)
+///
 /// # Example
 /// ```
 /// use rust_genai::interactions_api::audio_uri_content;
 ///
 /// let audio = audio_uri_content(
 ///     "https://example.com/audio.mp3",
-///     Some("audio/mp3".to_string())
+///     "audio/mp3"
 /// );
 /// ```
-pub fn audio_uri_content(uri: impl Into<String>, mime_type: Option<String>) -> InteractionContent {
+pub fn audio_uri_content(
+    uri: impl Into<String>,
+    mime_type: impl Into<String>,
+) -> InteractionContent {
     InteractionContent::Audio {
         data: None,
         uri: Some(uri.into()),
-        mime_type,
+        mime_type: Some(mime_type.into()),
     }
 }
 
@@ -282,20 +298,28 @@ pub fn video_data_content(
 
 /// Creates video content from a URI
 ///
+/// # Arguments
+///
+/// * `uri` - The URI of the video file
+/// * `mime_type` - The MIME type (required by the API for URI-based content)
+///
 /// # Example
 /// ```
 /// use rust_genai::interactions_api::video_uri_content;
 ///
 /// let video = video_uri_content(
 ///     "https://example.com/video.mp4",
-///     Some("video/mp4".to_string())
+///     "video/mp4"
 /// );
 /// ```
-pub fn video_uri_content(uri: impl Into<String>, mime_type: Option<String>) -> InteractionContent {
+pub fn video_uri_content(
+    uri: impl Into<String>,
+    mime_type: impl Into<String>,
+) -> InteractionContent {
     InteractionContent::Video {
         data: None,
         uri: Some(uri.into()),
-        mime_type,
+        mime_type: Some(mime_type.into()),
     }
 }
 
@@ -327,23 +351,28 @@ pub fn document_data_content(
 ///
 /// Use this for PDF files and other document formats accessible via URI.
 ///
+/// # Arguments
+///
+/// * `uri` - The URI of the document
+/// * `mime_type` - The MIME type (required by the API for URI-based content)
+///
 /// # Example
 /// ```
 /// use rust_genai::interactions_api::document_uri_content;
 ///
 /// let document = document_uri_content(
 ///     "https://example.com/document.pdf",
-///     Some("application/pdf".to_string())
+///     "application/pdf"
 /// );
 /// ```
 pub fn document_uri_content(
     uri: impl Into<String>,
-    mime_type: Option<String>,
+    mime_type: impl Into<String>,
 ) -> InteractionContent {
     InteractionContent::Document {
         data: None,
         uri: Some(uri.into()),
-        mime_type,
+        mime_type: Some(mime_type.into()),
     }
 }
 
@@ -355,7 +384,7 @@ pub fn document_uri_content(
 ///
 /// let input = build_interaction_input(vec![
 ///     text_content("What's in this image?"),
-///     image_uri_content("https://example.com/photo.jpg", None),
+///     image_uri_content("https://example.com/photo.jpg", "image/jpeg"),
 /// ]);
 /// ```
 pub fn build_interaction_input(contents: Vec<InteractionContent>) -> InteractionInput {
@@ -595,7 +624,7 @@ mod tests {
 
     #[test]
     fn test_image_uri_content() {
-        let content = image_uri_content("http://example.com/img.png", Some("image/png".into()));
+        let content = image_uri_content("http://example.com/img.png", "image/png");
         match content {
             InteractionContent::Image {
                 data,

@@ -45,7 +45,7 @@ async fn test_image_input_from_uri() {
 
     let contents = vec![
         text_content("What is in this image? Describe it briefly in 1-2 sentences."),
-        image_uri_content(SAMPLE_IMAGE_URL, Some("image/jpeg".to_string())),
+        image_uri_content(SAMPLE_IMAGE_URL, "image/jpeg"),
     ];
 
     let result = client
@@ -226,7 +226,7 @@ async fn test_audio_input_from_uri() {
 
     let contents = vec![
         text_content("What is this audio about? Summarize briefly."),
-        audio_uri_content(SAMPLE_AUDIO_URL, Some("audio/mpeg".to_string())),
+        audio_uri_content(SAMPLE_AUDIO_URL, "audio/mpeg"),
     ];
 
     let result = client
@@ -316,7 +316,7 @@ async fn test_video_input_from_uri() {
 
     let contents = vec![
         text_content("What animals appear in this video? List them."),
-        video_uri_content(SAMPLE_VIDEO_URL, Some("video/mp4".to_string())),
+        video_uri_content(SAMPLE_VIDEO_URL, "video/mp4"),
     ];
 
     let result = client
