@@ -2242,3 +2242,139 @@ async fn test_streaming_with_thinking_only() {
 
     println!("\n✓ Streaming with thinking (no function calling) completed successfully");
 }
+
+// =============================================================================
+// Multi-turn: Built-in Tools
+// =============================================================================
+
+/// Test code execution across multiple conversation turns.
+///
+/// This validates that:
+/// - Code execution works in stateful conversations
+/// - Results from Turn 1 can be referenced and extended in Turn 2
+/// - The model can modify/extend calculations based on prior context
+///
+/// Turn 1: Calculate factorial of 5 using code execution
+/// Turn 2: Ask model to extend: "Now multiply that result by 2"
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_code_execution_multi_turn() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    println!("=== Code Execution + Multi-turn ===");
+
+    // Turn 1: Calculate factorial of 5 (= 120)
+    println!("\n--- Turn 1: Initial calculation ---");
+    let result1 = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Calculate the factorial of 5 using Python code execution. Show the result.")
+        .with_code_execution()
+        .with_store(true)
+        .create()
+        .await;
+
+    let response1 = match result1 {
+        Ok(response) => {
+            println!("Turn 1 status: {:?}", response.status);
+            if let Some(text) = response.text() {
+                println!("Turn 1 response: {}", text);
+            }
+            // Log code execution details
+            for (language, code) in response.code_execution_calls() {
+                println!(
+                    "Executed {} code: {}",
+                    language,
+                    &code[..code.len().min(100)]
+                );
+            }
+            if let Some(output) = response.successful_code_output() {
+                println!("Code output: {}", output);
+                // Verify factorial(5) = 120
+                assert!(
+                    output.contains("120"),
+                    "Turn 1 should calculate factorial(5) = 120. Got: {}",
+                    output
+                );
+            }
+            response
+        }
+        Err(e) => {
+            let error_str = format!("{:?}", e);
+            println!("Code Execution error: {}", error_str);
+            // Code Execution may not be available in all accounts
+            if error_str.contains("not supported") || error_str.contains("not available") {
+                println!("Code Execution tool not available - skipping test");
+                return;
+            }
+            panic!("Turn 1 failed unexpectedly: {:?}", e);
+        }
+    };
+
+    assert_eq!(
+        response1.status,
+        InteractionStatus::Completed,
+        "Turn 1 should complete successfully"
+    );
+
+    // Turn 2: Extend the calculation
+    println!("\n--- Turn 2: Extend calculation ---");
+    let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
+        client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_previous_interaction(&response1.id)
+            .with_text(
+                "Now multiply that factorial result by 2 using code. What's the final answer?",
+            )
+            .with_code_execution()
+            .create()
+            .await
+    })
+    .await;
+
+    match result2 {
+        Ok(response2) => {
+            println!("Turn 2 status: {:?}", response2.status);
+            if let Some(text) = response2.text() {
+                println!("Turn 2 response: {}", text);
+            }
+
+            // Check for code execution output or text response containing 240
+            let has_240_in_output = response2
+                .successful_code_output()
+                .map(|o| o.contains("240"))
+                .unwrap_or(false);
+            let has_240_in_text = response2.text().map(|t| t.contains("240")).unwrap_or(false);
+
+            // Model might calculate directly or explain without code
+            assert!(
+                has_240_in_output || has_240_in_text,
+                "Turn 2 should calculate 120 * 2 = 240. Response: {:?}",
+                response2.text()
+            );
+
+            assert_eq!(
+                response2.status,
+                InteractionStatus::Completed,
+                "Turn 2 should complete successfully"
+            );
+        }
+        Err(e) => {
+            // Check for transient errors that might occur with multi-turn
+            if is_long_conversation_api_error(&e) {
+                println!(
+                    "API limitation encountered (expected for some contexts): {:?}",
+                    e
+                );
+                return;
+            }
+            panic!("Turn 2 failed unexpectedly: {:?}", e);
+        }
+    }
+
+    println!("\n✓ Code Execution + multi-turn completed successfully");
+}
