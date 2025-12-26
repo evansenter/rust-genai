@@ -55,7 +55,7 @@ Note: `async-trait` and `inventory` are already included as dependencies of `rus
 
 ### Prerequisites
 
-- Rust 1.75 or later (for stable async traits and other features)
+- Rust 1.85 or later (edition 2024)
 - A Google AI API key with access to Gemini models (get one from [Google AI Studio](https://ai.dev/))
 
 ## Usage
@@ -63,6 +63,7 @@ Note: `async-trait` and `inventory` are already included as dependencies of `rus
 > **Note**: For complete, runnable examples, check out the `examples/` directory:
 > - `simple_interaction.rs` - Basic text generation
 > - `streaming.rs` - Real-time streaming responses
+> - `system_instructions.rs` - Custom system prompts
 > - `stateful_interaction.rs` - Multi-turn conversations
 > - `auto_function_calling.rs` - Automatic function execution
 > - `structured_output.rs` - JSON schema enforcement
@@ -71,6 +72,8 @@ Note: `async-trait` and `inventory` are already included as dependencies of `rus
 > - `url_context.rs` - URL content fetching
 > - `thinking.rs` - Reasoning with thought content
 > - `multimodal_image.rs` - Image input handling
+> - `audio_input.rs` - Audio input handling
+> - `video_input.rs` - Video input handling
 > - `pdf_input.rs` - PDF document processing
 > - `image_generation.rs` - Image generation
 

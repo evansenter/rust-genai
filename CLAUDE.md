@@ -33,7 +33,7 @@ cargo test -- --nocapture                 # Show test output
 cargo fmt                                                            # Format
 cargo fmt -- --check                                                 # Check format
 cargo clippy --workspace --all-targets --all-features -- -D warnings # Lint
-cargo doc --workspace --no-deps --document-private-items             # Build docs
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items  # Build docs (warnings as errors, matches CI)
 ```
 
 ### Examples
@@ -42,6 +42,8 @@ All require `GEMINI_API_KEY`:
 ```bash
 cargo run --example simple_interaction
 cargo run --example streaming
+cargo run --example system_instructions
+cargo run --example stateful_interaction
 cargo run --example auto_function_calling
 cargo run --example structured_output
 cargo run --example google_search
@@ -49,9 +51,10 @@ cargo run --example code_execution
 cargo run --example url_context
 cargo run --example thinking
 cargo run --example multimodal_image
+cargo run --example audio_input
+cargo run --example video_input
 cargo run --example pdf_input
 cargo run --example image_generation
-cargo run --example stateful_interaction
 ```
 
 ## Architecture
@@ -161,8 +164,9 @@ let content: InteractionContent = serde_json::from_str(json)?;
 - **SessionStart**: Verifies `GEMINI_API_KEY` and build status (`.claude/hooks/session_init.sh`)
 - **Stop**: Pre-push validation matching CI (`.claude/hooks/stop.sh`)
 
-### Skills (auto-invoked)
+### Skills (manual)
 
+Available via `/skill-name` in conversations:
 - **`test-full`**: Complete test suite with `--include-ignored`
 - **`review-workspace`**: Health check (cargo check, clippy, unit tests)
 - **`check-docs`**: Documentation build with warning checks
@@ -170,7 +174,7 @@ let content: InteractionContent = serde_json::from_str(json)?;
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/rust.yml`) runs 6 parallel jobs: check, test, test-integration, fmt, clippy, doc. Integration tests require same-repo origin (protects API key).
+GitHub Actions (`.github/workflows/rust.yml`) runs 6 parallel jobs: check, test, test-integration, fmt, clippy, doc. Integration tests require same-repo origin (protects API key). CI runs on all PRs regardless of file type.
 
 ## Project Conventions
 
@@ -178,7 +182,7 @@ GitHub Actions (`.github/workflows/rust.yml`) runs 6 parallel jobs: check, test,
 
 ## Technical Notes
 
-- Rust edition 2024, minimum 1.75
+- Rust edition 2024 (requires Rust 1.85+)
 - Uses `rustls-tls` (not native TLS)
 - Tokio async runtime
 - API version: Gemini V1Beta (configured in `genai-client/src/common.rs`, not user-configurable)

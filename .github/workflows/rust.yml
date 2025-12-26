@@ -3,14 +3,8 @@ name: Rust
 on:
   push:
     branches: [ "main" ]
-    paths-ignore:
-      - '**.md'
-      - 'LICENSE'
   pull_request:
     branches: [ "main" ]
-    paths-ignore:
-      - '**.md'
-      - 'LICENSE'
 
 env:
   CARGO_TERM_COLOR: always
@@ -84,28 +78,3 @@ jobs:
         run: cargo doc --workspace --no-deps --document-private-items
         env:
           RUSTDOCFLAGS: -D warnings
-
-  # Gate job that always runs - use this as the single required check
-  # This allows paths-ignore to skip CI jobs while still satisfying branch protection
-  ci-gate:
-    name: CI Gate
-    runs-on: ubuntu-latest
-    if: always()
-    needs: [check, test, test-integration, fmt, clippy, doc]
-    steps:
-      - name: Check required jobs passed
-        run: |
-          # Integration tests are informational (external API dependency)
-          # Only fail on core job failures: check, test, fmt, clippy, doc
-          CORE_RESULTS="${{ needs.check.result }},${{ needs.test.result }},${{ needs.fmt.result }},${{ needs.clippy.result }},${{ needs.doc.result }}"
-          if [[ "$CORE_RESULTS" == *"failure"* ]]; then
-            echo "One or more core jobs failed"
-            exit 1
-          fi
-
-          # Report integration test status but don't block
-          if [[ "${{ needs.test-integration.result }}" == "failure" ]]; then
-            echo "⚠️ Integration tests failed (informational - external API dependency)"
-          fi
-
-          echo "All required jobs passed or were skipped"
