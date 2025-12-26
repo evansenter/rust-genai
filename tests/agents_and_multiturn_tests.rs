@@ -2324,6 +2324,7 @@ async fn test_google_search_multi_turn() {
             .with_model("gemini-3-flash-preview")
             .with_previous_interaction(&response1.id)
             .with_text("Based on the weather information you just found, should I bring an umbrella if I visit Tokyo today?")
+            .with_store(true)
             .create()
             .await
     })
