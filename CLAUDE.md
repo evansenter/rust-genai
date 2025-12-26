@@ -42,6 +42,8 @@ All require `GEMINI_API_KEY`:
 ```bash
 cargo run --example simple_interaction
 cargo run --example streaming
+cargo run --example system_instructions
+cargo run --example stateful_interaction
 cargo run --example auto_function_calling
 cargo run --example structured_output
 cargo run --example google_search
@@ -49,9 +51,10 @@ cargo run --example code_execution
 cargo run --example url_context
 cargo run --example thinking
 cargo run --example multimodal_image
+cargo run --example audio_input
+cargo run --example video_input
 cargo run --example pdf_input
 cargo run --example image_generation
-cargo run --example stateful_interaction
 ```
 
 ## Architecture
