@@ -2515,14 +2515,17 @@ async fn test_code_execution_multi_turn() {
 
     // Turn 1: Calculate factorial of 5
     println!("\n--- Turn 1: Calculate factorial ---");
-    let result1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("Calculate the factorial of 5 using code execution. Return just the number.")
-        .with_code_execution()
-        .with_store(true)
-        .create()
-        .await;
+    let result1 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
+        client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Calculate the factorial of 5 using code execution. Return just the number.")
+            .with_code_execution()
+            .with_store(true)
+            .create()
+            .await
+    })
+    .await;
 
     let response1 = match result1 {
         Ok(response) => {
