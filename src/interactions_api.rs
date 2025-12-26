@@ -1,6 +1,25 @@
 /// Helper functions for building Interactions API content
 ///
 /// This module provides ergonomic builders for InteractionContent and InteractionInput.
+///
+/// # Thought Signatures
+///
+/// When using function calling with Gemini 3 models, thought signatures are critical for
+/// maintaining reasoning context across multi-turn interactions. Per Google's documentation
+/// (<https://ai.google.dev/gemini-api/docs/thought-signatures>):
+///
+/// - **What they are**: Encrypted representations of the model's internal thought process
+/// - **When they appear**: On function calls (first call in each step), and sometimes on final content
+/// - **Requirement**: For Gemini 3 models, signatures MUST be echoed back during function calling
+///   or you will receive a 400 validation error
+///
+/// ## Interactions API Handling
+///
+/// When using `previous_interaction_id` with the Interactions API, thought signatures are
+/// managed automatically by the server. You don't need to manually extract and echo them.
+///
+/// For manual conversation construction (without `previous_interaction_id`), use
+/// [`function_call_content_with_signature`] to include the signature when echoing function calls.
 use genai_client::{
     CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent, InteractionInput,
 };
@@ -50,6 +69,10 @@ pub fn thought_content(text: impl Into<String>) -> InteractionContent {
 ///
 /// For Gemini 3 models, thought signatures are required for multi-turn function calling.
 /// Extract them from the interaction response and pass them here when building conversation history.
+///
+/// See <https://ai.google.dev/gemini-api/docs/thought-signatures> for details on thought signatures.
+///
+/// **Note**: When using `previous_interaction_id`, the server manages signatures automatically.
 ///
 /// # Example
 /// ```
