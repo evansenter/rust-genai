@@ -155,7 +155,7 @@ fn test_generation_config_serialization() {
 fn test_interaction_response_text() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -184,7 +184,7 @@ fn test_interaction_response_text() {
 fn test_interaction_response_thoughts() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -223,7 +223,7 @@ fn test_interaction_response_thoughts() {
 fn test_interaction_response_no_thoughts() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::Text {
@@ -246,7 +246,7 @@ fn test_interaction_response_no_thoughts() {
 fn test_interaction_response_function_calls() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -292,7 +292,7 @@ fn test_function_call_missing_id() {
     // but if it does, the auto-function loop will return an error.
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::FunctionCall {
@@ -325,7 +325,7 @@ fn test_function_call_missing_id() {
 fn test_interaction_response_mixed_content() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -361,7 +361,7 @@ fn test_interaction_response_mixed_content() {
 fn test_interaction_response_empty_outputs() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![],
@@ -589,7 +589,7 @@ fn test_known_types_still_work() {
 fn test_interaction_response_has_unknown() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -626,7 +626,7 @@ fn test_interaction_response_has_unknown() {
 fn test_interaction_response_no_unknown() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::Text {
@@ -648,7 +648,7 @@ fn test_interaction_response_no_unknown() {
 fn test_content_summary() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -703,7 +703,7 @@ fn test_content_summary() {
 fn test_content_summary_empty() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![],
@@ -1471,7 +1471,7 @@ fn test_edge_cases_empty_values() {
 fn test_interaction_response_code_execution_helpers() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -1521,7 +1521,7 @@ fn test_interaction_response_code_execution_helpers() {
 fn test_interaction_response_google_search_helpers() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -1551,7 +1551,7 @@ fn test_interaction_response_google_search_helpers() {
 fn test_interaction_response_url_context_helpers() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::UrlContextResult {
@@ -1580,7 +1580,7 @@ fn test_interaction_response_url_context_helpers() {
 fn test_content_summary_with_built_in_tools() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -1717,11 +1717,13 @@ fn test_url_retrieval_status_serialization_roundtrip() {
 
 // --- Additional Response Helper Tests ---
 
+// --- Function Result Helpers ---
+
 #[test]
 fn test_interaction_response_function_results() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -1763,7 +1765,7 @@ fn test_interaction_response_function_results() {
 fn test_interaction_response_no_function_results() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::Text {
@@ -1781,11 +1783,13 @@ fn test_interaction_response_no_function_results() {
     assert!(response.function_results().is_empty());
 }
 
+// --- Google Search Helpers ---
+
 #[test]
 fn test_interaction_response_google_search_call_helpers() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -1826,7 +1830,7 @@ fn test_interaction_response_google_search_call_helpers() {
 fn test_interaction_response_no_google_search_calls() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::Text {
@@ -1845,11 +1849,13 @@ fn test_interaction_response_no_google_search_calls() {
     assert!(response.google_search_calls().is_empty());
 }
 
+// --- URL Context Helpers ---
+
 #[test]
 fn test_interaction_response_url_context_call_helpers() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -1884,7 +1890,7 @@ fn test_interaction_response_url_context_call_helpers() {
 fn test_interaction_response_no_url_context_calls() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![],
@@ -1901,11 +1907,13 @@ fn test_interaction_response_no_url_context_calls() {
     assert!(response.url_context_calls().is_empty());
 }
 
+// --- Code Execution Helpers ---
+
 #[test]
 fn test_interaction_response_code_execution_call_singular() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -1940,7 +1948,7 @@ fn test_interaction_response_code_execution_call_singular() {
 fn test_interaction_response_no_code_execution_call() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::Text {
@@ -1957,13 +1965,15 @@ fn test_interaction_response_no_code_execution_call() {
     assert!(response.code_execution_call().is_none());
 }
 
+// --- Metadata Helpers ---
+
 #[test]
 fn test_interaction_response_google_search_metadata_helpers() {
     use crate::models::interactions::GroundingMetadata;
 
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::Text {
@@ -1992,7 +2002,7 @@ fn test_interaction_response_google_search_metadata_helpers() {
 fn test_interaction_response_no_google_search_metadata() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![],
@@ -2012,7 +2022,7 @@ fn test_interaction_response_no_google_search_metadata() {
 fn test_interaction_response_url_context_metadata_helpers() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![],
@@ -2049,7 +2059,7 @@ fn test_interaction_response_url_context_metadata_helpers() {
 fn test_interaction_response_no_url_context_metadata() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![],
@@ -2069,7 +2079,7 @@ fn test_interaction_response_no_url_context_metadata() {
 fn test_interaction_response_code_execution_calls_plural() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -2109,7 +2119,7 @@ fn test_interaction_response_code_execution_calls_plural() {
 fn test_interaction_response_code_execution_results() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -2150,7 +2160,7 @@ fn test_interaction_response_code_execution_results() {
 fn test_interaction_response_no_code_execution_results() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::Text {
@@ -2173,7 +2183,7 @@ fn test_interaction_response_no_code_execution_results() {
 fn test_interaction_response_google_search_results() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -2204,7 +2214,7 @@ fn test_interaction_response_google_search_results() {
 fn test_interaction_response_no_google_search_results() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![],
@@ -2224,7 +2234,7 @@ fn test_interaction_response_no_google_search_results() {
 fn test_interaction_response_url_context_results() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -2264,7 +2274,7 @@ fn test_interaction_response_url_context_results() {
 fn test_interaction_response_no_url_context_results() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![],

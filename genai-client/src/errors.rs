@@ -157,4 +157,18 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_genai_error_api_with_empty_message() {
+        // Some APIs might return empty error messages
+        let error = GenaiError::Api {
+            status_code: 500,
+            message: "".to_string(),
+            request_id: None,
+        };
+        let display = format!("{}", error);
+        assert!(display.contains("500"));
+        // Should still display properly even with empty message
+        assert!(display.contains("API error"));
+    }
 }
