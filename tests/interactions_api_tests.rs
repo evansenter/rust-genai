@@ -810,6 +810,63 @@ async fn test_system_instruction_persists() {
     assert!(response2.has_text(), "Should have text response");
 }
 
+/// Test system instructions work correctly with streaming.
+///
+/// This validates that:
+/// - System instructions are respected during streaming
+/// - Text deltas are received incrementally
+/// - Response follows the system instruction persona
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_system_instruction_streaming() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    println!("=== System Instruction + Streaming ===");
+
+    // Stream with pirate persona
+    let stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_system_instruction(
+            "You are a pirate. Always respond in pirate speak with 'Arrr!' somewhere in your response.",
+        )
+        .with_text("Hello, how are you?")
+        .create_stream();
+
+    let result = consume_stream(stream).await;
+
+    println!("\nTotal deltas: {}", result.delta_count);
+    println!("Collected text: {}", result.collected_text);
+
+    // Verify streaming worked
+    assert!(
+        result.has_output(),
+        "Should receive streaming chunks or final response"
+    );
+
+    // Check for pirate vocabulary in collected text or final response
+    let text_to_check = if !result.collected_text.is_empty() {
+        result.collected_text.to_lowercase()
+    } else if let Some(ref response) = result.final_response {
+        response.text().unwrap_or_default().to_lowercase()
+    } else {
+        String::new()
+    };
+
+    assert!(
+        text_to_check.contains("arr")
+            || text_to_check.contains("matey")
+            || text_to_check.contains("ahoy"),
+        "Response should contain pirate speak. Got: {}",
+        text_to_check
+    );
+
+    println!("\n✓ System instruction + streaming completed successfully");
+}
+
 // =============================================================================
 // Error Handling
 // =============================================================================

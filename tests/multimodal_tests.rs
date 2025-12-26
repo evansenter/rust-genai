@@ -20,7 +20,7 @@ mod common;
 
 use common::{
     SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TINY_BLUE_PNG_BASE64, TINY_MP4_BASE64,
-    TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, get_client,
+    TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, consume_stream, get_client,
 };
 use rust_genai::{
     InteractionInput, InteractionStatus, audio_data_content, audio_uri_content,
@@ -728,4 +728,76 @@ async fn test_pdf_with_question() {
             println!("PDF with question error (may be expected): {:?}", e);
         }
     }
+}
+
+// =============================================================================
+// Streaming Tests
+// =============================================================================
+
+/// Test streaming with multimodal (image) input.
+///
+/// This validates that:
+/// - Streaming works correctly when images are part of the input
+/// - Text deltas are received incrementally
+/// - Final response correctly describes the image
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_multimodal_streaming() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    println!("=== Multimodal + Streaming ===");
+
+    // Create content with text and image
+    let contents = vec![
+        text_content("What color is this image? Answer in one word."),
+        image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+    ];
+
+    // Stream the response using with_input for multimodal content
+    let stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_input(InteractionInput::Content(contents))
+        .with_store(true)
+        .create_stream();
+
+    let result = consume_stream(stream).await;
+
+    println!("\nDelta count: {}", result.delta_count);
+    println!("Collected text: {}", result.collected_text);
+
+    // Verify streaming worked
+    assert!(
+        result.has_output(),
+        "Should receive streaming chunks or final response"
+    );
+
+    // Verify content describes the red image
+    let text_to_check = if !result.collected_text.is_empty() {
+        result.collected_text.to_lowercase()
+    } else if let Some(ref response) = result.final_response {
+        response.text().unwrap_or_default().to_lowercase()
+    } else {
+        String::new()
+    };
+
+    assert!(
+        text_to_check.contains("red"),
+        "Response should identify the red color. Got: {}",
+        text_to_check
+    );
+
+    // Verify final response if present
+    if let Some(ref response) = result.final_response {
+        assert_eq!(
+            response.status,
+            InteractionStatus::Completed,
+            "Final response should be completed"
+        );
+    }
+
+    println!("\n✓ Multimodal + streaming completed successfully");
 }
