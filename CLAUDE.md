@@ -33,7 +33,7 @@ cargo test -- --nocapture                 # Show test output
 cargo fmt                                                            # Format
 cargo fmt -- --check                                                 # Check format
 cargo clippy --workspace --all-targets --all-features -- -D warnings # Lint
-cargo doc --workspace --no-deps --document-private-items             # Build docs
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items  # Build docs (warnings as errors, matches CI)
 ```
 
 ### Examples
@@ -161,8 +161,9 @@ let content: InteractionContent = serde_json::from_str(json)?;
 - **SessionStart**: Verifies `GEMINI_API_KEY` and build status (`.claude/hooks/session_init.sh`)
 - **Stop**: Pre-push validation matching CI (`.claude/hooks/stop.sh`)
 
-### Skills (auto-invoked)
+### Skills (manual)
 
+Available via `/skill-name` in conversations:
 - **`test-full`**: Complete test suite with `--include-ignored`
 - **`review-workspace`**: Health check (cargo check, clippy, unit tests)
 - **`check-docs`**: Documentation build with warning checks
@@ -178,7 +179,7 @@ GitHub Actions (`.github/workflows/rust.yml`) runs 6 parallel jobs: check, test,
 
 ## Technical Notes
 
-- Rust edition 2024, minimum 1.75
+- Rust edition 2024 (requires Rust 1.85+)
 - Uses `rustls-tls` (not native TLS)
 - Tokio async runtime
 - API version: Gemini V1Beta (configured in `genai-client/src/common.rs`, not user-configurable)
