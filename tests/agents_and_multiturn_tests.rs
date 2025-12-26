@@ -1986,3 +1986,259 @@ async fn test_function_calling_without_thinking() {
     println!("\n✓ Function calling without thinking completed successfully");
     println!("  (Provides baseline comparison for thinking-enabled tests)");
 }
+
+// =============================================================================
+// Thinking + Function Calling + Streaming
+// =============================================================================
+
+/// Test thinking mode with function calling in streaming responses.
+///
+/// This validates that:
+/// - Thinking mode works correctly when streaming responses that include function calls
+/// - Thought deltas stream incrementally
+/// - ThoughtSignature deltas appear in the stream
+/// - Function call deltas are properly detected alongside thinking content
+///
+/// Per Google's documentation (https://ai.google.dev/gemini-api/docs/thought-signatures):
+/// - Thought signatures appear on function calls for Gemini 3 models
+/// - When streaming, thought content and signatures arrive as deltas
+///
+/// # Stream Content Types
+///
+/// When streaming with thinking enabled, the stream may contain:
+/// - `Thought` deltas: Incremental reasoning text
+/// - `ThoughtSignature` deltas: Cryptographic signatures for verification
+/// - `FunctionCall` deltas: The actual function call data
+/// - `Text` deltas: Regular text output (in follow-up responses)
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_streaming_with_thinking_and_function_calling() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let get_weather = FunctionDeclaration::builder("get_weather")
+        .description("Get the current weather for a city including temperature and conditions")
+        .parameter(
+            "city",
+            json!({"type": "string", "description": "The city name"}),
+        )
+        .required(vec!["city".to_string()])
+        .build();
+
+    // =========================================================================
+    // Turn 1: Stream a request that should trigger function call with thinking
+    // =========================================================================
+    println!("=== Turn 1: Streaming with thinking + function call ===");
+
+    let stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What's the weather in Tokyo? I need to know if I should bring an umbrella.")
+        .with_function(get_weather.clone())
+        .with_thinking_level(ThinkingLevel::Medium)
+        .with_store(true)
+        .create_stream();
+
+    let result = consume_stream(stream).await;
+
+    println!("\n--- Streaming Results ---");
+    println!("Total deltas: {}", result.delta_count);
+    println!("Saw thought deltas: {}", result.saw_thought);
+    println!("Saw thought signature: {}", result.saw_thought_signature);
+    println!("Saw function call: {}", result.saw_function_call);
+    println!("Collected text length: {}", result.collected_text.len());
+    println!(
+        "Collected thoughts length: {}",
+        result.collected_thoughts.len()
+    );
+
+    // Verify we received streaming content
+    assert!(result.has_output(), "Should receive streaming chunks");
+
+    // Check for thinking-related content
+    // Note: The API may or may not expose thoughts in streaming - log but don't hard-assert
+    if result.saw_thought {
+        println!("✓ Thought deltas received during streaming");
+        if !result.collected_thoughts.is_empty() {
+            println!(
+                "  Thoughts preview: {}...",
+                &result.collected_thoughts[..result.collected_thoughts.len().min(100)]
+            );
+        }
+    } else {
+        println!("ℹ Thoughts processed internally (not exposed in stream)");
+    }
+
+    if result.saw_thought_signature {
+        println!("✓ ThoughtSignature delta received during streaming");
+    } else {
+        println!("ℹ ThoughtSignature not received in stream (API behavior varies)");
+    }
+
+    // Check for function call
+    let response1 = result
+        .final_response
+        .expect("Should receive complete response");
+
+    println!("Turn 1 status: {:?}", response1.status);
+
+    let function_calls = response1.function_calls();
+    if function_calls.is_empty() {
+        // If saw_function_call was true during streaming, the test passes
+        if result.saw_function_call {
+            println!(
+                "✓ Function call deltas detected in stream (final response may not include them)"
+            );
+            return;
+        }
+        println!("Model chose not to call function - skipping rest of test");
+        return;
+    }
+
+    let call = &function_calls[0];
+    println!(
+        "Function call: {} (has thought_signature: {})",
+        call.name,
+        call.thought_signature.is_some()
+    );
+
+    // =========================================================================
+    // Turn 2: Stream the follow-up after providing function result
+    // =========================================================================
+    println!("\n=== Turn 2: Streaming response after function result ===");
+
+    let function_result = function_result_content(
+        "get_weather",
+        call.id.expect("call should have ID"),
+        json!({
+            "temperature": "18°C",
+            "conditions": "rainy",
+            "precipitation": "85%",
+            "humidity": "90%"
+        }),
+    );
+
+    let stream2 = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_previous_interaction(&response1.id)
+        .with_content(vec![function_result])
+        .with_function(get_weather)
+        .with_thinking_level(ThinkingLevel::Medium)
+        .with_store(true)
+        .create_stream();
+
+    let result2 = consume_stream(stream2).await;
+
+    println!("\n--- Turn 2 Streaming Results ---");
+    println!("Total deltas: {}", result2.delta_count);
+    println!("Saw thought deltas: {}", result2.saw_thought);
+    println!("Saw thought signature: {}", result2.saw_thought_signature);
+    println!("Collected text length: {}", result2.collected_text.len());
+
+    // Verify streaming worked
+    assert!(result2.has_output(), "Should receive streaming chunks");
+
+    // Log thinking observations
+    if result2.saw_thought {
+        println!("✓ Thought deltas received in Turn 2");
+    } else {
+        println!("ℹ Thoughts processed internally in Turn 2");
+    }
+
+    // Verify we got text output
+    assert!(
+        !result2.collected_text.is_empty(),
+        "Turn 2 should stream text content"
+    );
+
+    // Verify context was maintained - response should reference weather
+    let text_lower = result2.collected_text.to_lowercase();
+    assert!(
+        text_lower.contains("umbrella")
+            || text_lower.contains("rain")
+            || text_lower.contains("yes")
+            || text_lower.contains("18"),
+        "Streaming response should reference weather context. Got: {}",
+        result2.collected_text
+    );
+
+    // Verify final response
+    if let Some(response2) = result2.final_response {
+        println!("Turn 2 final status: {:?}", response2.status);
+        assert_eq!(
+            response2.status,
+            InteractionStatus::Completed,
+            "Turn 2 should complete successfully"
+        );
+    }
+
+    println!("\n✓ Streaming with thinking + function calling completed successfully");
+}
+
+/// Test streaming with thinking but NO function calling (baseline for comparison).
+///
+/// This provides a baseline to verify that streaming with just thinking works,
+/// and helps identify any differences in behavior when function calling is added.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_streaming_with_thinking_only() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    println!("=== Streaming with thinking (no function calling) ===");
+
+    let stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Explain briefly why the sky is blue.")
+        .with_thinking_level(ThinkingLevel::Medium)
+        .create_stream();
+
+    let result = consume_stream(stream).await;
+
+    println!("\n--- Streaming Results ---");
+    println!("Total deltas: {}", result.delta_count);
+    println!("Saw thought deltas: {}", result.saw_thought);
+    println!("Saw thought signature: {}", result.saw_thought_signature);
+    println!("Collected text length: {}", result.collected_text.len());
+
+    // Verify streaming worked
+    assert!(result.has_output(), "Should receive streaming chunks");
+
+    // Log thinking observations
+    if result.saw_thought {
+        println!("✓ Thought deltas received during streaming");
+        if !result.collected_thoughts.is_empty() {
+            println!(
+                "  Thoughts preview: {}...",
+                &result.collected_thoughts[..result.collected_thoughts.len().min(100)]
+            );
+        }
+    } else {
+        println!("ℹ Thoughts processed internally");
+    }
+
+    // Verify we got text
+    assert!(
+        !result.collected_text.is_empty(),
+        "Should stream text content"
+    );
+
+    // Verify content is about the sky/light/scattering
+    let text_lower = result.collected_text.to_lowercase();
+    assert!(
+        text_lower.contains("light")
+            || text_lower.contains("scatter")
+            || text_lower.contains("blue")
+            || text_lower.contains("wavelength"),
+        "Response should explain why sky is blue. Got: {}",
+        result.collected_text
+    );
+
+    println!("\n✓ Streaming with thinking (no function calling) completed successfully");
+}
