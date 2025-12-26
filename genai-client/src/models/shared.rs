@@ -361,13 +361,6 @@ impl FunctionDeclarationBuilder {
     }
 }
 
-/// Represents a function call made by the model.
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct FunctionCall {
-    pub name: String,
-    pub args: serde_json::Value,
-}
-
 /// Represents tool configuration for function calling.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ToolConfig {

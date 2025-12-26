@@ -14,7 +14,8 @@
 
 use futures_util::StreamExt;
 use rust_genai::{
-    Client, GenaiError, InteractionContent, InteractionResponse, InteractionStatus, StreamChunk,
+    AutoFunctionStreamChunk, Client, GenaiError, InteractionContent, InteractionResponse,
+    InteractionStatus, StreamChunk,
 };
 use std::env;
 use std::future::Future;
@@ -377,6 +378,114 @@ pub async fn consume_stream(
                 StreamChunk::Complete(response) => {
                     println!("\nStream complete: {}", response.id);
                     result.final_response = Some(response);
+                }
+            },
+            Err(e) => {
+                println!("Stream error: {:?}", e);
+                break;
+            }
+        }
+    }
+
+    result
+}
+
+/// Result of consuming an auto-function stream.
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct AutoFunctionStreamResult {
+    /// Number of delta chunks received during streaming.
+    pub delta_count: usize,
+    /// All text content collected from delta chunks.
+    pub collected_text: String,
+    /// Number of times function execution was signaled.
+    pub executing_functions_count: usize,
+    /// Names of all functions that were executed.
+    pub executed_function_names: Vec<String>,
+    /// Number of function result events.
+    pub function_results_count: usize,
+    /// The final complete response, if received.
+    pub final_response: Option<InteractionResponse>,
+    /// Whether any thought deltas were received.
+    pub saw_thought: bool,
+    /// All thought content collected from delta chunks.
+    pub collected_thoughts: String,
+}
+
+impl AutoFunctionStreamResult {
+    /// Returns true if streaming produced any output.
+    #[allow(dead_code)]
+    pub fn has_output(&self) -> bool {
+        self.delta_count > 0 || self.final_response.is_some()
+    }
+}
+
+/// Consumes an auto-function stream, collecting events and the final response.
+///
+/// This helper standardizes auto-function stream consumption across tests.
+///
+/// # Arguments
+///
+/// * `stream` - A boxed stream of `Result<AutoFunctionStreamChunk, GenaiError>`
+///
+/// # Returns
+///
+/// An `AutoFunctionStreamResult` containing the collected data from the stream.
+#[allow(dead_code)]
+pub async fn consume_auto_function_stream(
+    mut stream: futures_util::stream::BoxStream<'_, Result<AutoFunctionStreamChunk, GenaiError>>,
+) -> AutoFunctionStreamResult {
+    let mut result = AutoFunctionStreamResult {
+        delta_count: 0,
+        collected_text: String::new(),
+        executing_functions_count: 0,
+        executed_function_names: Vec::new(),
+        function_results_count: 0,
+        final_response: None,
+        saw_thought: false,
+        collected_thoughts: String::new(),
+    };
+
+    while let Some(item) = stream.next().await {
+        match item {
+            Ok(chunk) => match chunk {
+                AutoFunctionStreamChunk::Delta(delta) => {
+                    result.delta_count += 1;
+                    if let Some(text) = delta.text() {
+                        result.collected_text.push_str(text);
+                        print!("{}", text);
+                    }
+                    if delta.is_thought() {
+                        result.saw_thought = true;
+                        if let InteractionContent::Thought { text: Some(t) } = &delta {
+                            result.collected_thoughts.push_str(t);
+                        }
+                    }
+                }
+                AutoFunctionStreamChunk::ExecutingFunctions(response) => {
+                    result.executing_functions_count += 1;
+                    for call in response.function_calls() {
+                        println!("\n[Executing: {}]", call.name);
+                        result.executed_function_names.push(call.name.to_string());
+                    }
+                }
+                AutoFunctionStreamChunk::FunctionResults(results) => {
+                    result.function_results_count += 1;
+                    println!("[Got {} result(s)]", results.len());
+                    // Track executed function names from results
+                    for r in &results {
+                        if !result.executed_function_names.contains(&r.name) {
+                            result.executed_function_names.push(r.name.clone());
+                        }
+                    }
+                }
+                AutoFunctionStreamChunk::Complete(response) => {
+                    println!("\n[Stream complete: {}]", response.id);
+                    result.final_response = Some(response);
+                }
+                _ => {
+                    // Unknown future variants - ignore
+                    println!("[Unknown chunk type]");
                 }
             },
             Err(e) => {

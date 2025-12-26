@@ -20,7 +20,8 @@ pub use metadata::{
 };
 pub use request::{CreateInteractionRequest, GenerationConfig, InteractionInput, ThinkingLevel};
 pub use response::{
-    ContentSummary, FunctionCallInfo, FunctionResultInfo, InteractionResponse, InteractionStatus,
+    CodeExecutionCallInfo, CodeExecutionResultInfo, ContentSummary, FunctionCallInfo,
+    FunctionResultInfo, InteractionResponse, InteractionStatus, UrlContextResultInfo,
     UsageMetadata,
 };
 pub use streaming::{InteractionStreamEvent, StreamChunk};

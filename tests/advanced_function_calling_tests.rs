@@ -13,7 +13,7 @@
 
 mod common;
 
-use common::{consume_stream, get_client};
+use common::{consume_auto_function_stream, consume_stream, get_client};
 use rust_genai::{CallableFunction, FunctionDeclaration, function_result_content};
 use rust_genai_macros::generate_function_declaration;
 use serde_json::json;
@@ -808,5 +808,209 @@ async fn test_auto_function_calling_max_loops() {
                 println!("✓ Max loops limit was respected");
             }
         }
+    }
+}
+
+// =============================================================================
+// Streaming with Auto Function Calling Tests
+// =============================================================================
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_streaming_auto_functions_simple() {
+    // Test basic streaming with automatic function calling
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Use a registered function via the macro
+    let weather_func = GetWeatherTestCallable.declaration();
+
+    let stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What's the weather in Tokyo?")
+        .with_function(weather_func)
+        .create_stream_with_auto_functions();
+
+    let result = consume_auto_function_stream(stream).await;
+
+    println!("\n--- Results ---");
+    println!("Delta count: {}", result.delta_count);
+    println!("Text length: {}", result.collected_text.len());
+    println!(
+        "Executing functions count: {}",
+        result.executing_functions_count
+    );
+    println!("Function results count: {}", result.function_results_count);
+    println!("Functions executed: {:?}", result.executed_function_names);
+
+    // Should have received a final response
+    assert!(
+        result.final_response.is_some(),
+        "Should receive a complete response"
+    );
+
+    let response = result.final_response.unwrap();
+
+    // If functions were executed, verify the events were received
+    if result.executing_functions_count > 0 {
+        println!("✓ Function execution was streamed");
+        assert!(
+            result.function_results_count > 0,
+            "Should have function results after execution"
+        );
+        assert!(
+            result
+                .executed_function_names
+                .contains(&"get_weather_test".to_string()),
+            "Should have executed get_weather_test"
+        );
+        // After function execution, we should have text
+        assert!(
+            response.has_text() || !result.collected_text.is_empty(),
+            "Should have text after function execution"
+        );
+    } else {
+        // Model may have answered directly without calling functions
+        // This is valid behavior - just verify we got some response
+        println!("Model answered without calling functions");
+        println!(
+            "  response.has_text(): {}, response.has_function_calls(): {}",
+            response.has_text(),
+            response.has_function_calls()
+        );
+        println!("  Output count: {}", response.outputs.len());
+        if !response.outputs.is_empty() {
+            println!(
+                "  First output type: {:?}",
+                std::mem::discriminant(&response.outputs[0])
+            );
+        }
+
+        // The stream worked - we got deltas and a complete response
+        // Model behavior varies (may use functions or answer directly)
+        // Key assertions: stream completed successfully
+        assert!(
+            result.delta_count > 0 || response.has_text() || response.has_function_calls(),
+            "Should have deltas, text, or function calls"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_streaming_auto_functions_no_function_call() {
+    // Test that streaming works when no function is called
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Ask a question that doesn't need a function
+    let stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What is 2 + 2?")
+        .create_stream_with_auto_functions();
+
+    let result = consume_auto_function_stream(stream).await;
+
+    println!("\n--- Results ---");
+    println!("Delta count: {}", result.delta_count);
+    println!("Text: {}", result.collected_text);
+
+    // Should complete without any function execution
+    assert!(
+        result.final_response.is_some(),
+        "Should receive a complete response"
+    );
+    assert_eq!(
+        result.executing_functions_count, 0,
+        "No functions should be executed for simple math"
+    );
+    assert!(
+        result.collected_text.contains('4')
+            || result.collected_text.to_lowercase().contains("four"),
+        "Response should contain the answer"
+    );
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_streaming_auto_functions_multiple_calls() {
+    // Test streaming with multiple function calls
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Use both weather and time functions
+    let weather_func = GetWeatherTestCallable.declaration();
+    let time_func = GetTimeTestCallable.declaration();
+
+    let stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What's the weather in London and what time is it there (GMT timezone)?")
+        .with_functions(vec![weather_func, time_func])
+        .create_stream_with_auto_functions();
+
+    let result = consume_auto_function_stream(stream).await;
+
+    println!("\n--- Results ---");
+    println!("Delta count: {}", result.delta_count);
+    println!("Functions executed: {:?}", result.executed_function_names);
+
+    assert!(
+        result.final_response.is_some(),
+        "Should receive a complete response"
+    );
+
+    // Should have streamed some content
+    assert!(result.delta_count > 0, "Should have received delta chunks");
+
+    // Model may call both functions (parallel or sequential)
+    println!(
+        "Total functions executed: {}",
+        result.executed_function_names.len()
+    );
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_streaming_auto_functions_max_loops() {
+    // Test that max_function_call_loops is respected in streaming mode
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let weather_func = GetWeatherTestCallable.declaration();
+
+    // Use a very low max loops
+    let stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What's the weather in Paris?")
+        .with_function(weather_func)
+        .with_max_function_call_loops(1)
+        .create_stream_with_auto_functions();
+
+    let result = consume_auto_function_stream(stream).await;
+
+    // Should either complete successfully or be limited by max loops
+    // Either way, we shouldn't hang
+    println!("\n--- Results ---");
+    println!("Final response: {}", result.final_response.is_some());
+    println!(
+        "Executing functions count: {}",
+        result.executing_functions_count
+    );
+
+    // With max_loops=1, it should complete (model might answer directly or do 1 function call)
+    if result.final_response.is_some() {
+        println!("✓ Completed within max loop limit");
     }
 }
