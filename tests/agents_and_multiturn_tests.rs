@@ -854,7 +854,9 @@ async fn test_streaming_multi_turn_function_calling() {
     // Verify streaming worked
     assert!(result.has_output(), "Should receive streaming chunks");
 
-    // Verify context was maintained - response should reference weather conditions
+    // Verify context was maintained - response should reference weather conditions.
+    // Allow flexible matching due to LLM response variability - any reference to
+    // the weather conditions indicates the multi-turn context was preserved.
     let text_lower = result.collected_text.to_lowercase();
     assert!(
         text_lower.contains("yes")

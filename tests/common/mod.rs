@@ -306,6 +306,9 @@ impl StreamResult {
 /// - Detecting function call deltas
 /// - Graceful error handling (breaks on error, doesn't panic)
 ///
+/// **Note**: Text content is printed to stdout as it's received for debugging
+/// purposes when running tests with `--nocapture`.
+///
 /// # Arguments
 ///
 /// * `stream` - A boxed stream of `Result<StreamChunk, GenaiError>`
