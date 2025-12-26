@@ -40,8 +40,8 @@ pub use models::interactions::UrlRetrievalStatus;
 pub use models::interactions::UsageMetadata;
 pub use models::interactions::WebSource;
 
-// Re-export InternalError from the errors module
-pub use errors::InternalError;
+// Re-export GenaiError from the errors module
+pub use errors::GenaiError;
 
 // Re-export ApiVersion, Endpoint, and URL construction functions from the common module
 pub use common::ApiVersion;

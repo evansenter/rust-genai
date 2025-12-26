@@ -1,5 +1,3 @@
-use thiserror::Error;
-
 // Re-export unified function declaration types from genai_client
 pub use genai_client::{FunctionDeclaration, FunctionDeclarationBuilder, FunctionParameters, Tool};
 
@@ -11,6 +9,9 @@ pub use genai_client::{
     ThinkingLevel, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus, UsageMetadata,
     WebSource,
 };
+
+// Re-export error type from genai_client
+pub use genai_client::GenaiError;
 
 // Interactions API helper functions
 //
@@ -42,135 +43,3 @@ pub use request_builder::{DEFAULT_MAX_FUNCTION_CALL_LOOPS, InteractionBuilder};
 pub mod function_calling;
 // Re-export public types from function_calling module
 pub use function_calling::{CallableFunction, FunctionError};
-
-/// Defines errors that can occur when interacting with the `GenAI` API.
-///
-/// # Example: Handling API Errors
-///
-/// ```ignore
-/// match client.interaction().create().await {
-///     Err(GenaiError::Api { status_code: 429, request_id, .. }) => {
-///         log::warn!("Rate limited, request_id: {:?}", request_id);
-///         // Retry with backoff
-///     }
-///     Err(GenaiError::Api { status_code, message, request_id }) => {
-///         log::error!("API error {}: {} (request: {:?})", status_code, message, request_id);
-///     }
-///     // ...
-/// }
-/// ```
-#[derive(Debug, Error)]
-pub enum GenaiError {
-    #[error("HTTP request error: {0}")]
-    Http(#[from] reqwest::Error),
-    #[error("SSE parsing error: {0}")]
-    Parse(String),
-    #[error("JSON deserialization error: {0}")]
-    Json(#[from] serde_json::Error),
-    #[error("UTF-8 decoding error: {0}")]
-    Utf8(#[from] std::str::Utf8Error),
-    /// API error with structured context for debugging and automated handling.
-    ///
-    /// Contains the HTTP status code (for retry logic), error message, and
-    /// optional request ID (for correlation with Google API logs/support).
-    #[error("API error (HTTP {status_code}): {message}")]
-    Api {
-        /// HTTP status code (e.g., 400, 429, 500)
-        status_code: u16,
-        /// Error message from the API response body
-        message: String,
-        /// Request ID from `x-goog-request-id` header, if available
-        request_id: Option<String>,
-    },
-    #[error("Internal client error: {0}")]
-    Internal(String),
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
-}
-
-// Implement conversion from internal error to public error
-impl From<genai_client::InternalError> for GenaiError {
-    fn from(internal_err: genai_client::InternalError) -> Self {
-        match internal_err {
-            genai_client::InternalError::Http(e) => Self::Http(e),
-            genai_client::InternalError::Parse(s) => Self::Parse(s),
-            genai_client::InternalError::Json(e) => Self::Json(e),
-            genai_client::InternalError::Utf8(e) => Self::Utf8(e),
-            genai_client::InternalError::Api {
-                status_code,
-                message,
-                request_id,
-            } => Self::Api {
-                status_code,
-                message,
-                request_id,
-            },
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*; // This will bring in Client, InteractionResponse, etc.
-    use genai_client::InternalError;
-
-    #[test]
-    fn test_internal_error_to_genai_error_conversion() {
-        // Test Parse variant
-        let internal_parse = InternalError::Parse("parse error".to_string());
-        let public_parse: GenaiError = internal_parse.into();
-        assert!(matches!(public_parse, GenaiError::Parse(s) if s == "parse error"));
-
-        // Test Http variant - we'll skip this test since creating a reqwest::Error is complex
-        // and the #[from] attribute is well-tested in the reqwest crate itself
-        // If we need to test this in the future, we can use a mock HTTP client
-
-        // Test Json variant
-        let invalid_json = "{invalid json";
-        let json_error = serde_json::from_str::<serde_json::Value>(invalid_json).unwrap_err();
-        let internal_json = InternalError::Json(json_error);
-        let public_json: GenaiError = internal_json.into();
-        assert!(matches!(public_json, GenaiError::Json(_)));
-
-        // Test Utf8 variant - using a dynamic approach to create invalid UTF-8
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"valid");
-        bytes.push(0xFF); // Add an invalid byte
-        let utf8_error = std::str::from_utf8(&bytes).unwrap_err();
-        let internal_utf8 = InternalError::Utf8(utf8_error);
-        let public_utf8: GenaiError = internal_utf8.into();
-        assert!(matches!(public_utf8, GenaiError::Utf8(_)));
-
-        // Test Api variant with structured fields
-        let internal_api = InternalError::Api {
-            status_code: 429,
-            message: "rate limit exceeded".to_string(),
-            request_id: Some("req-123".to_string()),
-        };
-        let public_api: GenaiError = internal_api.into();
-        assert!(matches!(
-            public_api,
-            GenaiError::Api {
-                status_code: 429,
-                ref message,
-                ref request_id,
-            } if message == "rate limit exceeded" && request_id == &Some("req-123".to_string())
-        ));
-
-        // Test Api variant without request_id
-        let internal_api_no_id = InternalError::Api {
-            status_code: 500,
-            message: "internal error".to_string(),
-            request_id: None,
-        };
-        let public_api_no_id: GenaiError = internal_api_no_id.into();
-        assert!(matches!(
-            public_api_no_id,
-            GenaiError::Api {
-                status_code: 500,
-                ref message,
-                request_id: None,
-            } if message == "internal error"
-        ));
-    }
-}

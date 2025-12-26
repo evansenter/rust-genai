@@ -310,11 +310,9 @@ impl Client {
 
         stream
             .map(move |result| {
-                result
-                    .inspect(|chunk| {
-                        log::debug!("Received stream chunk: {:?}", chunk);
-                    })
-                    .map_err(GenaiError::from)
+                result.inspect(|chunk| {
+                    log::debug!("Received stream chunk: {:?}", chunk);
+                })
             })
             .boxed()
     }

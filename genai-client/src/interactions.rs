@@ -1,6 +1,6 @@
 use crate::common::{Endpoint, construct_endpoint_url};
 use crate::error_helpers::check_response;
-use crate::errors::InternalError;
+use crate::errors::GenaiError;
 use crate::models::interactions::{
     CreateInteractionRequest, InteractionResponse, InteractionStreamEvent, StreamChunk,
 };
@@ -25,13 +25,13 @@ pub async fn create_interaction(
     http_client: &ReqwestClient,
     api_key: &str,
     request: CreateInteractionRequest,
-) -> Result<InteractionResponse, InternalError> {
+) -> Result<InteractionResponse, GenaiError> {
     let endpoint = Endpoint::CreateInteraction { stream: false };
     let url = construct_endpoint_url(endpoint, api_key);
 
     let response = http_client.post(&url).json(&request).send().await?;
     let response = check_response(response).await?;
-    let response_text = response.text().await.map_err(InternalError::Http)?;
+    let response_text = response.text().await.map_err(GenaiError::Http)?;
     let interaction_response: InteractionResponse = serde_json::from_str(&response_text)?;
 
     Ok(interaction_response)
@@ -64,7 +64,7 @@ pub fn create_interaction_stream<'a>(
     http_client: &'a ReqwestClient,
     api_key: &'a str,
     request: CreateInteractionRequest,
-) -> impl Stream<Item = Result<StreamChunk, InternalError>> + Send + 'a {
+) -> impl Stream<Item = Result<StreamChunk, GenaiError>> + Send + 'a {
     let endpoint = Endpoint::CreateInteraction { stream: true };
     let url = construct_endpoint_url(endpoint, api_key);
 
@@ -151,13 +151,13 @@ pub async fn get_interaction(
     http_client: &ReqwestClient,
     api_key: &str,
     interaction_id: &str,
-) -> Result<InteractionResponse, InternalError> {
+) -> Result<InteractionResponse, GenaiError> {
     let endpoint = Endpoint::GetInteraction { id: interaction_id };
     let url = construct_endpoint_url(endpoint, api_key);
 
     let response = http_client.get(&url).send().await?;
     let response = check_response(response).await?;
-    let response_text = response.text().await.map_err(InternalError::Http)?;
+    let response_text = response.text().await.map_err(GenaiError::Http)?;
     let interaction_response: InteractionResponse = serde_json::from_str(&response_text)?;
 
     Ok(interaction_response)
@@ -177,7 +177,7 @@ pub async fn delete_interaction(
     http_client: &ReqwestClient,
     api_key: &str,
     interaction_id: &str,
-) -> Result<(), InternalError> {
+) -> Result<(), GenaiError> {
     let endpoint = Endpoint::DeleteInteraction { id: interaction_id };
     let url = construct_endpoint_url(endpoint, api_key);
 
