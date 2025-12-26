@@ -13,7 +13,9 @@
 //! gracefully handle the unsupported URI error.
 
 use futures_util::StreamExt;
-use rust_genai::{Client, GenaiError, InteractionResponse, InteractionStatus, StreamChunk};
+use rust_genai::{
+    Client, GenaiError, InteractionContent, InteractionResponse, InteractionStatus, StreamChunk,
+};
 use std::env;
 use std::future::Future;
 use std::time::{Duration, Instant};
@@ -287,6 +289,12 @@ pub struct StreamResult {
     pub final_response: Option<InteractionResponse>,
     /// Whether any function call deltas were received.
     pub saw_function_call: bool,
+    /// Whether any thought deltas were received.
+    pub saw_thought: bool,
+    /// Whether any thought signature deltas were received.
+    pub saw_thought_signature: bool,
+    /// All thought content collected from delta chunks.
+    pub collected_thoughts: String,
 }
 
 impl StreamResult {
@@ -339,6 +347,9 @@ pub async fn consume_stream(
         collected_text: String::new(),
         final_response: None,
         saw_function_call: false,
+        saw_thought: false,
+        saw_thought_signature: false,
+        collected_thoughts: String::new(),
     };
 
     while let Some(item) = stream.next().await {
@@ -352,6 +363,15 @@ pub async fn consume_stream(
                     }
                     if delta.is_function_call() {
                         result.saw_function_call = true;
+                    }
+                    if delta.is_thought() {
+                        result.saw_thought = true;
+                        if let InteractionContent::Thought { text: Some(t) } = &delta {
+                            result.collected_thoughts.push_str(t);
+                        }
+                    }
+                    if delta.is_thought_signature() {
+                        result.saw_thought_signature = true;
                     }
                 }
                 StreamChunk::Complete(response) => {
