@@ -1222,8 +1222,8 @@ async fn test_generation_config_combined() {
 /// - Data from Turn 1 can be extended with new schema in Turn 2
 /// - Context is preserved between turns with different schemas
 ///
-/// Turn 1: Generate {name, age} for a user
-/// Turn 2: Extend with {original_name, original_age, email, occupation}
+/// Turn 1: Generate {name, age} for a software developer (model chooses values)
+/// Turn 2: Extend with {original_name, original_age, email, occupation} preserving Turn 1 values
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_structured_output_multi_turn() {
@@ -1248,7 +1248,7 @@ async fn test_structured_output_multi_turn() {
     let response1 = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("Create a user profile for a software developer named Alice who is 28 years old. Output as JSON.")
+        .with_text("Create a user profile for a software developer. Choose any name and age you like. Output as JSON.")
         .with_response_format(schema1)
         .with_store(true)
         .create()
