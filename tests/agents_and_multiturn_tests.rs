@@ -972,6 +972,22 @@ async fn test_thinking_with_function_calling_multi_turn() {
     assert!(call.id.is_some(), "Function call must have an id");
 
     // =========================================================================
+    // Verify storage: Explicitly confirm with_store(true) worked
+    // =========================================================================
+    let retrieved = client
+        .get_interaction(&response1.id)
+        .await
+        .expect("Should be able to retrieve stored interaction");
+    assert_eq!(
+        retrieved.id, response1.id,
+        "Retrieved interaction ID should match"
+    );
+    println!(
+        "✓ Storage verified: interaction {} is retrievable",
+        response1.id
+    );
+
+    // =========================================================================
     // Turn 2: Provide function result - model should reason about it
     // =========================================================================
     let function_result = function_result_content(
@@ -1664,4 +1680,309 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
 
         println!("\n✓ Function calls with thinking completed in 2 steps");
     }
+}
+
+/// Test different ThinkingLevel values with function calling.
+///
+/// Validates that all ThinkingLevel variants (Low, Medium, High) work correctly
+/// with function calling. Each level allocates different reasoning token budgets,
+/// but all should successfully complete the function calling flow.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_thinking_levels_with_function_calling() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let get_weather = FunctionDeclaration::builder("get_weather")
+        .description("Get the current weather for a city")
+        .parameter(
+            "city",
+            json!({"type": "string", "description": "City name"}),
+        )
+        .required(vec!["city".to_string()])
+        .build();
+
+    // Test each thinking level
+    let levels = [
+        (ThinkingLevel::Low, "Low"),
+        (ThinkingLevel::Medium, "Medium"),
+        (ThinkingLevel::High, "High"),
+    ];
+
+    for (level, level_name) in levels {
+        println!("\n=== Testing ThinkingLevel::{} ===", level_name);
+
+        // Turn 1: Trigger function call with this thinking level
+        let response1 = {
+            let client = client.clone();
+            let get_weather = get_weather.clone();
+            retry_on_transient(DEFAULT_MAX_RETRIES, || {
+                let client = client.clone();
+                let get_weather = get_weather.clone();
+                async move {
+                    client
+                        .interaction()
+                        .with_model("gemini-3-flash-preview")
+                        .with_text("What's the weather in Paris?")
+                        .with_function(get_weather)
+                        .with_thinking_level(level)
+                        .with_store(true)
+                        .create()
+                        .await
+                }
+            })
+            .await
+            .unwrap_or_else(|e| panic!("Turn 1 failed for ThinkingLevel::{}: {}", level_name, e))
+        };
+
+        println!(
+            "  Turn 1 status: {:?}, has_thoughts: {}",
+            response1.status,
+            response1.has_thoughts()
+        );
+
+        let function_calls = response1.function_calls();
+        if function_calls.is_empty() {
+            println!("  Model chose not to call function - skipping this level");
+            continue;
+        }
+
+        let call = &function_calls[0];
+        println!(
+            "  Function call: {} (has signature: {})",
+            call.name,
+            call.thought_signature.is_some()
+        );
+
+        // Turn 2: Provide result
+        let function_result = function_result_content(
+            "get_weather",
+            call.id.expect("call should have ID"),
+            json!({
+                "temperature": "15°C",
+                "conditions": "sunny"
+            }),
+        );
+
+        let response2 = {
+            let client = client.clone();
+            let prev_id = response1.id.clone();
+            let get_weather = get_weather.clone();
+            let function_result = function_result.clone();
+            retry_on_transient(DEFAULT_MAX_RETRIES, || {
+                let client = client.clone();
+                let prev_id = prev_id.clone();
+                let get_weather = get_weather.clone();
+                let function_result = function_result.clone();
+                async move {
+                    client
+                        .interaction()
+                        .with_model("gemini-3-flash-preview")
+                        .with_previous_interaction(&prev_id)
+                        .with_content(vec![function_result])
+                        .with_function(get_weather)
+                        .with_thinking_level(level)
+                        .create()
+                        .await
+                }
+            })
+            .await
+            .unwrap_or_else(|e| panic!("Turn 2 failed for ThinkingLevel::{}: {}", level_name, e))
+        };
+
+        println!(
+            "  Turn 2 status: {:?}, has_thoughts: {}, has_text: {}",
+            response2.status,
+            response2.has_thoughts(),
+            response2.has_text()
+        );
+
+        // Log reasoning tokens if available
+        if let Some(ref usage) = response2.usage
+            && let Some(reasoning_tokens) = usage.total_reasoning_tokens
+        {
+            println!("  Reasoning tokens used: {}", reasoning_tokens);
+        }
+
+        assert!(
+            response2.has_text(),
+            "ThinkingLevel::{} should produce text response",
+            level_name
+        );
+
+        println!("  ✓ ThinkingLevel::{} completed successfully", level_name);
+    }
+
+    println!("\n✓ All ThinkingLevel variants work with function calling");
+}
+
+/// Negative test: Function calling WITHOUT thinking mode.
+///
+/// This test provides a baseline comparison showing that function calling works
+/// correctly without thinking enabled. This helps validate that thinking mode
+/// is an enhancement, not a requirement for function calling.
+///
+/// Comparison with thinking-enabled tests:
+/// - No `with_thinking_level()` call
+/// - No `Thought` content in responses
+/// - No `thought_signature` on function calls
+/// - No `total_reasoning_tokens` in usage
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_function_calling_without_thinking() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let get_weather = FunctionDeclaration::builder("get_weather")
+        .description("Get the current weather for a city including temperature and conditions")
+        .parameter(
+            "city",
+            json!({"type": "string", "description": "The city name"}),
+        )
+        .required(vec!["city".to_string()])
+        .build();
+
+    // =========================================================================
+    // Turn 1: Trigger function call WITHOUT thinking
+    // =========================================================================
+    println!("=== Turn 1: Request without thinking ===");
+
+    let response1 = {
+        let client = client.clone();
+        let get_weather = get_weather.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            let get_weather = get_weather.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_text("What's the weather in Tokyo?")
+                    .with_function(get_weather)
+                    // Note: NO with_thinking_level() call
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
+        .await
+        .expect("Turn 1 failed")
+    };
+
+    println!("Turn 1 status: {:?}", response1.status);
+    println!("Turn 1 has_thoughts: {}", response1.has_thoughts());
+
+    // Without thinking mode, there should be no thoughts
+    assert!(
+        !response1.has_thoughts(),
+        "Without thinking mode, response should NOT have thoughts"
+    );
+
+    let function_calls = response1.function_calls();
+    if function_calls.is_empty() {
+        println!("Model chose not to call function - skipping rest of test");
+        return;
+    }
+
+    let call = &function_calls[0];
+    println!(
+        "Turn 1 function call: {} (has thought_signature: {})",
+        call.name,
+        call.thought_signature.is_some()
+    );
+
+    // Without thinking mode, thought_signature should not be present
+    if call.thought_signature.is_none() {
+        println!("✓ No thought_signature (expected without thinking mode)");
+    } else {
+        println!("ℹ thought_signature present (unexpected but not invalid)");
+    }
+
+    assert!(call.id.is_some(), "Function call must have an id");
+
+    // =========================================================================
+    // Turn 2: Provide function result
+    // =========================================================================
+    println!("\n=== Turn 2: Provide result ===");
+
+    let function_result = function_result_content(
+        "get_weather",
+        call.id.expect("call_id should exist"),
+        json!({
+            "temperature": "22°C",
+            "conditions": "clear",
+            "humidity": "45%"
+        }),
+    );
+
+    let response2 = {
+        let client = client.clone();
+        let prev_id = response1.id.clone();
+        let get_weather = get_weather.clone();
+        let function_result = function_result.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            let prev_id = prev_id.clone();
+            let get_weather = get_weather.clone();
+            let function_result = function_result.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_previous_interaction(&prev_id)
+                    .with_content(vec![function_result])
+                    .with_function(get_weather)
+                    // Note: NO with_thinking_level() call
+                    .create()
+                    .await
+            }
+        })
+        .await
+        .expect("Turn 2 failed")
+    };
+
+    println!("Turn 2 status: {:?}", response2.status);
+    println!("Turn 2 has_thoughts: {}", response2.has_thoughts());
+    println!("Turn 2 has_text: {}", response2.has_text());
+
+    // Without thinking mode, there should be no thoughts
+    assert!(
+        !response2.has_thoughts(),
+        "Without thinking mode, response should NOT have thoughts"
+    );
+
+    assert!(
+        response2.has_text(),
+        "Turn 2 should have text response about the weather"
+    );
+
+    // Verify no reasoning tokens (thinking was not enabled)
+    if let Some(ref usage) = response2.usage {
+        if usage.total_reasoning_tokens.is_none() || usage.total_reasoning_tokens == Some(0) {
+            println!("✓ No reasoning tokens (expected without thinking mode)");
+        } else {
+            println!(
+                "ℹ Reasoning tokens: {:?} (unexpected without thinking)",
+                usage.total_reasoning_tokens
+            );
+        }
+    }
+
+    let text = response2.text().unwrap();
+    println!("Turn 2 text: {}", text);
+
+    // Response should reference the weather
+    let text_lower = text.to_lowercase();
+    assert!(
+        text_lower.contains("22") || text_lower.contains("clear") || text_lower.contains("tokyo"),
+        "Response should reference weather data. Got: {}",
+        text
+    );
+
+    println!("\n✓ Function calling without thinking completed successfully");
+    println!("  (Provides baseline comparison for thinking-enabled tests)");
 }
