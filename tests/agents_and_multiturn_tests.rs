@@ -2493,3 +2493,127 @@ async fn test_url_context_multi_turn() {
 
     println!("\n✓ URL Context + multi-turn completed successfully");
 }
+
+/// Test code execution across multiple conversation turns.
+///
+/// This validates that:
+/// - Code execution works in stateful conversations
+/// - Results from Turn 1 code execution can be referenced in Turn 2
+/// - The model can build upon previous calculations
+///
+/// Turn 1: Calculate factorial of 5 (= 120)
+/// Turn 2: Multiply that result by 2 (= 240)
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_code_execution_multi_turn() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    println!("=== Code Execution + Multi-turn ===");
+
+    // Turn 1: Calculate factorial of 5
+    println!("\n--- Turn 1: Calculate factorial ---");
+    let result1 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
+        client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Calculate the factorial of 5 using code execution. Return just the number.")
+            .with_code_execution()
+            .with_store(true)
+            .create()
+            .await
+    })
+    .await;
+
+    let response1 = match result1 {
+        Ok(response) => {
+            println!("Turn 1 status: {:?}", response.status);
+            if let Some(text) = response.text() {
+                println!("Turn 1 response: {}", text);
+            }
+            // Log code execution results if available
+            let results = response.code_execution_results();
+            if !results.is_empty() {
+                println!("Code execution results:");
+                for (outcome, output) in &results {
+                    println!("  Outcome: {:?}", outcome);
+                    println!("  Output: {}", output);
+                }
+            }
+            response
+        }
+        Err(e) => {
+            let error_str = format!("{:?}", e);
+            println!("Code Execution error: {}", error_str);
+            if error_str.contains("not supported") || error_str.contains("not available") {
+                println!("Code Execution tool not available - skipping test");
+                return;
+            }
+            panic!("Turn 1 failed unexpectedly: {:?}", e);
+        }
+    };
+
+    assert_eq!(
+        response1.status,
+        InteractionStatus::Completed,
+        "Turn 1 should complete successfully"
+    );
+
+    // Turn 2: Multiply the result by 2
+    println!("\n--- Turn 2: Multiply result by 2 ---");
+    let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
+        client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_previous_interaction(&response1.id)
+            .with_text(
+                "Multiply the factorial result you just calculated by 2. What is the answer?",
+            )
+            .with_code_execution()
+            .with_store(true)
+            .create()
+            .await
+    })
+    .await;
+
+    match result2 {
+        Ok(response2) => {
+            println!("Turn 2 status: {:?}", response2.status);
+            if let Some(text) = response2.text() {
+                println!("Turn 2 response: {}", text);
+                // 5! = 120, 120 * 2 = 240
+                assert!(
+                    text.contains("240"),
+                    "Turn 2 should calculate 120 * 2 = 240. Got: {}",
+                    text
+                );
+            }
+            // Also check code execution output
+            let results = response2.code_execution_results();
+            for (_outcome, output) in &results {
+                if output.contains("240") {
+                    println!("Verified: Code output contains 240");
+                }
+            }
+            assert_eq!(
+                response2.status,
+                InteractionStatus::Completed,
+                "Turn 2 should complete successfully"
+            );
+        }
+        Err(e) => {
+            if is_long_conversation_api_error(&e) {
+                println!(
+                    "API limitation encountered (expected for some contexts): {:?}",
+                    e
+                );
+                return;
+            }
+            panic!("Turn 2 failed unexpectedly: {:?}", e);
+        }
+    }
+
+    println!("\n✓ Code Execution + multi-turn completed successfully");
+}

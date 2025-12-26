@@ -1210,3 +1210,141 @@ async fn test_generation_config_combined() {
     println!("Line count: {}", line_count);
     assert!(line_count >= 1, "Should have at least one line of text");
 }
+
+// =============================================================================
+// Multi-turn with Structured Output
+// =============================================================================
+
+/// Test structured output (JSON schema) across multiple conversation turns.
+///
+/// This validates that:
+/// - JSON schema enforcement works in stateful conversations
+/// - Data from Turn 1 can be extended with new schema in Turn 2
+/// - Context is preserved between turns with different schemas
+///
+/// Turn 1: Generate {name, age} for a software developer (model chooses values)
+/// Turn 2: Extend with {original_name, original_age, email, occupation} preserving Turn 1 values
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_structured_output_multi_turn() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    println!("=== Structured Output + Multi-turn ===");
+
+    // Turn 1: Generate initial user profile
+    let schema1 = serde_json::json!({
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer"}
+        },
+        "required": ["name", "age"]
+    });
+
+    println!("\n--- Turn 1: Generate user profile ---");
+    let response1 = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Create a user profile for a software developer. Choose any name and age you like. Output as JSON.")
+        .with_response_format(schema1)
+        .with_store(true)
+        .create()
+        .await
+        .expect("Turn 1 should succeed");
+
+    assert_eq!(
+        response1.status,
+        InteractionStatus::Completed,
+        "Turn 1 should complete successfully"
+    );
+
+    let text1 = response1.text().expect("Should have text response");
+    println!("Turn 1 JSON: {}", text1);
+
+    // Parse and validate Turn 1 JSON
+    let json1: serde_json::Value = serde_json::from_str(text1).expect("Should parse as JSON");
+    let original_name = json1["name"].as_str().expect("Should have name");
+    let original_age = json1["age"].as_i64().expect("Should have age");
+    println!(
+        "Turn 1 values - name: {}, age: {}",
+        original_name, original_age
+    );
+
+    // Turn 2: Extend the profile with new fields
+    let schema2 = serde_json::json!({
+        "type": "object",
+        "properties": {
+            "original_name": {"type": "string"},
+            "original_age": {"type": "integer"},
+            "email": {"type": "string"},
+            "occupation": {"type": "string"}
+        },
+        "required": ["original_name", "original_age", "email", "occupation"]
+    });
+
+    println!("\n--- Turn 2: Extend profile ---");
+    let response2 = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_previous_interaction(&response1.id)
+        .with_text("Based on the user profile you just created, output a new JSON with the original name and age, plus add an email address and occupation that fits the profile.")
+        .with_response_format(schema2)
+        .with_store(true)
+        .create()
+        .await
+        .expect("Turn 2 should succeed");
+
+    assert_eq!(
+        response2.status,
+        InteractionStatus::Completed,
+        "Turn 2 should complete successfully"
+    );
+
+    let text2 = response2.text().expect("Should have text response");
+    println!("Turn 2 JSON: {}", text2);
+
+    // Parse and validate Turn 2 JSON
+    let json2: serde_json::Value = serde_json::from_str(text2).expect("Should parse as JSON");
+    let turn2_name = json2["original_name"]
+        .as_str()
+        .expect("Should have original_name");
+    let turn2_age = json2["original_age"]
+        .as_i64()
+        .expect("Should have original_age");
+    let email = json2["email"].as_str().expect("Should have email");
+    let occupation = json2["occupation"]
+        .as_str()
+        .expect("Should have occupation");
+
+    println!(
+        "Turn 2 references - name: {}, age: {}",
+        turn2_name, turn2_age
+    );
+
+    // Compare Turn 2 values against Turn 1 values for robust context preservation test
+    assert!(
+        turn2_name.to_lowercase() == original_name.to_lowercase(),
+        "Turn 2 should preserve name from Turn 1. Expected '{}', got: '{}'",
+        original_name,
+        turn2_name
+    );
+
+    assert_eq!(
+        turn2_age, original_age,
+        "Turn 2 should preserve age from Turn 1. Expected {}, got: {}",
+        original_age, turn2_age
+    );
+
+    // Email should look valid and occupation should be set
+    assert!(
+        email.contains("@"),
+        "Email should contain @. Got: {}",
+        email
+    );
+    assert!(!occupation.is_empty(), "Occupation should not be empty");
+
+    println!("\n✓ Structured Output + multi-turn completed successfully");
+}
