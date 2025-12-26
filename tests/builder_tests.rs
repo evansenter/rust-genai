@@ -696,3 +696,150 @@ fn test_interaction_builder_with_url_context_and_functions() {
     assert!(matches!(tools[0], Tool::Function { .. }));
     assert!(matches!(tools[1], Tool::UrlContext));
 }
+
+// =============================================================================
+// Builder Edge Case Tests
+// =============================================================================
+
+#[test]
+fn test_interaction_builder_model_overwrites_previous_model() {
+    // Verify that calling with_model twice overwrites the first value
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("first-model")
+        .with_model("second-model")
+        .with_text("Hello");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    // Second model should win
+    assert_eq!(request.model.as_deref(), Some("second-model"));
+}
+
+#[test]
+fn test_interaction_builder_agent_overwrites_previous_agent() {
+    // Verify that calling with_agent twice overwrites the first value
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_agent("first-agent")
+        .with_agent("second-agent")
+        .with_text("Hello");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    // Second agent should win
+    assert_eq!(request.agent.as_deref(), Some("second-agent"));
+}
+
+#[test]
+fn test_interaction_builder_model_and_agent_both_set() {
+    // Verify that setting both model and agent works (API allows this)
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_agent("some-agent")
+        .with_text("Hello");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    // Both should be present
+    assert!(request.model.is_some());
+    assert!(request.agent.is_some());
+}
+
+#[test]
+fn test_interaction_builder_empty_text_allowed() {
+    // Verify that empty text is allowed (API will validate)
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("");
+
+    let result = builder.build_request();
+    // Empty text should be accepted at builder level
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_interaction_builder_previous_interaction_id() {
+    // Verify that previous_interaction_id is set correctly
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Continue conversation")
+        .with_previous_interaction("prev-interaction-123");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    assert_eq!(
+        request.previous_interaction_id.as_deref(),
+        Some("prev-interaction-123")
+    );
+}
+
+#[test]
+fn test_interaction_builder_max_function_call_loops() {
+    // Verify that max_function_call_loops is set correctly
+    let client = Client::new("test-api-key".to_string());
+
+    let func = FunctionDeclaration::builder("test_fn")
+        .description("Test function")
+        .build();
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Call functions")
+        .with_function(func)
+        .with_max_function_call_loops(5);
+
+    // The max_function_call_loops is stored in the builder, verified by integration tests
+    let result = builder.build_request();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_interaction_builder_all_three_tools_combined() {
+    use rust_genai::Tool;
+
+    // Verify all three built-in tools can be combined
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Use all tools")
+        .with_google_search()
+        .with_code_execution()
+        .with_url_context();
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    assert!(request.tools.is_some());
+
+    let tools = request.tools.unwrap();
+    assert_eq!(tools.len(), 3);
+    assert!(matches!(tools[0], Tool::GoogleSearch));
+    assert!(matches!(tools[1], Tool::CodeExecution));
+    assert!(matches!(tools[2], Tool::UrlContext));
+}

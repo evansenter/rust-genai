@@ -155,7 +155,7 @@ fn test_generation_config_serialization() {
 fn test_interaction_response_text() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -184,7 +184,7 @@ fn test_interaction_response_text() {
 fn test_interaction_response_thoughts() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -223,7 +223,7 @@ fn test_interaction_response_thoughts() {
 fn test_interaction_response_no_thoughts() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::Text {
@@ -246,7 +246,7 @@ fn test_interaction_response_no_thoughts() {
 fn test_interaction_response_function_calls() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -292,7 +292,7 @@ fn test_function_call_missing_id() {
     // but if it does, the auto-function loop will return an error.
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::FunctionCall {
@@ -325,7 +325,7 @@ fn test_function_call_missing_id() {
 fn test_interaction_response_mixed_content() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -361,7 +361,7 @@ fn test_interaction_response_mixed_content() {
 fn test_interaction_response_empty_outputs() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![],
@@ -589,7 +589,7 @@ fn test_known_types_still_work() {
 fn test_interaction_response_has_unknown() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -626,7 +626,7 @@ fn test_interaction_response_has_unknown() {
 fn test_interaction_response_no_unknown() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::Text {
@@ -648,7 +648,7 @@ fn test_interaction_response_no_unknown() {
 fn test_content_summary() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -703,7 +703,7 @@ fn test_content_summary() {
 fn test_content_summary_empty() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![],
@@ -1471,7 +1471,7 @@ fn test_edge_cases_empty_values() {
 fn test_interaction_response_code_execution_helpers() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -1521,7 +1521,7 @@ fn test_interaction_response_code_execution_helpers() {
 fn test_interaction_response_google_search_helpers() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -1551,7 +1551,7 @@ fn test_interaction_response_google_search_helpers() {
 fn test_interaction_response_url_context_helpers() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::UrlContextResult {
@@ -1580,7 +1580,7 @@ fn test_interaction_response_url_context_helpers() {
 fn test_content_summary_with_built_in_tools() {
     let response = InteractionResponse {
         id: "test_id".to_string(),
-        model: Some("gemini-3-flash".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -1713,4 +1713,579 @@ fn test_url_retrieval_status_serialization_roundtrip() {
             serde_json::from_str(&serialized).expect("Failed to deserialize");
         assert_eq!(status, deserialized);
     }
+}
+
+// --- Additional Response Helper Tests ---
+
+// --- Function Result Helpers ---
+
+#[test]
+fn test_interaction_response_function_results() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::FunctionResult {
+                name: "get_weather".to_string(),
+                call_id: "call_001".to_string(),
+                result: serde_json::json!({"temp": 72, "unit": "F"}),
+            },
+            InteractionContent::FunctionResult {
+                name: "get_time".to_string(),
+                call_id: "call_002".to_string(),
+                result: serde_json::json!({"time": "14:30", "zone": "UTC"}),
+            },
+            InteractionContent::Text {
+                text: Some("Here are the results".to_string()),
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(response.has_function_results());
+    assert!(response.has_text());
+
+    let results = response.function_results();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].name, "get_weather");
+    assert_eq!(results[0].call_id, "call_001");
+    assert_eq!(results[0].result["temp"], 72);
+    assert_eq!(results[1].name, "get_time");
+    assert_eq!(results[1].call_id, "call_002");
+}
+
+#[test]
+fn test_interaction_response_no_function_results() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("Just text".to_string()),
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(!response.has_function_results());
+    assert!(response.function_results().is_empty());
+}
+
+// --- Google Search Helpers ---
+
+#[test]
+fn test_interaction_response_google_search_call_helpers() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::GoogleSearchCall {
+                query: "Rust programming language".to_string(),
+            },
+            InteractionContent::GoogleSearchCall {
+                query: "async await Rust".to_string(),
+            },
+            InteractionContent::Text {
+                text: Some("Search results...".to_string()),
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(response.has_google_search_calls());
+
+    // Test google_search_call() - returns first one
+    assert_eq!(
+        response.google_search_call(),
+        Some("Rust programming language")
+    );
+
+    // Test google_search_calls() - returns all
+    let queries = response.google_search_calls();
+    assert_eq!(queries.len(), 2);
+    assert_eq!(queries[0], "Rust programming language");
+    assert_eq!(queries[1], "async await Rust");
+}
+
+#[test]
+fn test_interaction_response_no_google_search_calls() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("No search".to_string()),
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(!response.has_google_search_calls());
+    assert!(response.google_search_call().is_none());
+    assert!(response.google_search_calls().is_empty());
+}
+
+// --- URL Context Helpers ---
+
+#[test]
+fn test_interaction_response_url_context_call_helpers() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::UrlContextCall {
+                url: "https://docs.rs".to_string(),
+            },
+            InteractionContent::UrlContextCall {
+                url: "https://rust-lang.org".to_string(),
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(response.has_url_context_calls());
+
+    // Test url_context_call() - returns first one
+    assert_eq!(response.url_context_call(), Some("https://docs.rs"));
+
+    // Test url_context_calls() - returns all
+    let urls = response.url_context_calls();
+    assert_eq!(urls.len(), 2);
+    assert_eq!(urls[0], "https://docs.rs");
+    assert_eq!(urls[1], "https://rust-lang.org");
+}
+
+#[test]
+fn test_interaction_response_no_url_context_calls() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(!response.has_url_context_calls());
+    assert!(response.url_context_call().is_none());
+    assert!(response.url_context_calls().is_empty());
+}
+
+// --- Code Execution Helpers ---
+
+#[test]
+fn test_interaction_response_code_execution_call_singular() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::CodeExecutionCall {
+                id: "call_first".to_string(),
+                language: CodeExecutionLanguage::Python,
+                code: "print('first')".to_string(),
+            },
+            InteractionContent::CodeExecutionCall {
+                id: "call_second".to_string(),
+                language: CodeExecutionLanguage::Python,
+                code: "print('second')".to_string(),
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    // Test code_execution_call() - returns first one
+    let call = response.code_execution_call();
+    assert!(call.is_some());
+    let (language, code) = call.unwrap();
+    assert_eq!(language, CodeExecutionLanguage::Python);
+    assert_eq!(code, "print('first')");
+}
+
+#[test]
+fn test_interaction_response_no_code_execution_call() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("No code".to_string()),
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(response.code_execution_call().is_none());
+}
+
+// --- Metadata Helpers ---
+
+#[test]
+fn test_interaction_response_google_search_metadata_helpers() {
+    use crate::models::interactions::GroundingMetadata;
+
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("Response grounded with search".to_string()),
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: Some(GroundingMetadata {
+            web_search_queries: vec!["Rust language".to_string()],
+            grounding_chunks: vec![],
+        }),
+        url_context_metadata: None,
+    };
+
+    assert!(response.has_google_search_metadata());
+
+    let metadata = response.google_search_metadata();
+    assert!(metadata.is_some());
+    let metadata = metadata.unwrap();
+    assert_eq!(metadata.web_search_queries, vec!["Rust language"]);
+}
+
+#[test]
+fn test_interaction_response_no_google_search_metadata() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(!response.has_google_search_metadata());
+    assert!(response.google_search_metadata().is_none());
+}
+
+#[test]
+fn test_interaction_response_url_context_metadata_helpers() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: Some(UrlContextMetadata {
+            url_metadata: vec![UrlMetadataEntry {
+                retrieved_url: "https://example.com".to_string(),
+                url_retrieval_status: UrlRetrievalStatus::UrlRetrievalStatusSuccess,
+            }],
+        }),
+    };
+
+    assert!(response.has_url_context_metadata());
+
+    let metadata = response.url_context_metadata();
+    assert!(metadata.is_some());
+    let metadata = metadata.unwrap();
+    assert_eq!(metadata.url_metadata.len(), 1);
+    assert_eq!(
+        metadata.url_metadata[0].retrieved_url,
+        "https://example.com"
+    );
+    assert_eq!(
+        metadata.url_metadata[0].url_retrieval_status,
+        UrlRetrievalStatus::UrlRetrievalStatusSuccess
+    );
+}
+
+#[test]
+fn test_interaction_response_no_url_context_metadata() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(!response.has_url_context_metadata());
+    assert!(response.url_context_metadata().is_none());
+}
+
+#[test]
+fn test_interaction_response_code_execution_calls_plural() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::CodeExecutionCall {
+                id: "call_1".to_string(),
+                language: CodeExecutionLanguage::Python,
+                code: "print('first')".to_string(),
+            },
+            InteractionContent::CodeExecutionCall {
+                id: "call_2".to_string(),
+                language: CodeExecutionLanguage::Python,
+                code: "print('second')".to_string(),
+            },
+            InteractionContent::Text {
+                text: Some("Results".to_string()),
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(response.has_code_execution_calls());
+
+    let calls = response.code_execution_calls();
+    assert_eq!(calls.len(), 2);
+    assert_eq!(calls[0].0, CodeExecutionLanguage::Python);
+    assert_eq!(calls[0].1, "print('first')");
+    assert_eq!(calls[1].0, CodeExecutionLanguage::Python);
+    assert_eq!(calls[1].1, "print('second')");
+}
+
+#[test]
+fn test_interaction_response_code_execution_results() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::CodeExecutionResult {
+                call_id: "call_1".to_string(),
+                outcome: CodeExecutionOutcome::Ok,
+                output: "first output".to_string(),
+            },
+            InteractionContent::CodeExecutionResult {
+                call_id: "call_2".to_string(),
+                outcome: CodeExecutionOutcome::Failed,
+                output: "error message".to_string(),
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(response.has_code_execution_results());
+
+    let results = response.code_execution_results();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].0, CodeExecutionOutcome::Ok);
+    assert_eq!(results[0].1, "first output");
+    assert_eq!(results[1].0, CodeExecutionOutcome::Failed);
+    assert_eq!(results[1].1, "error message");
+
+    // Test successful_code_output - should return first successful output
+    let success = response.successful_code_output();
+    assert_eq!(success, Some("first output"));
+}
+
+#[test]
+fn test_interaction_response_no_code_execution_results() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("No code".to_string()),
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(!response.has_code_execution_results());
+    assert!(response.code_execution_results().is_empty());
+    assert!(response.successful_code_output().is_none());
+}
+
+#[test]
+fn test_interaction_response_google_search_results() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::GoogleSearchResult {
+                results: serde_json::json!({"items": [{"title": "Rust Lang"}]}),
+            },
+            InteractionContent::GoogleSearchResult {
+                results: serde_json::json!({"items": [{"title": "Cargo"}]}),
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(response.has_google_search_results());
+
+    let results = response.google_search_results();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0]["items"][0]["title"], "Rust Lang");
+    assert_eq!(results[1]["items"][0]["title"], "Cargo");
+}
+
+#[test]
+fn test_interaction_response_no_google_search_results() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(!response.has_google_search_results());
+    assert!(response.google_search_results().is_empty());
+}
+
+#[test]
+fn test_interaction_response_url_context_results() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::UrlContextResult {
+                url: "https://docs.rs".to_string(),
+                content: Some("<html>docs content</html>".to_string()),
+            },
+            InteractionContent::UrlContextResult {
+                url: "https://crates.io".to_string(),
+                content: Some("<html>crates content</html>".to_string()),
+            },
+            InteractionContent::UrlContextResult {
+                url: "https://blocked.com".to_string(),
+                content: None, // Failed fetch
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(response.has_url_context_results());
+
+    let results = response.url_context_results();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0].0, "https://docs.rs");
+    assert_eq!(results[0].1, Some("<html>docs content</html>"));
+    assert_eq!(results[1].0, "https://crates.io");
+    assert_eq!(results[2].0, "https://blocked.com");
+    assert_eq!(results[2].1, None); // Failed fetch has no content
+}
+
+#[test]
+fn test_interaction_response_no_url_context_results() {
+    let response = InteractionResponse {
+        id: "test_id".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(!response.has_url_context_results());
+    assert!(response.url_context_results().is_empty());
 }

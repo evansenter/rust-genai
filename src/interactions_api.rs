@@ -680,4 +680,279 @@ mod tests {
             _ => panic!("Expected Content variant"),
         }
     }
+
+    #[test]
+    fn test_function_call_content_with_signature() {
+        let content = function_call_content_with_signature(
+            Some("call_abc"),
+            "get_weather",
+            json!({"city": "Tokyo"}),
+            Some("sig_xyz".to_string()),
+        );
+        match content {
+            InteractionContent::FunctionCall {
+                id,
+                name,
+                args,
+                thought_signature,
+            } => {
+                assert_eq!(id, Some("call_abc".to_string()));
+                assert_eq!(name, "get_weather");
+                assert_eq!(args, json!({"city": "Tokyo"}));
+                assert_eq!(thought_signature, Some("sig_xyz".to_string()));
+            }
+            _ => panic!("Expected FunctionCall variant"),
+        }
+    }
+
+    #[test]
+    fn test_function_call_content_without_signature() {
+        let content =
+            function_call_content_with_signature(None::<String>, "test_fn", json!({}), None);
+        match content {
+            InteractionContent::FunctionCall {
+                id,
+                thought_signature,
+                ..
+            } => {
+                assert_eq!(id, None);
+                assert_eq!(thought_signature, None);
+            }
+            _ => panic!("Expected FunctionCall variant"),
+        }
+    }
+
+    #[test]
+    fn test_audio_data_content() {
+        let content = audio_data_content("audio_base64_data", "audio/mp3");
+        match content {
+            InteractionContent::Audio {
+                data,
+                uri,
+                mime_type,
+            } => {
+                assert_eq!(data, Some("audio_base64_data".to_string()));
+                assert_eq!(uri, None);
+                assert_eq!(mime_type, Some("audio/mp3".to_string()));
+            }
+            _ => panic!("Expected Audio variant"),
+        }
+    }
+
+    #[test]
+    fn test_audio_uri_content() {
+        let content = audio_uri_content("https://example.com/audio.mp3", "audio/mp3");
+        match content {
+            InteractionContent::Audio {
+                data,
+                uri,
+                mime_type,
+            } => {
+                assert_eq!(data, None);
+                assert_eq!(uri, Some("https://example.com/audio.mp3".to_string()));
+                assert_eq!(mime_type, Some("audio/mp3".to_string()));
+            }
+            _ => panic!("Expected Audio variant"),
+        }
+    }
+
+    #[test]
+    fn test_video_data_content() {
+        let content = video_data_content("video_base64_data", "video/mp4");
+        match content {
+            InteractionContent::Video {
+                data,
+                uri,
+                mime_type,
+            } => {
+                assert_eq!(data, Some("video_base64_data".to_string()));
+                assert_eq!(uri, None);
+                assert_eq!(mime_type, Some("video/mp4".to_string()));
+            }
+            _ => panic!("Expected Video variant"),
+        }
+    }
+
+    #[test]
+    fn test_video_uri_content() {
+        let content = video_uri_content("https://example.com/video.mp4", "video/mp4");
+        match content {
+            InteractionContent::Video {
+                data,
+                uri,
+                mime_type,
+            } => {
+                assert_eq!(data, None);
+                assert_eq!(uri, Some("https://example.com/video.mp4".to_string()));
+                assert_eq!(mime_type, Some("video/mp4".to_string()));
+            }
+            _ => panic!("Expected Video variant"),
+        }
+    }
+
+    #[test]
+    fn test_document_data_content() {
+        let content = document_data_content("pdf_base64_data", "application/pdf");
+        match content {
+            InteractionContent::Document {
+                data,
+                uri,
+                mime_type,
+            } => {
+                assert_eq!(data, Some("pdf_base64_data".to_string()));
+                assert_eq!(uri, None);
+                assert_eq!(mime_type, Some("application/pdf".to_string()));
+            }
+            _ => panic!("Expected Document variant"),
+        }
+    }
+
+    #[test]
+    fn test_document_uri_content() {
+        let content = document_uri_content("https://example.com/doc.pdf", "application/pdf");
+        match content {
+            InteractionContent::Document {
+                data,
+                uri,
+                mime_type,
+            } => {
+                assert_eq!(data, None);
+                assert_eq!(uri, Some("https://example.com/doc.pdf".to_string()));
+                assert_eq!(mime_type, Some("application/pdf".to_string()));
+            }
+            _ => panic!("Expected Document variant"),
+        }
+    }
+
+    #[test]
+    fn test_code_execution_call_content() {
+        let content =
+            code_execution_call_content("call_123", CodeExecutionLanguage::Python, "print(42)");
+        match content {
+            InteractionContent::CodeExecutionCall { id, language, code } => {
+                assert_eq!(id, "call_123");
+                assert_eq!(language, CodeExecutionLanguage::Python);
+                assert_eq!(code, "print(42)");
+            }
+            _ => panic!("Expected CodeExecutionCall variant"),
+        }
+    }
+
+    #[test]
+    fn test_code_execution_result_content() {
+        let content = code_execution_result_content("call_123", CodeExecutionOutcome::Ok, "42\n");
+        match content {
+            InteractionContent::CodeExecutionResult {
+                call_id,
+                outcome,
+                output,
+            } => {
+                assert_eq!(call_id, "call_123");
+                assert_eq!(outcome, CodeExecutionOutcome::Ok);
+                assert_eq!(output, "42\n");
+            }
+            _ => panic!("Expected CodeExecutionResult variant"),
+        }
+    }
+
+    #[test]
+    fn test_code_execution_success() {
+        let content = code_execution_success("call_456", "Hello World");
+        match content {
+            InteractionContent::CodeExecutionResult {
+                outcome, output, ..
+            } => {
+                assert_eq!(outcome, CodeExecutionOutcome::Ok);
+                assert_eq!(output, "Hello World");
+            }
+            _ => panic!("Expected CodeExecutionResult variant"),
+        }
+    }
+
+    #[test]
+    fn test_code_execution_error() {
+        let content = code_execution_error("call_789", "NameError: x not defined");
+        match content {
+            InteractionContent::CodeExecutionResult {
+                outcome, output, ..
+            } => {
+                assert_eq!(outcome, CodeExecutionOutcome::Failed);
+                assert!(output.contains("NameError"));
+            }
+            _ => panic!("Expected CodeExecutionResult variant"),
+        }
+    }
+
+    #[test]
+    fn test_google_search_call_content() {
+        let content = google_search_call_content("Rust programming");
+        match content {
+            InteractionContent::GoogleSearchCall { query } => {
+                assert_eq!(query, "Rust programming");
+            }
+            _ => panic!("Expected GoogleSearchCall variant"),
+        }
+    }
+
+    #[test]
+    fn test_google_search_result_content() {
+        let results = json!({"items": [{"title": "Rust"}]});
+        let content = google_search_result_content(results.clone());
+        match content {
+            InteractionContent::GoogleSearchResult { results: r } => {
+                assert_eq!(r, results);
+            }
+            _ => panic!("Expected GoogleSearchResult variant"),
+        }
+    }
+
+    #[test]
+    fn test_url_context_call_content() {
+        let content = url_context_call_content("https://docs.rs");
+        match content {
+            InteractionContent::UrlContextCall { url } => {
+                assert_eq!(url, "https://docs.rs");
+            }
+            _ => panic!("Expected UrlContextCall variant"),
+        }
+    }
+
+    #[test]
+    fn test_url_context_result_content() {
+        let content = url_context_result_content(
+            "https://example.com",
+            Some("<html>test</html>".to_string()),
+        );
+        match content {
+            InteractionContent::UrlContextResult { url, content: c } => {
+                assert_eq!(url, "https://example.com");
+                assert_eq!(c, Some("<html>test</html>".to_string()));
+            }
+            _ => panic!("Expected UrlContextResult variant"),
+        }
+    }
+
+    #[test]
+    fn test_url_context_success() {
+        let content = url_context_success("https://example.com", "<html>...</html>");
+        match content {
+            InteractionContent::UrlContextResult { url, content: c } => {
+                assert_eq!(url, "https://example.com");
+                assert_eq!(c, Some("<html>...</html>".to_string()));
+            }
+            _ => panic!("Expected UrlContextResult variant"),
+        }
+    }
+
+    #[test]
+    fn test_url_context_failure() {
+        let content = url_context_failure("https://blocked.com");
+        match content {
+            InteractionContent::UrlContextResult { url, content: c } => {
+                assert_eq!(url, "https://blocked.com");
+                assert_eq!(c, None);
+            }
+            _ => panic!("Expected UrlContextResult variant"),
+        }
+    }
 }
