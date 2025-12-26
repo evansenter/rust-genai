@@ -625,6 +625,14 @@ impl<'a> InteractionBuilder<'a> {
     /// - Function calls array is empty
     /// - Maximum iterations is reached (default 5, configurable via `with_max_function_call_loops()`)
     ///
+    /// # Thought Signatures
+    ///
+    /// For Gemini 3 models, thought signatures are required to maintain reasoning context
+    /// across function calling turns. This method uses `previous_interaction_id` to link
+    /// turns, which allows the server to manage thought signatures automatically.
+    ///
+    /// See <https://ai.google.dev/gemini-api/docs/thought-signatures> for more details.
+    ///
     /// # Example
     /// ```no_run
     /// # use rust_genai::{Client, FunctionDeclaration};

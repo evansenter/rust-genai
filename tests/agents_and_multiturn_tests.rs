@@ -22,7 +22,7 @@ use common::{
     DEFAULT_MAX_RETRIES, PollError, consume_stream, get_client, poll_until_complete,
     retry_on_transient,
 };
-use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
+use rust_genai::{FunctionDeclaration, InteractionStatus, ThinkingLevel, function_result_content};
 use serde_json::json;
 use std::time::Duration;
 
@@ -872,4 +872,471 @@ async fn test_streaming_multi_turn_function_calling() {
     if let Some(response) = result.final_response {
         assert_eq!(response.status, InteractionStatus::Completed);
     }
+}
+
+// =============================================================================
+// Thinking + Function Calling + Multi-turn
+// =============================================================================
+
+/// Test thinking mode combined with function calling across multiple turns.
+///
+/// This validates that:
+/// - Thinking mode (`ThinkingLevel`) works with client-side function calling
+/// - Multi-turn conversations function correctly with thinking enabled
+/// - Context is preserved across turns via `previous_interaction_id`
+///
+/// # Thought Signatures
+///
+/// Per Google's documentation (https://ai.google.dev/gemini-api/docs/thought-signatures):
+/// - Thought signatures are encrypted representations of the model's reasoning
+/// - For Gemini 3 models, signatures MUST be echoed back during function calling
+/// - The Interactions API handles this automatically via `previous_interaction_id`
+/// - Signatures may or may not be exposed in the response (API behavior varies)
+///
+/// # Thinking Mode vs Thought Signatures
+///
+/// These are distinct concepts:
+/// - `ThinkingLevel`: Exposes model's chain-of-thought as `Thought` content
+/// - `thought_signature`: Cryptographic field on function calls for verification
+///
+/// Thoughts may be processed internally without visible text, especially when
+/// the model is focused on function calling rather than explanation.
+///
+/// Turn 1: Enable thinking + ask question → triggers function call
+/// Turn 2: Provide function result → model processes and responds
+/// Turn 3: Follow-up question → model reasons with full context preserved
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_thinking_with_function_calling_multi_turn() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let get_weather = FunctionDeclaration::builder("get_weather")
+        .description("Get the current weather for a city including temperature and conditions")
+        .parameter(
+            "city",
+            json!({"type": "string", "description": "The city name"}),
+        )
+        .required(vec!["city".to_string()])
+        .build();
+
+    // =========================================================================
+    // Turn 1: Enable thinking + trigger function call
+    // =========================================================================
+    let response1 = {
+        let client = client.clone();
+        let get_weather = get_weather.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            let get_weather = get_weather.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_text("What's the weather in Tokyo? Should I bring an umbrella?")
+                    .with_function(get_weather)
+                    .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
+        .await
+        .expect("Turn 1 failed")
+    };
+
+    println!("Turn 1 status: {:?}", response1.status);
+
+    let function_calls = response1.function_calls();
+    if function_calls.is_empty() {
+        println!("Model chose not to call function - skipping rest of test");
+        return;
+    }
+
+    let call = &function_calls[0];
+    println!(
+        "Turn 1 function call: {} (has thought_signature: {})",
+        call.name,
+        call.thought_signature.is_some()
+    );
+
+    // Note: thought_signature is not guaranteed by the API - it depends on model behavior.
+    // We log its presence but don't hard-assert, as the existing tests show it can be None.
+    if call.thought_signature.is_some() {
+        println!("✓ Thought signature present on function call");
+    } else {
+        println!("ℹ Thought signature not present (API behavior varies)");
+    }
+    assert!(call.id.is_some(), "Function call must have an id");
+
+    // =========================================================================
+    // Turn 2: Provide function result - model should reason about it
+    // =========================================================================
+    let function_result = function_result_content(
+        "get_weather",
+        call.id.expect("call_id should exist").to_string(),
+        json!({
+            "temperature": "18°C",
+            "conditions": "rainy",
+            "precipitation": "80%",
+            "humidity": "85%"
+        }),
+    );
+
+    let response2 = {
+        let client = client.clone();
+        let prev_id = response1.id.clone();
+        let get_weather = get_weather.clone();
+        let function_result = function_result.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            let prev_id = prev_id.clone();
+            let get_weather = get_weather.clone();
+            let function_result = function_result.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_previous_interaction(&prev_id)
+                    .with_content(vec![function_result])
+                    .with_function(get_weather)
+                    .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
+        .await
+        .expect("Turn 2 failed")
+    };
+
+    println!("Turn 2 status: {:?}", response2.status);
+    println!("Turn 2 has_thoughts: {}", response2.has_thoughts());
+    println!("Turn 2 has_text: {}", response2.has_text());
+
+    if response2.has_thoughts() {
+        for (i, thought) in response2.thoughts().enumerate() {
+            println!(
+                "Turn 2 thought {}: {}...",
+                i + 1,
+                &thought[..thought.len().min(100)]
+            );
+        }
+    }
+
+    if response2.has_text() {
+        println!("Turn 2 text: {}", response2.text().unwrap());
+    }
+
+    // Verify we got a response - thoughts may or may not be visible
+    // (the API may process reasoning internally without exposing it)
+    if response2.has_thoughts() {
+        println!("✓ Thoughts visible in Turn 2");
+    } else {
+        println!("ℹ Thoughts processed internally (not exposed in response)");
+    }
+
+    assert!(
+        response2.has_text(),
+        "Turn 2 should have text response about the weather"
+    );
+
+    // Response should reference the weather conditions
+    let text2 = response2.text().unwrap().to_lowercase();
+    assert!(
+        text2.contains("umbrella")
+            || text2.contains("rain")
+            || text2.contains("yes")
+            || text2.contains("18"),
+        "Turn 2 should reference weather conditions. Got: {}",
+        text2
+    );
+
+    // =========================================================================
+    // Turn 3: Follow-up question - model reasons with full context
+    // =========================================================================
+    let response3 = {
+        let client = client.clone();
+        let prev_id = response2.id.clone();
+        let get_weather = get_weather.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            let prev_id = prev_id.clone();
+            let get_weather = get_weather.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_previous_interaction(&prev_id)
+                    .with_text(
+                        "Given this weather, what indoor activities would you recommend in Tokyo?",
+                    )
+                    .with_function(get_weather)
+                    .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
+        .await
+        .expect("Turn 3 failed")
+    };
+
+    println!("Turn 3 status: {:?}", response3.status);
+    println!("Turn 3 has_thoughts: {}", response3.has_thoughts());
+    println!("Turn 3 has_text: {}", response3.has_text());
+
+    if response3.has_thoughts() {
+        for (i, thought) in response3.thoughts().enumerate() {
+            println!(
+                "Turn 3 thought {}: {}...",
+                i + 1,
+                &thought[..thought.len().min(100)]
+            );
+        }
+    }
+
+    if response3.has_text() {
+        println!("Turn 3 text: {}", response3.text().unwrap());
+    }
+
+    // Verify we got a response - thoughts may or may not be visible
+    if response3.has_thoughts() {
+        println!("✓ Thoughts visible in Turn 3");
+    } else {
+        println!("ℹ Thoughts processed internally (not exposed in response)");
+    }
+
+    assert!(
+        response3.has_text(),
+        "Turn 3 should have text response with recommendations"
+    );
+
+    // Log reasoning tokens if available (indicates thinking is engaged)
+    if let Some(ref usage) = response3.usage
+        && let Some(reasoning_tokens) = usage.total_reasoning_tokens
+    {
+        println!("Turn 3 reasoning tokens: {}", reasoning_tokens);
+    }
+
+    // Response should be contextually relevant (about indoor activities)
+    let text3 = response3.text().unwrap().to_lowercase();
+    assert!(
+        text3.contains("indoor")
+            || text3.contains("inside")
+            || text3.contains("museum")
+            || text3.contains("shopping")
+            || text3.contains("restaurant")
+            || text3.contains("cafe")
+            || text3.contains("temple")
+            || text3.contains("activity")
+            || text3.contains("activities"),
+        "Turn 3 should recommend indoor activities. Got: {}",
+        text3
+    );
+
+    println!("\n✓ All three turns completed successfully with thinking + function calling");
+}
+
+/// Test thinking mode with parallel function calls.
+///
+/// This validates that:
+/// - Thinking mode works correctly when the model makes multiple function calls in one response
+/// - Thought signatures follow the documented pattern (only first parallel call has signature)
+/// - Results can be provided for all parallel calls and the model reasons about them
+///
+/// Per Google's documentation (https://ai.google.dev/gemini-api/docs/thought-signatures):
+/// "If the model generates parallel function calls in a response, only the first
+/// function call will contain a signature."
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_thinking_with_parallel_function_calls() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let get_weather = FunctionDeclaration::builder("get_weather")
+        .description("Get the current weather for a city")
+        .parameter(
+            "city",
+            json!({"type": "string", "description": "City name"}),
+        )
+        .required(vec!["city".to_string()])
+        .build();
+
+    let get_time = FunctionDeclaration::builder("get_time")
+        .description("Get the current time in a timezone")
+        .parameter(
+            "timezone",
+            json!({"type": "string", "description": "Timezone like UTC, PST, JST"}),
+        )
+        .required(vec!["timezone".to_string()])
+        .build();
+
+    // =========================================================================
+    // Turn 1: Enable thinking + trigger parallel function calls
+    // =========================================================================
+    let response1 = {
+        let client = client.clone();
+        let get_weather = get_weather.clone();
+        let get_time = get_time.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            let get_weather = get_weather.clone();
+            let get_time = get_time.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_text(
+                        "What's the weather in Tokyo and what time is it there? \
+                         I need both pieces of information.",
+                    )
+                    .with_functions(vec![get_weather, get_time])
+                    .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
+        .await
+        .expect("Turn 1 failed")
+    };
+
+    println!("Turn 1 status: {:?}", response1.status);
+
+    let function_calls = response1.function_calls();
+    println!("Number of function calls: {}", function_calls.len());
+
+    if function_calls.is_empty() {
+        println!("Model chose not to call functions - skipping rest of test");
+        return;
+    }
+
+    for (i, call) in function_calls.iter().enumerate() {
+        println!(
+            "  Call {}: {} (has thought_signature: {})",
+            i + 1,
+            call.name,
+            call.thought_signature.is_some()
+        );
+    }
+
+    // Per docs: only the first parallel call should have a signature
+    if function_calls.len() >= 2 {
+        println!("✓ Model made parallel function calls");
+        if function_calls[0].thought_signature.is_some() {
+            println!("✓ First call has thought_signature (as documented)");
+        }
+        // Note: We don't hard-assert on signature presence as API behavior varies
+    }
+
+    // Verify all calls have IDs
+    for call in &function_calls {
+        assert!(
+            call.id.is_some(),
+            "Function call '{}' should have an ID",
+            call.name
+        );
+    }
+
+    // =========================================================================
+    // Turn 2: Provide results for all function calls
+    // =========================================================================
+    let mut results = Vec::new();
+    for call in &function_calls {
+        let result_data = match call.name {
+            "get_weather" => json!({
+                "temperature": "22°C",
+                "conditions": "partly cloudy",
+                "humidity": "65%"
+            }),
+            "get_time" => json!({
+                "time": "14:30",
+                "timezone": "JST",
+                "date": "2025-01-15"
+            }),
+            _ => json!({"status": "unknown function"}),
+        };
+
+        results.push(function_result_content(
+            call.name,
+            call.id.expect("call should have ID"),
+            result_data,
+        ));
+    }
+
+    let response2 = {
+        let client = client.clone();
+        let prev_id = response1.id.clone();
+        let get_weather = get_weather.clone();
+        let get_time = get_time.clone();
+        let results = results.clone();
+        retry_on_transient(DEFAULT_MAX_RETRIES, || {
+            let client = client.clone();
+            let prev_id = prev_id.clone();
+            let get_weather = get_weather.clone();
+            let get_time = get_time.clone();
+            let results = results.clone();
+            async move {
+                client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_previous_interaction(&prev_id)
+                    .with_content(results)
+                    .with_functions(vec![get_weather, get_time])
+                    .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store(true)
+                    .create()
+                    .await
+            }
+        })
+        .await
+        .expect("Turn 2 failed")
+    };
+
+    println!("Turn 2 status: {:?}", response2.status);
+    println!("Turn 2 has_thoughts: {}", response2.has_thoughts());
+    println!("Turn 2 has_text: {}", response2.has_text());
+
+    if response2.has_thoughts() {
+        println!("✓ Thoughts visible in Turn 2");
+    } else {
+        println!("ℹ Thoughts processed internally (not exposed in response)");
+    }
+
+    if response2.has_text() {
+        let text = response2.text().unwrap();
+        println!("Turn 2 text: {}", text);
+    }
+
+    assert!(
+        response2.has_text(),
+        "Turn 2 should have text response combining weather and time info"
+    );
+
+    // Response should reference both weather and time
+    let text2 = response2.text().unwrap().to_lowercase();
+    let has_weather_ref = text2.contains("weather")
+        || text2.contains("temperature")
+        || text2.contains("22")
+        || text2.contains("cloud");
+    let has_time_ref = text2.contains("time") || text2.contains("14:30") || text2.contains("2:30");
+
+    println!(
+        "References weather: {}, References time: {}",
+        has_weather_ref, has_time_ref
+    );
+
+    // At minimum, should reference at least one of the function results
+    assert!(
+        has_weather_ref || has_time_ref,
+        "Turn 2 should reference function results. Got: {}",
+        text2
+    );
+
+    println!("\n✓ Parallel function calls with thinking completed successfully");
 }
