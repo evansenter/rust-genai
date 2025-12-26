@@ -44,3 +44,117 @@ pub enum GenaiError {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_genai_error_parse_display() {
+        let error = GenaiError::Parse("Invalid SSE format".to_string());
+        let display = format!("{}", error);
+        assert!(display.contains("SSE parsing error"));
+        assert!(display.contains("Invalid SSE format"));
+    }
+
+    #[test]
+    fn test_genai_error_api_display() {
+        let error = GenaiError::Api {
+            status_code: 429,
+            message: "Rate limited".to_string(),
+            request_id: Some("req-123".to_string()),
+        };
+        let display = format!("{}", error);
+        assert!(display.contains("429"));
+        assert!(display.contains("Rate limited"));
+    }
+
+    #[test]
+    fn test_genai_error_api_without_request_id() {
+        let error = GenaiError::Api {
+            status_code: 500,
+            message: "Internal error".to_string(),
+            request_id: None,
+        };
+        let display = format!("{}", error);
+        assert!(display.contains("500"));
+        assert!(display.contains("Internal error"));
+    }
+
+    #[test]
+    fn test_genai_error_internal_display() {
+        let error = GenaiError::Internal("Max function loops exceeded".to_string());
+        let display = format!("{}", error);
+        assert!(display.contains("Internal client error"));
+        assert!(display.contains("Max function loops exceeded"));
+    }
+
+    #[test]
+    fn test_genai_error_invalid_input_display() {
+        let error = GenaiError::InvalidInput("Missing model or agent".to_string());
+        let display = format!("{}", error);
+        assert!(display.contains("Invalid input"));
+        assert!(display.contains("Missing model or agent"));
+    }
+
+    #[test]
+    fn test_genai_error_json_from() {
+        let json_str = "not valid json";
+        let json_err = serde_json::from_str::<serde_json::Value>(json_str).unwrap_err();
+        let genai_err: GenaiError = json_err.into();
+        let display = format!("{}", genai_err);
+        assert!(display.contains("JSON deserialization error"));
+    }
+
+    #[test]
+    fn test_genai_error_utf8_from() {
+        // Create an invalid UTF-8 byte sequence
+        let bytes = vec![0xff, 0xfe];
+        let utf8_err = std::str::from_utf8(&bytes).unwrap_err();
+        let genai_err: GenaiError = utf8_err.into();
+        let display = format!("{}", genai_err);
+        assert!(display.contains("UTF-8 decoding error"));
+    }
+
+    #[test]
+    fn test_genai_error_debug_format() {
+        let error = GenaiError::Api {
+            status_code: 400,
+            message: "Bad request".to_string(),
+            request_id: Some("req-456".to_string()),
+        };
+        let debug = format!("{:?}", error);
+        assert!(debug.contains("Api"));
+        assert!(debug.contains("400"));
+        assert!(debug.contains("req-456"));
+    }
+
+    #[test]
+    fn test_genai_error_api_status_codes() {
+        // Test common HTTP status codes
+        let status_codes = [
+            (400, "Bad Request"),
+            (401, "Unauthorized"),
+            (403, "Forbidden"),
+            (404, "Not Found"),
+            (429, "Too Many Requests"),
+            (500, "Internal Server Error"),
+            (503, "Service Unavailable"),
+        ];
+
+        for (code, message) in status_codes {
+            let error = GenaiError::Api {
+                status_code: code,
+                message: message.to_string(),
+                request_id: None,
+            };
+            let display = format!("{}", error);
+            assert!(
+                display.contains(&code.to_string()),
+                "Expected {} in display: {}",
+                code,
+                display
+            );
+        }
+    }
+}

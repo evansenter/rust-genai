@@ -32,12 +32,13 @@ use rust_genai::{
 // Image Input Tests
 // =============================================================================
 
-/// Tests image input from URI.
-/// Note: GCS URIs are not supported by the Interactions API, so this test
-/// documents the expected error behavior.
+/// Tests image input via GCS URI (gs://) which may not be supported by the Interactions API.
+/// This test documents the expected "Unsupported file uri" error behavior when the API rejects
+/// such URIs, but also handles success gracefully if the API accepts the format.
+/// For reliable image input, use base64 encoding (see `test_image_input_from_base64`).
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_image_input_from_uri() {
+async fn test_image_input_gcs_uri_unsupported() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
