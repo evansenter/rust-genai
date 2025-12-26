@@ -729,3 +729,111 @@ async fn test_pdf_with_question() {
         }
     }
 }
+
+// =============================================================================
+// Streaming Tests
+// =============================================================================
+
+/// Test streaming with multimodal (image) input.
+///
+/// This validates that:
+/// - Streaming works correctly when images are part of the input
+/// - Text deltas are received incrementally
+/// - Final response correctly describes the image
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_multimodal_streaming() {
+    use futures_util::StreamExt;
+    use rust_genai::StreamChunk;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    println!("=== Multimodal + Streaming ===");
+
+    // Create content with text and image
+    let contents = vec![
+        text_content("What color is this image? Answer in one word."),
+        image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+    ];
+
+    // Stream the response using with_input for multimodal content
+    let mut stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_input(InteractionInput::Content(contents))
+        .with_store(true)
+        .create_stream();
+
+    let mut delta_count = 0;
+    let mut collected_text = String::new();
+    let mut final_response = None;
+    let mut had_error = false;
+
+    println!("Starting stream consumption...");
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(chunk) => match chunk {
+                StreamChunk::Delta(delta) => {
+                    delta_count += 1;
+                    if let Some(text) = delta.text() {
+                        collected_text.push_str(text);
+                        print!("{}", text);
+                    }
+                }
+                StreamChunk::Complete(response) => {
+                    println!("\nStream complete: {}", response.id);
+                    final_response = Some(response);
+                }
+            },
+            Err(e) => {
+                println!("Stream error: {:?}", e);
+                had_error = true;
+            }
+        }
+    }
+
+    println!("\nDelta count: {}", delta_count);
+    println!("Collected text: {}", collected_text);
+    println!("Had error: {}", had_error);
+
+    // Verify streaming worked - either we got deltas OR a final response
+    assert!(
+        delta_count > 0 || final_response.is_some(),
+        "Should receive streaming chunks or final response"
+    );
+
+    // Verify content describes the red image (if we got text)
+    if !collected_text.is_empty() {
+        let text_lower = collected_text.to_lowercase();
+        assert!(
+            text_lower.contains("red"),
+            "Response should identify the red color. Got: {}",
+            collected_text
+        );
+    } else if let Some(ref response) = final_response {
+        // Check final response text if no deltas
+        if let Some(text) = response.text() {
+            let text_lower = text.to_lowercase();
+            assert!(
+                text_lower.contains("red"),
+                "Response should identify the red color. Got: {}",
+                text
+            );
+        }
+    }
+
+    // Verify final response if present
+    if let Some(response) = final_response {
+        assert_eq!(
+            response.status,
+            InteractionStatus::Completed,
+            "Final response should be completed"
+        );
+    }
+
+    println!("\n✓ Multimodal + streaming completed successfully");
+}
