@@ -312,6 +312,7 @@ impl Client {
     ///         StreamChunk::Complete(response) => {
     ///             println!("\nDone! ID: {}", response.id);
     ///         }
+    ///         _ => {} // Handle unknown future variants
     ///     }
     /// }
     /// # Ok(())

@@ -162,6 +162,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     println!("\n");
                     final_response = Some(response);
                 }
+                _ => {} // Handle unknown variants
             },
             Err(e) => {
                 eprintln!("\nStream error: {e}");

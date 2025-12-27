@@ -379,6 +379,7 @@ pub async fn consume_stream(
                     println!("\nStream complete: {}", response.id);
                     result.final_response = Some(response);
                 }
+                _ => {} // Handle unknown variants
             },
             Err(e) => {
                 println!("Stream error: {:?}", e);

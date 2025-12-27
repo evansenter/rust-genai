@@ -145,6 +145,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("the function and send results back to the model.");
                     }
                 }
+                _ => {} // Handle unknown variants
             },
             Err(e) => {
                 eprintln!("\nStream error: {e}");

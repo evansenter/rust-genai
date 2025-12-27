@@ -152,6 +152,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 StreamChunk::Complete(_) => {
                     println!("\n");
                 }
+                _ => {} // Handle unknown variants
             },
             Err(e) => {
                 eprintln!("\nStream error: {e}");
