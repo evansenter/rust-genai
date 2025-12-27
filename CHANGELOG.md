@@ -32,6 +32,27 @@ image_uri_content("https://example.com/image.png", "image/png")
 - New `Internal` and `InvalidInput` variants for better error categorization
 - Users of the public `rust-genai` crate are unaffected (uses the same `GenaiError`)
 
+#### create_with_auto_functions() Returns AutoFunctionResult (#148)
+- **Changed return type**: `create_with_auto_functions()` now returns `AutoFunctionResult` instead of `InteractionResponse`
+- **New `AutoFunctionResult` type**: Contains both the final response and execution history
+- Provides visibility into which functions were called, enabling debugging, logging, and evaluation
+
+**Migration guide:**
+```rust
+// Before:
+let response = builder.create_with_auto_functions().await?;
+println!("{}", response.text().unwrap());
+
+// After:
+let result = builder.create_with_auto_functions().await?;
+println!("{}", result.response.text().unwrap());
+
+// New: Access execution history
+for exec in &result.executions {
+    println!("Called {} -> {}", exec.name, exec.result);
+}
+```
+
 ### Added
 
 - **New convenience helpers on `InteractionResponse`** (#131):

@@ -129,6 +129,46 @@ impl FunctionExecutionResult {
     }
 }
 
+/// Result from `create_with_auto_functions()` containing the final response
+/// and a history of all function executions.
+///
+/// This type provides visibility into which functions were called during
+/// automatic function execution, useful for debugging, logging, and evaluation.
+///
+/// # Example
+///
+/// ```no_run
+/// # use rust_genai::{Client, AutoFunctionResult};
+/// # async fn example() -> Result<(), rust_genai::GenaiError> {
+/// # let client = Client::new("key".to_string());
+/// let result = client
+///     .interaction()
+///     .with_model("gemini-3-flash-preview")
+///     .with_text("What's the weather in London?")
+///     .create_with_auto_functions()
+///     .await?;
+///
+/// // Access the final response
+/// if let Some(text) = result.response.text() {
+///     println!("Answer: {}", text);
+/// }
+///
+/// // Access execution history
+/// for exec in &result.executions {
+///     println!("Called {} -> {}", exec.name, exec.result);
+/// }
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct AutoFunctionResult {
+    /// The final response from the model (after all function calls completed)
+    pub response: InteractionResponse,
+    /// All functions that were executed during the auto-function loop
+    pub executions: Vec<FunctionExecutionResult>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -746,7 +746,7 @@ async fn test_auto_function_calling_registered() {
     // Use a function registered via the macro
     let weather_func = GetWeatherTestCallable.declaration();
 
-    let response = client
+    let result = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("What's the weather in Seattle?")
@@ -755,6 +755,18 @@ async fn test_auto_function_calling_registered() {
         .await
         .expect("Auto function calling failed");
 
+    // Verify executions are tracked
+    println!("Function executions: {:?}", result.executions);
+    assert!(
+        !result.executions.is_empty(),
+        "Should have at least one function execution"
+    );
+    assert_eq!(
+        result.executions[0].name, "get_weather_test",
+        "Should have called get_weather_test"
+    );
+
+    let response = &result.response;
     println!("Final status: {:?}", response.status);
     assert!(
         response.has_text(),
@@ -798,8 +810,9 @@ async fn test_auto_function_calling_max_loops() {
 
     // With max_loops=1, it should either succeed quickly or hit the limit
     match result {
-        Ok(response) => {
-            println!("Completed within 1 loop: {:?}", response.status);
+        Ok(auto_result) => {
+            println!("Completed within 1 loop: {:?}", auto_result.response.status);
+            println!("Executions: {:?}", auto_result.executions);
         }
         Err(e) => {
             let error_msg = format!("{:?}", e);

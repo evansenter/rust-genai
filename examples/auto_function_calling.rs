@@ -77,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 2. If model returns function calls, execute them
     // 3. Send results back to model
     // 4. Repeat until model returns text
-    let response = client
+    let result = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(prompt)
@@ -85,10 +85,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create_with_auto_functions()
         .await?;
 
-    println!("\n--- Final Response ---");
-    println!("Status: {:?}", response.status);
+    println!("\n--- Function Executions ---");
+    for exec in &result.executions {
+        println!("  {} -> {}", exec.name, exec.result);
+    }
 
-    if let Some(text) = response.text() {
+    println!("\n--- Final Response ---");
+    println!("Status: {:?}", result.response.status);
+
+    if let Some(text) = result.response.text() {
         println!("\nAssistant: {}", text);
     }
 
