@@ -69,6 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("Total tokens: {}", total);
                     }
                 }
+                _ => {} // Handle unknown variants
             },
             Err(e) => {
                 eprintln!("\nStream error: {:?}", e);

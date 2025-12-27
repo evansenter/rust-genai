@@ -90,6 +90,7 @@ async fn canary_streaming_interaction() {
             rust_genai::StreamChunk::Complete(response) => {
                 assert_no_unknown_content(&response, "streaming complete response");
             }
+            _ => {} // Handle unknown variants
         }
     }
 

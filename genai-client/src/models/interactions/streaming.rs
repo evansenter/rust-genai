@@ -13,13 +13,30 @@ use super::response::{InteractionResponse, InteractionStatus};
 ///
 /// Both variants implement `Serialize` and `Deserialize` for logging,
 /// persistence, and replay of streaming events.
+///
+/// # Forward Compatibility
+///
+/// This enum uses `#[non_exhaustive]` to allow adding new chunk types in future
+/// versions without breaking existing code. Always include a wildcard arm in
+/// match statements. Unknown chunk types deserialize to the `Unknown` variant.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "chunk_type", content = "data", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum StreamChunk {
     /// Incremental content update
     Delta(InteractionContent),
     /// Complete interaction response (final event)
     Complete(InteractionResponse),
+    /// Unknown chunk type (for forward compatibility).
+    ///
+    /// This variant is used when deserializing JSON that contains an unrecognized
+    /// `chunk_type`. This allows the library to gracefully handle new chunk types
+    /// added by the API in future versions without failing deserialization.
+    ///
+    /// When encountering an `Unknown` variant, code should typically log a warning
+    /// and continue processing, as the stream may still contain useful events.
+    #[serde(other)]
+    Unknown,
 }
 
 /// Wrapper for SSE streaming events from the Interactions API
@@ -121,5 +138,16 @@ mod tests {
             }
             _ => panic!("Expected Complete variant"),
         }
+    }
+
+    #[test]
+    fn test_stream_chunk_unknown_forward_compatibility() {
+        // Simulate a future chunk type that doesn't exist yet
+        // Note: With adjacently tagged enums and #[serde(other)], the Unknown
+        // variant must not have a data field (it's a unit variant)
+        let unknown_json = r#"{"chunk_type": "future_chunk_type"}"#;
+        let deserialized: StreamChunk =
+            serde_json::from_str(unknown_json).expect("Should deserialize unknown variant");
+        assert!(matches!(deserialized, StreamChunk::Unknown));
     }
 }

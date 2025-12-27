@@ -49,6 +49,7 @@ pub const DEFAULT_MAX_FUNCTION_CALL_LOOPS: usize = 5;
 ///         StreamChunk::Complete(response) => {
 ///             println!("\nDone!");
 ///         }
+///         _ => {} // Handle unknown future variants
 ///     }
 /// }
 /// # Ok(())
@@ -594,6 +595,7 @@ impl<'a> InteractionBuilder<'a> {
     ///         StreamChunk::Complete(response) => {
     ///             println!("\nFinal response ID: {}", response.id);
     ///         }
+    ///         _ => {} // Handle unknown future variants
     ///     }
     /// }
     /// # Ok(())
@@ -897,6 +899,8 @@ impl<'a> InteractionBuilder<'a> {
                         StreamChunk::Complete(response) => {
                             complete_response = Some(response);
                         }
+                        // Ignore unknown chunk types for forward compatibility
+                        _ => {}
                     }
                 }
 

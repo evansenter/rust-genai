@@ -97,8 +97,12 @@ pub enum AutoFunctionStreamChunk {
 
     /// Unknown event type (for forward compatibility).
     ///
-    /// This variant captures any unrecognized event types that may be added
-    /// in future versions, allowing deserialization to succeed gracefully.
+    /// This variant is used when deserializing JSON that contains an unrecognized
+    /// `chunk_type`. This allows the library to gracefully handle new event types
+    /// added by the API in future versions without failing deserialization.
+    ///
+    /// When encountering an `Unknown` variant, code should typically log a warning
+    /// and continue processing, as the stream may still contain useful events.
     #[serde(other)]
     Unknown,
 }

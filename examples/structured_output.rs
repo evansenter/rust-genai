@@ -268,6 +268,7 @@ async fn streaming_structured_output(client: &Client) -> Result<(), Box<dyn Erro
                 StreamChunk::Complete(response) => {
                     final_response = Some(response);
                 }
+                _ => {} // Handle unknown variants
             },
             Err(e) => {
                 eprintln!("\nStream error: {e}");

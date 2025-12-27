@@ -133,6 +133,7 @@ async fn test_google_search_streaming() {
                         }
                         final_response = Some(response);
                     }
+                    _ => {} // Handle unknown variants
                 }
             }
             Err(e) => {
@@ -353,6 +354,7 @@ async fn test_code_execution_streaming() {
                         );
                         has_complete = true;
                     }
+                    _ => {} // Handle unknown variants
                 }
             }
             Err(e) => {
@@ -505,6 +507,7 @@ async fn test_url_context_streaming() {
                         }
                         final_response = Some(response);
                     }
+                    _ => {} // Handle unknown variants
                 }
             }
             Err(e) => {
@@ -910,6 +913,7 @@ async fn test_structured_output_streaming() {
                         println!("Complete response received");
                         final_response = Some(response);
                     }
+                    _ => {} // Handle unknown variants
                 }
             }
             Err(e) => {

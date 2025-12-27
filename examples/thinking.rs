@@ -199,6 +199,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         summary.thought_count, summary.text_count
                     );
                 }
+                _ => {} // Handle unknown variants
             },
             Err(e) => {
                 eprintln!("\nStream error: {}", e);
