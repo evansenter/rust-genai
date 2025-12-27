@@ -32,7 +32,52 @@ image_uri_content("https://example.com/image.png", "image/png")
 - New `Internal` and `InvalidInput` variants for better error categorization
 - Users of the public `rust-genai` crate are unaffected (uses the same `GenaiError`)
 
+#### create_with_auto_functions() Returns AutoFunctionResult (#148)
+- **Changed return type**: `create_with_auto_functions()` now returns `AutoFunctionResult` instead of `InteractionResponse`
+- **New `AutoFunctionResult` type**: Contains both the final response and execution history
+- Provides visibility into which functions were called, enabling debugging, logging, and evaluation
+
+**Migration guide:**
+```rust
+// Before:
+let response = builder.create_with_auto_functions().await?;
+println!("{}", response.text().unwrap());
+
+// After:
+let result = builder.create_with_auto_functions().await?;
+println!("{}", result.response.text().unwrap());
+
+// New: Access execution history with timing
+for exec in &result.executions {
+    println!("Called {} ({:?}) -> {}", exec.name, exec.duration, exec.result);
+}
+```
+
 ### Added
+
+- **Function execution timing** (#148):
+  - `FunctionExecutionResult.duration` tracks how long each function took to execute
+  - Duration is serialized as milliseconds for JSON compatibility
+  - Useful for performance monitoring, debugging, and optimization
+
+- **Streaming accumulator helper** (#148):
+  - New `AutoFunctionResultAccumulator` type to collect `AutoFunctionResult` from streaming
+  - Allows combining streaming UI updates with execution history collection
+  - Example:
+    ```rust
+    let mut accumulator = AutoFunctionResultAccumulator::new();
+    while let Some(chunk) = stream.next().await {
+        if let Some(result) = accumulator.push(chunk?) {
+            // Stream complete, result contains full execution history
+            println!("Executed {} functions", result.executions.len());
+        }
+    }
+    ```
+
+- **`Serialize` support for response types** (#148):
+  - `InteractionResponse` now implements `Serialize` for logging, caching, and persistence
+  - `AutoFunctionResult` implements `Serialize` for full execution history serialization
+  - All nested types (`InteractionContent`, `Tool`, etc.) already support roundtrip serialization with `Unknown` variant preservation
 
 - **New convenience helpers on `InteractionResponse`** (#131):
   - `google_search_call()` - returns first Google Search call (singular)

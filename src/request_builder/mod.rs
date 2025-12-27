@@ -1,6 +1,8 @@
+use std::time::Instant;
+
 use crate::GenaiError;
 use crate::client::Client;
-use crate::streaming::{AutoFunctionStreamChunk, FunctionExecutionResult};
+use crate::streaming::{AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionResult};
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
@@ -642,16 +644,28 @@ impl<'a> InteractionBuilder<'a> {
     /// let client = Client::builder("api_key".to_string()).build();
     ///
     /// // Functions are auto-discovered from registry
-    /// let response = client.interaction()
+    /// let result = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("What's the weather in Tokyo?")
     ///     .create_with_auto_functions()
     ///     .await?;
     ///
-    /// println!("{}", response.text().unwrap_or("No text"));
+    /// // Access the final response
+    /// println!("{}", result.response.text().unwrap_or("No text"));
+    ///
+    /// // Access execution history
+    /// for exec in &result.executions {
+    ///     println!("Called {} -> {}", exec.name, exec.result);
+    /// }
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Serialization
+    ///
+    /// Both [`AutoFunctionResult`] and its contained [`InteractionResponse`]
+    /// implement `Serialize`, enabling logging, caching, and persistence of complete
+    /// execution histories for debugging and evaluation workflows.
     ///
     /// # Errors
     ///
@@ -660,7 +674,7 @@ impl<'a> InteractionBuilder<'a> {
     /// - Neither model nor agent was specified
     /// - The API request fails
     /// - Maximum function call loops is exceeded (default 5, configurable via `with_max_function_call_loops()`)
-    pub async fn create_with_auto_functions(self) -> Result<InteractionResponse, GenaiError> {
+    pub async fn create_with_auto_functions(self) -> Result<AutoFunctionResult, GenaiError> {
         use crate::function_calling::get_global_function_registry;
         use crate::interactions_api::function_result_content;
         use log::{error, warn};
@@ -669,6 +683,9 @@ impl<'a> InteractionBuilder<'a> {
         let client = self.client;
         let max_loops = self.max_function_call_loops;
         let mut request = self.build_request()?;
+
+        // Track all function executions for the result
+        let mut all_executions: Vec<FunctionExecutionResult> = Vec::new();
 
         // Auto-discover functions from registry if not explicitly provided
         let function_registry = get_global_function_registry();
@@ -693,7 +710,10 @@ impl<'a> InteractionBuilder<'a> {
 
             // If no function calls, we're done!
             if function_calls.is_empty() {
-                return Ok(response);
+                return Ok(AutoFunctionResult {
+                    response,
+                    executions: all_executions,
+                });
             }
 
             // Build function results for next iteration
@@ -713,7 +733,8 @@ impl<'a> InteractionBuilder<'a> {
                     ))
                 })?;
 
-                // Execute the function
+                // Execute the function with timing
+                let start = Instant::now();
                 let result = if let Some(function) = function_registry.get(call.name) {
                     match function.call(call.args.clone()).await {
                         Ok(result) => result,
@@ -732,6 +753,15 @@ impl<'a> InteractionBuilder<'a> {
                     );
                     json!({ "error": format!("Function '{}' is not available or not found.", call.name) })
                 };
+                let duration = start.elapsed();
+
+                // Track execution for the result
+                all_executions.push(FunctionExecutionResult::new(
+                    call.name,
+                    call_id,
+                    result.clone(),
+                    duration,
+                ));
 
                 // Add function result (only the result, not the call - server has it via previous_interaction_id)
                 function_results.push(function_result_content(
@@ -942,7 +972,8 @@ impl<'a> InteractionBuilder<'a> {
                 let mut execution_results = Vec::new();
 
                 for (call_id, name, args) in &calls_to_execute {
-                    // Execute the function
+                    // Execute the function with timing
+                    let start = Instant::now();
                     let result = if let Some(function) = function_registry.get(name) {
                         match function.call(args.clone()).await {
                             Ok(result) => result,
@@ -961,12 +992,14 @@ impl<'a> InteractionBuilder<'a> {
                         );
                         json!({ "error": format!("Function '{}' is not available or not found.", name) })
                     };
+                    let duration = start.elapsed();
 
                     // Track result for yielding
                     execution_results.push(FunctionExecutionResult::new(
                         name.clone(),
                         call_id.clone(),
                         result.clone(),
+                        duration,
                     ));
 
                     // Add function result content for API

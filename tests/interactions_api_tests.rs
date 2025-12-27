@@ -474,7 +474,7 @@ async fn test_auto_function_calling() {
     // Use the get_mock_weather function registered via macro
     let weather_func = GetMockWeatherCallable.declaration();
 
-    let response = client
+    let result = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("What's the weather like in Seattle?")
@@ -483,6 +483,14 @@ async fn test_auto_function_calling() {
         .await
         .expect("Auto-function call failed");
 
+    // Verify executions are tracked
+    println!("Function executions: {:?}", result.executions);
+    assert!(
+        !result.executions.is_empty(),
+        "Should have at least one function execution"
+    );
+
+    let response = &result.response;
     println!("Final response status: {:?}", response.status);
     assert!(
         response.has_text(),
@@ -524,9 +532,10 @@ async fn test_auto_function_with_unregistered_function() {
 
     // Should complete (model handles the error gracefully) or return an error
     match result {
-        Ok(response) => {
-            println!("Response status: {:?}", response.status);
-            println!("Response text: {:?}", response.text());
+        Ok(auto_result) => {
+            println!("Response status: {:?}", auto_result.response.status);
+            println!("Response text: {:?}", auto_result.response.text());
+            println!("Executions: {:?}", auto_result.executions);
         }
         Err(e) => {
             println!("Error (expected for unregistered function): {:?}", e);

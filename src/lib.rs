@@ -100,4 +100,7 @@ pub use function_calling::{CallableFunction, FunctionError};
 
 pub mod streaming;
 // Re-export streaming types for automatic function calling
-pub use streaming::{AutoFunctionStreamChunk, FunctionExecutionResult};
+pub use streaming::{
+    AutoFunctionResult, AutoFunctionResultAccumulator, AutoFunctionStreamChunk,
+    FunctionExecutionResult,
+};

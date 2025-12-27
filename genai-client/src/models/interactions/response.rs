@@ -215,7 +215,7 @@ pub struct UrlContextResultInfo<'a> {
 }
 
 /// Response from creating or retrieving an interaction
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct InteractionResponse {
     /// Unique identifier for this interaction
