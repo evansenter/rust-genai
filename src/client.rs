@@ -11,11 +11,22 @@ fn log_request_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
 }
 
 /// The main client for interacting with the Google Generative AI API.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Client {
     pub(crate) api_key: String,
     #[allow(clippy::struct_field_names)]
     pub(crate) http_client: ReqwestClient,
+}
+
+// Custom Debug implementation that redacts the API key for security.
+// This prevents accidental exposure of credentials in logs, error messages, or debug output.
+impl std::fmt::Debug for Client {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Client")
+            .field("api_key", &"[REDACTED]")
+            .field("http_client", &self.http_client)
+            .finish()
+    }
 }
 
 /// Builder for `Client` instances.
@@ -31,11 +42,21 @@ pub struct Client {
 ///     .connect_timeout(Duration::from_secs(10))
 ///     .build();
 /// ```
-#[derive(Debug)]
 pub struct ClientBuilder {
     api_key: String,
     timeout: Option<Duration>,
     connect_timeout: Option<Duration>,
+}
+
+// Custom Debug implementation that redacts the API key for security.
+impl std::fmt::Debug for ClientBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClientBuilder")
+            .field("api_key", &"[REDACTED]")
+            .field("timeout", &self.timeout)
+            .field("connect_timeout", &self.connect_timeout)
+            .finish()
+    }
 }
 
 impl ClientBuilder {
@@ -412,5 +433,44 @@ mod tests {
     fn test_client_new() {
         let client = Client::new("test_key".to_string());
         assert_eq!(client.api_key, "test_key");
+    }
+
+    #[test]
+    fn test_client_debug_redacts_api_key() {
+        let client = Client::new("super_secret_api_key_12345".to_string());
+        let debug_output = format!("{:?}", client);
+
+        // API key should NOT appear in debug output
+        assert!(
+            !debug_output.contains("super_secret_api_key_12345"),
+            "API key was exposed in debug output: {}",
+            debug_output
+        );
+        // Should show [REDACTED] instead
+        assert!(
+            debug_output.contains("[REDACTED]"),
+            "Debug output should contain [REDACTED]: {}",
+            debug_output
+        );
+    }
+
+    #[test]
+    fn test_client_builder_debug_redacts_api_key() {
+        let builder = Client::builder("another_secret_key_67890".to_string())
+            .timeout(Duration::from_secs(60));
+        let debug_output = format!("{:?}", builder);
+
+        // API key should NOT appear in debug output
+        assert!(
+            !debug_output.contains("another_secret_key_67890"),
+            "API key was exposed in builder debug output: {}",
+            debug_output
+        );
+        // Should show [REDACTED] instead
+        assert!(
+            debug_output.contains("[REDACTED]"),
+            "Builder debug output should contain [REDACTED]: {}",
+            debug_output
+        );
     }
 }
