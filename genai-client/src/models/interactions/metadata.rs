@@ -83,8 +83,12 @@ pub struct UrlMetadataEntry {
 }
 
 /// Status of a URL retrieval attempt.
+///
+/// This enum is marked `#[non_exhaustive]` for forward compatibility.
+/// New status values may be added by the API in future versions.
 #[derive(Clone, Deserialize, Serialize, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[non_exhaustive]
 pub enum UrlRetrievalStatus {
     /// Status not specified
     #[default]
@@ -95,4 +99,9 @@ pub enum UrlRetrievalStatus {
     UrlRetrievalStatusUnsafe,
     /// URL retrieval failed for other reasons
     UrlRetrievalStatusError,
+    /// Unknown status (for forward compatibility).
+    ///
+    /// This variant captures any unrecognized status values from the API.
+    #[serde(other, rename = "URL_RETRIEVAL_STATUS_UNKNOWN")]
+    Unknown,
 }
