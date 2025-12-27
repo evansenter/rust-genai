@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::GenaiError;
 use crate::client::Client;
 use crate::streaming::{AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionResult};
@@ -731,7 +733,8 @@ impl<'a> InteractionBuilder<'a> {
                     ))
                 })?;
 
-                // Execute the function
+                // Execute the function with timing
+                let start = Instant::now();
                 let result = if let Some(function) = function_registry.get(call.name) {
                     match function.call(call.args.clone()).await {
                         Ok(result) => result,
@@ -750,12 +753,14 @@ impl<'a> InteractionBuilder<'a> {
                     );
                     json!({ "error": format!("Function '{}' is not available or not found.", call.name) })
                 };
+                let duration = start.elapsed();
 
                 // Track execution for the result
                 all_executions.push(FunctionExecutionResult::new(
                     call.name,
                     call_id,
                     result.clone(),
+                    duration,
                 ));
 
                 // Add function result (only the result, not the call - server has it via previous_interaction_id)
@@ -967,7 +972,8 @@ impl<'a> InteractionBuilder<'a> {
                 let mut execution_results = Vec::new();
 
                 for (call_id, name, args) in &calls_to_execute {
-                    // Execute the function
+                    // Execute the function with timing
+                    let start = Instant::now();
                     let result = if let Some(function) = function_registry.get(name) {
                         match function.call(args.clone()).await {
                             Ok(result) => result,
@@ -986,12 +992,14 @@ impl<'a> InteractionBuilder<'a> {
                         );
                         json!({ "error": format!("Function '{}' is not available or not found.", name) })
                     };
+                    let duration = start.elapsed();
 
                     // Track result for yielding
                     execution_results.push(FunctionExecutionResult::new(
                         name.clone(),
                         call_id.clone(),
                         result.clone(),
+                        duration,
                     ));
 
                     // Add function result content for API

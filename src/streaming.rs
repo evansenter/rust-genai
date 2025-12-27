@@ -43,6 +43,8 @@
 //! # }
 //! ```
 
+use std::time::Duration;
+
 use genai_client::models::interactions::{InteractionContent, InteractionResponse};
 use serde::Serialize;
 
@@ -100,7 +102,7 @@ pub enum AutoFunctionStreamChunk {
 /// # use rust_genai::FunctionExecutionResult;
 /// # let result: FunctionExecutionResult = todo!();
 /// println!("Function {} returned: {}", result.name, result.result);
-/// println!("  For call ID: {}", result.call_id);
+/// println!("  Call ID: {}, Duration: {:?}", result.call_id, result.duration);
 /// ```
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[non_exhaustive]
@@ -111,6 +113,9 @@ pub struct FunctionExecutionResult {
     pub call_id: String,
     /// The result returned by the function
     pub result: serde_json::Value,
+    /// How long the function took to execute
+    #[serde(with = "duration_millis")]
+    pub duration: Duration,
 }
 
 impl FunctionExecutionResult {
@@ -120,12 +125,36 @@ impl FunctionExecutionResult {
         name: impl Into<String>,
         call_id: impl Into<String>,
         result: serde_json::Value,
+        duration: Duration,
     ) -> Self {
         Self {
             name: name.into(),
             call_id: call_id.into(),
             result,
+            duration,
         }
+    }
+}
+
+/// Serialize Duration as milliseconds for JSON compatibility
+mod duration_millis {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::time::Duration;
+
+    pub fn serialize<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        duration.as_millis().serialize(serializer)
+    }
+
+    #[allow(dead_code)]
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let millis = u64::deserialize(deserializer)?;
+        Ok(Duration::from_millis(millis))
     }
 }
 
@@ -169,6 +198,103 @@ pub struct AutoFunctionResult {
     pub executions: Vec<FunctionExecutionResult>,
 }
 
+/// Accumulator for building [`AutoFunctionResult`] from a stream of [`AutoFunctionStreamChunk`].
+///
+/// This helper collects all function execution results and the final response from
+/// a streaming auto-function interaction, producing the same result type as the
+/// non-streaming `create_with_auto_functions()` method.
+///
+/// # Example
+///
+/// ```no_run
+/// use futures_util::StreamExt;
+/// use rust_genai::{Client, AutoFunctionStreamChunk, AutoFunctionResultAccumulator};
+///
+/// # async fn example() -> Result<(), rust_genai::GenaiError> {
+/// let client = Client::new("your-api-key".to_string());
+///
+/// let mut stream = client
+///     .interaction()
+///     .with_model("gemini-3-flash-preview")
+///     .with_text("What's the weather in London?")
+///     .create_stream_with_auto_functions();
+///
+/// let mut accumulator = AutoFunctionResultAccumulator::new();
+///
+/// while let Some(chunk) = stream.next().await {
+///     let chunk = chunk?;
+///
+///     // Process deltas for UI updates
+///     if let AutoFunctionStreamChunk::Delta(content) = &chunk {
+///         if let Some(text) = content.text() {
+///             print!("{}", text);
+///         }
+///     }
+///
+///     // Feed all chunks to the accumulator
+///     if let Some(result) = accumulator.push(chunk) {
+///         // Stream is complete, we have the full result
+///         println!("\n\nExecuted {} functions", result.executions.len());
+///         for exec in &result.executions {
+///             println!("  {} took {:?}", exec.name, exec.duration);
+///         }
+///     }
+/// }
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Clone, Debug, Default)]
+pub struct AutoFunctionResultAccumulator {
+    executions: Vec<FunctionExecutionResult>,
+}
+
+impl AutoFunctionResultAccumulator {
+    /// Creates a new empty accumulator.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Feeds a chunk to the accumulator.
+    ///
+    /// Returns `Some(AutoFunctionResult)` when the stream is complete (i.e., when
+    /// a `Complete` chunk is received). Returns `None` for all other chunk types.
+    ///
+    /// The accumulator collects all `FunctionResults` chunks and combines them
+    /// with the final `Complete` response.
+    #[allow(unreachable_patterns)] // Handle future variants from #[non_exhaustive] enum
+    pub fn push(&mut self, chunk: AutoFunctionStreamChunk) -> Option<AutoFunctionResult> {
+        match chunk {
+            AutoFunctionStreamChunk::FunctionResults(results) => {
+                self.executions.extend(results);
+                None
+            }
+            AutoFunctionStreamChunk::Complete(response) => Some(AutoFunctionResult {
+                response,
+                executions: std::mem::take(&mut self.executions),
+            }),
+            AutoFunctionStreamChunk::Delta(_) | AutoFunctionStreamChunk::ExecutingFunctions(_) => {
+                None
+            }
+            // Handle future variants gracefully
+            _ => None,
+        }
+    }
+
+    /// Returns the accumulated executions so far.
+    ///
+    /// Useful for checking progress without consuming the accumulator.
+    #[must_use]
+    pub fn executions(&self) -> &[FunctionExecutionResult] {
+        &self.executions
+    }
+
+    /// Resets the accumulator to its initial empty state.
+    pub fn reset(&mut self) {
+        self.executions.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,11 +306,13 @@ mod tests {
             "get_weather",
             "call-123",
             json!({"temp": 20, "unit": "celsius"}),
+            Duration::from_millis(42),
         );
 
         assert_eq!(result.name, "get_weather");
         assert_eq!(result.call_id, "call-123");
         assert_eq!(result.result, json!({"temp": 20, "unit": "celsius"}));
+        assert_eq!(result.duration, Duration::from_millis(42));
     }
 
     #[test]
@@ -198,6 +326,7 @@ mod tests {
             name: "test".to_string(),
             call_id: "1".to_string(),
             result: json!({"ok": true}),
+            duration: Duration::from_millis(10),
         }]);
 
         // Note: ExecutingFunctions and Complete require InteractionResponse which is harder to construct in tests
@@ -209,6 +338,7 @@ mod tests {
             "get_weather",
             "call-456",
             json!({"temp": 22, "conditions": "sunny"}),
+            Duration::from_millis(150),
         );
 
         let json_str = serde_json::to_string(&result).expect("Serialization should succeed");
@@ -228,5 +358,6 @@ mod tests {
         assert_eq!(parsed["name"], "get_weather");
         assert_eq!(parsed["call_id"], "call-456");
         assert_eq!(parsed["result"]["temp"], 22);
+        assert_eq!(parsed["duration"], 150); // Duration serialized as milliseconds
     }
 }

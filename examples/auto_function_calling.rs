@@ -87,7 +87,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n--- Function Executions ---");
     for exec in &result.executions {
-        println!("  {} -> {}", exec.name, exec.result);
+        println!("  {} ({:?}) -> {}", exec.name, exec.duration, exec.result);
     }
 
     println!("\n--- Final Response ---");

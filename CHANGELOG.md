@@ -47,13 +47,32 @@ println!("{}", response.text().unwrap());
 let result = builder.create_with_auto_functions().await?;
 println!("{}", result.response.text().unwrap());
 
-// New: Access execution history
+// New: Access execution history with timing
 for exec in &result.executions {
-    println!("Called {} -> {}", exec.name, exec.result);
+    println!("Called {} ({:?}) -> {}", exec.name, exec.duration, exec.result);
 }
 ```
 
 ### Added
+
+- **Function execution timing** (#148):
+  - `FunctionExecutionResult.duration` tracks how long each function took to execute
+  - Duration is serialized as milliseconds for JSON compatibility
+  - Useful for performance monitoring, debugging, and optimization
+
+- **Streaming accumulator helper** (#148):
+  - New `AutoFunctionResultAccumulator` type to collect `AutoFunctionResult` from streaming
+  - Allows combining streaming UI updates with execution history collection
+  - Example:
+    ```rust
+    let mut accumulator = AutoFunctionResultAccumulator::new();
+    while let Some(chunk) = stream.next().await {
+        if let Some(result) = accumulator.push(chunk?) {
+            // Stream complete, result contains full execution history
+            println!("Executed {} functions", result.executions.len());
+        }
+    }
+    ```
 
 - **`Serialize` support for response types** (#148):
   - `InteractionResponse` now implements `Serialize` for logging, caching, and persistence

@@ -144,10 +144,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("---------------------------");
                 }
                 AutoFunctionStreamChunk::FunctionResults(results) => {
-                    // Function execution completed
+                    // Function execution completed - includes timing info
                     println!("--- Function Results ---");
                     for result in &results {
-                        println!("  {} -> {}", result.name, result.result);
+                        println!(
+                            "  {} ({:?}) -> {}",
+                            result.name, result.duration, result.result
+                        );
                     }
                     println!("------------------------\n");
                     println!("Continuing response...\n");
