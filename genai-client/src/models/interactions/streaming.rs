@@ -75,4 +75,51 @@ mod tests {
             _ => panic!("Expected Delta variant"),
         }
     }
+
+    #[test]
+    fn test_stream_chunk_complete_roundtrip() {
+        let response = InteractionResponse {
+            id: "test-interaction-123".to_string(),
+            model: Some("gemini-3-flash-preview".to_string()),
+            agent: None,
+            input: vec![InteractionContent::Text {
+                text: Some("What is 2+2?".to_string()),
+            }],
+            outputs: vec![InteractionContent::Text {
+                text: Some("The answer is 4.".to_string()),
+            }],
+            status: InteractionStatus::Completed,
+            usage: None,
+            tools: None,
+            grounding_metadata: None,
+            url_context_metadata: None,
+            previous_interaction_id: None,
+        };
+
+        let chunk = StreamChunk::Complete(response);
+
+        let json = serde_json::to_string(&chunk).expect("Serialization should succeed");
+        assert!(json.contains("chunk_type"), "Should have chunk_type tag");
+        assert!(json.contains("complete"), "Should have complete variant");
+        assert!(
+            json.contains("test-interaction-123"),
+            "Should have interaction id"
+        );
+        assert!(
+            json.contains("The answer is 4"),
+            "Should have response text"
+        );
+
+        let deserialized: StreamChunk =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        match deserialized {
+            StreamChunk::Complete(response) => {
+                assert_eq!(response.id, "test-interaction-123");
+                assert_eq!(response.status, InteractionStatus::Completed);
+                assert_eq!(response.text(), Some("The answer is 4."));
+            }
+            _ => panic!("Expected Complete variant"),
+        }
+    }
 }
