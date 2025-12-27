@@ -37,7 +37,7 @@ use rust_genai::{
     CallableFunction, Client, CreateInteractionRequest, FunctionDeclaration, GenerationConfig,
     InteractionInput, InteractionStatus, function_result_content, image_uri_content, text_content,
 };
-use rust_genai_macros::generate_function_declaration;
+use rust_genai_macros::tool;
 use serde_json::json;
 use std::env;
 
@@ -55,7 +55,7 @@ fn get_client() -> Option<Client> {
 // The macro generates a callable wrapper, so the function itself appears unused.
 /// Gets a mock weather report for a city
 #[allow(dead_code)]
-#[generate_function_declaration(city(description = "The city to get weather for"))]
+#[tool(city(description = "The city to get weather for"))]
 fn get_mock_weather(city: String) -> String {
     format!("Weather in {}: Sunny, 75°F", city)
 }

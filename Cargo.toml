@@ -42,5 +42,6 @@ inventory = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
+trybuild = "1.0.114"
 
 # Workspace-level metadata
