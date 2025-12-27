@@ -18,10 +18,10 @@ use std::fmt;
 /// ```no_run
 /// # use genai_client::models::interactions::{InteractionResponse, CodeExecutionOutcome};
 /// # let response: InteractionResponse = todo!();
-/// for (outcome, output) in response.code_execution_results() {
-///     match outcome {
-///         CodeExecutionOutcome::Ok => println!("Success: {}", output),
-///         CodeExecutionOutcome::Failed => eprintln!("Error: {}", output),
+/// for result in response.code_execution_results() {
+///     match result.outcome {
+///         CodeExecutionOutcome::Ok => println!("Success: {}", result.output),
+///         CodeExecutionOutcome::Failed => eprintln!("Error: {}", result.output),
 ///         CodeExecutionOutcome::DeadlineExceeded => eprintln!("Timeout!"),
 ///         _ => eprintln!("Unknown outcome"),
 ///     }

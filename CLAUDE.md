@@ -45,6 +45,7 @@ cargo run --example streaming
 cargo run --example system_instructions
 cargo run --example stateful_interaction
 cargo run --example auto_function_calling
+cargo run --example streaming_auto_functions
 cargo run --example structured_output
 cargo run --example google_search
 cargo run --example code_execution

@@ -2537,9 +2537,9 @@ async fn test_code_execution_multi_turn() {
             let results = response.code_execution_results();
             if !results.is_empty() {
                 println!("Code execution results:");
-                for (outcome, output) in &results {
-                    println!("  Outcome: {:?}", outcome);
-                    println!("  Output: {}", output);
+                for result in &results {
+                    println!("  Outcome: {:?}", result.outcome);
+                    println!("  Output: {}", result.output);
                 }
             }
             response
@@ -2592,8 +2592,8 @@ async fn test_code_execution_multi_turn() {
             }
             // Also check code execution output
             let results = response2.code_execution_results();
-            for (_outcome, output) in &results {
-                if output.contains("240") {
+            for result in &results {
+                if result.output.contains("240") {
                     println!("Verified: Code output contains 240");
                 }
             }

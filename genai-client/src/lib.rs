@@ -30,7 +30,6 @@ pub mod sse_parser;
 // Import and selectively re-export the necessary structs from the models module
 
 // Shared types for the Interactions API
-pub use models::shared::FunctionCall;
 pub use models::shared::FunctionCallingConfig;
 pub use models::shared::FunctionCallingMode;
 pub use models::shared::FunctionDeclaration;
@@ -40,8 +39,10 @@ pub use models::shared::Tool;
 pub use models::shared::ToolConfig;
 
 // Interactions API types
+pub use models::interactions::CodeExecutionCallInfo;
 pub use models::interactions::CodeExecutionLanguage;
 pub use models::interactions::CodeExecutionOutcome;
+pub use models::interactions::CodeExecutionResultInfo;
 pub use models::interactions::ContentSummary;
 pub use models::interactions::CreateInteractionRequest;
 pub use models::interactions::FunctionCallInfo;
@@ -56,6 +57,7 @@ pub use models::interactions::InteractionStatus;
 pub use models::interactions::StreamChunk;
 pub use models::interactions::ThinkingLevel;
 pub use models::interactions::UrlContextMetadata;
+pub use models::interactions::UrlContextResultInfo;
 pub use models::interactions::UrlMetadataEntry;
 pub use models::interactions::UrlRetrievalStatus;
 pub use models::interactions::UsageMetadata;

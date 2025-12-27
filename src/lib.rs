@@ -57,11 +57,11 @@ pub use genai_client::{FunctionDeclaration, FunctionDeclarationBuilder, Function
 
 // Re-export Interactions API types for convenient access
 pub use genai_client::{
-    CodeExecutionLanguage, CodeExecutionOutcome, ContentSummary, CreateInteractionRequest,
-    FunctionCallInfo, FunctionResultInfo, GenerationConfig, GroundingChunk, GroundingMetadata,
-    InteractionContent, InteractionInput, InteractionResponse, InteractionStatus, StreamChunk,
-    ThinkingLevel, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus, UsageMetadata,
-    WebSource,
+    CodeExecutionCallInfo, CodeExecutionLanguage, CodeExecutionOutcome, CodeExecutionResultInfo,
+    ContentSummary, CreateInteractionRequest, FunctionCallInfo, FunctionResultInfo,
+    GenerationConfig, GroundingChunk, GroundingMetadata, InteractionContent, InteractionInput,
+    InteractionResponse, InteractionStatus, StreamChunk, ThinkingLevel, UrlContextMetadata,
+    UrlContextResultInfo, UrlMetadataEntry, UrlRetrievalStatus, UsageMetadata, WebSource,
 };
 
 // Re-export error type from genai_client
@@ -97,3 +97,7 @@ pub use request_builder::{DEFAULT_MAX_FUNCTION_CALL_LOOPS, InteractionBuilder};
 pub mod function_calling;
 // Re-export public types from function_calling module
 pub use function_calling::{CallableFunction, FunctionError};
+
+pub mod streaming;
+// Re-export streaming types for automatic function calling
+pub use streaming::{AutoFunctionStreamChunk, FunctionExecutionResult};

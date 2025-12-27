@@ -120,6 +120,100 @@ pub struct FunctionResultInfo<'a> {
     pub result: &'a serde_json::Value,
 }
 
+/// Information about a code execution call requested by the model.
+///
+/// Returned by [`InteractionResponse::code_execution_calls()`] for convenient access
+/// to code execution details.
+///
+/// This is a **view type** that borrows data from the underlying [`InteractionResponse`].
+/// It implements [`Serialize`] for logging and debugging purposes, but not `Deserialize`
+/// since it's not meant to be constructed directly—use the response helper methods instead.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::InteractionResponse;
+/// # let response: InteractionResponse = todo!();
+/// for call in response.code_execution_calls() {
+///     println!("Executing {} code (id: {})", call.language, call.id);
+///     println!("Code: {}", call.code);
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[non_exhaustive]
+pub struct CodeExecutionCallInfo<'a> {
+    /// Unique identifier for this code execution call
+    pub id: &'a str,
+    /// Programming language (currently only Python is supported)
+    pub language: CodeExecutionLanguage,
+    /// Source code to execute
+    pub code: &'a str,
+}
+
+/// Information about a code execution result.
+///
+/// Returned by [`InteractionResponse::code_execution_results()`] for convenient access
+/// to code execution results.
+///
+/// This is a **view type** that borrows data from the underlying [`InteractionResponse`].
+/// It implements [`Serialize`] for logging and debugging purposes, but not `Deserialize`
+/// since it's not meant to be constructed directly—use the response helper methods instead.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::InteractionResponse;
+/// # let response: InteractionResponse = todo!();
+/// for result in response.code_execution_results() {
+///     println!("Call {} completed with outcome: {}", result.call_id, result.outcome);
+///     if result.outcome.is_success() {
+///         println!("Output: {}", result.output);
+///     }
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[non_exhaustive]
+pub struct CodeExecutionResultInfo<'a> {
+    /// The call_id matching the CodeExecutionCall this result is for
+    pub call_id: &'a str,
+    /// Execution outcome (OK, FAILED, DEADLINE_EXCEEDED, etc.)
+    pub outcome: CodeExecutionOutcome,
+    /// The output of the code execution (stdout for success, error message for failure)
+    pub output: &'a str,
+}
+
+/// Information about a URL context result.
+///
+/// Returned by [`InteractionResponse::url_context_results()`] for convenient access
+/// to URL context results.
+///
+/// This is a **view type** that borrows data from the underlying [`InteractionResponse`].
+/// It implements [`Serialize`] for logging and debugging purposes, but not `Deserialize`
+/// since it's not meant to be constructed directly—use the response helper methods instead.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::InteractionResponse;
+/// # let response: InteractionResponse = todo!();
+/// for result in response.url_context_results() {
+///     println!("URL: {}", result.url);
+///     if let Some(content) = result.content {
+///         println!("Content: {}", content);
+///     } else {
+///         println!("(fetch failed)");
+///     }
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[non_exhaustive]
+pub struct UrlContextResultInfo<'a> {
+    /// The URL that was fetched
+    pub url: &'a str,
+    /// The fetched content, or `None` if the fetch failed
+    pub content: Option<&'a str>,
+}
+
 /// Response from creating or retrieving an interaction
 #[derive(Clone, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -546,14 +640,18 @@ impl InteractionResponse {
     /// ```no_run
     /// # use genai_client::models::interactions::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
-    /// if let Some((language, code)) = response.code_execution_call() {
-    ///     println!("Model wants to run {} code:\n{}", language, code);
+    /// if let Some(call) = response.code_execution_call() {
+    ///     println!("Model wants to run {} code (id: {}):\n{}", call.language, call.id, call.code);
     /// }
     /// ```
-    pub fn code_execution_call(&self) -> Option<(CodeExecutionLanguage, &str)> {
+    pub fn code_execution_call(&self) -> Option<CodeExecutionCallInfo<'_>> {
         self.outputs.iter().find_map(|content| {
-            if let InteractionContent::CodeExecutionCall { language, code, .. } = content {
-                Some((*language, code.as_str()))
+            if let InteractionContent::CodeExecutionCall { id, language, code } = content {
+                Some(CodeExecutionCallInfo {
+                    id: id.as_str(),
+                    language: *language,
+                    code: code.as_str(),
+                })
             } else {
                 None
             }
@@ -562,27 +660,31 @@ impl InteractionResponse {
 
     /// Extract all code execution calls from outputs
     ///
-    /// Returns a vector of (language, code) tuples representing code the model
-    /// wants to execute.
+    /// Returns a vector of [`CodeExecutionCallInfo`] structs with named fields for
+    /// convenient access to code execution details.
     ///
     /// # Example
     ///
     /// ```no_run
     /// # use genai_client::models::interactions::{InteractionResponse, CodeExecutionLanguage};
     /// # let response: InteractionResponse = todo!();
-    /// for (language, code) in response.code_execution_calls() {
-    ///     match language {
-    ///         CodeExecutionLanguage::Python => println!("Python:\n{}", code),
-    ///         _ => println!("Other:\n{}", code),
+    /// for call in response.code_execution_calls() {
+    ///     match call.language {
+    ///         CodeExecutionLanguage::Python => println!("Python (id: {}):\n{}", call.id, call.code),
+    ///         _ => println!("Other (id: {}):\n{}", call.id, call.code),
     ///     }
     /// }
     /// ```
-    pub fn code_execution_calls(&self) -> Vec<(CodeExecutionLanguage, &str)> {
+    pub fn code_execution_calls(&self) -> Vec<CodeExecutionCallInfo<'_>> {
         self.outputs
             .iter()
             .filter_map(|content| {
-                if let InteractionContent::CodeExecutionCall { language, code, .. } = content {
-                    Some((*language, code.as_str()))
+                if let InteractionContent::CodeExecutionCall { id, language, code } = content {
+                    Some(CodeExecutionCallInfo {
+                        id: id.as_str(),
+                        language: *language,
+                        code: code.as_str(),
+                    })
                 } else {
                     None
                 }
@@ -600,31 +702,37 @@ impl InteractionResponse {
 
     /// Extract code execution results from outputs
     ///
-    /// Returns a vector of (outcome, output) tuples representing the results
-    /// of executed code.
+    /// Returns a vector of [`CodeExecutionResultInfo`] structs with named fields for
+    /// convenient access to code execution results.
     ///
     /// # Example
     ///
     /// ```no_run
     /// # use genai_client::models::interactions::{InteractionResponse, CodeExecutionOutcome};
     /// # let response: InteractionResponse = todo!();
-    /// for (outcome, output) in response.code_execution_results() {
-    ///     if outcome.is_success() {
-    ///         println!("Code output: {}", output);
+    /// for result in response.code_execution_results() {
+    ///     if result.outcome.is_success() {
+    ///         println!("Code output (call_id: {}): {}", result.call_id, result.output);
     ///     } else {
-    ///         eprintln!("Code failed ({}): {}", outcome, output);
+    ///         eprintln!("Code failed ({}): {}", result.outcome, result.output);
     ///     }
     /// }
     /// ```
-    pub fn code_execution_results(&self) -> Vec<(CodeExecutionOutcome, &str)> {
+    pub fn code_execution_results(&self) -> Vec<CodeExecutionResultInfo<'_>> {
         self.outputs
             .iter()
             .filter_map(|content| {
                 if let InteractionContent::CodeExecutionResult {
-                    outcome, output, ..
+                    call_id,
+                    outcome,
+                    output,
                 } = content
                 {
-                    Some((*outcome, output.as_str()))
+                    Some(CodeExecutionResultInfo {
+                        call_id: call_id.as_str(),
+                        outcome: *outcome,
+                        output: output.as_str(),
+                    })
                 } else {
                     None
                 }
@@ -845,13 +953,30 @@ impl InteractionResponse {
 
     /// Extract URL context results from outputs
     ///
-    /// Returns a vector of (url, content) tuples.
-    pub fn url_context_results(&self) -> Vec<(&str, Option<&str>)> {
+    /// Returns a vector of [`UrlContextResultInfo`] structs with named fields for
+    /// convenient access to URL context results.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// for result in response.url_context_results() {
+    ///     println!("URL: {}", result.url);
+    ///     if let Some(content) = result.content {
+    ///         println!("Content: {}", content);
+    ///     }
+    /// }
+    /// ```
+    pub fn url_context_results(&self) -> Vec<UrlContextResultInfo<'_>> {
         self.outputs
             .iter()
             .filter_map(|content| {
                 if let InteractionContent::UrlContextResult { url, content } = content {
-                    Some((url.as_str(), content.as_deref()))
+                    Some(UrlContextResultInfo {
+                        url: url.as_str(),
+                        content: content.as_deref(),
+                    })
                 } else {
                     None
                 }

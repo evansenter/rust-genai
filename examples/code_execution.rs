@@ -51,22 +51,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             // 5. Display the executed code
             println!("--- Executed Code ---");
-            for (language, code) in response.code_execution_calls() {
-                println!("Language: {language}");
-                println!("```python\n{code}\n```\n");
+            for call in response.code_execution_calls() {
+                println!("Language: {}", call.language);
+                println!("```python\n{}\n```\n", call.code);
             }
 
             // 6. Display the code execution results with typed outcomes
             println!("--- Execution Results ---");
-            for (outcome, output) in response.code_execution_results() {
-                match outcome {
+            for result in response.code_execution_results() {
+                match result.outcome {
                     CodeExecutionOutcome::Ok => {
                         println!("Status: SUCCESS");
-                        println!("Output:\n{output}");
+                        println!("Output:\n{}", result.output);
                     }
                     CodeExecutionOutcome::Failed => {
                         println!("Status: FAILED");
-                        println!("Error:\n{output}");
+                        println!("Error:\n{}", result.output);
                     }
                     CodeExecutionOutcome::DeadlineExceeded => {
                         println!("Status: TIMEOUT");
@@ -74,7 +74,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     }
                     _ => {
                         println!("Status: UNKNOWN");
-                        println!("Output:\n{output}");
+                        println!("Output:\n{}", result.output);
                     }
                 }
             }

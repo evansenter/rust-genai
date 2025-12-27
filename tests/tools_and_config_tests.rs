@@ -203,17 +203,23 @@ async fn test_code_execution() {
             );
 
             // Test the new typed helper methods
-            for (language, code) in response.code_execution_calls() {
+            for call in response.code_execution_calls() {
                 println!(
-                    "Executed {} code: {}",
-                    language,
-                    &code[..code.len().min(100)]
+                    "Executed {} code (id: {}): {}",
+                    call.language,
+                    call.id,
+                    &call.code[..call.code.len().min(100)]
                 );
             }
 
-            for (outcome, output) in response.code_execution_results() {
-                println!("Outcome: {} (success: {})", outcome, outcome.is_success());
-                println!("Output: {}", &output[..output.len().min(100)]);
+            for result in response.code_execution_results() {
+                println!(
+                    "Outcome: {} (success: {}, call_id: {})",
+                    result.outcome,
+                    result.outcome.is_success(),
+                    result.call_id
+                );
+                println!("Output: {}", &result.output[..result.output.len().min(100)]);
             }
 
             // Test the convenience helper and verify the code output directly

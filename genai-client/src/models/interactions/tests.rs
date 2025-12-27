@@ -1504,14 +1504,16 @@ fn test_interaction_response_code_execution_helpers() {
     // Test code_execution_calls helper
     let code_blocks = response.code_execution_calls();
     assert_eq!(code_blocks.len(), 1);
-    assert_eq!(code_blocks[0].0, CodeExecutionLanguage::Python);
-    assert_eq!(code_blocks[0].1, "print(42)");
+    assert_eq!(code_blocks[0].id, "call_123");
+    assert_eq!(code_blocks[0].language, CodeExecutionLanguage::Python);
+    assert_eq!(code_blocks[0].code, "print(42)");
 
     // Test code_execution_results helper
     let results = response.code_execution_results();
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].0, CodeExecutionOutcome::Ok);
-    assert_eq!(results[0].1, "42\n");
+    assert_eq!(results[0].call_id, "call_123");
+    assert_eq!(results[0].outcome, CodeExecutionOutcome::Ok);
+    assert_eq!(results[0].output, "42\n");
 
     // Test successful_code_output helper
     assert_eq!(response.successful_code_output(), Some("42\n"));
@@ -1570,10 +1572,8 @@ fn test_interaction_response_url_context_helpers() {
 
     let url_results = response.url_context_results();
     assert_eq!(url_results.len(), 1);
-    assert_eq!(
-        url_results[0],
-        ("https://example.com", Some("Example content"))
-    );
+    assert_eq!(url_results[0].url, "https://example.com");
+    assert_eq!(url_results[0].content, Some("Example content"));
 }
 
 #[test]
@@ -1939,9 +1939,10 @@ fn test_interaction_response_code_execution_call_singular() {
     // Test code_execution_call() - returns first one
     let call = response.code_execution_call();
     assert!(call.is_some());
-    let (language, code) = call.unwrap();
-    assert_eq!(language, CodeExecutionLanguage::Python);
-    assert_eq!(code, "print('first')");
+    let call = call.unwrap();
+    assert_eq!(call.id, "call_first");
+    assert_eq!(call.language, CodeExecutionLanguage::Python);
+    assert_eq!(call.code, "print('first')");
 }
 
 #[test]
@@ -2109,10 +2110,12 @@ fn test_interaction_response_code_execution_calls_plural() {
 
     let calls = response.code_execution_calls();
     assert_eq!(calls.len(), 2);
-    assert_eq!(calls[0].0, CodeExecutionLanguage::Python);
-    assert_eq!(calls[0].1, "print('first')");
-    assert_eq!(calls[1].0, CodeExecutionLanguage::Python);
-    assert_eq!(calls[1].1, "print('second')");
+    assert_eq!(calls[0].id, "call_1");
+    assert_eq!(calls[0].language, CodeExecutionLanguage::Python);
+    assert_eq!(calls[0].code, "print('first')");
+    assert_eq!(calls[1].id, "call_2");
+    assert_eq!(calls[1].language, CodeExecutionLanguage::Python);
+    assert_eq!(calls[1].code, "print('second')");
 }
 
 #[test]
@@ -2146,10 +2149,12 @@ fn test_interaction_response_code_execution_results() {
 
     let results = response.code_execution_results();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0].0, CodeExecutionOutcome::Ok);
-    assert_eq!(results[0].1, "first output");
-    assert_eq!(results[1].0, CodeExecutionOutcome::Failed);
-    assert_eq!(results[1].1, "error message");
+    assert_eq!(results[0].call_id, "call_1");
+    assert_eq!(results[0].outcome, CodeExecutionOutcome::Ok);
+    assert_eq!(results[0].output, "first output");
+    assert_eq!(results[1].call_id, "call_2");
+    assert_eq!(results[1].outcome, CodeExecutionOutcome::Failed);
+    assert_eq!(results[1].output, "error message");
 
     // Test successful_code_output - should return first successful output
     let success = response.successful_code_output();
@@ -2263,11 +2268,12 @@ fn test_interaction_response_url_context_results() {
 
     let results = response.url_context_results();
     assert_eq!(results.len(), 3);
-    assert_eq!(results[0].0, "https://docs.rs");
-    assert_eq!(results[0].1, Some("<html>docs content</html>"));
-    assert_eq!(results[1].0, "https://crates.io");
-    assert_eq!(results[2].0, "https://blocked.com");
-    assert_eq!(results[2].1, None); // Failed fetch has no content
+    assert_eq!(results[0].url, "https://docs.rs");
+    assert_eq!(results[0].content, Some("<html>docs content</html>"));
+    assert_eq!(results[1].url, "https://crates.io");
+    assert_eq!(results[1].content, Some("<html>crates content</html>"));
+    assert_eq!(results[2].url, "https://blocked.com");
+    assert_eq!(results[2].content, None); // Failed fetch has no content
 }
 
 #[test]
