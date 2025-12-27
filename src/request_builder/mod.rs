@@ -659,6 +659,12 @@ impl<'a> InteractionBuilder<'a> {
     /// # }
     /// ```
     ///
+    /// # Serialization
+    ///
+    /// Both [`AutoFunctionResult`] and its contained [`InteractionResponse`]
+    /// implement `Serialize`, enabling logging, caching, and persistence of complete
+    /// execution histories for debugging and evaluation workflows.
+    ///
     /// # Errors
     ///
     /// Returns an error if:
