@@ -202,4 +202,31 @@ mod tests {
 
         // Note: ExecutingFunctions and Complete require InteractionResponse which is harder to construct in tests
     }
+
+    #[test]
+    fn test_function_execution_result_serialization() {
+        let result = FunctionExecutionResult::new(
+            "get_weather",
+            "call-456",
+            json!({"temp": 22, "conditions": "sunny"}),
+        );
+
+        let json_str = serde_json::to_string(&result).expect("Serialization should succeed");
+
+        // Verify key fields are present in serialized output
+        assert!(
+            json_str.contains("get_weather"),
+            "Should contain function name"
+        );
+        assert!(json_str.contains("call-456"), "Should contain call_id");
+        assert!(json_str.contains("sunny"), "Should contain result data");
+
+        // Verify roundtrip works (FunctionExecutionResult would need Deserialize for full roundtrip,
+        // but we can at least verify it serializes to valid JSON)
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json_str).expect("Should be valid JSON");
+        assert_eq!(parsed["name"], "get_weather");
+        assert_eq!(parsed["call_id"], "call-456");
+        assert_eq!(parsed["result"]["temp"], 22);
+    }
 }
