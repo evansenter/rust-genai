@@ -305,7 +305,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let weather_func = GetWeatherCallable.declaration();
 
     // Use create_with_auto_functions() to automatically handle function calls
-    let response = client
+    let result = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("What's the weather in Tokyo?")
@@ -319,7 +319,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 3. Sends results back to the model
     // 4. Continues until the model provides a final response
 
-    println!("{}", response.text().unwrap_or("No response"));
+    // Access the final response and execution history
+    println!("{}", result.response.text().unwrap_or("No response"));
+
+    // You can also inspect which functions were called
+    for exec in &result.executions {
+        println!("Called {} -> {}", exec.name, exec.result);
+    }
     Ok(())
 }
 ```
