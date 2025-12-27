@@ -24,6 +24,7 @@ utoipa = "5.4"
 name = "rust-genai"
 version = "0.2.0"
 edition = "2024"
+rust-version = "1.85"
 license = "MIT"
 
 [dependencies]

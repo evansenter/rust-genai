@@ -378,8 +378,12 @@ pub struct FunctionCallingConfig {
 }
 
 /// Modes for function calling behavior.
+///
+/// This enum is marked `#[non_exhaustive]` for forward compatibility.
+/// New modes may be added in future versions.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[non_exhaustive]
 pub enum FunctionCallingMode {
     Auto,
     Any,

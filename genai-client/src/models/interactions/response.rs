@@ -11,15 +11,25 @@ use super::content::{CodeExecutionLanguage, CodeExecutionOutcome, InteractionCon
 use super::metadata::{GroundingMetadata, UrlContextMetadata};
 use crate::models::shared::Tool;
 
-/// Status of an interaction
+/// Status of an interaction.
+///
+/// This enum is marked `#[non_exhaustive]` for forward compatibility.
+/// New status values may be added by the API in future versions.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum InteractionStatus {
     Completed,
     InProgress,
     RequiresAction,
     Failed,
     Cancelled,
+    /// Unknown status (for forward compatibility).
+    ///
+    /// This variant captures any unrecognized status values from the API,
+    /// allowing the library to handle new statuses gracefully.
+    #[serde(other, rename = "unknown")]
+    Unknown,
 }
 
 /// Token usage information from the Interactions API

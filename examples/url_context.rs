@@ -54,6 +54,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         UrlRetrievalStatus::UrlRetrievalStatusUnsafe => "Unsafe (blocked)",
                         UrlRetrievalStatus::UrlRetrievalStatusError => "Error",
                         UrlRetrievalStatus::UrlRetrievalStatusUnspecified => "Unspecified",
+                        _ => "Unknown", // Handle future status values
                     };
                     println!("  {} - {}", entry.retrieved_url, status_str);
                 }

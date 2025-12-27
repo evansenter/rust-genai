@@ -19,8 +19,12 @@ pub enum InteractionInput {
 ///
 /// Controls the depth of reasoning the model performs before generating a response.
 /// Higher levels produce more detailed reasoning but consume more tokens.
+///
+/// This enum is marked `#[non_exhaustive]` for forward compatibility.
+/// New thinking levels may be added in future versions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ThinkingLevel {
     /// Minimal reasoning, fastest responses
     Minimal,
