@@ -23,7 +23,7 @@
 //! Higher levels produce more detailed reasoning but consume more tokens.
 
 use futures_util::StreamExt;
-use rust_genai::{Client, InteractionContent, StreamChunk, ThinkingLevel};
+use rust_genai::{Client, StreamChunk, ThinkingLevel};
 use std::env;
 use std::io::{Write, stdout};
 
@@ -173,30 +173,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match result {
             Ok(chunk) => match chunk {
                 StreamChunk::Delta(content) => {
-                    match &content {
-                        InteractionContent::Thought { text: Some(t) } => {
-                            if !in_thought {
-                                print!("\n[THINKING] ");
-                                in_thought = true;
-                            }
-                            print!("{}", t);
-                            stdout().flush()?;
+                    if let Some(t) = content.thought() {
+                        if !in_thought {
+                            print!("\n[THINKING] ");
+                            in_thought = true;
                         }
-                        InteractionContent::Text { text: Some(t) } => {
-                            if in_thought {
-                                println!("\n[END THINKING]\n");
-                                in_thought = false;
-                                print!("[ANSWER] ");
-                            }
-                            print!("{}", t);
-                            stdout().flush()?;
+                        print!("{}", t);
+                        stdout().flush()?;
+                    } else if let Some(t) = content.text() {
+                        if in_thought {
+                            println!("\n[END THINKING]\n");
+                            in_thought = false;
+                            print!("[ANSWER] ");
                         }
-                        InteractionContent::ThoughtSignature { .. } => {
-                            // ThoughtSignature verifies thought authenticity
-                            // Usually appears at the end of thought streaming
-                        }
-                        _ => {}
+                        print!("{}", t);
+                        stdout().flush()?;
                     }
+                    // ThoughtSignature (thought authenticity verification) is silently ignored
                 }
                 StreamChunk::Complete(response) => {
                     println!("\n");

@@ -8,7 +8,7 @@
 //!
 //! ```no_run
 //! use futures_util::StreamExt;
-//! use rust_genai::{Client, AutoFunctionStreamChunk, InteractionContent};
+//! use rust_genai::{Client, AutoFunctionStreamChunk};
 //!
 //! # async fn example() -> Result<(), rust_genai::GenaiError> {
 //! let client = Client::new("your-api-key".to_string());
@@ -22,7 +22,7 @@
 //! while let Some(chunk) = stream.next().await {
 //!     match chunk? {
 //!         AutoFunctionStreamChunk::Delta(content) => {
-//!             if let InteractionContent::Text { text: Some(t) } = content {
+//!             if let Some(t) = content.text() {
 //!                 print!("{}", t);
 //!             }
 //!         }

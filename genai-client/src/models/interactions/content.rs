@@ -597,6 +597,17 @@ impl InteractionContent {
         }
     }
 
+    /// Extract the thought content, if this is a Thought variant with non-empty text.
+    ///
+    /// Returns `Some` only for `Thought` variants with non-empty text.
+    /// Returns `None` for all other variants including `Text`.
+    pub fn thought(&self) -> Option<&str> {
+        match self {
+            Self::Thought { text: Some(t) } if !t.is_empty() => Some(t),
+            _ => None,
+        }
+    }
+
     /// Check if this is a Text content type.
     pub const fn is_text(&self) -> bool {
         matches!(self, Self::Text { .. })
