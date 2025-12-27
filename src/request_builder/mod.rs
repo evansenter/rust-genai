@@ -877,7 +877,15 @@ impl<'a> InteractionBuilder<'a> {
                     )
                 })?;
 
-                // Check for function calls: first in Complete response, then in accumulated deltas
+                // Check for function calls from two possible sources:
+                // 1. response.function_calls(): Populated when the Complete event includes
+                //    FunctionCall content items (typical for non-streaming or when the API
+                //    batches function calls into the final response)
+                // 2. accumulated_calls: Populated from Delta events during streaming when
+                //    the API sends FunctionCall content incrementally via deltas
+                //
+                // We check both because API behavior may vary; prefer Complete response
+                // data when available as it represents the finalized state.
                 let response_function_calls = response.function_calls();
                 let has_function_calls = !response_function_calls.is_empty() || !accumulated_calls.is_empty();
 
@@ -890,8 +898,9 @@ impl<'a> InteractionBuilder<'a> {
                 // Signal that we're executing functions (pass the response for inspection)
                 yield AutoFunctionStreamChunk::ExecutingFunctions(response.clone());
 
-                // Determine which function calls to execute
-                // Prefer response.function_calls() if available, fall back to accumulated
+                // Determine which function calls to execute.
+                // Prefer response.function_calls() if available (finalized data),
+                // fall back to accumulated deltas otherwise.
                 let calls_to_execute: Vec<(String, String, serde_json::Value)> = if !response_function_calls.is_empty() {
                     let mut calls = Vec::new();
                     for call in &response_function_calls {
