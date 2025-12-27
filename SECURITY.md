@@ -2,7 +2,18 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in rust-genai, please report it by opening a GitHub issue or contacting the maintainers directly. We take security issues seriously and will respond promptly.
+**Please do not report security vulnerabilities through public GitHub issues.**
+
+If you discover a security vulnerability in rust-genai, please report it privately using one of these methods:
+
+1. **GitHub Private Vulnerability Reporting**: Use the "Report a vulnerability" button in the Security tab
+2. **Email**: Contact the maintainers directly
+
+We take security issues seriously and will respond within 48 hours. Please include:
+- Description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Any suggested fixes (optional)
 
 ## Security Design
 
@@ -60,6 +71,10 @@ println!("{:?}", client);
 // But better: Don't log at all unless needed for debugging
 ```
 
+### HTTP Client Logging
+
+**Warning**: If you enable verbose HTTP client logging (e.g., via `RUST_LOG=reqwest=debug`), API keys may be exposed in URL query parameters. Avoid verbose HTTP logging in production or ensure logs are properly secured.
+
 ### Function Calling Security
 
 When implementing callable functions, validate all arguments:
@@ -69,9 +84,9 @@ When implementing callable functions, validate all arguments:
     city(description = "The city name")
 )]
 fn get_weather(city: String) -> String {
-    // Validate input before using
-    if city.len() > 100 || city.contains("..") {
-        return r#"{"error": "Invalid city name"}"#.to_string();
+    // Validate input length to prevent abuse
+    if city.len() > 100 {
+        return r#"{"error": "City name too long"}"#.to_string();
     }
 
     // Safe to use after validation
