@@ -55,6 +55,11 @@ for exec in &result.executions {
 
 ### Added
 
+- **`Serialize` support for response types** (#148):
+  - `InteractionResponse` now implements `Serialize` for logging, caching, and persistence
+  - `AutoFunctionResult` implements `Serialize` for full execution history serialization
+  - All nested types (`InteractionContent`, `Tool`, etc.) already support roundtrip serialization with `Unknown` variant preservation
+
 - **New convenience helpers on `InteractionResponse`** (#131):
   - `google_search_call()` - returns first Google Search call (singular)
   - `code_execution_call()` - returns first Code Execution call (singular)

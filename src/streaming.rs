@@ -160,7 +160,7 @@ impl FunctionExecutionResult {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 #[non_exhaustive]
 pub struct AutoFunctionResult {
     /// The final response from the model (after all function calls completed)

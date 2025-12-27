@@ -825,6 +825,76 @@ async fn test_auto_function_calling_max_loops() {
     }
 }
 
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_auto_function_calling_multi_round_accumulation() {
+    // Test that executions from multiple rounds are accumulated correctly.
+    // This test uses chained functions: get_weather returns Celsius, and we ask
+    // for Fahrenheit which should trigger a second round with convert_temperature.
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let weather_func = GetWeatherTestCallable.declaration();
+    let convert_func = ConvertTemperatureCallable.declaration();
+
+    // Ask for weather in Fahrenheit - model should:
+    // Round 1: Call get_weather_test (returns 22°C)
+    // Round 2: Call convert_temperature to convert 22°C to Fahrenheit
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text(
+            "What's the weather in Tokyo? I need the temperature in Fahrenheit, not Celsius. \
+             Use the convert_temperature function to convert the result.",
+        )
+        .with_functions(vec![weather_func, convert_func])
+        .create_with_auto_functions()
+        .await
+        .expect("Auto function calling failed");
+
+    println!("Function executions ({} total):", result.executions.len());
+    for (i, exec) in result.executions.iter().enumerate() {
+        println!("  {}: {} -> {}", i + 1, exec.name, exec.result);
+    }
+
+    // Verify we got executions from the auto-function loop
+    assert!(
+        !result.executions.is_empty(),
+        "Should have at least one function execution"
+    );
+
+    // Check which functions were called
+    let function_names: Vec<&str> = result.executions.iter().map(|e| e.name.as_str()).collect();
+    println!("Functions called: {:?}", function_names);
+
+    // We expect get_weather_test to be called
+    assert!(
+        function_names.contains(&"get_weather_test"),
+        "Should have called get_weather_test"
+    );
+
+    // If the model understood the task, it should also call convert_temperature
+    // Note: LLM behavior can vary, so we check but don't require it
+    if function_names.contains(&"convert_temperature") {
+        println!("✓ Model correctly chained get_weather_test -> convert_temperature");
+        assert!(
+            result.executions.len() >= 2,
+            "Should have at least 2 executions for chained calls"
+        );
+    } else {
+        println!(
+            "Note: Model did not chain functions (may have converted inline or misunderstood)"
+        );
+    }
+
+    // Verify final response
+    let response = &result.response;
+    assert!(response.has_text(), "Should have final text response");
+    println!("Final response: {}", response.text().unwrap_or("(none)"));
+}
+
 // =============================================================================
 // Streaming with Auto Function Calling Tests
 // =============================================================================
