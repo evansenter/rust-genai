@@ -46,7 +46,7 @@
 use std::time::Duration;
 
 use genai_client::models::interactions::{InteractionContent, InteractionResponse};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// A chunk from streaming with automatic function calling.
 ///
@@ -60,7 +60,13 @@ use serde::Serialize;
 /// This enum uses `#[non_exhaustive]` to allow adding new event types in future
 /// versions without breaking existing code. Always include a wildcard arm in
 /// match statements.
-#[derive(Clone, Debug)]
+///
+/// # Serialization
+///
+/// This enum implements `Serialize` and `Deserialize` for logging, persistence,
+/// and replay of streaming events. Unknown variants deserialize to `Unknown`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "chunk_type", content = "data", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum AutoFunctionStreamChunk {
     /// Incremental content from the model (text, thoughts, etc.)
@@ -88,6 +94,13 @@ pub enum AutoFunctionStreamChunk {
     /// This is the last event in the stream, yielded when the model returns
     /// a response that doesn't request any function calls.
     Complete(InteractionResponse),
+
+    /// Unknown event type (for forward compatibility).
+    ///
+    /// This variant captures any unrecognized event types that may be added
+    /// in future versions, allowing deserialization to succeed gracefully.
+    #[serde(other)]
+    Unknown,
 }
 
 /// Result of executing a function locally.
@@ -104,7 +117,7 @@ pub enum AutoFunctionStreamChunk {
 /// println!("Function {} returned: {}", result.name, result.result);
 /// println!("  Call ID: {}, Duration: {:?}", result.call_id, result.duration);
 /// ```
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct FunctionExecutionResult {
     /// Name of the function that was called
@@ -148,7 +161,6 @@ mod duration_millis {
         duration.as_millis().serialize(serializer)
     }
 
-    #[allow(dead_code)]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
     where
         D: Deserializer<'de>,
@@ -189,7 +201,7 @@ mod duration_millis {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct AutoFunctionResult {
     /// The final response from the model (after all function calls completed)
@@ -351,13 +363,67 @@ mod tests {
         assert!(json_str.contains("call-456"), "Should contain call_id");
         assert!(json_str.contains("sunny"), "Should contain result data");
 
-        // Verify roundtrip works (FunctionExecutionResult would need Deserialize for full roundtrip,
-        // but we can at least verify it serializes to valid JSON)
-        let parsed: serde_json::Value =
-            serde_json::from_str(&json_str).expect("Should be valid JSON");
-        assert_eq!(parsed["name"], "get_weather");
-        assert_eq!(parsed["call_id"], "call-456");
-        assert_eq!(parsed["result"]["temp"], 22);
-        assert_eq!(parsed["duration"], 150); // Duration serialized as milliseconds
+        // Verify full roundtrip
+        let deserialized: FunctionExecutionResult =
+            serde_json::from_str(&json_str).expect("Deserialization should succeed");
+        assert_eq!(deserialized, result);
+    }
+
+    #[test]
+    fn test_auto_function_stream_chunk_serialization_roundtrip() {
+        // Test Delta variant roundtrip
+        let delta = AutoFunctionStreamChunk::Delta(InteractionContent::Text {
+            text: Some("Hello, world!".to_string()),
+        });
+
+        let json_str = serde_json::to_string(&delta).expect("Serialization should succeed");
+        assert!(json_str.contains("chunk_type"), "Should contain tag field");
+        assert!(json_str.contains("delta"), "Should contain variant name");
+        assert!(json_str.contains("Hello, world!"), "Should contain text");
+
+        let deserialized: AutoFunctionStreamChunk =
+            serde_json::from_str(&json_str).expect("Deserialization should succeed");
+
+        match deserialized {
+            AutoFunctionStreamChunk::Delta(content) => {
+                assert_eq!(content.text(), Some("Hello, world!"));
+            }
+            _ => panic!("Expected Delta variant"),
+        }
+
+        // Test FunctionResults variant roundtrip
+        let results = AutoFunctionStreamChunk::FunctionResults(vec![
+            FunctionExecutionResult::new(
+                "get_weather",
+                "call-1",
+                json!({"temp": 20}),
+                Duration::from_millis(50),
+            ),
+            FunctionExecutionResult::new(
+                "get_time",
+                "call-2",
+                json!({"time": "14:30"}),
+                Duration::from_millis(30),
+            ),
+        ]);
+
+        let json_str = serde_json::to_string(&results).expect("Serialization should succeed");
+        let deserialized: AutoFunctionStreamChunk =
+            serde_json::from_str(&json_str).expect("Deserialization should succeed");
+
+        match deserialized {
+            AutoFunctionStreamChunk::FunctionResults(execs) => {
+                assert_eq!(execs.len(), 2);
+                assert_eq!(execs[0].name, "get_weather");
+                assert_eq!(execs[1].name, "get_time");
+            }
+            _ => panic!("Expected FunctionResults variant"),
+        }
+
+        // Test Unknown variant handling (forward compatibility)
+        let unknown_json = r#"{"chunk_type": "future_event_type"}"#;
+        let deserialized: AutoFunctionStreamChunk =
+            serde_json::from_str(unknown_json).expect("Should deserialize unknown variant");
+        assert!(matches!(deserialized, AutoFunctionStreamChunk::Unknown));
     }
 }
