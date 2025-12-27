@@ -148,7 +148,7 @@ let content: InteractionContent = serde_json::from_str(json)?;
 
 - **Unit tests**: Inline in source files
 - **Integration tests** (`tests/`):
-  - `builder_tests.rs`, `macro_tests.rs`: No API key needed
+  - `builder_tests.rs`, `macro_tests.rs`, `ui_tests.rs`: No API key needed
   - `interactions_api_tests.rs`: Core CRUD, streaming
   - `advanced_function_calling_tests.rs`: Complex function scenarios
   - `agents_and_multiturn_tests.rs`: Stateful conversations
