@@ -55,10 +55,13 @@ for exec in &result.executions {
 
 ### Added
 
-- **`Serialize` support for response types** (#148):
+- **Full `Serialize`/`Deserialize` support for save/resume semantics** (#148, #151):
   - `InteractionResponse` now implements `Serialize` for logging, caching, and persistence
-  - `AutoFunctionResult` implements `Serialize` for full execution history serialization
-  - All nested types (`InteractionContent`, `Tool`, etc.) already support roundtrip serialization with `Unknown` variant preservation
+  - `AutoFunctionResult` implements `Serialize` and `Deserialize` for full execution history
+  - `FunctionExecutionResult` now implements `Deserialize` for roundtrip serialization
+  - `StreamChunk` and `AutoFunctionStreamChunk` implement both traits for streaming event replay
+  - New `AutoFunctionStreamChunk::Unknown` variant for forward-compatible deserialization
+  - Enables offline replay, testing/mocking, and state persistence for long-running agents
 
 - **New convenience helpers on `InteractionResponse`** (#131):
   - `google_search_call()` - returns first Google Search call (singular)
