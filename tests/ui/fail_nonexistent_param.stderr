@@ -1,0 +1,5 @@
+error: Parameter 'nonexistent' referenced in #[tool] attribute does not exist in function 'test_nonexistent_param'. Available parameters: ["name"]
+ --> tests/ui/fail_nonexistent_param.rs:5:4
+  |
+5 | fn test_nonexistent_param(name: String) -> String {
+  |    ^^^^^^^^^^^^^^^^^^^^^^

@@ -3,11 +3,11 @@
 #![allow(clippy::uninlined_format_args)] // Not important in tests
 
 use rust_genai::CallableFunction;
-use rust_genai_macros::generate_function_declaration;
+use rust_genai_macros::tool;
 
 #[test]
 fn test_basic_function_declaration() {
-    #[generate_function_declaration]
+    #[tool]
     fn test_basic(name: String) -> String {
         name
     }
@@ -22,7 +22,7 @@ fn test_basic_function_declaration() {
 #[test]
 fn test_function_with_doc_comment() {
     /// This is a test function that does something
-    #[generate_function_declaration]
+    #[tool]
     fn test_with_docs(name: String) -> String {
         name
     }
@@ -39,7 +39,7 @@ fn test_function_with_doc_comment() {
 #[test]
 fn test_with_param_metadata() {
     /// Function to greet someone
-    #[generate_function_declaration(
+    #[tool(
         name(description = "The person's name"),
         age(description = "The person's age")
     )]
@@ -61,7 +61,7 @@ fn test_with_param_metadata() {
 
 #[test]
 fn test_optional_parameters() {
-    #[generate_function_declaration(
+    #[tool(
         name(description = "Required name"),
         nickname(description = "Optional nickname")
     )]
@@ -76,7 +76,7 @@ fn test_optional_parameters() {
 
 #[test]
 fn test_enum_values() {
-    #[generate_function_declaration(
+    #[tool(
         unit(enum_values = ["celsius", "fahrenheit", "kelvin"])
     )]
     #[allow(unused_variables)]
@@ -95,7 +95,7 @@ fn test_enum_values() {
 
 #[test]
 fn test_various_types() {
-    #[generate_function_declaration]
+    #[tool]
     fn test_types(
         text: String,
         count: i32,
@@ -130,7 +130,7 @@ fn test_multiline_doc_comment() {
     /// does multiple things:
     /// - First thing
     /// - Second thing
-    #[generate_function_declaration]
+    #[tool]
     fn test_multiline(x: String) -> String {
         x
     }
@@ -148,7 +148,7 @@ fn test_multiline_doc_comment() {
 // that this comment in the code is accurate
 #[test]
 fn test_param_without_metadata_no_description() {
-    #[generate_function_declaration]
+    #[tool]
     fn test_no_param_desc(
         // Regular comment - not a doc comment
         name: String,
@@ -169,7 +169,7 @@ fn test_param_without_metadata_no_description() {
 fn test_param_docs_not_allowed() {
     // The following would NOT compile if uncommented:
     /*
-    #[generate_function_declaration]
+    #[tool]
     fn test_param_doc(
         /// This doc comment would cause a compile error
         name: String
@@ -179,9 +179,7 @@ fn test_param_docs_not_allowed() {
     */
 
     // Instead, descriptions must be provided via the macro attribute:
-    #[generate_function_declaration(name(
-        description = "This is the correct way to add param descriptions"
-    ))]
+    #[tool(name(description = "This is the correct way to add param descriptions"))]
     fn test_correct_param_desc(name: String) -> String {
         name
     }

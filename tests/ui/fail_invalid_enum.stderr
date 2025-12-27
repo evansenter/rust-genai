@@ -1,0 +1,5 @@
+error: Enum values for param 'unit' must be string literals.
+ --> tests/ui/fail_invalid_enum.rs:4:25
+  |
+4 |     unit(enum_values = [1, 2, 3])
+  |                         ^

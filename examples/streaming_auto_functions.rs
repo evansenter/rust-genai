@@ -21,14 +21,14 @@
 
 use futures_util::StreamExt;
 use rust_genai::{AutoFunctionStreamChunk, CallableFunction, Client, InteractionContent};
-use rust_genai_macros::generate_function_declaration;
+use rust_genai_macros::tool;
 use std::env;
 use std::io::{Write, stdout};
 
 // Define functions using the macro - automatically registered for auto-calling.
 
 /// Gets the current weather for a city
-#[generate_function_declaration(city(description = "The city to get weather for"))]
+#[tool(city(description = "The city to get weather for"))]
 fn get_weather(city: String) -> String {
     // Simulate some processing time
     std::thread::sleep(std::time::Duration::from_millis(100));
@@ -39,7 +39,7 @@ fn get_weather(city: String) -> String {
 }
 
 /// Gets the current time in a timezone
-#[generate_function_declaration(timezone(description = "The timezone like UTC, PST, EST, JST"))]
+#[tool(timezone(description = "The timezone like UTC, PST, EST, JST"))]
 fn get_time(timezone: String) -> String {
     std::thread::sleep(std::time::Duration::from_millis(100));
     format!(
@@ -49,7 +49,7 @@ fn get_time(timezone: String) -> String {
 }
 
 /// Converts temperature between units
-#[generate_function_declaration(
+#[tool(
     value(description = "The temperature value"),
     from_unit(description = "Source unit: celsius or fahrenheit"),
     to_unit(description = "Target unit: celsius or fahrenheit")

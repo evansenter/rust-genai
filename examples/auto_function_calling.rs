@@ -17,7 +17,7 @@
 
 use futures_util::StreamExt;
 use rust_genai::{CallableFunction, Client, StreamChunk};
-use rust_genai_macros::generate_function_declaration;
+use rust_genai_macros::tool;
 use std::env;
 use std::io::{Write, stdout};
 
@@ -25,7 +25,7 @@ use std::io::{Write, stdout};
 // in the global function registry for auto-calling.
 
 /// Gets the current weather for a city
-#[generate_function_declaration(city(description = "The city to get weather for"))]
+#[tool(city(description = "The city to get weather for"))]
 fn get_weather(city: String) -> String {
     // In a real application, this would call a weather API
     println!("  [Function called: get_weather(city={})]", city);
@@ -36,7 +36,7 @@ fn get_weather(city: String) -> String {
 }
 
 /// Gets the current time in a timezone
-#[generate_function_declaration(timezone(description = "The timezone like UTC, PST, EST, JST"))]
+#[tool(timezone(description = "The timezone like UTC, PST, EST, JST"))]
 fn get_time(timezone: String) -> String {
     println!("  [Function called: get_time(timezone={})]", timezone);
     format!(

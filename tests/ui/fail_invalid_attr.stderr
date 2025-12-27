@@ -1,0 +1,5 @@
+error: Unknown attribute 'invalid_key'. Valid attributes are: description, enum_values
+ --> tests/ui/fail_invalid_attr.rs:5:13
+  |
+5 | #[tool(name(invalid_key = "value"))]
+  |             ^^^^^^^^^^^

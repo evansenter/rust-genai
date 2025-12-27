@@ -15,7 +15,7 @@ mod common;
 
 use common::{consume_auto_function_stream, consume_stream, get_client};
 use rust_genai::{CallableFunction, FunctionDeclaration, function_result_content};
-use rust_genai_macros::generate_function_declaration;
+use rust_genai_macros::tool;
 use serde_json::json;
 
 // =============================================================================
@@ -23,7 +23,7 @@ use serde_json::json;
 // =============================================================================
 //
 // NOTE: These functions are marked #[allow(dead_code)] because they're registered
-// with the inventory crate via #[generate_function_declaration]. The macro creates
+// with the inventory crate via #[tool]. The macro creates
 // `Callable*` structs that are collected at runtime for automatic function calling.
 //
 // While not all functions are explicitly called in tests, they serve these purposes:
@@ -34,7 +34,7 @@ use serde_json::json;
 
 /// Gets the current weather for a city
 #[allow(dead_code)]
-#[generate_function_declaration(city(description = "The city to get weather for"))]
+#[tool(city(description = "The city to get weather for"))]
 fn get_weather_test(city: String) -> String {
     format!(
         r#"{{"city": "{}", "temperature": "22°C", "conditions": "sunny"}}"#,
@@ -44,14 +44,14 @@ fn get_weather_test(city: String) -> String {
 
 /// Gets the current time in a timezone
 #[allow(dead_code)]
-#[generate_function_declaration(timezone(description = "The timezone like UTC, PST, JST"))]
+#[tool(timezone(description = "The timezone like UTC, PST, JST"))]
 fn get_time_test(timezone: String) -> String {
     format!(r#"{{"timezone": "{}", "time": "14:30:00"}}"#, timezone)
 }
 
 /// Converts temperature between units
 #[allow(dead_code)]
-#[generate_function_declaration(
+#[tool(
     value(description = "The temperature value"),
     from_unit(description = "Source unit: celsius or fahrenheit"),
     to_unit(description = "Target unit: celsius or fahrenheit")
@@ -70,21 +70,22 @@ fn convert_temperature(value: f64, from_unit: String, to_unit: String) -> String
 
 /// A function that always fails (for testing error handling)
 #[allow(dead_code)]
-#[generate_function_declaration(input(description = "Any input"))]
-fn always_fails(_input: String) -> String {
+#[allow(unused_variables)]
+#[tool(input(description = "Any input"))]
+fn always_fails(input: String) -> String {
     panic!("This function always fails!")
 }
 
 /// A function with no parameters
 #[allow(dead_code)]
-#[generate_function_declaration]
+#[tool]
 fn get_server_status() -> String {
     r#"{"status": "online", "uptime": "99.9%"}"#.to_string()
 }
 
 /// A function with complex nested arguments
 #[allow(dead_code)]
-#[generate_function_declaration(
+#[tool(
     user_id(description = "The user ID"),
     filters(description = "Optional filter criteria")
 )]

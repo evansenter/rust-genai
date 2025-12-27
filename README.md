@@ -278,15 +278,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Automatic Function Calling
 
-The library supports automatic function discovery and execution. Functions decorated with `#[generate_function_declaration]` are automatically discovered and executed when the model requests them:
+The library supports automatic function discovery and execution. Functions decorated with `#[tool]` are automatically discovered and executed when the model requests them:
 
 ```rust
 use rust_genai::{Client, CallableFunction, WithFunctionCalling};
-use rust_genai_macros::generate_function_declaration;
+use rust_genai_macros::tool;
 use std::env;
 
 /// Get the current weather in a location
-#[generate_function_declaration(
+#[tool(
     location(description = "The city and state, e.g. San Francisco, CA"),
     unit(description = "The temperature unit", enum_values = ["celsius", "fahrenheit"])
 )]
@@ -333,13 +333,13 @@ Key features of automatic function calling:
 
 ### Using the Procedural Macro
 
-The `#[generate_function_declaration]` macro provides an ergonomic way to create function declarations:
+The `#[tool]` macro provides an ergonomic way to create function declarations:
 
 ```rust
-use rust_genai_macros::generate_function_declaration;
+use rust_genai_macros::tool;
 
 /// Function to get the weather in a given location
-#[generate_function_declaration(
+#[tool(
     location(description = "The city and state, e.g. San Francisco, CA"),
     unit(description = "The temperature unit to use", enum_values = ["celsius", "fahrenheit"])
 )]
@@ -532,8 +532,8 @@ impl CallableFunction for MyFunction {
     }
 }
 
-// Functions marked with #[generate_function_declaration] are automatically
-// registered in a global registry and discovered by create_with_auto_functions()
+// Functions marked with #[tool] are automatically registered in a global
+// registry and discovered by create_with_auto_functions()
 ```
 
 ## Logging
@@ -581,7 +581,7 @@ The project consists of three main components:
    - Handles the actual HTTP requests and response parsing
 
 3. **Macro Crate (`rust-genai-macros/`)**:
-   - Procedural macro for `#[generate_function_declaration]`
+   - Procedural macro for `#[tool]`
    - Automatic function registration via `inventory` crate
 
 Users of the `rust-genai` crate typically do not need to interact with `genai-client` directly, as its functionalities are exposed through the main `rust-genai` API.
@@ -664,7 +664,7 @@ match result {
 **Function calls not being executed**
 - Ensure you're using `create_with_auto_functions()` for automatic execution
 - For manual execution, check that you're sending the `FunctionResult` back correctly
-- Verify your function is registered via `#[generate_function_declaration]`
+- Verify your function is registered via `#[tool]`
 
 **Image URL not accessible**
 - The API blocks most public HTTP URLs for security
