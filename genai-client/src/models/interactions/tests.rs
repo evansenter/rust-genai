@@ -513,6 +513,31 @@ fn test_content_empty_text_returns_none() {
     assert_eq!(content_none.text(), None);
 }
 
+#[test]
+fn test_content_thought_accessor() {
+    // Non-empty thought returns Some
+    let content = InteractionContent::Thought {
+        text: Some("reasoning about the problem".to_string()),
+    };
+    assert_eq!(content.thought(), Some("reasoning about the problem"));
+
+    // Empty thought returns None
+    let empty = InteractionContent::Thought {
+        text: Some(String::new()),
+    };
+    assert_eq!(empty.thought(), None);
+
+    // None thought returns None
+    let none = InteractionContent::Thought { text: None };
+    assert_eq!(none.thought(), None);
+
+    // Text variant returns None for thought()
+    let text_content = InteractionContent::Text {
+        text: Some("hello".to_string()),
+    };
+    assert_eq!(text_content.thought(), None);
+}
+
 // --- Unknown Variant Tests ---
 
 #[test]

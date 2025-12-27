@@ -20,7 +20,7 @@
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
 use futures_util::StreamExt;
-use rust_genai::{AutoFunctionStreamChunk, CallableFunction, Client, InteractionContent};
+use rust_genai::{AutoFunctionStreamChunk, CallableFunction, Client};
 use rust_genai_macros::tool;
 use std::env;
 use std::io::{Write, stdout};
@@ -115,12 +115,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 AutoFunctionStreamChunk::Delta(content) => {
                     delta_count += 1;
                     // Print text content as it arrives
-                    if let InteractionContent::Text { text: Some(ref t) } = content {
+                    if let Some(t) = content.text() {
                         print!("{}", t);
                         stdout().flush()?;
                     }
                     // Show thoughts if present
-                    if let InteractionContent::Thought { text: Some(ref t) } = content {
+                    if let Some(t) = content.thought() {
                         print!("\n[Thinking: {}...]", &t[..t.len().min(50)]);
                         stdout().flush()?;
                     }
