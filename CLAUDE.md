@@ -57,6 +57,7 @@ cargo run --example video_input
 cargo run --example pdf_input
 cargo run --example image_generation
 cargo run --example deep_research
+cargo run --example thought_echo
 ```
 
 ## Architecture
@@ -181,10 +182,11 @@ let content: InteractionContent = serde_json::from_str(json)?;
 
 - **Unit tests**: Inline in source files
 - **Integration tests** (`tests/`):
-  - `builder_tests.rs`, `macro_tests.rs`, `ui_tests.rs`: No API key needed
+  - `function_declaration_builder_tests.rs`, `interaction_builder_tests.rs`, `macro_tests.rs`, `ui_tests.rs`: No API key needed
   - `interactions_api_tests.rs`: Core CRUD, streaming
   - `advanced_function_calling_tests.rs`: Complex function scenarios
-  - `agents_and_multiturn_tests.rs`: Stateful conversations
+  - `agents_tests.rs`, `multiturn_tests.rs`, `streaming_multiturn_tests.rs`: Stateful conversations
+  - `thinking_function_tests.rs`, `tools_multiturn_tests.rs`: Thinking and tool multi-turn tests
   - `multimodal_tests.rs`: Image/media handling
   - `tools_and_config_tests.rs`: Built-in tools
   - `api_canary_tests.rs`: API compatibility checks

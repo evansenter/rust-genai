@@ -52,10 +52,6 @@ bytes = { workspace = true }
 futures-util = { workspace = true }
 
 [[bench]]
-name = "sse_streaming"
-harness = false
-
-[[bench]]
 name = "serialization"
 harness = false
 

@@ -20,22 +20,8 @@
 ///
 /// For manual conversation construction (without `previous_interaction_id`), use
 /// [`function_call_content_with_signature`] to include the signature when echoing function calls.
-use genai_client::{
-    CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent, InteractionInput,
-};
+use genai_client::{CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
 use serde_json::Value;
-
-/// Creates a simple text input from a string
-///
-/// # Example
-/// ```
-/// use rust_genai::interactions_api::text_input;
-///
-/// let input = text_input("Hello, how are you?");
-/// ```
-pub fn text_input(text: impl Into<String>) -> InteractionInput {
-    InteractionInput::Text(text.into())
-}
 
 /// Creates text content
 ///
@@ -376,21 +362,6 @@ pub fn document_uri_content(
     }
 }
 
-/// Builds a complete interaction input from multiple content items
-///
-/// # Example
-/// ```
-/// use rust_genai::interactions_api::{build_interaction_input, text_content, image_uri_content};
-///
-/// let input = build_interaction_input(vec![
-///     text_content("What's in this image?"),
-///     image_uri_content("https://example.com/photo.jpg", "image/jpeg"),
-/// ]);
-/// ```
-pub fn build_interaction_input(contents: Vec<InteractionContent>) -> InteractionInput {
-    InteractionInput::Content(contents)
-}
-
 /// Creates code execution call content
 ///
 /// This variant appears when the model initiates code execution
@@ -580,15 +551,6 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn test_text_input() {
-        let input = text_input("Hello");
-        match input {
-            InteractionInput::Text(text) => assert_eq!(text, "Hello"),
-            _ => panic!("Expected Text variant"),
-        }
-    }
-
-    #[test]
     fn test_text_content() {
         let content = text_content("Hello");
         match content {
@@ -668,16 +630,6 @@ mod tests {
                 assert_eq!(mime_type, Some("image/png".to_string()));
             }
             _ => panic!("Expected Image variant"),
-        }
-    }
-
-    #[test]
-    fn test_build_interaction_input() {
-        let contents = vec![text_content("Hello"), text_content("World")];
-        let input = build_interaction_input(contents);
-        match input {
-            InteractionInput::Content(vec) => assert_eq!(vec.len(), 2),
-            _ => panic!("Expected Content variant"),
         }
     }
 

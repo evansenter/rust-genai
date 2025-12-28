@@ -1,17 +1,15 @@
-use std::time::Instant;
+mod auto_functions;
+
+use auto_functions::DEFAULT_MAX_FUNCTION_CALL_LOOPS;
 
 use crate::GenaiError;
 use crate::client::Client;
-use crate::streaming::{AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionResult};
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
     self, CreateInteractionRequest, FunctionDeclaration, GenerationConfig, InteractionContent,
     InteractionInput, InteractionResponse, StreamChunk, ThinkingLevel, Tool as InternalTool,
 };
-
-/// Default maximum iterations for auto function calling
-pub const DEFAULT_MAX_FUNCTION_CALL_LOOPS: usize = 5;
 
 /// Builder for creating interactions with the Gemini Interactions API.
 ///
@@ -321,6 +319,11 @@ impl<'a> InteractionBuilder<'a> {
         }
     }
 
+    /// Internal helper to add a tool to the tools list.
+    fn add_tool(&mut self, tool: InternalTool) {
+        self.tools.get_or_insert_with(Vec::new).push(tool);
+    }
+
     /// References a previous interaction for stateful conversations.
     ///
     /// The interaction will have access to the context from the previous interaction.
@@ -361,8 +364,7 @@ impl<'a> InteractionBuilder<'a> {
     ///     .with_function(func);
     /// ```
     pub fn with_function(mut self, function: FunctionDeclaration) -> Self {
-        let tool = function.into_tool();
-        self.tools.get_or_insert_with(Vec::new).push(tool);
+        self.add_tool(function.into_tool());
         self
     }
 
@@ -390,10 +392,11 @@ impl<'a> InteractionBuilder<'a> {
     /// ```
     ///
     /// [`with_function`]: InteractionBuilder::with_function
-    pub fn with_functions(self, functions: Vec<FunctionDeclaration>) -> Self {
-        functions
-            .into_iter()
-            .fold(self, |builder, func| builder.with_function(func))
+    pub fn with_functions(mut self, functions: Vec<FunctionDeclaration>) -> Self {
+        for func in functions {
+            self.add_tool(func.into_tool());
+        }
+        self
     }
 
     /// Enables Google Search grounding for this interaction.
@@ -433,9 +436,7 @@ impl<'a> InteractionBuilder<'a> {
     ///
     /// [`InteractionResponse::google_search_metadata`]: crate::InteractionResponse::google_search_metadata
     pub fn with_google_search(mut self) -> Self {
-        self.tools
-            .get_or_insert_with(Vec::new)
-            .push(InternalTool::GoogleSearch);
+        self.add_tool(InternalTool::GoogleSearch);
         self
     }
 
@@ -480,9 +481,7 @@ impl<'a> InteractionBuilder<'a> {
     /// # }
     /// ```
     pub fn with_code_execution(mut self) -> Self {
-        self.tools
-            .get_or_insert_with(Vec::new)
-            .push(InternalTool::CodeExecution);
+        self.add_tool(InternalTool::CodeExecution);
         self
     }
 
@@ -531,9 +530,7 @@ impl<'a> InteractionBuilder<'a> {
     ///
     /// [`InteractionResponse::url_context_metadata`]: crate::InteractionResponse::url_context_metadata
     pub fn with_url_context(mut self) -> Self {
-        self.tools
-            .get_or_insert_with(Vec::new)
-            .push(InternalTool::UrlContext);
+        self.add_tool(InternalTool::UrlContext);
         self
     }
 
@@ -787,424 +784,6 @@ impl<'a> InteractionBuilder<'a> {
             while let Some(result) = stream.next().await {
                 yield result?;
             }
-        })
-    }
-
-    /// Creates interaction with automatic function call handling.
-    ///
-    /// This method implements the auto-function execution loop:
-    /// 1. Send initial input to model with available tools
-    /// 2. If response contains function calls, execute them
-    /// 3. Send function results back to model in new interaction
-    /// 4. Repeat until model returns text or max iterations reached
-    ///
-    /// Functions are auto-discovered from the global registry (via `#[tool]` macro)
-    /// or can be explicitly provided via `.with_function()` or `.with_tools()`.
-    ///
-    /// The loop automatically stops when:
-    /// - Model returns text without function calls
-    /// - Function calls array is empty
-    /// - Maximum iterations is reached (default 5, configurable via `with_max_function_call_loops()`)
-    ///
-    /// # Thought Signatures
-    ///
-    /// For Gemini 3 models, thought signatures are required to maintain reasoning context
-    /// across function calling turns. This method uses `previous_interaction_id` to link
-    /// turns, which allows the server to manage thought signatures automatically.
-    ///
-    /// See <https://ai.google.dev/gemini-api/docs/thought-signatures> for more details.
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use rust_genai::{Client, FunctionDeclaration};
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::builder("api_key".to_string()).build();
-    ///
-    /// // Functions are auto-discovered from registry
-    /// let result = client.interaction()
-    ///     .with_model("gemini-3-flash-preview")
-    ///     .with_text("What's the weather in Tokyo?")
-    ///     .create_with_auto_functions()
-    ///     .await?;
-    ///
-    /// // Access the final response
-    /// println!("{}", result.response.text().unwrap_or("No text"));
-    ///
-    /// // Access execution history
-    /// for exec in &result.executions {
-    ///     println!("Called {} -> {}", exec.name, exec.result);
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// # Serialization
-    ///
-    /// Both [`AutoFunctionResult`] and its contained [`InteractionResponse`]
-    /// implement `Serialize`, enabling logging, caching, and persistence of complete
-    /// execution histories for debugging and evaluation workflows.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - No input was provided
-    /// - Neither model nor agent was specified
-    /// - The API request fails
-    /// - Maximum function call loops is exceeded (default 5, configurable via `with_max_function_call_loops()`)
-    pub async fn create_with_auto_functions(self) -> Result<AutoFunctionResult, GenaiError> {
-        use crate::function_calling::get_global_function_registry;
-        use crate::interactions_api::function_result_content;
-        use log::{error, warn};
-        use serde_json::json;
-
-        let client = self.client;
-        let max_loops = self.max_function_call_loops;
-        let mut request = self.build_request()?;
-
-        // Track all function executions for the result
-        let mut all_executions: Vec<FunctionExecutionResult> = Vec::new();
-
-        // Auto-discover functions from registry if not explicitly provided
-        let function_registry = get_global_function_registry();
-        if request.tools.is_none() {
-            let auto_discovered_declarations = function_registry.all_declarations();
-            if !auto_discovered_declarations.is_empty() {
-                request.tools = Some(
-                    auto_discovered_declarations
-                        .into_iter()
-                        .map(|decl| decl.into_tool())
-                        .collect(),
-                );
-            }
-        }
-
-        // Main auto-function loop (configurable iterations to prevent infinite loops)
-        for _loop_count in 0..max_loops {
-            let response = client.create_interaction(request.clone()).await?;
-
-            // Extract function calls using convenience method
-            let function_calls = response.function_calls();
-
-            // If no function calls, we're done!
-            if function_calls.is_empty() {
-                return Ok(AutoFunctionResult {
-                    response,
-                    executions: all_executions,
-                });
-            }
-
-            // Build function results for next iteration
-            let mut function_results = Vec::new();
-
-            for call in function_calls {
-                // Validate that we have a call_id (required by API)
-                let call_id = call.id.ok_or_else(|| {
-                    error!(
-                        "Function call '{}' is missing required call_id field.",
-                        call.name
-                    );
-                    GenaiError::InvalidInput(format!(
-                        "Function call '{}' is missing required call_id field. \
-                         This may indicate an API response format change.",
-                        call.name
-                    ))
-                })?;
-
-                // Execute the function with timing
-                let start = Instant::now();
-                let result = if let Some(function) = function_registry.get(call.name) {
-                    match function.call(call.args.clone()).await {
-                        Ok(result) => result,
-                        Err(e) => {
-                            error!(
-                                "Function execution failed: function='{}', error='{}'",
-                                call.name, e
-                            );
-                            json!({ "error": e.to_string() })
-                        }
-                    }
-                } else {
-                    warn!(
-                        "Function not found in registry: function='{}'. Informing model.",
-                        call.name
-                    );
-                    json!({ "error": format!("Function '{}' is not available or not found.", call.name) })
-                };
-                let duration = start.elapsed();
-
-                // Track execution for the result
-                all_executions.push(FunctionExecutionResult::new(
-                    call.name,
-                    call_id,
-                    result.clone(),
-                    duration,
-                ));
-
-                // Add function result (only the result, not the call - server has it via previous_interaction_id)
-                function_results.push(function_result_content(
-                    call.name.to_string(),
-                    call_id.to_string(),
-                    result,
-                ));
-            }
-
-            // Create new request with function results
-            // The server maintains function call context via previous_interaction_id
-            request.previous_interaction_id = Some(response.id);
-            request.input = InteractionInput::Content(function_results);
-        }
-
-        Err(GenaiError::Internal(format!(
-            "Exceeded maximum function call loops ({max_loops}). \
-             The model may be stuck in a loop. Check your function implementations, \
-             increase the limit using with_max_function_call_loops(), \
-             or use manual function calling for more control."
-        )))
-    }
-
-    /// Creates a streaming interaction with automatic function call handling.
-    ///
-    /// This method combines the streaming capabilities of `create_stream()` with the
-    /// automatic function execution of `create_with_auto_functions()`. It yields
-    /// [`AutoFunctionStreamChunk`] events that include:
-    ///
-    /// - `Delta`: Incremental content from the model (text, thoughts, etc.)
-    /// - `ExecutingFunctions`: Notification when function calls are about to execute
-    /// - `FunctionResults`: Results from executed functions
-    /// - `Complete`: Final response when no more function calls are needed
-    ///
-    /// The stream automatically handles multiple function calling rounds, streaming
-    /// content from each round and executing functions between rounds.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use rust_genai::{Client, AutoFunctionStreamChunk, InteractionContent};
-    /// # use futures_util::StreamExt;
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::builder("api_key".to_string()).build();
-    ///
-    /// let mut stream = client.interaction()
-    ///     .with_model("gemini-3-flash-preview")
-    ///     .with_text("What's the weather in Tokyo?")
-    ///     .create_stream_with_auto_functions();
-    ///
-    /// while let Some(chunk) = stream.next().await {
-    ///     match chunk? {
-    ///         AutoFunctionStreamChunk::Delta(content) => {
-    ///             if let InteractionContent::Text { text: Some(t) } = content {
-    ///                 print!("{}", t);
-    ///             }
-    ///         }
-    ///         AutoFunctionStreamChunk::ExecutingFunctions(response) => {
-    ///             let names: Vec<_> = response.function_calls().iter().map(|c| c.name).collect();
-    ///             println!("[Executing: {:?}]", names);
-    ///         }
-    ///         AutoFunctionStreamChunk::FunctionResults(results) => {
-    ///             println!("[Got {} results]", results.len());
-    ///         }
-    ///         AutoFunctionStreamChunk::Complete(response) => {
-    ///             println!("\n[Complete: {} tokens]", response.usage.as_ref()
-    ///                 .and_then(|u| u.total_tokens).unwrap_or(0));
-    ///         }
-    ///         _ => {} // Handle unknown future variants
-    ///     }
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns errors if:
-    /// - No input was provided
-    /// - Neither model nor agent was specified
-    /// - The API request fails
-    /// - A function call is missing its required `call_id` field
-    /// - Maximum function call loops is exceeded
-    pub fn create_stream_with_auto_functions(
-        self,
-    ) -> BoxStream<'a, Result<AutoFunctionStreamChunk, GenaiError>> {
-        use crate::function_calling::get_global_function_registry;
-        use crate::interactions_api::function_result_content;
-        use log::{error, warn};
-        use serde_json::json;
-
-        let client = self.client;
-        let max_loops = self.max_function_call_loops;
-
-        Box::pin(async_stream::try_stream! {
-            let mut request = self.build_request()?;
-
-            // Auto-discover functions from registry if not explicitly provided
-            let function_registry = get_global_function_registry();
-            if request.tools.is_none() {
-                let auto_discovered_declarations = function_registry.all_declarations();
-                if !auto_discovered_declarations.is_empty() {
-                    request.tools = Some(
-                        auto_discovered_declarations
-                            .into_iter()
-                            .map(|decl| decl.into_tool())
-                            .collect(),
-                    );
-                }
-            }
-
-            // Main auto-function streaming loop
-            for _loop_count in 0..max_loops {
-                // Enable streaming for this request
-                request.stream = Some(true);
-
-                // Stream this iteration's response
-                let mut stream = client.create_interaction_stream(request.clone());
-                let mut complete_response: Option<InteractionResponse> = None;
-                // Accumulate function calls from deltas (streaming API may not include them in Complete)
-                let mut accumulated_calls: Vec<(Option<String>, String, serde_json::Value)> = Vec::new();
-
-                while let Some(result) = stream.next().await {
-                    match result? {
-                        StreamChunk::Delta(delta) => {
-                            // Check for function calls in delta
-                            if let InteractionContent::FunctionCall { id, name, args, .. } = &delta {
-                                accumulated_calls.push((id.clone(), name.clone(), args.clone()));
-                            }
-                            yield AutoFunctionStreamChunk::Delta(delta);
-                        }
-                        StreamChunk::Complete(response) => {
-                            complete_response = Some(response);
-                        }
-                        // Ignore unknown chunk types for forward compatibility
-                        _ => {}
-                    }
-                }
-
-                // Get the complete response (should always be present after stream ends)
-                let response = complete_response.ok_or_else(|| {
-                    GenaiError::Internal(
-                        "Stream ended without Complete event".to_string()
-                    )
-                })?;
-
-                // Check for function calls from two possible sources:
-                // 1. response.function_calls(): Populated when the Complete event includes
-                //    FunctionCall content items (typical for non-streaming or when the API
-                //    batches function calls into the final response)
-                // 2. accumulated_calls: Populated from Delta events during streaming when
-                //    the API sends FunctionCall content incrementally via deltas
-                //
-                // We check both because API behavior may vary; prefer Complete response
-                // data when available as it represents the finalized state.
-                let response_function_calls = response.function_calls();
-                let has_function_calls = !response_function_calls.is_empty() || !accumulated_calls.is_empty();
-
-                // If no function calls, we're done!
-                if !has_function_calls {
-                    yield AutoFunctionStreamChunk::Complete(response);
-                    return;
-                }
-
-                // Signal that we're executing functions (pass the response for inspection)
-                yield AutoFunctionStreamChunk::ExecutingFunctions(response.clone());
-
-                // Determine which function calls to execute.
-                // Prefer response.function_calls() if available (finalized data),
-                // fall back to accumulated deltas otherwise.
-                let calls_to_execute: Vec<(String, String, serde_json::Value)> = if !response_function_calls.is_empty() {
-                    let mut calls = Vec::new();
-                    for call in &response_function_calls {
-                        let call_id = call.id.ok_or_else(|| {
-                            error!(
-                                "Function call '{}' is missing required call_id field.",
-                                call.name
-                            );
-                            GenaiError::InvalidInput(format!(
-                                "Function call '{}' is missing required call_id field. \
-                                 This may indicate an API response format change.",
-                                call.name
-                            ))
-                        })?;
-                        calls.push((call_id.to_string(), call.name.to_string(), call.args.clone()));
-                    }
-                    calls
-                } else {
-                    let mut calls = Vec::new();
-                    for (id, name, args) in &accumulated_calls {
-                        let call_id = id.as_ref().ok_or_else(|| {
-                            error!(
-                                "Function call '{}' is missing required call_id field.",
-                                name
-                            );
-                            GenaiError::InvalidInput(format!(
-                                "Function call '{}' is missing required call_id field. \
-                                 This may indicate an API response format change.",
-                                name
-                            ))
-                        })?;
-                        calls.push((call_id.clone(), name.clone(), args.clone()));
-                    }
-                    calls
-                };
-
-                // Build function results for next iteration
-                let mut function_results_content = Vec::new();
-                let mut execution_results = Vec::new();
-
-                for (call_id, name, args) in &calls_to_execute {
-                    // Execute the function with timing
-                    let start = Instant::now();
-                    let result = if let Some(function) = function_registry.get(name) {
-                        match function.call(args.clone()).await {
-                            Ok(result) => result,
-                            Err(e) => {
-                                error!(
-                                    "Function execution failed: function='{}', error='{}'",
-                                    name, e
-                                );
-                                json!({ "error": e.to_string() })
-                            }
-                        }
-                    } else {
-                        warn!(
-                            "Function not found in registry: function='{}'. Informing model.",
-                            name
-                        );
-                        json!({ "error": format!("Function '{}' is not available or not found.", name) })
-                    };
-                    let duration = start.elapsed();
-
-                    // Track result for yielding
-                    execution_results.push(FunctionExecutionResult::new(
-                        name.clone(),
-                        call_id.clone(),
-                        result.clone(),
-                        duration,
-                    ));
-
-                    // Add function result content for API
-                    function_results_content.push(function_result_content(
-                        name.clone(),
-                        call_id.clone(),
-                        result,
-                    ));
-                }
-
-                // Yield function results
-                yield AutoFunctionStreamChunk::FunctionResults(execution_results);
-
-                // Create new request with function results
-                request.previous_interaction_id = Some(response.id);
-                request.input = InteractionInput::Content(function_results_content);
-            }
-
-            // If we get here, we exceeded max loops
-            Err(GenaiError::Internal(format!(
-                "Exceeded maximum function call loops ({max_loops}). \
-                 The model may be stuck in a loop. Check your function implementations, \
-                 increase the limit using with_max_function_call_loops(), \
-                 or use manual function calling for more control."
-            )))?;
         })
     }
 

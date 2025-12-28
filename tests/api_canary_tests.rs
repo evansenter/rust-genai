@@ -28,7 +28,7 @@ mod common;
 
 use common::get_client;
 use futures_util::StreamExt;
-use rust_genai::interactions_api::text_input;
+use rust_genai::InteractionInput;
 
 /// Model used for all canary tests - update if model availability changes
 const CANARY_MODEL: &str = "gemini-3-flash-preview";
@@ -60,7 +60,7 @@ async fn canary_basic_text_interaction() {
     let response = client
         .interaction()
         .with_model(CANARY_MODEL)
-        .with_input(text_input("Say 'hello' and nothing else."))
+        .with_text("Say 'hello' and nothing else.")
         .create()
         .await
         .expect("API call should succeed");
@@ -79,7 +79,7 @@ async fn canary_streaming_interaction() {
     let mut stream = client
         .interaction()
         .with_model(CANARY_MODEL)
-        .with_input(text_input("Count from 1 to 3."))
+        .with_text("Count from 1 to 3.")
         .create_stream();
 
     let mut unknown_types_found = Vec::new();
@@ -135,7 +135,7 @@ async fn canary_function_calling_interaction() {
     let response = client
         .interaction()
         .with_model(CANARY_MODEL)
-        .with_input(text_input("What time is it?"))
+        .with_text("What time is it?")
         .with_functions(vec![get_time])
         .create()
         .await
@@ -150,12 +150,12 @@ async fn canary_function_calling_interaction() {
         let call = &response.function_calls()[0];
 
         use rust_genai::interactions_api::{
-            build_interaction_input, function_call_content, function_result_content, text_content,
+            function_call_content, function_result_content, text_content,
         };
 
         // Build conversation history with the function call and result
         let call_id = call.id.unwrap_or("call_1");
-        let history = build_interaction_input(vec![
+        let history = InteractionInput::Content(vec![
             text_content("What time is it?"),
             function_call_content(call.name, json!({})),
             function_result_content(call.name, call_id, json!({"time": "12:00 PM"})),
@@ -186,7 +186,7 @@ async fn canary_code_execution_interaction() {
     let response = client
         .interaction()
         .with_model(CANARY_MODEL)
-        .with_input(text_input("Use code execution to calculate 2 + 2"))
+        .with_text("Use code execution to calculate 2 + 2")
         .with_tools(vec![Tool::CodeExecution])
         .create()
         .await
@@ -201,12 +201,12 @@ async fn canary_code_execution_interaction() {
 #[tokio::test]
 #[ignore] // Requires GEMINI_API_KEY
 async fn canary_multimodal_interaction() {
-    use rust_genai::interactions_api::{build_interaction_input, image_data_content, text_content};
+    use rust_genai::interactions_api::{image_data_content, text_content};
 
     let client = get_client().expect("GEMINI_API_KEY must be set");
 
     // Use a tiny 1x1 red PNG
-    let input = build_interaction_input(vec![
+    let input = InteractionInput::Content(vec![
         text_content("What color is this image?"),
         image_data_content(common::TINY_RED_PNG_BASE64, "image/png"),
     ]);
@@ -241,7 +241,7 @@ async fn canary_thinking_model_interaction() {
     let response = client
         .interaction()
         .with_model(CANARY_MODEL)
-        .with_input(text_input("What is 15 * 23?"))
+        .with_text("What is 15 * 23?")
         .with_generation_config(config)
         .create()
         .await

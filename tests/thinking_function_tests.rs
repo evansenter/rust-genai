@@ -1,833 +1,32 @@
-//! Agents, multi-turn conversations, and usage metadata tests
+//! Thinking mode + function calling tests
 //!
-//! Tests for deep research agent, background mode, very long conversations,
-//! conversation branching, and token usage verification.
+//! Tests for combining thinking mode (ThinkingLevel) with function calling,
+//! including multi-turn conversations, parallel function calls, sequential
+//! chains, and streaming scenarios.
 //!
 //! These tests require the GEMINI_API_KEY environment variable to be set.
 //!
 //! # Running Tests
 //!
 //! ```bash
-//! cargo test --test agents_and_multiturn_tests -- --include-ignored --nocapture
+//! cargo test --test thinking_function_tests -- --include-ignored --nocapture
 //! ```
 //!
-//! # Notes
+//! # Thought Signatures
 //!
-//! Agent tests may take longer to complete due to background processing.
-//! Some agents may not be available in all accounts.
+//! Per Google's documentation (https://ai.google.dev/gemini-api/docs/thought-signatures):
+//! - Thought signatures are encrypted representations of the model's reasoning
+//! - For Gemini 3 models, signatures MUST be echoed back during function calling
+//! - The Interactions API handles this automatically via `previous_interaction_id`
+//! - Signatures may or may not be exposed in the response (API behavior varies)
 
 mod common;
 
 use common::{
-    DEFAULT_MAX_RETRIES, EXTENDED_TEST_TIMEOUT, PollError, TEST_TIMEOUT, consume_stream,
-    get_client, interaction_builder, poll_until_complete, retry_on_transient, stateful_builder,
-    with_timeout,
+    DEFAULT_MAX_RETRIES, consume_stream, get_client, retry_on_transient, stateful_builder,
 };
 use rust_genai::{FunctionDeclaration, InteractionStatus, ThinkingLevel, function_result_content};
 use serde_json::json;
-use std::time::Duration;
-
-// =============================================================================
-// Test Configuration Constants
-// =============================================================================
-
-/// Minimum number of successful conversation turns to consider long conversation test valid.
-/// API may encounter limitations (UTF-8 errors, etc.) with very long chains.
-const MIN_SUCCESSFUL_TURNS: usize = 3;
-
-/// Minimum facts the model should remember out of 10 in the recall test.
-const MIN_REMEMBERED_FACTS: usize = 5;
-
-/// Maximum time to wait for background tasks to complete.
-const BACKGROUND_TASK_TIMEOUT: Duration = Duration::from_secs(60);
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-/// Checks if an error is a known API limitation for long conversation chains.
-/// These errors (UTF-8 encoding issues, spanner errors, truncation) can occur
-/// when the conversation context becomes too large.
-fn is_long_conversation_api_error(error: &rust_genai::GenaiError) -> bool {
-    let error_str = format!("{:?}", error);
-    error_str.contains("UTF-8") || error_str.contains("spanner") || error_str.contains("truncated")
-}
-
-// =============================================================================
-// Multi-turn: Very Long Conversations
-// =============================================================================
-
-/// Test a conversation with 10+ turns to verify context is maintained.
-/// Note: Very long conversations may encounter API-side limitations.
-#[tokio::test]
-#[ignore = "Requires API key"]
-async fn test_very_long_conversation() {
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    with_timeout(EXTENDED_TEST_TIMEOUT, async {
-        let facts = [
-        "My name is Alice.",
-        "I live in Seattle.",
-        "I work as a software engineer.",
-        "My favorite programming language is Rust.",
-        "I have a dog named Max.",
-        "My birthday is in March.",
-        "I enjoy hiking on weekends.",
-        "My favorite food is sushi.",
-        "I drive a blue car.",
-        "I went to Stanford for college.",
-    ];
-
-    let mut previous_id: Option<String> = None;
-    let mut successful_turns = 0;
-
-    // Build up context over 10 turns
-    for (i, fact) in facts.iter().enumerate() {
-        let mut builder = stateful_builder(&client)
-            .with_text(*fact);
-
-        if let Some(ref prev_id) = previous_id {
-            builder = builder.with_previous_interaction(prev_id);
-        }
-
-        match builder.create().await {
-            Ok(response) => {
-                println!("Turn {}: {}", i + 1, fact);
-                previous_id = Some(response.id);
-                successful_turns += 1;
-            }
-            Err(e) => {
-                if is_long_conversation_api_error(&e) {
-                    println!(
-                        "Turn {} encountered API limitation (expected for long conversations): {:?}",
-                        i + 1,
-                        e
-                    );
-                    println!(
-                        "Completed {} turns before hitting API limitation",
-                        successful_turns
-                    );
-                    // Still pass if we got the minimum successful turns
-                    assert!(
-                        successful_turns >= MIN_SUCCESSFUL_TURNS,
-                        "Should complete at least {} turns, got {}",
-                        MIN_SUCCESSFUL_TURNS,
-                        successful_turns
-                    );
-                    return;
-                }
-                panic!("Turn {} failed: {:?}", i + 1, e);
-            }
-        }
-    }
-
-    // Final turn: ask about everything
-    let final_result = stateful_builder(&client)
-        .with_previous_interaction(previous_id.as_ref().unwrap())
-        .with_text("What do you know about me? List everything you can remember.")
-        .create()
-        .await;
-
-    let final_response = match final_result {
-        Ok(response) => response,
-        Err(e) => {
-            if is_long_conversation_api_error(&e) {
-                println!(
-                    "Final turn encountered API limitation (expected for long conversations): {:?}",
-                    e
-                );
-                println!(
-                    "Completed {} turns before hitting API limitation",
-                    successful_turns
-                );
-                assert!(
-                    successful_turns >= MIN_SUCCESSFUL_TURNS,
-                    "Should complete at least {} turns, got {}",
-                    MIN_SUCCESSFUL_TURNS,
-                    successful_turns
-                );
-                return;
-            }
-            panic!("Final turn failed: {:?}", e);
-        }
-    };
-
-    assert_eq!(final_response.status, InteractionStatus::Completed);
-    assert!(final_response.has_text(), "Should have text response");
-
-    let text = final_response.text().unwrap().to_lowercase();
-    println!("Final response: {}", text);
-
-    // Count how many facts the model remembers
-    let fact_checks = [
-        ("alice", "name"),
-        ("seattle", "city"),
-        ("software", "job"),
-        ("rust", "language"),
-        ("max", "dog"),
-        ("march", "birthday"),
-        ("hiking", "hobby"),
-        ("sushi", "food"),
-        ("blue", "car"),
-        ("stanford", "college"),
-    ];
-
-    let mut remembered = 0;
-    for (keyword, label) in fact_checks.iter() {
-        if text.contains(*keyword) {
-            remembered += 1;
-            println!("  ✓ Remembered: {} ({})", keyword, label);
-        }
-    }
-
-    println!("Facts remembered: {}/{}", remembered, fact_checks.len());
-
-        // Should remember at least the minimum number of facts
-        assert!(
-            remembered >= MIN_REMEMBERED_FACTS,
-            "Model should remember at least {} out of {} facts, got {}",
-            MIN_REMEMBERED_FACTS,
-            fact_checks.len(),
-            remembered
-        );
-    })
-    .await;
-}
-
-// =============================================================================
-// Multi-turn: Mixed Function/Text Turns
-// =============================================================================
-
-#[tokio::test]
-#[ignore = "Requires API key"]
-async fn test_conversation_function_then_text() {
-    // Test a conversation that mixes function calls and text turns
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    let get_weather = FunctionDeclaration::builder("get_weather")
-        .description("Get the current weather")
-        .parameter("city", json!({"type": "string"}))
-        .required(vec!["city".to_string()])
-        .build();
-
-    // Turn 1: Trigger function call
-    let response1 = stateful_builder(&client)
-        .with_text("What's the weather in Tokyo?")
-        .with_function(get_weather.clone())
-        .create()
-        .await
-        .expect("Turn 1 failed");
-
-    println!("Turn 1 status: {:?}", response1.status);
-
-    let calls = response1.function_calls();
-    if calls.is_empty() {
-        println!("No function call - cannot continue test");
-        return;
-    }
-
-    let call = &calls[0];
-
-    // Turn 2: Provide function result
-    let result = function_result_content(
-        "get_weather",
-        call.id.unwrap().to_string(),
-        json!({"temperature": "25°C", "conditions": "sunny"}),
-    );
-
-    let response2 = stateful_builder(&client)
-        .with_previous_interaction(&response1.id)
-        .with_content(vec![result])
-        .with_function(get_weather.clone())
-        .create()
-        .await
-        .expect("Turn 2 failed");
-
-    println!("Turn 2 status: {:?}", response2.status);
-    if response2.has_text() {
-        println!("Turn 2 text: {}", response2.text().unwrap());
-    }
-
-    // Turn 3: Follow-up text question (no function call expected)
-    let response3 = stateful_builder(&client)
-        .with_previous_interaction(&response2.id)
-        .with_text("Should I bring a jacket?")
-        .with_function(get_weather)
-        .create()
-        .await
-        .expect("Turn 3 failed");
-
-    println!("Turn 3 status: {:?}", response3.status);
-    assert!(response3.has_text(), "Turn 3 should have text response");
-
-    let text = response3.text().unwrap().to_lowercase();
-    println!("Turn 3 text: {}", text);
-
-    // Should reference the weather context
-    assert!(
-        text.contains("no")
-            || text.contains("yes")
-            || text.contains("sunny")
-            || text.contains("warm")
-            || text.contains("jacket")
-            || text.contains("25"),
-        "Response should reference weather context"
-    );
-}
-
-// =============================================================================
-// Multi-turn: Conversation Branching
-// =============================================================================
-
-#[tokio::test]
-#[ignore = "Requires API key"]
-async fn test_conversation_branch() {
-    // Test starting a new conversation from a mid-point
-    //
-    // NOTE: This test uses retry_on_transient to handle intermittent Spanner UTF-8
-    // errors from the Google backend. See issue #60 for details.
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    // Build initial context
-    // Each call is wrapped with retry logic to handle transient Spanner errors
-    let response1 = {
-        let client = client.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_text("My favorite color is red.")
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 1 failed")
-    };
-
-    let response2 = {
-        let client = client.clone();
-        let prev_id = response1.id.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
-                    .with_text("My favorite number is 7.")
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 2 failed")
-    };
-
-    let response3 = {
-        let client = client.clone();
-        let prev_id = response2.id.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
-                    .with_text("My favorite animal is a cat.")
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 3 failed")
-    };
-
-    // Branch from turn 2 (before the cat fact)
-    let branch_response = {
-        let client = client.clone();
-        let prev_id = response2.id.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(&prev_id) // Branch from turn 2
-                    .with_text("What do you know about my favorites so far?")
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Branch failed")
-    };
-
-    assert!(branch_response.has_text(), "Should have text response");
-
-    let text = branch_response.text().unwrap().to_lowercase();
-    println!("Branch response (from turn 2): {}", text);
-
-    // Should know about color and number, but NOT cat (that was in turn 3)
-    let knows_color = text.contains("red");
-    let knows_number = text.contains("7") || text.contains("seven");
-    let knows_cat = text.contains("cat");
-
-    println!(
-        "Knows color: {}, number: {}, cat: {}",
-        knows_color, knows_number, knows_cat
-    );
-
-    // Should know at least color or number
-    assert!(
-        knows_color || knows_number,
-        "Branch should have context from earlier turns"
-    );
-
-    // Continue from turn 3 to verify it still works
-    let continue_response = {
-        let client = client.clone();
-        let prev_id = response3.id.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
-                    .with_text("And what's my favorite animal?")
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Continue failed")
-    };
-
-    let continue_text = continue_response.text().unwrap().to_lowercase();
-    println!("Continue response (from turn 3): {}", continue_text);
-    assert!(
-        continue_text.contains("cat"),
-        "Continue should remember the cat from turn 3"
-    );
-}
-
-// =============================================================================
-// Agents: Deep Research
-// =============================================================================
-
-#[tokio::test]
-#[ignore = "Requires API key"]
-async fn test_deep_research_agent() {
-    // Test the deep research agent
-    // Note: This agent may not be available in all accounts
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    with_timeout(TEST_TIMEOUT, async {
-        let result = client
-            .interaction()
-            .with_agent("deep-research-pro-preview-12-2025")
-            .with_text("What are the main differences between Rust and Go programming languages?")
-            .create()
-            .await;
-
-        match result {
-            Ok(response) => {
-                println!("Deep research status: {:?}", response.status);
-                if response.has_text() {
-                    let text = response.text().unwrap();
-                    println!(
-                        "Research response (truncated): {}...",
-                        &text[..text.len().min(500)]
-                    );
-
-                    // Should mention both languages
-                    let text_lower = text.to_lowercase();
-                    assert!(
-                        text_lower.contains("rust") || text_lower.contains("go"),
-                        "Response should discuss programming languages"
-                    );
-                }
-            }
-            Err(e) => {
-                let error_str = format!("{:?}", e);
-                println!("Deep research error (may be expected): {}", error_str);
-                if error_str.contains("not found")
-                    || error_str.contains("not available")
-                    || error_str.contains("agent")
-                {
-                    println!("Deep research agent not available - skipping test");
-                }
-            }
-        }
-    })
-    .await;
-}
-
-// =============================================================================
-// Agents: Background Mode
-// =============================================================================
-
-#[tokio::test]
-#[ignore = "Requires API key"]
-async fn test_background_mode_polling() {
-    // Test background mode with polling using exponential backoff
-    // Note: This requires an agent that supports background mode
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    with_timeout(EXTENDED_TEST_TIMEOUT, async {
-        // Start background task
-        let result = client
-            .interaction()
-            .with_agent("deep-research-pro-preview-12-2025")
-            .with_text("Briefly explain what machine learning is.")
-            .with_background(true)
-            .create()
-            .await;
-
-        match result {
-            Ok(initial_response) => {
-                println!("Initial status: {:?}", initial_response.status);
-                println!("Interaction ID: {}", initial_response.id);
-
-                // If already completed, we're done
-                if initial_response.status == InteractionStatus::Completed {
-                    println!("Task completed immediately (may not have used background mode)");
-                    if initial_response.has_text() {
-                        println!("Result: {}", initial_response.text().unwrap());
-                    }
-                    return;
-                }
-
-                // Poll for completion using exponential backoff
-                match poll_until_complete(&client, &initial_response.id, BACKGROUND_TASK_TIMEOUT)
-                    .await
-                {
-                    Ok(response) => {
-                        println!("Task completed!");
-                        if response.has_text() {
-                            let text = response.text().unwrap();
-                            println!("Result: {}...", &text[..200.min(text.len())]);
-                        }
-                    }
-                    Err(PollError::Timeout) => {
-                        println!(
-                            "Polling timed out after {:?} - task may still be running",
-                            BACKGROUND_TASK_TIMEOUT
-                        );
-                    }
-                    Err(PollError::Failed) => {
-                        println!("Task failed");
-                    }
-                    Err(PollError::Api(e)) => {
-                        println!("Poll error: {:?}", e);
-                    }
-                }
-            }
-            Err(e) => {
-                let error_str = format!("{:?}", e);
-                println!("Background mode error (may be expected): {}", error_str);
-                if error_str.contains("not found")
-                    || error_str.contains("not supported")
-                    || error_str.contains("background")
-                {
-                    println!("Background mode not available - skipping test");
-                }
-            }
-        }
-    })
-    .await;
-}
-
-// =============================================================================
-// Usage Metadata
-// =============================================================================
-
-#[tokio::test]
-#[ignore = "Requires API key"]
-async fn test_usage_metadata_returned() {
-    // Verify that token usage metadata is returned
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    let response = stateful_builder(&client)
-        .with_text("What is the capital of France? Answer briefly.")
-        .create()
-        .await
-        .expect("Interaction failed");
-
-    assert_eq!(response.status, InteractionStatus::Completed);
-
-    // Check usage metadata
-    if let Some(usage) = &response.usage {
-        println!("Usage metadata:");
-        println!("  Input tokens: {:?}", usage.total_input_tokens);
-        println!("  Output tokens: {:?}", usage.total_output_tokens);
-        println!("  Total tokens: {:?}", usage.total_tokens);
-
-        // At least one of these should be set
-        if usage.has_data() {
-            // Verify reasonable values
-            if let Some(input) = usage.total_input_tokens {
-                assert!(input > 0, "Input tokens should be positive");
-            }
-            if let Some(output) = usage.total_output_tokens {
-                assert!(output > 0, "Output tokens should be positive");
-            }
-            if let Some(total) = usage.total_tokens {
-                assert!(total > 0, "Total tokens should be positive");
-            }
-        } else {
-            println!("Note: Usage metadata fields are all None");
-        }
-    } else {
-        println!("No usage metadata returned (may be expected for some configurations)");
-    }
-}
-
-#[tokio::test]
-#[ignore = "Requires API key"]
-async fn test_usage_longer_response() {
-    // Test that longer responses have more tokens
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    // Short response
-    let short_response = stateful_builder(&client)
-        .with_text("Say 'hello'")
-        .create()
-        .await
-        .expect("Short interaction failed");
-
-    // Longer response
-    let long_response = stateful_builder(&client)
-        .with_text("Write a 100-word paragraph about space exploration.")
-        .create()
-        .await
-        .expect("Long interaction failed");
-
-    // Compare usage
-    let short_tokens = short_response
-        .usage
-        .and_then(|u| u.total_tokens)
-        .unwrap_or(0);
-    let long_tokens = long_response
-        .usage
-        .and_then(|u| u.total_tokens)
-        .unwrap_or(0);
-
-    println!("Short response tokens: {}", short_tokens);
-    println!("Long response tokens: {}", long_tokens);
-
-    if short_tokens > 0 && long_tokens > 0 {
-        assert!(
-            long_tokens > short_tokens,
-            "Longer response should use more tokens: {} vs {}",
-            long_tokens,
-            short_tokens
-        );
-    } else {
-        println!("Token counts not available for comparison");
-    }
-}
-
-// =============================================================================
-// Multi-turn: Streaming
-// =============================================================================
-
-/// Test that streaming works correctly in a multi-turn conversation.
-/// Turn 1 establishes context, Turn 2 uses streaming to verify recall.
-#[tokio::test]
-#[ignore = "Requires API key"]
-async fn test_streaming_multi_turn_basic() {
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    // Turn 1: Establish a fact (non-streaming)
-    let response1 = {
-        let client = client.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_text(
-                        "My favorite programming language is Python. Please acknowledge this.",
-                    )
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 1 failed")
-    };
-
-    println!("Turn 1 completed: {}", response1.id);
-    assert_eq!(response1.status, InteractionStatus::Completed);
-
-    // Turn 2: Stream a question that requires context from Turn 1
-    let stream = stateful_builder(&client)
-        .with_previous_interaction(&response1.id)
-        .with_text("What is my favorite programming language? Answer in one word.")
-        .create_stream();
-
-    let result = consume_stream(stream).await;
-
-    println!("\nDeltas received: {}", result.delta_count);
-    println!("Collected text: {}", result.collected_text);
-
-    // Verify streaming worked
-    assert!(result.has_output(), "Should receive streaming chunks");
-
-    // Verify context was maintained - response should mention Python
-    let text_lower = result.collected_text.to_lowercase();
-    assert!(
-        text_lower.contains("python"),
-        "Streaming response should recall the fact from Turn 1. Got: {}",
-        result.collected_text
-    );
-
-    // Verify final response if received
-    if let Some(response) = result.final_response {
-        assert_eq!(response.status, InteractionStatus::Completed);
-    }
-}
-
-/// Test streaming in a multi-turn conversation with function calling.
-/// Turn 1: Trigger function call
-/// Turn 2: Provide function result
-/// Turn 3: Stream a follow-up question
-#[tokio::test]
-#[ignore = "Requires API key"]
-async fn test_streaming_multi_turn_function_calling() {
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    let get_weather = FunctionDeclaration::builder("get_weather")
-        .description("Get the current weather for a city")
-        .parameter(
-            "city",
-            json!({"type": "string", "description": "The city name"}),
-        )
-        .required(vec!["city".to_string()])
-        .build();
-
-    // Turn 1: Trigger function call
-    let response1 = {
-        let client = client.clone();
-        let get_weather = get_weather.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let get_weather = get_weather.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_text("What's the weather in Paris?")
-                    .with_function(get_weather)
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 1 failed")
-    };
-
-    println!("Turn 1 status: {:?}", response1.status);
-
-    let calls = response1.function_calls();
-    if calls.is_empty() {
-        println!("Model chose not to call function - skipping rest of test");
-        return;
-    }
-
-    let call = &calls[0];
-    println!("Function call: {} with args: {:?}", call.name, call.args);
-
-    // Turn 2: Provide function result
-    let result = function_result_content(
-        "get_weather",
-        call.id.expect("Function call should have ID").to_string(),
-        json!({"temperature": "18°C", "conditions": "rainy", "humidity": "85%"}),
-    );
-
-    let response2 = {
-        let client = client.clone();
-        let prev_id = response1.id.clone();
-        let get_weather = get_weather.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            let result = result.clone();
-            let get_weather = get_weather.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
-                    .with_content(vec![result])
-                    .with_function(get_weather)
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 2 failed")
-    };
-
-    println!("Turn 2 status: {:?}", response2.status);
-    if response2.has_text() {
-        println!("Turn 2 text: {}", response2.text().unwrap());
-    }
-
-    // Turn 3: Stream a follow-up question about the weather context
-    let stream = stateful_builder(&client)
-        .with_previous_interaction(&response2.id)
-        .with_text("Should I bring an umbrella? Answer briefly.")
-        .with_function(get_weather)
-        .create_stream();
-
-    let result = consume_stream(stream).await;
-
-    println!("\nDeltas received: {}", result.delta_count);
-    println!("Collected text: {}", result.collected_text);
-
-    // Verify streaming worked
-    assert!(result.has_output(), "Should receive streaming chunks");
-
-    // Verify context was maintained - response should reference weather conditions.
-    // Allow flexible matching due to LLM response variability - any reference to
-    // the weather conditions indicates the multi-turn context was preserved.
-    let text_lower = result.collected_text.to_lowercase();
-    assert!(
-        text_lower.contains("yes")
-            || text_lower.contains("umbrella")
-            || text_lower.contains("rain")
-            || text_lower.contains("18")
-            || text_lower.contains("humid"),
-        "Streaming response should reference weather context. Got: {}",
-        result.collected_text
-    );
-
-    // Verify final response if received
-    if let Some(response) = result.final_response {
-        assert_eq!(response.status, InteractionStatus::Completed);
-    }
-}
 
 // =============================================================================
 // Thinking + Function Calling + Multi-turn
@@ -840,14 +39,6 @@ async fn test_streaming_multi_turn_function_calling() {
 /// - Multi-turn conversations function correctly with thinking enabled
 /// - Context is preserved across turns via `previous_interaction_id`
 ///
-/// # Thought Signatures
-///
-/// Per Google's documentation (https://ai.google.dev/gemini-api/docs/thought-signatures):
-/// - Thought signatures are encrypted representations of the model's reasoning
-/// - For Gemini 3 models, signatures MUST be echoed back during function calling
-/// - The Interactions API handles this automatically via `previous_interaction_id`
-/// - Signatures may or may not be exposed in the response (API behavior varies)
-///
 /// # Thinking Mode vs Thought Signatures
 ///
 /// These are distinct concepts:
@@ -857,9 +48,9 @@ async fn test_streaming_multi_turn_function_calling() {
 /// Thoughts may be processed internally without visible text, especially when
 /// the model is focused on function calling rather than explanation.
 ///
-/// Turn 1: Enable thinking + ask question → triggers function call
-/// Turn 2: Provide function result → model processes and responds
-/// Turn 3: Follow-up question → model reasons with full context preserved
+/// Turn 1: Enable thinking + ask question -> triggers function call
+/// Turn 2: Provide function result -> model processes and responds
+/// Turn 3: Follow-up question -> model reasons with full context preserved
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_thinking_with_function_calling_multi_turn() {
@@ -891,6 +82,7 @@ async fn test_thinking_with_function_calling_multi_turn() {
                     .with_text("What's the weather in Tokyo? Should I bring an umbrella?")
                     .with_function(get_weather)
                     .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store(true)
                     .create()
                     .await
             }
@@ -969,6 +161,7 @@ async fn test_thinking_with_function_calling_multi_turn() {
                     .with_content(vec![function_result])
                     .with_function(get_weather)
                     .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store(true)
                     .create()
                     .await
             }
@@ -1038,6 +231,7 @@ async fn test_thinking_with_function_calling_multi_turn() {
                     )
                     .with_function(get_weather)
                     .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store(true)
                     .create()
                     .await
             }
@@ -1157,6 +351,7 @@ async fn test_thinking_with_parallel_function_calls() {
                     )
                     .with_functions(vec![get_weather, get_time])
                     .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store(true)
                     .create()
                     .await
             }
@@ -1246,6 +441,7 @@ async fn test_thinking_with_parallel_function_calls() {
                     .with_content(results)
                     .with_functions(vec![get_weather, get_time])
                     .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store(true)
                     .create()
                     .await
             }
@@ -1386,6 +582,7 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
                     )
                     .with_functions(functions)
                     .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store(true)
                     .create()
                     .await
             }
@@ -1473,6 +670,7 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
                     .with_content(results)
                     .with_functions(functions)
                     .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store(true)
                     .create()
                     .await
             }
@@ -1554,6 +752,7 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
                         .with_content(results)
                         .with_functions(functions)
                         .with_thinking_level(ThinkingLevel::Medium)
+                        .with_store(true)
                         .create()
                         .await
                 }
@@ -1657,6 +856,7 @@ async fn test_thinking_levels_with_function_calling() {
                         .with_text("What's the weather in Paris?")
                         .with_function(get_weather)
                         .with_thinking_level(level)
+                        .with_store(true)
                         .create()
                         .await
                 }
@@ -1705,7 +905,7 @@ async fn test_thinking_levels_with_function_calling() {
                 let get_weather = get_weather.clone();
                 let function_result = function_result.clone();
                 async move {
-                    interaction_builder(&client)
+                    stateful_builder(&client)
                         .with_previous_interaction(&prev_id)
                         .with_content(vec![function_result])
                         .with_function(get_weather)
@@ -1788,6 +988,7 @@ async fn test_function_calling_without_thinking() {
                     .with_text("What's the weather in Tokyo?")
                     .with_function(get_weather)
                     // Note: NO with_thinking_level() call
+                    .with_store(true)
                     .create()
                     .await
             }
@@ -1853,7 +1054,7 @@ async fn test_function_calling_without_thinking() {
             let get_weather = get_weather.clone();
             let function_result = function_result.clone();
             async move {
-                interaction_builder(&client)
+                stateful_builder(&client)
                     .with_previous_interaction(&prev_id)
                     .with_content(vec![function_result])
                     .with_function(get_weather)
@@ -1957,6 +1158,7 @@ async fn test_streaming_with_thinking_and_function_calling() {
         .with_text("What's the weather in Tokyo? I need to know if I should bring an umbrella.")
         .with_function(get_weather.clone())
         .with_thinking_level(ThinkingLevel::Medium)
+        .with_store(true)
         .create_stream();
 
     let result = consume_stream(stream).await;
@@ -2043,6 +1245,7 @@ async fn test_streaming_with_thinking_and_function_calling() {
         .with_content(vec![function_result])
         .with_function(get_weather)
         .with_thinking_level(ThinkingLevel::Medium)
+        .with_store(true)
         .create_stream();
 
     let result2 = consume_stream(stream2).await;
@@ -2154,362 +1357,4 @@ async fn test_streaming_with_thinking_only() {
     );
 
     println!("\n✓ Streaming with thinking (no function calling) completed successfully");
-}
-
-// =============================================================================
-// Multi-turn: Built-in Tools
-// =============================================================================
-
-/// Test Google Search grounding across multiple conversation turns.
-///
-/// This validates that:
-/// - Google Search grounding works in stateful conversations
-/// - Search results from Turn 1 are accessible in follow-up turns
-/// - The model can reason about previously fetched search data
-///
-/// Turn 1: Ask about current information (triggers search)
-/// Turn 2: Ask follow-up about the search results
-#[tokio::test]
-#[ignore = "Requires API key"]
-async fn test_google_search_multi_turn() {
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    println!("=== Google Search + Multi-turn ===");
-
-    // Turn 1: Ask about current weather (requires real-time data)
-    println!("\n--- Turn 1: Initial search query ---");
-    let result1 = stateful_builder(&client)
-        .with_text(
-            "What is the current weather in Tokyo, Japan today? Use search to find current data.",
-        )
-        .with_google_search()
-        .create()
-        .await;
-
-    let response1 = match result1 {
-        Ok(response) => {
-            println!("Turn 1 status: {:?}", response.status);
-            if let Some(text) = response.text() {
-                println!("Turn 1 response: {}", text);
-            }
-            // Log grounding metadata if available
-            if let Some(metadata) = response.google_search_metadata() {
-                println!("Grounding metadata found:");
-                println!("  Search queries: {:?}", metadata.web_search_queries);
-                println!("  Grounding chunks: {}", metadata.grounding_chunks.len());
-            } else {
-                println!("Note: No grounding metadata returned (may vary by API response)");
-            }
-            response
-        }
-        Err(e) => {
-            let error_str = format!("{:?}", e);
-            println!("Google Search error: {}", error_str);
-            // Google Search may not be available in all accounts
-            if error_str.contains("not supported")
-                || error_str.contains("not available")
-                || error_str.contains("permission")
-            {
-                println!("Google Search tool not available - skipping test");
-                return;
-            }
-            panic!("Turn 1 failed unexpectedly: {:?}", e);
-        }
-    };
-
-    assert_eq!(
-        response1.status,
-        InteractionStatus::Completed,
-        "Turn 1 should complete successfully"
-    );
-
-    // Turn 2: Ask follow-up referencing the search results
-    println!("\n--- Turn 2: Follow-up about search ---");
-    let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
-        stateful_builder(&client)
-            .with_previous_interaction(&response1.id)
-            .with_text("Based on the weather information you just found, should I bring an umbrella if I visit Tokyo today?")
-            .create()
-            .await
-    })
-    .await;
-
-    match result2 {
-        Ok(response2) => {
-            println!("Turn 2 status: {:?}", response2.status);
-            if let Some(text) = response2.text() {
-                println!("Turn 2 response: {}", text);
-                // Verify response references the previous weather context
-                let text_lower = text.to_lowercase();
-                assert!(
-                    text_lower.contains("tokyo")
-                        || text_lower.contains("weather")
-                        || text_lower.contains("umbrella")
-                        || text_lower.contains("rain")
-                        || text_lower.contains("sun")
-                        || text_lower.contains("yes")
-                        || text_lower.contains("no"),
-                    "Turn 2 should reference weather context. Got: {}",
-                    text
-                );
-            }
-            assert_eq!(
-                response2.status,
-                InteractionStatus::Completed,
-                "Turn 2 should complete successfully"
-            );
-        }
-        Err(e) => {
-            // Check for transient errors that might occur with multi-turn
-            if is_long_conversation_api_error(&e) {
-                println!(
-                    "API limitation encountered (expected for some contexts): {:?}",
-                    e
-                );
-                return;
-            }
-            panic!("Turn 2 failed unexpectedly: {:?}", e);
-        }
-    }
-
-    println!("\n✓ Google Search + multi-turn completed successfully");
-}
-
-/// Test URL context fetching across multiple conversation turns.
-///
-/// This validates that:
-/// - URL context tool works in stateful conversations
-/// - Fetched URL content from Turn 1 is preserved in conversation context
-/// - The model can answer follow-up questions about fetched content
-///
-/// Turn 1: Fetch and summarize https://example.com
-/// Turn 2: Ask specific question about the fetched content
-#[tokio::test]
-#[ignore = "Requires API key"]
-async fn test_url_context_multi_turn() {
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    println!("=== URL Context + Multi-turn ===");
-
-    // Turn 1: Fetch example.com content
-    println!("\n--- Turn 1: Fetch URL content ---");
-    let result1 = stateful_builder(&client)
-        .with_text(
-            "Fetch and summarize the main content from https://example.com using URL context.",
-        )
-        .with_url_context()
-        .create()
-        .await;
-
-    let response1 = match result1 {
-        Ok(response) => {
-            println!("Turn 1 status: {:?}", response.status);
-            if let Some(text) = response.text() {
-                println!("Turn 1 response: {}", text);
-            }
-            // Log URL context metadata if available
-            if let Some(metadata) = response.url_context_metadata() {
-                println!("URL context metadata found:");
-                for entry in &metadata.url_metadata {
-                    println!(
-                        "  URL: {} - Status: {:?}",
-                        entry.retrieved_url, entry.url_retrieval_status
-                    );
-                }
-            } else {
-                println!("Note: No URL context metadata returned (may vary by API response)");
-            }
-            response
-        }
-        Err(e) => {
-            let error_str = format!("{:?}", e);
-            println!("URL Context error: {}", error_str);
-            // URL Context may not be available in all accounts
-            if error_str.contains("not supported") || error_str.contains("not available") {
-                println!("URL Context tool not available - skipping test");
-                return;
-            }
-            panic!("Turn 1 failed unexpectedly: {:?}", e);
-        }
-    };
-
-    assert_eq!(
-        response1.status,
-        InteractionStatus::Completed,
-        "Turn 1 should complete successfully"
-    );
-
-    // Turn 2: Ask follow-up about the fetched content
-    println!("\n--- Turn 2: Follow-up about URL content ---");
-    let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
-        interaction_builder(&client)
-            .with_previous_interaction(&response1.id)
-            .with_text("What is the main purpose of that website you just fetched? Is it a real company or an example domain?")
-            .create()
-            .await
-    })
-    .await;
-
-    match result2 {
-        Ok(response2) => {
-            println!("Turn 2 status: {:?}", response2.status);
-            if let Some(text) = response2.text() {
-                println!("Turn 2 response: {}", text);
-                // Verify response references the example.com content
-                let text_lower = text.to_lowercase();
-                assert!(
-                    text_lower.contains("example")
-                        || text_lower.contains("domain")
-                        || text_lower.contains("placeholder")
-                        || text_lower.contains("illustrative")
-                        || text_lower.contains("documentation")
-                        || text_lower.contains("reserved"),
-                    "Turn 2 should reference example.com content. Got: {}",
-                    text
-                );
-            }
-            assert_eq!(
-                response2.status,
-                InteractionStatus::Completed,
-                "Turn 2 should complete successfully"
-            );
-        }
-        Err(e) => {
-            // Check for transient errors that might occur with multi-turn
-            if is_long_conversation_api_error(&e) {
-                println!(
-                    "API limitation encountered (expected for some contexts): {:?}",
-                    e
-                );
-                return;
-            }
-            panic!("Turn 2 failed unexpectedly: {:?}", e);
-        }
-    }
-
-    println!("\n✓ URL Context + multi-turn completed successfully");
-}
-
-/// Test code execution across multiple conversation turns.
-///
-/// This validates that:
-/// - Code execution works in stateful conversations
-/// - Results from Turn 1 code execution can be referenced in Turn 2
-/// - The model can build upon previous calculations
-///
-/// Turn 1: Calculate factorial of 5 (= 120)
-/// Turn 2: Multiply that result by 2 (= 240)
-#[tokio::test]
-#[ignore = "Requires API key"]
-async fn test_code_execution_multi_turn() {
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    println!("=== Code Execution + Multi-turn ===");
-
-    // Turn 1: Calculate factorial of 5
-    println!("\n--- Turn 1: Calculate factorial ---");
-    let result1 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
-        stateful_builder(&client)
-            .with_text("Calculate the factorial of 5 using code execution. Return just the number.")
-            .with_code_execution()
-            .create()
-            .await
-    })
-    .await;
-
-    let response1 = match result1 {
-        Ok(response) => {
-            println!("Turn 1 status: {:?}", response.status);
-            if let Some(text) = response.text() {
-                println!("Turn 1 response: {}", text);
-            }
-            // Log code execution results if available
-            let results = response.code_execution_results();
-            if !results.is_empty() {
-                println!("Code execution results:");
-                for result in &results {
-                    println!("  Outcome: {:?}", result.outcome);
-                    println!("  Output: {}", result.output);
-                }
-            }
-            response
-        }
-        Err(e) => {
-            let error_str = format!("{:?}", e);
-            println!("Code Execution error: {}", error_str);
-            if error_str.contains("not supported") || error_str.contains("not available") {
-                println!("Code Execution tool not available - skipping test");
-                return;
-            }
-            panic!("Turn 1 failed unexpectedly: {:?}", e);
-        }
-    };
-
-    assert_eq!(
-        response1.status,
-        InteractionStatus::Completed,
-        "Turn 1 should complete successfully"
-    );
-
-    // Turn 2: Multiply the result by 2
-    println!("\n--- Turn 2: Multiply result by 2 ---");
-    let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
-        stateful_builder(&client)
-            .with_previous_interaction(&response1.id)
-            .with_text(
-                "Multiply the factorial result you just calculated by 2. What is the answer?",
-            )
-            .with_code_execution()
-            .create()
-            .await
-    })
-    .await;
-
-    match result2 {
-        Ok(response2) => {
-            println!("Turn 2 status: {:?}", response2.status);
-            if let Some(text) = response2.text() {
-                println!("Turn 2 response: {}", text);
-                // 5! = 120, 120 * 2 = 240
-                assert!(
-                    text.contains("240"),
-                    "Turn 2 should calculate 120 * 2 = 240. Got: {}",
-                    text
-                );
-            }
-            // Also check code execution output
-            let results = response2.code_execution_results();
-            for result in &results {
-                if result.output.contains("240") {
-                    println!("Verified: Code output contains 240");
-                }
-            }
-            assert_eq!(
-                response2.status,
-                InteractionStatus::Completed,
-                "Turn 2 should complete successfully"
-            );
-        }
-        Err(e) => {
-            if is_long_conversation_api_error(&e) {
-                println!(
-                    "API limitation encountered (expected for some contexts): {:?}",
-                    e
-                );
-                return;
-            }
-            panic!("Turn 2 failed unexpectedly: {:?}", e);
-        }
-    }
-
-    println!("\n✓ Code Execution + multi-turn completed successfully");
 }

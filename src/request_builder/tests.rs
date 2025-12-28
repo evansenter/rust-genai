@@ -247,7 +247,7 @@ fn test_interaction_builder_with_max_function_call_loops() {
         .with_text("Test");
     assert_eq!(
         builder.max_function_call_loops,
-        crate::request_builder::DEFAULT_MAX_FUNCTION_CALL_LOOPS
+        super::auto_functions::DEFAULT_MAX_FUNCTION_CALL_LOOPS
     );
 
     // Test custom value
