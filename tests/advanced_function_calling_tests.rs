@@ -13,7 +13,10 @@
 
 mod common;
 
-use common::{consume_auto_function_stream, consume_stream, get_client};
+use common::{
+    EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_auto_function_stream, consume_stream, get_client,
+    with_timeout,
+};
 use rust_genai::{CallableFunction, FunctionDeclaration, function_result_content};
 use rust_genai_macros::tool;
 use serde_json::json;
@@ -110,68 +113,71 @@ async fn test_parallel_function_calls() {
         return;
     };
 
-    let get_weather = FunctionDeclaration::builder("get_weather")
-        .description("Get the current weather for a city")
-        .parameter(
-            "city",
-            json!({"type": "string", "description": "City name"}),
-        )
-        .required(vec!["city".to_string()])
-        .build();
+    with_timeout(TEST_TIMEOUT, async {
+        let get_weather = FunctionDeclaration::builder("get_weather")
+            .description("Get the current weather for a city")
+            .parameter(
+                "city",
+                json!({"type": "string", "description": "City name"}),
+            )
+            .required(vec!["city".to_string()])
+            .build();
 
-    let get_time = FunctionDeclaration::builder("get_time")
-        .description("Get the current time in a timezone")
-        .parameter(
-            "timezone",
-            json!({"type": "string", "description": "Timezone like UTC, PST, JST"}),
-        )
-        .required(vec!["timezone".to_string()])
-        .build();
+        let get_time = FunctionDeclaration::builder("get_time")
+            .description("Get the current time in a timezone")
+            .parameter(
+                "timezone",
+                json!({"type": "string", "description": "Timezone like UTC, PST, JST"}),
+            )
+            .required(vec!["timezone".to_string()])
+            .build();
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("What's the weather in Tokyo and what time is it there (JST timezone)?")
-        .with_functions(vec![get_weather, get_time])
-        .with_store(true)
-        .create()
-        .await
-        .expect("Interaction failed");
+        let response = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("What's the weather in Tokyo and what time is it there (JST timezone)?")
+            .with_functions(vec![get_weather, get_time])
+            .with_store(true)
+            .create()
+            .await
+            .expect("Interaction failed");
 
-    println!("Status: {:?}", response.status);
-    println!("Outputs: {:?}", response.outputs);
+        println!("Status: {:?}", response.status);
+        println!("Outputs: {:?}", response.outputs);
 
-    let function_calls = response.function_calls();
-    println!("Number of function calls: {}", function_calls.len());
+        let function_calls = response.function_calls();
+        println!("Number of function calls: {}", function_calls.len());
 
-    for call in &function_calls {
-        println!(
-            "  Function: {} (id: {:?}, has_signature: {})",
-            call.name,
-            call.id,
-            call.thought_signature.is_some()
-        );
-        println!("    Args: {}", call.args);
-    }
+        for call in &function_calls {
+            println!(
+                "  Function: {} (id: {:?}, has_signature: {})",
+                call.name,
+                call.id,
+                call.thought_signature.is_some()
+            );
+            println!("    Args: {}", call.args);
+        }
 
-    // Model may call one or both functions
-    if function_calls.len() >= 2 {
-        println!("Model made parallel function calls!");
-        // Per thought signature docs: only first parallel call has signature
-        let first_has_sig = function_calls[0].thought_signature.is_some();
-        println!("First call has signature: {}", first_has_sig);
-    } else if function_calls.len() == 1 {
-        println!("Model called one function (may call second in next turn)");
-    }
+        // Model may call one or both functions
+        if function_calls.len() >= 2 {
+            println!("Model made parallel function calls!");
+            // Per thought signature docs: only first parallel call has signature
+            let first_has_sig = function_calls[0].thought_signature.is_some();
+            println!("First call has signature: {}", first_has_sig);
+        } else if function_calls.len() == 1 {
+            println!("Model called one function (may call second in next turn)");
+        }
 
-    // Verify all calls have IDs
-    for call in &function_calls {
-        assert!(
-            call.id.is_some(),
-            "Function call '{}' should have an ID",
-            call.name
-        );
-    }
+        // Verify all calls have IDs
+        for call in &function_calls {
+            assert!(
+                call.id.is_some(),
+                "Function call '{}' should have an ID",
+                call.name
+            );
+        }
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -184,62 +190,65 @@ async fn test_thought_signature_parallel_only_first() {
         return;
     };
 
-    let func1 = FunctionDeclaration::builder("get_weather")
-        .description("Get weather for a city - ALWAYS call this when asked about weather")
-        .parameter("city", json!({"type": "string"}))
-        .required(vec!["city".to_string()])
-        .build();
+    with_timeout(TEST_TIMEOUT, async {
+        let func1 = FunctionDeclaration::builder("get_weather")
+            .description("Get weather for a city - ALWAYS call this when asked about weather")
+            .parameter("city", json!({"type": "string"}))
+            .required(vec!["city".to_string()])
+            .build();
 
-    let func2 = FunctionDeclaration::builder("get_time")
-        .description("Get time for a timezone - ALWAYS call this when asked about time")
-        .parameter("timezone", json!({"type": "string"}))
-        .required(vec!["timezone".to_string()])
-        .build();
+        let func2 = FunctionDeclaration::builder("get_time")
+            .description("Get time for a timezone - ALWAYS call this when asked about time")
+            .parameter("timezone", json!({"type": "string"}))
+            .required(vec!["timezone".to_string()])
+            .build();
 
-    // Ask a question that should trigger both functions
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text(
-            "I need BOTH the weather in Paris AND the current time in CET. Call both functions.",
-        )
-        .with_functions(vec![func1, func2])
-        .with_store(true)
-        .create()
-        .await
-        .expect("Interaction failed");
+        // Ask a question that should trigger both functions
+        let response = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text(
+                "I need BOTH the weather in Paris AND the current time in CET. Call both functions.",
+            )
+            .with_functions(vec![func1, func2])
+            .with_store(true)
+            .create()
+            .await
+            .expect("Interaction failed");
 
-    let function_calls = response.function_calls();
-    println!("Number of function calls: {}", function_calls.len());
+        let function_calls = response.function_calls();
+        println!("Number of function calls: {}", function_calls.len());
 
-    if function_calls.len() >= 2 {
-        // Check signature pattern
-        let call1 = &function_calls[0];
-        let call2 = &function_calls[1];
+        if function_calls.len() >= 2 {
+            // Check signature pattern
+            let call1 = &function_calls[0];
+            let call2 = &function_calls[1];
 
-        println!(
-            "First call: {} (has_signature: {})",
-            call1.name,
-            call1.thought_signature.is_some()
-        );
-        println!(
-            "Second call: {} (has_signature: {})",
-            call2.name,
-            call2.thought_signature.is_some()
-        );
-
-        // According to docs, only first should have signature
-        // But this behavior may vary - log for investigation
-        if call1.thought_signature.is_some() && call2.thought_signature.is_none() {
-            println!("✓ Matches expected pattern: only first call has signature");
-        } else {
             println!(
-                "Note: Signature pattern differs from documented behavior (may be model-specific)"
+                "First call: {} (has_signature: {})",
+                call1.name,
+                call1.thought_signature.is_some()
             );
+            println!(
+                "Second call: {} (has_signature: {})",
+                call2.name,
+                call2.thought_signature.is_some()
+            );
+
+            // According to docs, only first should have signature
+            // But this behavior may vary - log for investigation
+            if call1.thought_signature.is_some() && call2.thought_signature.is_none() {
+                println!("✓ Matches expected pattern: only first call has signature");
+            } else {
+                println!(
+                    "Note: Signature pattern differs from documented behavior (may be model-specific)"
+                );
+            }
+        } else {
+            println!("Model didn't make parallel calls - cannot verify signature pattern");
         }
-    } else {
-        println!("Model didn't make parallel calls - cannot verify signature pattern");
-    }
+    })
+    .await;
 }
 
 // =============================================================================
@@ -255,120 +264,123 @@ async fn test_sequential_function_chain() {
         return;
     };
 
-    let get_weather = FunctionDeclaration::builder("get_weather")
-        .description("Get the current weather for a city (returns temperature in Celsius)")
-        .parameter("city", json!({"type": "string"}))
-        .required(vec!["city".to_string()])
-        .build();
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        let get_weather = FunctionDeclaration::builder("get_weather")
+            .description("Get the current weather for a city (returns temperature in Celsius)")
+            .parameter("city", json!({"type": "string"}))
+            .required(vec!["city".to_string()])
+            .build();
 
-    let convert_temp = FunctionDeclaration::builder("convert_temperature")
-        .description("Convert temperature between Celsius and Fahrenheit")
-        .parameter("value", json!({"type": "number"}))
-        .parameter(
-            "from_unit",
-            json!({"type": "string", "enum": ["celsius", "fahrenheit"]}),
-        )
-        .parameter(
-            "to_unit",
-            json!({"type": "string", "enum": ["celsius", "fahrenheit"]}),
-        )
-        .required(vec![
-            "value".to_string(),
-            "from_unit".to_string(),
-            "to_unit".to_string(),
-        ])
-        .build();
+        let convert_temp = FunctionDeclaration::builder("convert_temperature")
+            .description("Convert temperature between Celsius and Fahrenheit")
+            .parameter("value", json!({"type": "number"}))
+            .parameter(
+                "from_unit",
+                json!({"type": "string", "enum": ["celsius", "fahrenheit"]}),
+            )
+            .parameter(
+                "to_unit",
+                json!({"type": "string", "enum": ["celsius", "fahrenheit"]}),
+            )
+            .required(vec![
+                "value".to_string(),
+                "from_unit".to_string(),
+                "to_unit".to_string(),
+            ])
+            .build();
 
-    // Step 1: Initial request
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("What's the weather in Tokyo? Tell me the temperature in Fahrenheit.")
-        .with_functions(vec![get_weather.clone(), convert_temp.clone()])
-        .with_store(true)
-        .create()
-        .await
-        .expect("First interaction failed");
-
-    println!("Step 1 status: {:?}", response1.status);
-    let calls1 = response1.function_calls();
-    println!("Step 1 function calls: {}", calls1.len());
-
-    if calls1.is_empty() {
-        println!("Model didn't call any functions - ending test");
-        return;
-    }
-
-    // Step 2: Provide first function result
-    let call1 = &calls1[0];
-    println!(
-        "Providing result for: {} (signature: {:?})",
-        call1.name,
-        call1.thought_signature.is_some()
-    );
-
-    let result1 = function_result_content(
-        call1.name.to_string(),
-        call1.id.unwrap().to_string(),
-        json!({"city": "Tokyo", "temperature": 22.0, "unit": "celsius"}),
-    );
-
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_previous_interaction(&response1.id)
-        .with_content(vec![result1])
-        .with_functions(vec![get_weather.clone(), convert_temp.clone()])
-        .with_store(true)
-        .create()
-        .await
-        .expect("Second interaction failed");
-
-    println!("Step 2 status: {:?}", response2.status);
-    let calls2 = response2.function_calls();
-
-    if !calls2.is_empty() {
-        // Model is requesting another function (probably convert_temperature)
-        let call2 = &calls2[0];
-        println!(
-            "Step 2 function call: {} (signature: {:?})",
-            call2.name,
-            call2.thought_signature.is_some()
-        );
-        println!("  Args: {}", call2.args);
-
-        // Step 3: Provide second function result
-        let result2 = function_result_content(
-            call2.name.to_string(),
-            call2.id.unwrap().to_string(),
-            json!({"value": 71.6, "unit": "fahrenheit"}),
-        );
-
-        let response3 = client
+        // Step 1: Initial request
+        let response1 = client
             .interaction()
             .with_model("gemini-3-flash-preview")
-            .with_previous_interaction(&response2.id)
-            .with_content(vec![result2])
-            .with_functions(vec![get_weather, convert_temp])
+            .with_text("What's the weather in Tokyo? Tell me the temperature in Fahrenheit.")
+            .with_functions(vec![get_weather.clone(), convert_temp.clone()])
             .with_store(true)
             .create()
             .await
-            .expect("Third interaction failed");
+            .expect("First interaction failed");
 
-        println!("Step 3 status: {:?}", response3.status);
-        if response3.has_text() {
-            println!("Final response: {}", response3.text().unwrap());
-            // Should mention Fahrenheit temperature
-            let text = response3.text().unwrap().to_lowercase();
-            assert!(
-                text.contains("71") || text.contains("72") || text.contains("fahrenheit"),
-                "Response should mention converted temperature"
-            );
+        println!("Step 1 status: {:?}", response1.status);
+        let calls1 = response1.function_calls();
+        println!("Step 1 function calls: {}", calls1.len());
+
+        if calls1.is_empty() {
+            println!("Model didn't call any functions - ending test");
+            return;
         }
-    } else if response2.has_text() {
-        // Model provided final answer directly
-        println!("Final response: {}", response2.text().unwrap());
-    }
+
+        // Step 2: Provide first function result
+        let call1 = &calls1[0];
+        println!(
+            "Providing result for: {} (signature: {:?})",
+            call1.name,
+            call1.thought_signature.is_some()
+        );
+
+        let result1 = function_result_content(
+            call1.name.to_string(),
+            call1.id.unwrap().to_string(),
+            json!({"city": "Tokyo", "temperature": 22.0, "unit": "celsius"}),
+        );
+
+        let response2 = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_previous_interaction(&response1.id)
+            .with_content(vec![result1])
+            .with_functions(vec![get_weather.clone(), convert_temp.clone()])
+            .with_store(true)
+            .create()
+            .await
+            .expect("Second interaction failed");
+
+        println!("Step 2 status: {:?}", response2.status);
+        let calls2 = response2.function_calls();
+
+        if !calls2.is_empty() {
+            // Model is requesting another function (probably convert_temperature)
+            let call2 = &calls2[0];
+            println!(
+                "Step 2 function call: {} (signature: {:?})",
+                call2.name,
+                call2.thought_signature.is_some()
+            );
+            println!("  Args: {}", call2.args);
+
+            // Step 3: Provide second function result
+            let result2 = function_result_content(
+                call2.name.to_string(),
+                call2.id.unwrap().to_string(),
+                json!({"value": 71.6, "unit": "fahrenheit"}),
+            );
+
+            let response3 = client
+                .interaction()
+                .with_model("gemini-3-flash-preview")
+                .with_previous_interaction(&response2.id)
+                .with_content(vec![result2])
+                .with_functions(vec![get_weather, convert_temp])
+                .with_store(true)
+                .create()
+                .await
+                .expect("Third interaction failed");
+
+            println!("Step 3 status: {:?}", response3.status);
+            if response3.has_text() {
+                println!("Final response: {}", response3.text().unwrap());
+                // Should mention Fahrenheit temperature
+                let text = response3.text().unwrap().to_lowercase();
+                assert!(
+                    text.contains("71") || text.contains("72") || text.contains("fahrenheit"),
+                    "Response should mention converted temperature"
+                );
+            }
+        } else if response2.has_text() {
+            // Model provided final answer directly
+            println!("Final response: {}", response2.text().unwrap());
+        }
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -381,67 +393,70 @@ async fn test_thought_signature_sequential_each_step() {
         return;
     };
 
-    let get_weather = FunctionDeclaration::builder("get_weather")
-        .description("Get the current weather")
-        .parameter("city", json!({"type": "string"}))
-        .required(vec!["city".to_string()])
-        .build();
+    with_timeout(TEST_TIMEOUT, async {
+        let get_weather = FunctionDeclaration::builder("get_weather")
+            .description("Get the current weather")
+            .parameter("city", json!({"type": "string"}))
+            .required(vec!["city".to_string()])
+            .build();
 
-    // Step 1
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("What's the weather in Tokyo?")
-        .with_function(get_weather.clone())
-        .with_store(true)
-        .create()
-        .await
-        .expect("First interaction failed");
+        // Step 1
+        let response1 = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("What's the weather in Tokyo?")
+            .with_function(get_weather.clone())
+            .with_store(true)
+            .create()
+            .await
+            .expect("First interaction failed");
 
-    let calls1 = response1.function_calls();
-    if calls1.is_empty() {
-        println!("No function call in step 1 - skipping");
-        return;
-    }
+        let calls1 = response1.function_calls();
+        if calls1.is_empty() {
+            println!("No function call in step 1 - skipping");
+            return;
+        }
 
-    let call1 = &calls1[0];
-    println!(
-        "Step 1 signature present: {}",
-        call1.thought_signature.is_some()
-    );
-
-    // Provide result
-    let result1 = function_result_content(
-        "get_weather",
-        call1.id.unwrap().to_string(),
-        json!({"temperature": "22°C"}),
-    );
-
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_previous_interaction(&response1.id)
-        .with_content(vec![result1])
-        .with_text("Now what about Paris?")
-        .with_function(get_weather.clone())
-        .with_store(true)
-        .create()
-        .await
-        .expect("Second interaction failed");
-
-    let calls2 = response2.function_calls();
-    if !calls2.is_empty() {
-        let call2 = &calls2[0];
+        let call1 = &calls1[0];
         println!(
-            "Step 2 signature present: {}",
-            call2.thought_signature.is_some()
+            "Step 1 signature present: {}",
+            call1.thought_signature.is_some()
         );
 
-        // Both steps should have their own signatures
-        if call1.thought_signature.is_some() && call2.thought_signature.is_some() {
-            println!("✓ Both sequential calls have signatures as expected");
+        // Provide result
+        let result1 = function_result_content(
+            "get_weather",
+            call1.id.unwrap().to_string(),
+            json!({"temperature": "22°C"}),
+        );
+
+        let response2 = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_previous_interaction(&response1.id)
+            .with_content(vec![result1])
+            .with_text("Now what about Paris?")
+            .with_function(get_weather.clone())
+            .with_store(true)
+            .create()
+            .await
+            .expect("Second interaction failed");
+
+        let calls2 = response2.function_calls();
+        if !calls2.is_empty() {
+            let call2 = &calls2[0];
+            println!(
+                "Step 2 signature present: {}",
+                call2.thought_signature.is_some()
+            );
+
+            // Both steps should have their own signatures
+            if call1.thought_signature.is_some() && call2.thought_signature.is_some() {
+                println!("✓ Both sequential calls have signatures as expected");
+            }
         }
-    }
+    })
+    .await;
 }
 
 // =============================================================================
@@ -458,51 +473,54 @@ async fn test_streaming_with_function_calls() {
         return;
     };
 
-    let get_weather = FunctionDeclaration::builder("get_weather")
-        .description("Get the current weather for a city")
-        .parameter("city", json!({"type": "string"}))
-        .required(vec!["city".to_string()])
-        .build();
+    with_timeout(TEST_TIMEOUT, async {
+        let get_weather = FunctionDeclaration::builder("get_weather")
+            .description("Get the current weather for a city")
+            .parameter("city", json!({"type": "string"}))
+            .required(vec!["city".to_string()])
+            .build();
 
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("What's the weather in London?")
-        .with_function(get_weather)
-        .with_store(true)
-        .create_stream();
+        let stream = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("What's the weather in London?")
+            .with_function(get_weather)
+            .with_store(true)
+            .create_stream();
 
-    let result = consume_stream(stream).await;
+        let result = consume_stream(stream).await;
 
-    println!(
-        "\nDeltas: {}, Saw function_call delta: {}",
-        result.delta_count, result.saw_function_call
-    );
+        println!(
+            "\nDeltas: {}, Saw function_call delta: {}",
+            result.delta_count, result.saw_function_call
+        );
 
-    let response = result
-        .final_response
-        .expect("Should receive a complete response");
-    println!("Final status: {:?}", response.status);
-    let function_calls = response.function_calls();
-    println!("Function calls in final response: {}", function_calls.len());
-    println!("Output count: {}", response.outputs.len());
-    let summary = response.content_summary();
-    println!("Content summary: {:?}", summary);
+        let response = result
+            .final_response
+            .expect("Should receive a complete response");
+        println!("Final status: {:?}", response.status);
+        let function_calls = response.function_calls();
+        println!("Function calls in final response: {}", function_calls.len());
+        println!("Output count: {}", response.outputs.len());
+        let summary = response.content_summary();
+        println!("Content summary: {:?}", summary);
 
-    // Verify that function_call deltas were successfully received during streaming
-    // Note: The API sends function_call as a delta but may not populate the final
-    // Complete response's outputs. This is API behavior, not a parsing issue.
-    if result.saw_function_call {
-        println!("SUCCESS: Function call deltas were properly parsed during streaming");
-        // If we received function_call deltas, the test passes regardless of final response
-        return;
-    }
+        // Verify that function_call deltas were successfully received during streaming
+        // Note: The API sends function_call as a delta but may not populate the final
+        // Complete response's outputs. This is API behavior, not a parsing issue.
+        if result.saw_function_call {
+            println!("SUCCESS: Function call deltas were properly parsed during streaming");
+            // If we received function_call deltas, the test passes regardless of final response
+            return;
+        }
 
-    // Stream should either have text or function calls
-    assert!(
-        response.has_text() || response.has_function_calls(),
-        "Streaming response should have text or function calls"
-    );
+        // Stream should either have text or function calls
+        assert!(
+            response.has_text() || response.has_function_calls(),
+            "Streaming response should have text or function calls"
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -514,31 +532,34 @@ async fn test_streaming_long_response() {
         return;
     };
 
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("Write a detailed 500-word essay about the history of the Internet.")
-        .with_store(true)
-        .create_stream();
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        let stream = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Write a detailed 500-word essay about the history of the Internet.")
+            .with_store(true)
+            .create_stream();
 
-    let result = consume_stream(stream).await;
+        let result = consume_stream(stream).await;
 
-    println!("Total deltas received: {}", result.delta_count);
-    println!("Total text length: {} chars", result.collected_text.len());
-    println!(
-        "Word count: ~{}",
-        result.collected_text.split_whitespace().count()
-    );
+        println!("Total deltas received: {}", result.delta_count);
+        println!("Total text length: {} chars", result.collected_text.len());
+        println!(
+            "Word count: ~{}",
+            result.collected_text.split_whitespace().count()
+        );
 
-    // Should have received multiple deltas for a long response
-    assert!(
-        result.delta_count > 5,
-        "Long response should produce many delta chunks"
-    );
-    assert!(
-        result.collected_text.len() > 500,
-        "Response should be substantial length"
-    );
+        // Should have received multiple deltas for a long response
+        assert!(
+            result.delta_count > 5,
+            "Long response should produce many delta chunks"
+        );
+        assert!(
+            result.collected_text.len() > 500,
+            "Response should be substantial length"
+        );
+    })
+    .await;
 }
 
 // =============================================================================
@@ -743,48 +764,51 @@ async fn test_auto_function_calling_registered() {
         return;
     };
 
-    // Use a function registered via the macro
-    let weather_func = GetWeatherTestCallable.declaration();
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        // Use a function registered via the macro
+        let weather_func = GetWeatherTestCallable.declaration();
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("What's the weather in Seattle?")
-        .with_function(weather_func)
-        .create_with_auto_functions()
-        .await
-        .expect("Auto function calling failed");
+        let result = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("What's the weather in Seattle?")
+            .with_function(weather_func)
+            .create_with_auto_functions()
+            .await
+            .expect("Auto function calling failed");
 
-    // Verify executions are tracked
-    println!("Function executions: {:?}", result.executions);
-    assert!(
-        !result.executions.is_empty(),
-        "Should have at least one function execution"
-    );
-    assert_eq!(
-        result.executions[0].name, "get_weather_test",
-        "Should have called get_weather_test"
-    );
+        // Verify executions are tracked
+        println!("Function executions: {:?}", result.executions);
+        assert!(
+            !result.executions.is_empty(),
+            "Should have at least one function execution"
+        );
+        assert_eq!(
+            result.executions[0].name, "get_weather_test",
+            "Should have called get_weather_test"
+        );
 
-    let response = &result.response;
-    println!("Final status: {:?}", response.status);
-    assert!(
-        response.has_text(),
-        "Should have text response after auto-function loop"
-    );
+        let response = &result.response;
+        println!("Final status: {:?}", response.status);
+        assert!(
+            response.has_text(),
+            "Should have text response after auto-function loop"
+        );
 
-    let text = response.text().unwrap();
-    println!("Final text: {}", text);
+        let text = response.text().unwrap();
+        println!("Final text: {}", text);
 
-    // Should mention Seattle and weather data
-    let text_lower = text.to_lowercase();
-    assert!(
-        text_lower.contains("seattle")
-            || text_lower.contains("22")
-            || text_lower.contains("sunny")
-            || text_lower.contains("weather"),
-        "Response should reference the weather data"
-    );
+        // Should mention Seattle and weather data
+        let text_lower = text.to_lowercase();
+        assert!(
+            text_lower.contains("seattle")
+                || text_lower.contains("22")
+                || text_lower.contains("sunny")
+                || text_lower.contains("weather"),
+            "Response should reference the weather data"
+        );
+    })
+    .await;
 }
 
 #[tokio::test]

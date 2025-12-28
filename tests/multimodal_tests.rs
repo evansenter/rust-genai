@@ -19,8 +19,9 @@
 mod common;
 
 use common::{
-    SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TINY_BLUE_PNG_BASE64, TINY_MP4_BASE64,
-    TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, consume_stream, get_client,
+    SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TEST_TIMEOUT, TINY_BLUE_PNG_BASE64,
+    TINY_MP4_BASE64, TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, consume_stream,
+    get_client, with_timeout,
 };
 use rust_genai::{
     InteractionInput, InteractionStatus, audio_data_content, audio_uri_content,
@@ -168,47 +169,50 @@ async fn test_image_with_follow_up_question() {
         return;
     };
 
-    // First turn: describe the base64 image
-    let contents = vec![
-        text_content("What color is this image?"),
-        image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-    ];
+    with_timeout(TEST_TIMEOUT, async {
+        // First turn: describe the base64 image
+        let contents = vec![
+            text_content("What color is this image?"),
+            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+        ];
 
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_input(InteractionInput::Content(contents))
-        .with_store(true)
-        .create()
-        .await
-        .expect("First interaction failed");
+        let response1 = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_input(InteractionInput::Content(contents))
+            .with_store(true)
+            .create()
+            .await
+            .expect("First interaction failed");
 
-    assert_eq!(response1.status, InteractionStatus::Completed);
-    println!("First response: {:?}", response1.text());
+        assert_eq!(response1.status, InteractionStatus::Completed);
+        println!("First response: {:?}", response1.text());
 
-    // Second turn: ask follow-up about the same image
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_previous_interaction(&response1.id)
-        .with_text("Is that a warm or cool color?")
-        .with_store(true)
-        .create()
-        .await
-        .expect("Follow-up interaction failed");
+        // Second turn: ask follow-up about the same image
+        let response2 = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_previous_interaction(&response1.id)
+            .with_text("Is that a warm or cool color?")
+            .with_store(true)
+            .create()
+            .await
+            .expect("Follow-up interaction failed");
 
-    assert_eq!(response2.status, InteractionStatus::Completed);
-    assert!(response2.has_text(), "Should have follow-up response");
+        assert_eq!(response2.status, InteractionStatus::Completed);
+        assert!(response2.has_text(), "Should have follow-up response");
 
-    let text = response2.text().unwrap().to_lowercase();
-    println!("Follow-up response: {}", text);
+        let text = response2.text().unwrap().to_lowercase();
+        println!("Follow-up response: {}", text);
 
-    // Red is a warm color
-    assert!(
-        text.contains("warm") || text.contains("hot") || text.contains("red"),
-        "Response should identify warm color: {}",
-        text
-    );
+        // Red is a warm color
+        assert!(
+            text.contains("warm") || text.contains("hot") || text.contains("red"),
+            "Response should identify warm color: {}",
+            text
+        );
+    })
+    .await;
 }
 
 // =============================================================================
@@ -749,56 +753,59 @@ async fn test_multimodal_streaming() {
         return;
     };
 
-    println!("=== Multimodal + Streaming ===");
+    with_timeout(TEST_TIMEOUT, async {
+        println!("=== Multimodal + Streaming ===");
 
-    // Create content with text and image
-    let contents = vec![
-        text_content("What color is this image? Answer in one word."),
-        image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-    ];
+        // Create content with text and image
+        let contents = vec![
+            text_content("What color is this image? Answer in one word."),
+            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+        ];
 
-    // Stream the response using with_input for multimodal content
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_input(InteractionInput::Content(contents))
-        .with_store(true)
-        .create_stream();
+        // Stream the response using with_input for multimodal content
+        let stream = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_input(InteractionInput::Content(contents))
+            .with_store(true)
+            .create_stream();
 
-    let result = consume_stream(stream).await;
+        let result = consume_stream(stream).await;
 
-    println!("\nDelta count: {}", result.delta_count);
-    println!("Collected text: {}", result.collected_text);
+        println!("\nDelta count: {}", result.delta_count);
+        println!("Collected text: {}", result.collected_text);
 
-    // Verify streaming worked
-    assert!(
-        result.has_output(),
-        "Should receive streaming chunks or final response"
-    );
-
-    // Verify content describes the red image
-    let text_to_check = if !result.collected_text.is_empty() {
-        result.collected_text.to_lowercase()
-    } else if let Some(ref response) = result.final_response {
-        response.text().unwrap_or_default().to_lowercase()
-    } else {
-        String::new()
-    };
-
-    assert!(
-        text_to_check.contains("red"),
-        "Response should identify the red color. Got: {}",
-        text_to_check
-    );
-
-    // Verify final response if present
-    if let Some(ref response) = result.final_response {
-        assert_eq!(
-            response.status,
-            InteractionStatus::Completed,
-            "Final response should be completed"
+        // Verify streaming worked
+        assert!(
+            result.has_output(),
+            "Should receive streaming chunks or final response"
         );
-    }
 
-    println!("\n✓ Multimodal + streaming completed successfully");
+        // Verify content describes the red image
+        let text_to_check = if !result.collected_text.is_empty() {
+            result.collected_text.to_lowercase()
+        } else if let Some(ref response) = result.final_response {
+            response.text().unwrap_or_default().to_lowercase()
+        } else {
+            String::new()
+        };
+
+        assert!(
+            text_to_check.contains("red"),
+            "Response should identify the red color. Got: {}",
+            text_to_check
+        );
+
+        // Verify final response if present
+        if let Some(ref response) = result.final_response {
+            assert_eq!(
+                response.status,
+                InteractionStatus::Completed,
+                "Final response should be completed"
+            );
+        }
+
+        println!("\n✓ Multimodal + streaming completed successfully");
+    })
+    .await;
 }
