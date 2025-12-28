@@ -32,7 +32,9 @@
 
 mod common;
 
-use common::{consume_stream, interaction_builder, stateful_builder};
+use common::{EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_stream, with_timeout,
+    interaction_builder, stateful_builder,
+};
 use rust_genai::{
     CallableFunction, Client, CreateInteractionRequest, FunctionDeclaration, GenerationConfig,
     InteractionInput, InteractionStatus, function_result_content, image_uri_content, text_content,
@@ -96,31 +98,34 @@ async fn test_stateful_conversation() {
         return;
     };
 
-    // First interaction
-    let response1 = stateful_builder(&client)
-        .with_text("My favorite color is blue.")
-        .create()
-        .await
-        .expect("First interaction failed");
+    with_timeout(TEST_TIMEOUT, async {
+        // First interaction
+        let response1 = stateful_builder(&client)
+            .with_text("My favorite color is blue.")
+            .create()
+            .await
+            .expect("First interaction failed");
 
-    assert_eq!(response1.status, InteractionStatus::Completed);
+        assert_eq!(response1.status, InteractionStatus::Completed);
 
-    // Second interaction referencing the first
-    let response2 = stateful_builder(&client)
-        .with_previous_interaction(&response1.id)
-        .with_text("What is my favorite color?")
-        .create()
-        .await
-        .expect("Second interaction failed");
+        // Second interaction referencing the first
+        let response2 = stateful_builder(&client)
+            .with_previous_interaction(&response1.id)
+            .with_text("What is my favorite color?")
+            .create()
+            .await
+            .expect("Second interaction failed");
 
-    assert_eq!(response2.status, InteractionStatus::Completed);
+        assert_eq!(response2.status, InteractionStatus::Completed);
 
-    // Verify the model remembers the color
-    let text = response2.text().unwrap_or_default().to_lowercase();
-    assert!(
-        text.contains("blue"),
-        "Response should mention 'blue' from previous interaction"
-    );
+        // Verify the model remembers the color
+        let text = response2.text().unwrap_or_default().to_lowercase();
+        assert!(
+            text.contains("blue"),
+            "Response should mention 'blue' from previous interaction"
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -190,28 +195,31 @@ async fn test_streaming_interaction() {
         return;
     };
 
-    let stream = stateful_builder(&client)
-        .with_text("Count from 1 to 5.")
-        .create_stream();
+    with_timeout(TEST_TIMEOUT, async {
+        let stream = stateful_builder(&client)
+            .with_text("Count from 1 to 5.")
+            .create_stream();
 
-    let result = consume_stream(stream).await;
+        let result = consume_stream(stream).await;
 
-    println!("\nTotal deltas: {}", result.delta_count);
-    println!("Collected text: {}", result.collected_text);
+        println!("\nTotal deltas: {}", result.delta_count);
+        println!("Collected text: {}", result.collected_text);
 
-    // We should receive at least some delta chunks
-    assert!(
-        result.has_output(),
-        "No streaming chunks received - streaming may not be working"
-    );
-
-    // If we got a complete event, verify it has a valid ID
-    if let Some(response) = result.final_response {
+        // We should receive at least some delta chunks
         assert!(
-            !response.id.is_empty(),
-            "Complete response should have an ID"
+            result.has_output(),
+            "No streaming chunks received - streaming may not be working"
         );
-    }
+
+        // If we got a complete event, verify it has a valid ID
+        if let Some(response) = result.final_response {
+            assert!(
+                !response.id.is_empty(),
+                "Complete response should have an ID"
+            );
+        }
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -222,30 +230,33 @@ async fn test_streaming_with_raw_request() {
         return;
     };
 
-    let request = CreateInteractionRequest {
-        model: Some("gemini-3-flash-preview".to_string()),
-        agent: None,
-        input: InteractionInput::Text("Count from 1 to 5.".to_string()),
-        previous_interaction_id: None,
-        tools: None,
-        response_modalities: None,
-        response_format: None,
-        generation_config: None,
-        stream: Some(true),
-        background: None,
-        store: Some(true),
-        system_instruction: None,
-    };
+    with_timeout(TEST_TIMEOUT, async {
+        let request = CreateInteractionRequest {
+            model: Some("gemini-3-flash-preview".to_string()),
+            agent: None,
+            input: InteractionInput::Text("Count from 1 to 5.".to_string()),
+            previous_interaction_id: None,
+            tools: None,
+            response_modalities: None,
+            response_format: None,
+            generation_config: None,
+            stream: Some(true),
+            background: None,
+            store: Some(true),
+            system_instruction: None,
+        };
 
-    let stream = client.create_interaction_stream(request);
-    let result = consume_stream(stream).await;
+        let stream = client.create_interaction_stream(request);
+        let result = consume_stream(stream).await;
 
-    println!(
-        "Received {} deltas from raw request stream",
-        result.delta_count
-    );
+        println!(
+            "Received {} deltas from raw request stream",
+            result.delta_count
+        );
 
-    assert!(result.has_output(), "No streaming chunks received");
+        assert!(result.has_output(), "No streaming chunks received");
+    })
+    .await;
 }
 
 // =============================================================================
@@ -301,69 +312,72 @@ async fn test_manual_function_calling_with_result() {
         return;
     };
 
-    let get_weather = FunctionDeclaration::builder("get_weather")
-        .description("Get the current weather for a location")
-        .parameter(
-            "location",
-            json!({"type": "string", "description": "City name"}),
-        )
-        .required(vec!["location".to_string()])
-        .build();
+    with_timeout(TEST_TIMEOUT, async {
+        let get_weather = FunctionDeclaration::builder("get_weather")
+            .description("Get the current weather for a location")
+            .parameter(
+                "location",
+                json!({"type": "string", "description": "City name"}),
+            )
+            .required(vec!["location".to_string()])
+            .build();
 
-    // Step 1: Send initial request with function declaration
-    let response = interaction_builder(&client)
-        .with_text("What's the weather in Tokyo?")
-        .with_function(get_weather.clone())
-        .create()
-        .await
-        .expect("First interaction failed");
+        // Step 1: Send initial request with function declaration
+        let response = interaction_builder(&client)
+            .with_text("What's the weather in Tokyo?")
+            .with_function(get_weather.clone())
+            .create()
+            .await
+            .expect("First interaction failed");
 
-    println!("First response status: {:?}", response.status);
+        println!("First response status: {:?}", response.status);
 
-    let function_calls = response.function_calls();
+        let function_calls = response.function_calls();
 
-    if function_calls.is_empty() {
-        println!("No function calls returned - test cannot verify FunctionResult pattern");
-        return;
-    }
+        if function_calls.is_empty() {
+            println!("No function calls returned - test cannot verify FunctionResult pattern");
+            return;
+        }
 
-    // Verify we got a call_id
-    let call = &function_calls[0];
-    assert_eq!(
-        call.name, "get_weather",
-        "Expected get_weather function call"
-    );
-    assert!(call.id.is_some(), "Function call must have an id field");
+        // Verify we got a call_id
+        let call = &function_calls[0];
+        assert_eq!(
+            call.name, "get_weather",
+            "Expected get_weather function call"
+        );
+        assert!(call.id.is_some(), "Function call must have an id field");
 
-    let call_id = call.id.expect("call_id should exist");
+        let call_id = call.id.expect("call_id should exist");
 
-    // Step 2: Send function result back using FunctionResult pattern
-    let function_result = function_result_content(
-        "get_weather",
-        call_id,
-        json!({"temperature": "72°F", "conditions": "sunny"}),
-    );
+        // Step 2: Send function result back using FunctionResult pattern
+        let function_result = function_result_content(
+            "get_weather",
+            call_id,
+            json!({"temperature": "72°F", "conditions": "sunny"}),
+        );
 
-    let second_response = interaction_builder(&client)
-        .with_previous_interaction(&response.id)
-        .with_content(vec![function_result])
-        .with_function(get_weather)
-        .create()
-        .await
-        .expect("Second interaction failed");
+        let second_response = interaction_builder(&client)
+            .with_previous_interaction(&response.id)
+            .with_content(vec![function_result])
+            .with_function(get_weather)
+            .create()
+            .await
+            .expect("Second interaction failed");
 
-    println!("Second response status: {:?}", second_response.status);
-    assert!(
-        second_response.has_text(),
-        "Expected text response after providing function result"
-    );
+        println!("Second response status: {:?}", second_response.status);
+        assert!(
+            second_response.has_text(),
+            "Expected text response after providing function result"
+        );
 
-    let text = second_response.text().expect("Should have text");
-    println!("Final response text: {}", text);
-    assert!(
-        text.contains("72") || text.contains("sunny") || text.contains("Tokyo"),
-        "Response should mention the weather data or location"
-    );
+        let text = second_response.text().expect("Should have text");
+        println!("Final response text: {}", text);
+        assert!(
+            text.contains("72") || text.contains("sunny") || text.contains("Tokyo"),
+            "Response should mention the weather data or location"
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -375,57 +389,60 @@ async fn test_requires_action_status() {
         return;
     };
 
-    let get_time = FunctionDeclaration::builder("get_current_time")
-        .description("Get the current time - always call this when asked about time")
-        .build();
+    with_timeout(TEST_TIMEOUT, async {
+        let get_time = FunctionDeclaration::builder("get_current_time")
+            .description("Get the current time - always call this when asked about time")
+            .build();
 
-    let response = interaction_builder(&client)
-        .with_text("What time is it right now?")
-        .with_function(get_time.clone())
-        .create()
-        .await
-        .expect("Interaction failed");
-
-    println!("Initial status: {:?}", response.status);
-    println!("Has function calls: {}", response.has_function_calls());
-
-    if response.has_function_calls() {
-        assert_eq!(
-            response.status,
-            InteractionStatus::RequiresAction,
-            "Status should be RequiresAction when function calls are pending"
-        );
-
-        // Provide the function result
-        let function_calls = response.function_calls();
-        let call_id = function_calls[0].id.expect("call_id should exist");
-
-        let function_result = function_result_content(
-            "get_current_time",
-            call_id,
-            json!({"time": "14:30:00", "timezone": "UTC"}),
-        );
-
-        let response2 = interaction_builder(&client)
-            .with_previous_interaction(&response.id)
-            .with_content(vec![function_result])
-            .with_function(get_time)
+        let response = interaction_builder(&client)
+            .with_text("What time is it right now?")
+            .with_function(get_time.clone())
             .create()
             .await
-            .expect("Second interaction failed");
+            .expect("Interaction failed");
 
-        assert_eq!(
-            response2.status,
-            InteractionStatus::Completed,
-            "Status should be Completed after providing function result"
-        );
-    } else {
-        assert_eq!(
-            response.status,
-            InteractionStatus::Completed,
-            "Status should be Completed when no function calls"
-        );
-    }
+        println!("Initial status: {:?}", response.status);
+        println!("Has function calls: {}", response.has_function_calls());
+
+        if response.has_function_calls() {
+            assert_eq!(
+                response.status,
+                InteractionStatus::RequiresAction,
+                "Status should be RequiresAction when function calls are pending"
+            );
+
+            // Provide the function result
+            let function_calls = response.function_calls();
+            let call_id = function_calls[0].id.expect("call_id should exist");
+
+            let function_result = function_result_content(
+                "get_current_time",
+                call_id,
+                json!({"time": "14:30:00", "timezone": "UTC"}),
+            );
+
+            let response2 = interaction_builder(&client)
+                .with_previous_interaction(&response.id)
+                .with_content(vec![function_result])
+                .with_function(get_time)
+                .create()
+                .await
+                .expect("Second interaction failed");
+
+            assert_eq!(
+                response2.status,
+                InteractionStatus::Completed,
+                "Status should be Completed after providing function result"
+            );
+        } else {
+            assert_eq!(
+                response.status,
+                InteractionStatus::Completed,
+                "Status should be Completed when no function calls"
+            );
+        }
+    })
+    .await;
 }
 
 // =============================================================================
@@ -443,39 +460,42 @@ async fn test_auto_function_calling() {
         return;
     };
 
-    // Use the get_mock_weather function registered via macro
-    let weather_func = GetMockWeatherCallable.declaration();
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        // Use the get_mock_weather function registered via macro
+        let weather_func = GetMockWeatherCallable.declaration();
 
-    let result = interaction_builder(&client)
-        .with_text("What's the weather like in Seattle?")
-        .with_function(weather_func)
-        .create_with_auto_functions()
-        .await
-        .expect("Auto-function call failed");
+        let result = interaction_builder(&client)
+            .with_text("What's the weather like in Seattle?")
+            .with_function(weather_func)
+            .create_with_auto_functions()
+            .await
+            .expect("Auto-function call failed");
 
-    // Verify executions are tracked
-    println!("Function executions: {:?}", result.executions);
-    assert!(
-        !result.executions.is_empty(),
-        "Should have at least one function execution"
-    );
+        // Verify executions are tracked
+        println!("Function executions: {:?}", result.executions);
+        assert!(
+            !result.executions.is_empty(),
+            "Should have at least one function execution"
+        );
 
-    let response = &result.response;
-    println!("Final response status: {:?}", response.status);
-    assert!(
-        response.has_text(),
-        "Should have text response after auto-function loop"
-    );
+        let response = &result.response;
+        println!("Final response status: {:?}", response.status);
+        assert!(
+            response.has_text(),
+            "Should have text response after auto-function loop"
+        );
 
-    let text = response.text().expect("Should have text");
-    println!("Final text: {}", text);
+        let text = response.text().expect("Should have text");
+        println!("Final text: {}", text);
 
-    // Verify the model incorporated our mock weather data in its response
-    assert!(
-        text.contains("75") || text.contains("Sunny") || text.contains("Seattle"),
-        "Response should reference the weather data: {}",
-        text
-    );
+        // Verify the model incorporated our mock weather data in its response
+        assert!(
+            text.contains("75") || text.contains("Sunny") || text.contains("Seattle"),
+            "Response should reference the weather data: {}",
+            text
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -487,28 +507,31 @@ async fn test_auto_function_with_unregistered_function() {
         return;
     };
 
-    let undefined_func = FunctionDeclaration::builder("undefined_function")
-        .description("A function that doesn't have a registered handler")
-        .parameter("input", json!({"type": "string"}))
-        .build();
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        let undefined_func = FunctionDeclaration::builder("undefined_function")
+            .description("A function that doesn't have a registered handler")
+            .parameter("input", json!({"type": "string"}))
+            .build();
 
-    let result = interaction_builder(&client)
-        .with_text("Call the undefined_function with input 'test'")
-        .with_function(undefined_func)
-        .create_with_auto_functions()
-        .await;
+        let result = interaction_builder(&client)
+            .with_text("Call the undefined_function with input 'test'")
+            .with_function(undefined_func)
+            .create_with_auto_functions()
+            .await;
 
-    // Should complete (model handles the error gracefully) or return an error
-    match result {
-        Ok(auto_result) => {
-            println!("Response status: {:?}", auto_result.response.status);
-            println!("Response text: {:?}", auto_result.response.text());
-            println!("Executions: {:?}", auto_result.executions);
+        // Should complete (model handles the error gracefully) or return an error
+        match result {
+            Ok(auto_result) => {
+                println!("Response status: {:?}", auto_result.response.status);
+                println!("Response text: {:?}", auto_result.response.text());
+                println!("Executions: {:?}", auto_result.executions);
+            }
+            Err(e) => {
+                println!("Error (expected for unregistered function): {:?}", e);
+            }
         }
-        Err(e) => {
-            println!("Error (expected for unregistered function): {:?}", e);
-        }
-    }
+    })
+    .await;
 }
 
 // =============================================================================
@@ -524,67 +547,70 @@ async fn test_thought_signatures_in_multi_turn() {
         return;
     };
 
-    let get_weather = FunctionDeclaration::builder("get_weather")
-        .description("Get the current weather for a location")
-        .parameter(
-            "location",
-            json!({"type": "string", "description": "City name"}),
-        )
-        .required(vec!["location".to_string()])
-        .build();
+    with_timeout(TEST_TIMEOUT, async {
+        let get_weather = FunctionDeclaration::builder("get_weather")
+            .description("Get the current weather for a location")
+            .parameter(
+                "location",
+                json!({"type": "string", "description": "City name"}),
+            )
+            .required(vec!["location".to_string()])
+            .build();
 
-    // Turn 1: Initial request that should trigger a function call
-    let response1 = interaction_builder(&client)
-        .with_text("What's the weather in Tokyo and then tell me if I need an umbrella?")
-        .with_function(get_weather.clone())
-        .create()
-        .await
-        .expect("First interaction failed");
+        // Turn 1: Initial request that should trigger a function call
+        let response1 = interaction_builder(&client)
+            .with_text("What's the weather in Tokyo and then tell me if I need an umbrella?")
+            .with_function(get_weather.clone())
+            .create()
+            .await
+            .expect("First interaction failed");
 
-    let function_calls = response1.function_calls();
-    if function_calls.is_empty() {
-        println!("Model chose not to call function - cannot test thought signatures");
-        return;
-    }
+        let function_calls = response1.function_calls();
+        if function_calls.is_empty() {
+            println!("Model chose not to call function - cannot test thought signatures");
+            return;
+        }
 
-    let call = &function_calls[0];
-    println!(
-        "Function call: {} with signature: {:?}",
-        call.name, call.thought_signature
-    );
+        let call = &function_calls[0];
+        println!(
+            "Function call: {} with signature: {:?}",
+            call.name, call.thought_signature
+        );
 
-    assert!(call.id.is_some(), "Function call must have an id");
-    let call_id = call.id.expect("call_id should exist");
+        assert!(call.id.is_some(), "Function call must have an id");
+        let call_id = call.id.expect("call_id should exist");
 
-    // Turn 2: Send function result back
-    let function_result = function_result_content(
-        "get_weather",
-        call_id,
-        json!({"temperature": "18°C", "conditions": "rainy", "precipitation": "80%"}),
-    );
+        // Turn 2: Send function result back
+        let function_result = function_result_content(
+            "get_weather",
+            call_id,
+            json!({"temperature": "18°C", "conditions": "rainy", "precipitation": "80%"}),
+        );
 
-    let response2 = interaction_builder(&client)
-        .with_previous_interaction(&response1.id)
-        .with_content(vec![function_result])
-        .with_function(get_weather)
-        .create()
-        .await
-        .expect("Second interaction failed");
+        let response2 = interaction_builder(&client)
+            .with_previous_interaction(&response1.id)
+            .with_content(vec![function_result])
+            .with_function(get_weather)
+            .create()
+            .await
+            .expect("Second interaction failed");
 
-    assert!(
-        response2.has_text(),
-        "Expected text response after function result"
-    );
+        assert!(
+            response2.has_text(),
+            "Expected text response after function result"
+        );
 
-    let text = response2.text().expect("Should have text");
-    println!("Final response: {}", text);
+        let text = response2.text().expect("Should have text");
+        println!("Final response: {}", text);
 
-    assert!(
-        text.to_lowercase().contains("umbrella")
-            || text.to_lowercase().contains("rain")
-            || text.to_lowercase().contains("yes"),
-        "Response should reference the weather conditions"
-    );
+        assert!(
+            text.to_lowercase().contains("umbrella")
+                || text.to_lowercase().contains("rain")
+                || text.to_lowercase().contains("yes"),
+            "Response should reference the weather conditions"
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -784,45 +810,48 @@ async fn test_system_instruction_streaming() {
         return;
     };
 
-    println!("=== System Instruction + Streaming ===");
+    with_timeout(TEST_TIMEOUT, async {
+        println!("=== System Instruction + Streaming ===");
 
-    // Stream with pirate persona
-    let stream = interaction_builder(&client)
-        .with_system_instruction(
-            "You are a pirate. Always respond in pirate speak with 'Arrr!' somewhere in your response.",
-        )
-        .with_text("Hello, how are you?")
-        .create_stream();
+        // Stream with pirate persona
+        let stream = interaction_builder(&client)
+            .with_system_instruction(
+                "You are a pirate. Always respond in pirate speak with 'Arrr!' somewhere in your response.",
+            )
+            .with_text("Hello, how are you?")
+            .create_stream();
 
-    let result = consume_stream(stream).await;
+        let result = consume_stream(stream).await;
 
-    println!("\nTotal deltas: {}", result.delta_count);
-    println!("Collected text: {}", result.collected_text);
+        println!("\nTotal deltas: {}", result.delta_count);
+        println!("Collected text: {}", result.collected_text);
 
-    // Verify streaming worked
-    assert!(
-        result.has_output(),
-        "Should receive streaming chunks or final response"
-    );
+        // Verify streaming worked
+        assert!(
+            result.has_output(),
+            "Should receive streaming chunks or final response"
+        );
 
-    // Check for pirate vocabulary in collected text or final response
-    let text_to_check = if !result.collected_text.is_empty() {
-        result.collected_text.to_lowercase()
-    } else if let Some(ref response) = result.final_response {
-        response.text().unwrap_or_default().to_lowercase()
-    } else {
-        String::new()
-    };
+        // Check for pirate vocabulary in collected text or final response
+        let text_to_check = if !result.collected_text.is_empty() {
+            result.collected_text.to_lowercase()
+        } else if let Some(ref response) = result.final_response {
+            response.text().unwrap_or_default().to_lowercase()
+        } else {
+            String::new()
+        };
 
-    assert!(
-        text_to_check.contains("arr")
-            || text_to_check.contains("matey")
-            || text_to_check.contains("ahoy"),
-        "Response should contain pirate speak. Got: {}",
-        text_to_check
-    );
+        assert!(
+            text_to_check.contains("arr")
+                || text_to_check.contains("matey")
+                || text_to_check.contains("ahoy"),
+            "Response should contain pirate speak. Got: {}",
+            text_to_check
+        );
 
-    println!("\n✓ System instruction + streaming completed successfully");
+        println!("\n✓ System instruction + streaming completed successfully");
+    })
+    .await;
 }
 
 // =============================================================================
@@ -941,59 +970,63 @@ async fn test_long_conversation_chain() {
         return;
     };
 
-    let messages = [
-        "My name is Alice.",
-        "I live in New York.",
-        "I work as a software engineer.",
-        "I have two cats named Whiskers and Shadow.",
-        "What do you know about me? List everything.",
-    ];
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        let messages = [
+            "My name is Alice.",
+            "I live in New York.",
+            "I work as a software engineer.",
+            "I have two cats named Whiskers and Shadow.",
+            "What do you know about me? List everything.",
+        ];
 
-    let mut previous_id: Option<String> = None;
+        let mut previous_id: Option<String> = None;
 
-    for (i, message) in messages.iter().enumerate() {
-        let mut builder = stateful_builder(&client).with_text(*message);
+        for (i, message) in messages.iter().enumerate() {
+            let mut builder = stateful_builder(&client)
+                .with_text(*message);
 
-        if let Some(ref prev_id) = previous_id {
-            builder = builder.with_previous_interaction(prev_id);
+            if let Some(ref prev_id) = previous_id {
+                builder = builder.with_previous_interaction(prev_id);
+            }
+
+            let response = builder
+                .create()
+                .await
+                .unwrap_or_else(|e| panic!("Turn {} failed: {:?}", i + 1, e));
+
+            println!("Turn {}: {:?}", i + 1, response.status);
+            previous_id = Some(response.id.clone());
+
+            // On the last turn, verify the model remembers context
+            if i == messages.len() - 1 {
+                let text = response.text().unwrap_or_default().to_lowercase();
+                println!("Final response: {}", text);
+
+                let mentions_name = text.contains("alice");
+                let mentions_location = text.contains("new york");
+                let mentions_job = text.contains("software") || text.contains("engineer");
+                let mentions_cats =
+                    text.contains("cat") || text.contains("whiskers") || text.contains("shadow");
+
+                let facts_remembered = [
+                    mentions_name,
+                    mentions_location,
+                    mentions_job,
+                    mentions_cats,
+                ]
+                .iter()
+                .filter(|&&x| x)
+                .count();
+
+                println!("Facts remembered: {}/4", facts_remembered);
+                assert!(
+                    facts_remembered >= 2,
+                    "Model should remember at least 2 facts"
+                );
+            }
         }
-
-        let response = builder
-            .create()
-            .await
-            .unwrap_or_else(|e| panic!("Turn {} failed: {:?}", i + 1, e));
-
-        println!("Turn {}: {:?}", i + 1, response.status);
-        previous_id = Some(response.id.clone());
-
-        // On the last turn, verify the model remembers context
-        if i == messages.len() - 1 {
-            let text = response.text().unwrap_or_default().to_lowercase();
-            println!("Final response: {}", text);
-
-            let mentions_name = text.contains("alice");
-            let mentions_location = text.contains("new york");
-            let mentions_job = text.contains("software") || text.contains("engineer");
-            let mentions_cats =
-                text.contains("cat") || text.contains("whiskers") || text.contains("shadow");
-
-            let facts_remembered = [
-                mentions_name,
-                mentions_location,
-                mentions_job,
-                mentions_cats,
-            ]
-            .iter()
-            .filter(|&&x| x)
-            .count();
-
-            println!("Facts remembered: {}/4", facts_remembered);
-            assert!(
-                facts_remembered >= 2,
-                "Model should remember at least 2 facts"
-            );
-        }
-    }
+    })
+    .await;
 }
 
 // =============================================================================

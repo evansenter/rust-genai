@@ -19,8 +19,9 @@
 mod common;
 
 use common::{
-    DEFAULT_MAX_RETRIES, PollError, consume_stream, get_client, interaction_builder,
-    poll_until_complete, retry_on_transient, stateful_builder,
+    DEFAULT_MAX_RETRIES, EXTENDED_TEST_TIMEOUT, PollError, TEST_TIMEOUT, consume_stream,
+    get_client, poll_until_complete, retry_on_transient, with_timeout,
+    interaction_builder, stateful_builder,
 };
 use rust_genai::{FunctionDeclaration, InteractionStatus, ThinkingLevel, function_result_content};
 use serde_json::json;
@@ -66,7 +67,8 @@ async fn test_very_long_conversation() {
         return;
     };
 
-    let facts = [
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        let facts = [
         "My name is Alice.",
         "I live in Seattle.",
         "I work as a software engineer.",
@@ -84,7 +86,8 @@ async fn test_very_long_conversation() {
 
     // Build up context over 10 turns
     for (i, fact) in facts.iter().enumerate() {
-        let mut builder = stateful_builder(&client).with_text(*fact);
+        let mut builder = stateful_builder(&client)
+            .with_text(*fact);
 
         if let Some(ref prev_id) = previous_id {
             builder = builder.with_previous_interaction(prev_id);
@@ -182,14 +185,16 @@ async fn test_very_long_conversation() {
 
     println!("Facts remembered: {}/{}", remembered, fact_checks.len());
 
-    // Should remember at least the minimum number of facts
-    assert!(
-        remembered >= MIN_REMEMBERED_FACTS,
-        "Model should remember at least {} out of {} facts, got {}",
-        MIN_REMEMBERED_FACTS,
-        fact_checks.len(),
-        remembered
-    );
+        // Should remember at least the minimum number of facts
+        assert!(
+            remembered >= MIN_REMEMBERED_FACTS,
+            "Model should remember at least {} out of {} facts, got {}",
+            MIN_REMEMBERED_FACTS,
+            fact_checks.len(),
+            remembered
+        );
+    })
+    .await;
 }
 
 // =============================================================================
@@ -426,43 +431,45 @@ async fn test_deep_research_agent() {
         return;
     };
 
-    let result = client
-        .interaction()
-        .with_agent("deep-research-pro-preview-12-2025")
-        .with_text("What are the main differences between Rust and Go programming languages?")
-        .with_store(true)
-        .create()
-        .await;
+    with_timeout(TEST_TIMEOUT, async {
+        let result = client
+            .interaction()
+            .with_agent("deep-research-pro-preview-12-2025")
+            .with_text("What are the main differences between Rust and Go programming languages?")
+            .create()
+            .await;
 
-    match result {
-        Ok(response) => {
-            println!("Deep research status: {:?}", response.status);
-            if response.has_text() {
-                let text = response.text().unwrap();
-                println!(
-                    "Research response (truncated): {}...",
-                    &text[..text.len().min(500)]
-                );
+        match result {
+            Ok(response) => {
+                println!("Deep research status: {:?}", response.status);
+                if response.has_text() {
+                    let text = response.text().unwrap();
+                    println!(
+                        "Research response (truncated): {}...",
+                        &text[..text.len().min(500)]
+                    );
 
-                // Should mention both languages
-                let text_lower = text.to_lowercase();
-                assert!(
-                    text_lower.contains("rust") || text_lower.contains("go"),
-                    "Response should discuss programming languages"
-                );
+                    // Should mention both languages
+                    let text_lower = text.to_lowercase();
+                    assert!(
+                        text_lower.contains("rust") || text_lower.contains("go"),
+                        "Response should discuss programming languages"
+                    );
+                }
+            }
+            Err(e) => {
+                let error_str = format!("{:?}", e);
+                println!("Deep research error (may be expected): {}", error_str);
+                if error_str.contains("not found")
+                    || error_str.contains("not available")
+                    || error_str.contains("agent")
+                {
+                    println!("Deep research agent not available - skipping test");
+                }
             }
         }
-        Err(e) => {
-            let error_str = format!("{:?}", e);
-            println!("Deep research error (may be expected): {}", error_str);
-            if error_str.contains("not found")
-                || error_str.contains("not available")
-                || error_str.contains("agent")
-            {
-                println!("Deep research agent not available - skipping test");
-            }
-        }
-    }
+    })
+    .await;
 }
 
 // =============================================================================
@@ -479,65 +486,68 @@ async fn test_background_mode_polling() {
         return;
     };
 
-    // Start background task
-    let result = client
-        .interaction()
-        .with_agent("deep-research-pro-preview-12-2025")
-        .with_text("Briefly explain what machine learning is.")
-        .with_background(true)
-        .with_store(true)
-        .create()
-        .await;
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        // Start background task
+        let result = client
+            .interaction()
+            .with_agent("deep-research-pro-preview-12-2025")
+            .with_text("Briefly explain what machine learning is.")
+            .with_background(true)
+            .create()
+            .await;
 
-    match result {
-        Ok(initial_response) => {
-            println!("Initial status: {:?}", initial_response.status);
-            println!("Interaction ID: {}", initial_response.id);
+        match result {
+            Ok(initial_response) => {
+                println!("Initial status: {:?}", initial_response.status);
+                println!("Interaction ID: {}", initial_response.id);
 
-            // If already completed, we're done
-            if initial_response.status == InteractionStatus::Completed {
-                println!("Task completed immediately (may not have used background mode)");
-                if initial_response.has_text() {
-                    println!("Result: {}", initial_response.text().unwrap());
+                // If already completed, we're done
+                if initial_response.status == InteractionStatus::Completed {
+                    println!("Task completed immediately (may not have used background mode)");
+                    if initial_response.has_text() {
+                        println!("Result: {}", initial_response.text().unwrap());
+                    }
+                    return;
                 }
-                return;
-            }
 
-            // Poll for completion using exponential backoff
-            match poll_until_complete(&client, &initial_response.id, BACKGROUND_TASK_TIMEOUT).await
-            {
-                Ok(response) => {
-                    println!("Task completed!");
-                    if response.has_text() {
-                        let text = response.text().unwrap();
-                        println!("Result: {}...", &text[..200.min(text.len())]);
+                // Poll for completion using exponential backoff
+                match poll_until_complete(&client, &initial_response.id, BACKGROUND_TASK_TIMEOUT)
+                    .await
+                {
+                    Ok(response) => {
+                        println!("Task completed!");
+                        if response.has_text() {
+                            let text = response.text().unwrap();
+                            println!("Result: {}...", &text[..200.min(text.len())]);
+                        }
+                    }
+                    Err(PollError::Timeout) => {
+                        println!(
+                            "Polling timed out after {:?} - task may still be running",
+                            BACKGROUND_TASK_TIMEOUT
+                        );
+                    }
+                    Err(PollError::Failed) => {
+                        println!("Task failed");
+                    }
+                    Err(PollError::Api(e)) => {
+                        println!("Poll error: {:?}", e);
                     }
                 }
-                Err(PollError::Timeout) => {
-                    println!(
-                        "Polling timed out after {:?} - task may still be running",
-                        BACKGROUND_TASK_TIMEOUT
-                    );
-                }
-                Err(PollError::Failed) => {
-                    println!("Task failed");
-                }
-                Err(PollError::Api(e)) => {
-                    println!("Poll error: {:?}", e);
+            }
+            Err(e) => {
+                let error_str = format!("{:?}", e);
+                println!("Background mode error (may be expected): {}", error_str);
+                if error_str.contains("not found")
+                    || error_str.contains("not supported")
+                    || error_str.contains("background")
+                {
+                    println!("Background mode not available - skipping test");
                 }
             }
         }
-        Err(e) => {
-            let error_str = format!("{:?}", e);
-            println!("Background mode error (may be expected): {}", error_str);
-            if error_str.contains("not found")
-                || error_str.contains("not supported")
-                || error_str.contains("background")
-            {
-                println!("Background mode not available - skipping test");
-            }
-        }
-    }
+    })
+    .await;
 }
 
 // =============================================================================
@@ -2097,7 +2107,7 @@ async fn test_streaming_with_thinking_only() {
 
     println!("=== Streaming with thinking (no function calling) ===");
 
-    let stream = interaction_builder(&client)
+    let stream = stateful_builder(&client)
         .with_text("Explain briefly why the sky is blue.")
         .with_thinking_level(ThinkingLevel::Medium)
         .create_stream();
