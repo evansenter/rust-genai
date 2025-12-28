@@ -769,12 +769,7 @@ match result {
 
 ## Claude Code Integration
 
-This project includes configuration for [Claude Code](https://claude.ai/code) to assist with development:
-
-- **PR feedback processing**: `/pr-feedback` command for review comment handling with critical thinking
-- **Quality gates**: Automatic formatting and linting checks
-
-See `CLAUDE.md` for detailed guidance and `.claude/commands/` for available commands.
+This project includes configuration for [Claude Code](https://claude.ai/code) to assist with development. See `CLAUDE.md` for detailed guidance.
 
 ## License
 

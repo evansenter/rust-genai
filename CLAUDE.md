@@ -226,15 +226,6 @@ This requires a custom `Deserialize` implementation. See `InteractionContent` in
 
 ## Claude Code Configuration
 
-### Hooks (automatic)
-
-- **Stop** (`~/.claude/hooks/stop-hook.sh`): Global hook providing context for auto-continue decisions
-
-### Commands (manual)
-
-Available via `/command-name` in conversations:
-- **`/pr-feedback [PR#]`**: Process PR review feedback with critical thinking - categorizes feedback, forms opinions, presents table, implements agreed items
-
 ### Plugins
 
 This project uses official Claude plugins:
