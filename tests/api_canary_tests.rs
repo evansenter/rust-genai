@@ -14,6 +14,15 @@
 //!
 //! These tests make 6 API calls and typically complete in 12-60 seconds total.
 //! Consider using `--test-threads=1` to avoid rate limiting.
+//!
+//! # Feature Flags
+//!
+//! These tests are SKIPPED when `strict-unknown` feature is enabled, since they
+//! rely on graceful degradation behavior (capturing unknown types in Unknown variants).
+//! In strict mode, unknown types cause deserialization errors instead.
+
+// Skip all tests in this module when strict-unknown is enabled
+#![cfg(not(feature = "strict-unknown"))]
 
 mod common;
 

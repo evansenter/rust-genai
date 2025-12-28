@@ -31,6 +31,16 @@ jobs:
       - name: Run unit tests
         run: cargo test --workspace --verbose
 
+  test-strict-unknown:
+    name: Test Suite (strict-unknown)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run unit tests with strict-unknown feature
+        run: cargo test --workspace --features strict-unknown --verbose
+
   test-integration:
     name: Integration Tests
     runs-on: ubuntu-latest
