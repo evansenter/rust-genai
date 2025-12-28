@@ -22,7 +22,7 @@ const BASE_URL_PREFIX: &str = "https://generativelanguage.googleapis.com";
 
 /// Represents different API endpoints for the Interactions API
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(clippy::enum_variant_names)] // Postfix is intentional for clarity
+#[allow(clippy::enum_variant_names)] // "Interaction" suffix is intentional for API clarity
 pub enum Endpoint<'a> {
     /// Create a new interaction
     CreateInteraction { stream: bool },
