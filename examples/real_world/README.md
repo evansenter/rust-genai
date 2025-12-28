@@ -1,0 +1,221 @@
+# Real-World Example Applications
+
+This directory contains comprehensive example applications demonstrating practical use cases for the `rust-genai` library. Each example showcases production patterns, error handling, and best practices.
+
+## Examples Overview
+
+| Example | Description | Key Features |
+|---------|-------------|--------------|
+| [RAG System](./rag_system/) | Document Q&A with retrieval | Context injection, source attribution |
+| [Multi-Turn Agent](./multi_turn_agent/) | Customer support bot | Stateful conversations, function calling |
+| [Code Assistant](./code_assistant/) | Code analysis tool | Structured output, multi-task analysis |
+| [Data Analysis](./data_analysis/) | CSV analysis with NL queries | Function calling, data operations |
+| [Web Scraper Agent](./web_scraper_agent/) | Web research assistant | Google Search grounding, streaming |
+| [Testing Assistant](./testing_assistant/) | Test generation from code | Coverage analysis, property tests |
+
+## Running Examples
+
+All examples require the `GEMINI_API_KEY` environment variable:
+
+```bash
+export GEMINI_API_KEY=your_api_key
+```
+
+Run any example with:
+
+```bash
+cargo run --example rag_system
+cargo run --example multi_turn_agent
+cargo run --example code_assistant
+cargo run --example data_analysis
+cargo run --example web_scraper_agent
+cargo run --example testing_assistant
+```
+
+## Features Demonstrated
+
+### Core API Features
+
+- **Client Building**: `Client::builder(api_key).build()`
+- **Interaction Building**: Fluent builder pattern with `with_*` methods
+- **Streaming**: Real-time response handling with `create_stream()`
+- **Stateful Conversations**: Using `with_previous_interaction()` and `with_store(true)`
+
+### Advanced Features
+
+| Feature | Examples |
+|---------|----------|
+| Function Calling | Multi-Turn Agent, Data Analysis |
+| Structured Output | Code Assistant, Testing Assistant |
+| Google Search Grounding | Web Scraper Agent |
+| Auto Function Execution | Multi-Turn Agent, Data Analysis |
+| System Instructions | All examples |
+
+### Production Patterns
+
+Each example demonstrates:
+
+- **Error Handling**: Graceful degradation and informative error messages
+- **Type Safety**: Structured outputs parsed into Rust structs
+- **Modularity**: Separation of concerns with clear interfaces
+- **Documentation**: Comprehensive code comments and READMEs
+
+## Example Summaries
+
+### RAG System
+
+Retrieval-Augmented Generation for document Q&A:
+
+```rust
+// Retrieve relevant documents
+let retrieved = store.retrieve(query, 2);
+
+// Build augmented prompt
+let context = build_context(&retrieved);
+let prompt = build_rag_prompt(query, &context);
+
+// Generate response with context
+let response = client.interaction()
+    .with_text(&prompt)
+    .create().await?;
+```
+
+### Multi-Turn Agent
+
+Stateful customer support bot:
+
+```rust
+// Chain conversations with previous interaction
+let response = client.interaction()
+    .with_previous_interaction(&last_id)
+    .with_functions(tools)
+    .create_with_auto_functions().await?;
+```
+
+### Code Assistant
+
+Structured code analysis:
+
+```rust
+// Get structured analysis output
+let analysis: CodeAnalysis = client.interaction()
+    .with_response_format(schema)
+    .create().await?
+    .text()
+    .and_then(|t| serde_json::from_str(t).ok())
+    .unwrap();
+```
+
+### Data Analysis
+
+Natural language data queries:
+
+```rust
+// NL question -> function calls -> answer
+let result = client.interaction()
+    .with_text("What are total sales by region?")
+    .with_functions(data_tools)
+    .create_with_auto_functions().await?;
+```
+
+### Web Scraper Agent
+
+Real-time web research:
+
+```rust
+// Grounded search with source attribution
+let response = client.interaction()
+    .with_google_search()
+    .create().await?;
+
+// Access sources
+if let Some(meta) = response.google_search_metadata() {
+    for source in &meta.grounding_chunks {
+        println!("{}: {}", source.web.title, source.web.domain);
+    }
+}
+```
+
+### Testing Assistant
+
+AI-powered test generation:
+
+```rust
+// Generate structured test suite
+let suite: TestSuite = assistant
+    .generate_test_suite(code, "rust").await?;
+
+// Analyze coverage gaps
+let analysis = assistant
+    .analyze_coverage(code, tests, "rust").await?;
+```
+
+## Architecture Patterns
+
+### Wrapper Structs
+
+Each example wraps the client for domain-specific operations:
+
+```rust
+struct SupportSession {
+    client: Client,
+    last_interaction_id: Option<String>,
+}
+
+impl SupportSession {
+    async fn process_message(&mut self, msg: &str) -> Result<String, Error> {
+        // Domain-specific logic
+    }
+}
+```
+
+### Tool Registration
+
+Function calling with the `#[tool]` macro:
+
+```rust
+#[tool(column(description = "Column name to analyze"))]
+fn get_stats(column: String) -> String {
+    // Implementation
+}
+
+// Use in interaction
+client.interaction()
+    .with_functions(vec![GetStatsCallable.declaration()])
+```
+
+### Structured Output
+
+JSON schema for consistent parsing:
+
+```rust
+let schema = json!({
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string"},
+        "items": {"type": "array", "items": {"type": "string"}}
+    }
+});
+
+client.interaction()
+    .with_response_format(schema)
+```
+
+## Production Considerations
+
+Each example includes notes on:
+
+- **Scaling**: Database connections, caching, rate limiting
+- **Security**: Authentication, input validation
+- **Monitoring**: Logging, metrics, error tracking
+- **Testing**: Unit tests, integration tests
+
+## Contributing
+
+When adding new examples:
+
+1. Create a directory under `examples/real_world/`
+2. Add `main.rs` with comprehensive comments
+3. Include a `README.md` with usage instructions
+4. Update this README and `Cargo.toml`
+5. Ensure the example compiles and runs successfully
