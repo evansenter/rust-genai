@@ -1,7 +1,8 @@
 //! Multimodal Image Input Example
 //!
-//! This example demonstrates sending an image to the Gemini API for analysis
-//! using base64-encoded image data.
+//! This example demonstrates sending images to the Gemini API for analysis
+//! using base64-encoded image data. It shows both the fluent builder pattern
+//! and the manual content vector approach.
 //!
 //! # Running
 //!
@@ -13,7 +14,7 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use rust_genai::{Client, InteractionInput, image_data_content, text_content};
+use rust_genai::{Client, image_data_content, text_content};
 use std::env;
 
 // A tiny red PNG image (1x1 pixel) encoded as base64
@@ -31,18 +32,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("=== MULTIMODAL IMAGE INPUT EXAMPLE ===\n");
 
-    // Build multimodal content with text and base64 image
-    let contents = vec![
-        text_content("What color is this image? Describe it."),
-        image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-    ];
-
+    // Method 1: Fluent builder pattern with add_image_data()
+    // This is the most ergonomic approach for inline multimodal content
     println!("Sending image to Gemini for analysis...\n");
 
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_input(InteractionInput::Content(contents))
+        .with_text("What color is this image? Describe it.")
+        .add_image_data(TINY_RED_PNG_BASE64, "image/png")
         .with_store(true)
         .create()
         .await?;
@@ -65,7 +63,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n--- End ---");
 
-    // Demonstrate comparing two images
+    // Method 2: Using with_content() for multiple items
+    // Useful when building content programmatically
     println!("\n=== IMAGE COMPARISON ===\n");
 
     let comparison_contents = vec![
@@ -77,7 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let comparison = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_input(InteractionInput::Content(comparison_contents))
+        .with_content(comparison_contents)
         .with_store(true)
         .create()
         .await?;

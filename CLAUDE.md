@@ -63,7 +63,7 @@ cargo run --example image_generation
 ### Layered Design
 
 1. **Public API** (`src/lib.rs`, `src/client.rs`, `src/request_builder.rs`): User-facing `Client`, `InteractionBuilder`, error conversion
-2. **Internal Logic** (`src/function_calling.rs`, `src/interactions_api.rs`): Function registry, content builders
+2. **Internal Logic** (`src/function_calling.rs`, `src/interactions_api.rs`, `src/multimodal.rs`): Function registry, content builders, file loading helpers
 3. **HTTP Client** (`genai-client/`): Raw API requests, JSON models (`models/interactions.rs`, `models/shared.rs`), SSE streaming
 4. **Macros** (`rust-genai-macros/`): `#[tool]` macro with `inventory` registration
 
@@ -83,9 +83,41 @@ cargo run --example image_generation
 - `GenaiError`: API/network errors (thiserror-based), defined in `genai-client/src/errors.rs`, re-exported from `rust-genai`
 - `FunctionError`: Function execution errors
 
+### Multimodal Input
+
+**Fluent Builder Pattern** (recommended for inline content):
+```rust
+// Images, audio, video, documents - all use the same pattern
+client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text("Analyze this image")
+    .add_image_file("photo.jpg").await?        // From file (auto MIME detection)
+    .add_image_data(base64_data, "image/png")  // From base64
+    .add_image_uri("gs://bucket/img.jpg", "image/jpeg")  // From URI
+    .create().await?
+```
+
+**Content Vector** (for programmatic/dynamic content):
+```rust
+use rust_genai::{text_content, image_from_file};
+
+let contents = vec![
+    text_content("Analyze this image"),
+    image_from_file("photo.jpg").await?,
+];
+client.interaction()
+    .with_content(contents)
+    .create().await?
+```
+
+**File Loading Helpers** (in `multimodal` module):
+- `image_from_file()`, `audio_from_file()`, `video_from_file()`, `document_from_file()`
+- Auto-detect MIME type from extension, load file, base64 encode
+- `*_from_file_with_mime()` variants for explicit MIME override
+
 ### Content Export Strategy
 
-**Re-exported** (user-constructed): `image_data_content`, `audio_uri_content`, `function_result_content`, `function_call_content`
+**Re-exported** (user-constructed): `image_data_content`, `audio_uri_content`, `function_result_content`, `function_call_content`, `image_from_file`, `audio_from_file`, `video_from_file`, `document_from_file`, `detect_mime_type`
 
 **Not re-exported** (model-generated): Built-in tool outputs accessed via response methods like `response.google_search_results()`, `response.code_execution_results()`
 

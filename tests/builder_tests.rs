@@ -5,8 +5,9 @@
 //! - InteractionBuilder edge cases and validation
 
 use genai_client::{GenerationConfig, InteractionContent, InteractionInput, ThinkingLevel};
-use rust_genai::{Client, FunctionDeclaration};
+use rust_genai::{Client, FunctionDeclaration, detect_mime_type};
 use serde_json::json;
+use std::path::Path;
 
 // =============================================================================
 // FunctionDeclarationBuilder Tests
@@ -828,4 +829,430 @@ fn test_interaction_builder_all_three_tools_combined() {
     assert!(matches!(tools[0], Tool::GoogleSearch));
     assert!(matches!(tools[1], Tool::CodeExecution));
     assert!(matches!(tools[2], Tool::UrlContext));
+}
+
+// =============================================================================
+// Multimodal Builder Methods Tests
+// =============================================================================
+
+#[test]
+fn test_detect_mime_type_basic() {
+    // Test MIME type detection for common file types
+    assert_eq!(detect_mime_type(Path::new("photo.jpg")), Some("image/jpeg"));
+    assert_eq!(detect_mime_type(Path::new("photo.png")), Some("image/png"));
+    assert_eq!(detect_mime_type(Path::new("audio.mp3")), Some("audio/mp3"));
+    assert_eq!(detect_mime_type(Path::new("video.mp4")), Some("video/mp4"));
+    assert_eq!(
+        detect_mime_type(Path::new("doc.pdf")),
+        Some("application/pdf")
+    );
+    assert_eq!(detect_mime_type(Path::new("unknown.xyz")), None);
+}
+
+#[test]
+fn test_add_image_data_creates_content_from_empty() {
+    // When input is None, add_image_data should create Content variant
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .add_image_data("base64data", "image/jpeg");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 1, "Should have 1 content item");
+            // Verify it's an Image with data
+            assert!(matches!(
+                &items[0],
+                InteractionContent::Image { mime_type, data, .. }
+                if mime_type.as_deref() == Some("image/jpeg") && data.is_some()
+            ));
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
+}
+
+#[test]
+fn test_add_image_data_converts_text_to_content() {
+    // When input is Text, add_image_data should convert to Content with both
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Analyze this image")
+        .add_image_data("base64data", "image/png");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 2, "Should have 2 content items");
+            // First should be text
+            assert!(matches!(
+                &items[0],
+                InteractionContent::Text { text }
+                if text.as_deref() == Some("Analyze this image")
+            ));
+            // Second should be image with data
+            assert!(matches!(
+                &items[1],
+                InteractionContent::Image { mime_type, data, .. }
+                if mime_type.as_deref() == Some("image/png") && data.is_some()
+            ));
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
+}
+
+#[test]
+fn test_multiple_add_calls_accumulate() {
+    // Multiple add_* calls should accumulate content
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .add_image_data("img1", "image/jpeg")
+        .add_image_data("img2", "image/png")
+        .add_audio_data("audio1", "audio/mp3");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 3, "Should have 3 content items");
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
+}
+
+#[test]
+fn test_add_methods_after_with_content() {
+    // add_* methods should accumulate with existing Content
+    let client = Client::new("test-api-key".to_string());
+
+    let initial_content = vec![InteractionContent::Text {
+        text: Some("Initial text".to_string()),
+    }];
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_content(initial_content)
+        .add_image_data("imagedata", "image/gif");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 2, "Should have 2 content items");
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
+}
+
+#[test]
+fn test_add_image_uri_works() {
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Describe this image")
+        .add_image_uri("gs://bucket/image.jpg", "image/jpeg");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 2, "Should have 2 content items");
+            // Second should be an Image with URI
+            assert!(matches!(
+                &items[1],
+                InteractionContent::Image { uri, mime_type, .. }
+                if uri.is_some() && mime_type.as_deref() == Some("image/jpeg")
+            ));
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
+}
+
+#[test]
+fn test_add_audio_data_works() {
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .add_audio_data("audiodata", "audio/wav");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 1);
+            assert!(matches!(
+                &items[0],
+                InteractionContent::Audio { mime_type, data, .. }
+                if mime_type.as_deref() == Some("audio/wav") && data.is_some()
+            ));
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
+}
+
+#[test]
+fn test_add_video_data_works() {
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .add_video_data("videodata", "video/mp4");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 1);
+            assert!(matches!(
+                &items[0],
+                InteractionContent::Video { mime_type, data, .. }
+                if mime_type.as_deref() == Some("video/mp4") && data.is_some()
+            ));
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
+}
+
+#[test]
+fn test_add_document_data_works() {
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .add_document_data("pdfdata", "application/pdf");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 1);
+            assert!(matches!(
+                &items[0],
+                InteractionContent::Document { mime_type, data, .. }
+                if mime_type.as_deref() == Some("application/pdf") && data.is_some()
+            ));
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
+}
+
+#[test]
+fn test_add_document_uri_works() {
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Summarize this document")
+        .add_document_uri("gs://bucket/report.pdf", "application/pdf");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 2);
+            assert!(matches!(
+                &items[1],
+                InteractionContent::Document { uri, mime_type, .. }
+                if uri.is_some() && mime_type.as_deref() == Some("application/pdf")
+            ));
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
+}
+
+#[test]
+fn test_add_audio_uri_works() {
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Describe this audio")
+        .add_audio_uri("gs://bucket/audio.mp3", "audio/mp3");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 2, "Should have 2 content items");
+            // Second should be an Audio with URI
+            assert!(matches!(
+                &items[1],
+                InteractionContent::Audio { uri, mime_type, .. }
+                if uri.is_some() && mime_type.as_deref() == Some("audio/mp3")
+            ));
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
+}
+
+#[test]
+fn test_add_video_uri_works() {
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Describe this video")
+        .add_video_uri("gs://bucket/video.mp4", "video/mp4");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 2, "Should have 2 content items");
+            // Second should be a Video with URI
+            assert!(matches!(
+                &items[1],
+                InteractionContent::Video { uri, mime_type, .. }
+                if uri.is_some() && mime_type.as_deref() == Some("video/mp4")
+            ));
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
+}
+
+#[test]
+fn test_add_methods_combine_with_all_builder_features() {
+    // Verify add_* methods work with other builder features
+    use rust_genai::Tool;
+
+    let client = Client::new("test-api-key".to_string());
+
+    let func = FunctionDeclaration::builder("analyze_image")
+        .description("Analyze an image")
+        .build();
+
+    let config = GenerationConfig {
+        temperature: Some(0.7),
+        max_output_tokens: Some(1024),
+        top_p: None,
+        top_k: None,
+        thinking_level: None,
+    };
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Analyze this image and describe it")
+        .add_image_data("imagedata", "image/jpeg")
+        .with_system_instruction("Be descriptive")
+        .with_function(func)
+        .with_generation_config(config)
+        .with_google_search();
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+
+    // Verify input has both text and image
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 2);
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
+
+    // Verify tools are set
+    assert!(request.tools.is_some());
+    let tools = request.tools.unwrap();
+    assert_eq!(tools.len(), 2);
+    assert!(matches!(tools[0], Tool::Function { .. }));
+    assert!(matches!(tools[1], Tool::GoogleSearch));
+
+    // Verify generation config
+    assert!(request.generation_config.is_some());
+
+    // Verify system instruction
+    assert!(request.system_instruction.is_some());
+}
+
+#[test]
+fn test_add_methods_order_preserves_sequence() {
+    // Content should appear in the order it was added
+    let client = Client::new("test-api-key".to_string());
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("First")
+        .add_image_data("second", "image/jpeg")
+        .add_audio_data("third", "audio/mp3")
+        .add_video_data("fourth", "video/mp4");
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 4);
+
+            // First: text
+            assert!(matches!(&items[0], InteractionContent::Text { .. }));
+
+            // Second: image
+            assert!(matches!(
+                &items[1],
+                InteractionContent::Image { mime_type, .. }
+                if mime_type.as_deref() == Some("image/jpeg")
+            ));
+
+            // Third: audio
+            assert!(matches!(
+                &items[2],
+                InteractionContent::Audio { mime_type, .. }
+                if mime_type.as_deref() == Some("audio/mp3")
+            ));
+
+            // Fourth: video
+            assert!(matches!(
+                &items[3],
+                InteractionContent::Video { mime_type, .. }
+                if mime_type.as_deref() == Some("video/mp4")
+            ));
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
 }

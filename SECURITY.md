@@ -80,9 +80,7 @@ println!("{:?}", client);
 When implementing callable functions, validate all arguments:
 
 ```rust
-#[generate_function_declaration(
-    city(description = "The city name")
-)]
+#[tool(city(description = "The city name"))]
 fn get_weather(city: String) -> String {
     // Validate input length to prevent abuse
     if city.len() > 100 {

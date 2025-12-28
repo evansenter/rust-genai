@@ -40,10 +40,10 @@ thiserror = { workspace = true }
 log = { workspace = true }
 async-trait = { workspace = true }
 inventory = { workspace = true }
+base64 = "0.22"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
 trybuild = "1.0.114"
-base64 = "0.22"
 
 # Workspace-level metadata

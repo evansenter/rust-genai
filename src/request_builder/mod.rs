@@ -152,6 +152,175 @@ impl<'a> InteractionBuilder<'a> {
         self
     }
 
+    // =========================================================================
+    // Multimodal Content Addition Methods
+    // =========================================================================
+    //
+    // These `add_*` methods allow fluent construction of multimodal content.
+    // Unlike `with_text` and `with_content` which REPLACE the input,
+    // these methods ACCUMULATE content items.
+
+    /// Adds an image from a file to the content.
+    ///
+    /// Reads the file, encodes it as base64, and auto-detects the MIME type
+    /// from the file extension.
+    ///
+    /// This method accumulates content - it can be called multiple times to add
+    /// multiple images, and works alongside `with_text()`.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Compare these two images")
+    ///     .add_image_file("photo1.jpg").await?
+    ///     .add_image_file("photo2.jpg").await?
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn add_image_file(
+        mut self,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<Self, GenaiError> {
+        let content = crate::multimodal::image_from_file(path).await?;
+        self.add_content_item(content);
+        Ok(self)
+    }
+
+    /// Adds an image from base64-encoded data to the content.
+    ///
+    /// This method accumulates content - it can be called multiple times.
+    pub fn add_image_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        let content = crate::interactions_api::image_data_content(data, mime_type);
+        self.add_content_item(content);
+        self
+    }
+
+    /// Adds an image from a URI to the content.
+    ///
+    /// This method accumulates content - it can be called multiple times.
+    pub fn add_image_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        let content = crate::interactions_api::image_uri_content(uri, mime_type);
+        self.add_content_item(content);
+        self
+    }
+
+    /// Adds an audio file to the content.
+    ///
+    /// Reads the file, encodes it as base64, and auto-detects the MIME type.
+    pub async fn add_audio_file(
+        mut self,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<Self, GenaiError> {
+        let content = crate::multimodal::audio_from_file(path).await?;
+        self.add_content_item(content);
+        Ok(self)
+    }
+
+    /// Adds audio from base64-encoded data to the content.
+    pub fn add_audio_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        let content = crate::interactions_api::audio_data_content(data, mime_type);
+        self.add_content_item(content);
+        self
+    }
+
+    /// Adds audio from a URI to the content.
+    pub fn add_audio_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        let content = crate::interactions_api::audio_uri_content(uri, mime_type);
+        self.add_content_item(content);
+        self
+    }
+
+    /// Adds a video file to the content.
+    ///
+    /// Reads the file, encodes it as base64, and auto-detects the MIME type.
+    pub async fn add_video_file(
+        mut self,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<Self, GenaiError> {
+        let content = crate::multimodal::video_from_file(path).await?;
+        self.add_content_item(content);
+        Ok(self)
+    }
+
+    /// Adds video from base64-encoded data to the content.
+    pub fn add_video_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        let content = crate::interactions_api::video_data_content(data, mime_type);
+        self.add_content_item(content);
+        self
+    }
+
+    /// Adds video from a URI to the content.
+    pub fn add_video_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        let content = crate::interactions_api::video_uri_content(uri, mime_type);
+        self.add_content_item(content);
+        self
+    }
+
+    /// Adds a document file (e.g., PDF) to the content.
+    ///
+    /// Reads the file, encodes it as base64, and auto-detects the MIME type.
+    pub async fn add_document_file(
+        mut self,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<Self, GenaiError> {
+        let content = crate::multimodal::document_from_file(path).await?;
+        self.add_content_item(content);
+        Ok(self)
+    }
+
+    /// Adds a document from base64-encoded data to the content.
+    pub fn add_document_data(
+        mut self,
+        data: impl Into<String>,
+        mime_type: impl Into<String>,
+    ) -> Self {
+        let content = crate::interactions_api::document_data_content(data, mime_type);
+        self.add_content_item(content);
+        self
+    }
+
+    /// Adds a document from a URI to the content.
+    pub fn add_document_uri(
+        mut self,
+        uri: impl Into<String>,
+        mime_type: impl Into<String>,
+    ) -> Self {
+        let content = crate::interactions_api::document_uri_content(uri, mime_type);
+        self.add_content_item(content);
+        self
+    }
+
+    /// Internal helper to add a content item, converting input type if needed.
+    ///
+    /// - If input is `None`: creates a new `Content` variant with the item
+    /// - If input is `Text`: converts to `Content` with the text as first item, then adds the new item
+    /// - If input is `Content`: appends the item to the existing vec
+    fn add_content_item(&mut self, item: InteractionContent) {
+        match &mut self.input {
+            None => {
+                self.input = Some(InteractionInput::Content(vec![item]));
+            }
+            Some(InteractionInput::Text(text)) => {
+                let text_item = crate::interactions_api::text_content(std::mem::take(text));
+                self.input = Some(InteractionInput::Content(vec![text_item, item]));
+            }
+            Some(InteractionInput::Content(contents)) => {
+                contents.push(item);
+            }
+        }
+    }
+
     /// References a previous interaction for stateful conversations.
     ///
     /// The interaction will have access to the context from the previous interaction.
@@ -629,7 +798,7 @@ impl<'a> InteractionBuilder<'a> {
     /// 3. Send function results back to model in new interaction
     /// 4. Repeat until model returns text or max iterations reached
     ///
-    /// Functions are auto-discovered from the global registry (via `#[generate_function_declaration]` macro)
+    /// Functions are auto-discovered from the global registry (via `#[tool]` macro)
     /// or can be explicitly provided via `.with_function()` or `.with_tools()`.
     ///
     /// The loop automatically stops when:
