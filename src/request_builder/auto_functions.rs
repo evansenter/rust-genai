@@ -95,13 +95,40 @@ impl<'a> InteractionBuilder<'a> {
     /// implement `Serialize`, enabling logging, caching, and persistence of complete
     /// execution histories for debugging and evaluation workflows.
     ///
+    /// # Max Loops Behavior
+    ///
+    /// When the maximum number of iterations is reached (default 5, configurable via
+    /// `with_max_function_call_loops()`), the method returns an `Ok` result with
+    /// `reached_max_loops: true` instead of an error. This preserves the execution
+    /// history and the last response for debugging stuck loops.
+    ///
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Client::new("key".to_string());
+    /// let result = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("...")
+    ///     .with_max_function_call_loops(3)
+    ///     .create_with_auto_functions()
+    ///     .await?;
+    ///
+    /// if result.reached_max_loops {
+    ///     eprintln!("Hit max loops! Executed {} functions", result.executions.len());
+    ///     // Inspect result.response.function_calls() to see what's still pending
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     ///
     /// Returns an error if:
     /// - No input was provided
     /// - Neither model nor agent was specified
     /// - The API request fails
-    /// - Maximum function call loops is exceeded (default 5, configurable via `with_max_function_call_loops()`)
+    /// - `max_function_call_loops` is set to 0 (invalid configuration)
     pub async fn create_with_auto_functions(self) -> Result<AutoFunctionResult, GenaiError> {
         let client = self.client;
         let max_loops = self.max_function_call_loops;
@@ -124,6 +151,9 @@ impl<'a> InteractionBuilder<'a> {
             }
         }
 
+        // Track the last response for returning partial results if max loops is reached
+        let mut last_response: Option<InteractionResponse> = None;
+
         // Main auto-function loop (configurable iterations to prevent infinite loops)
         for _loop_count in 0..max_loops {
             let response = client.create_interaction(request.clone()).await?;
@@ -136,6 +166,7 @@ impl<'a> InteractionBuilder<'a> {
                 return Ok(AutoFunctionResult {
                     response,
                     executions: all_executions,
+                    reached_max_loops: false,
                 });
             }
 
@@ -191,18 +222,38 @@ impl<'a> InteractionBuilder<'a> {
                 ));
             }
 
+            // Save this response before moving to next iteration
+            // (in case we hit max loops, we want to return the last response)
+            last_response = Some(response.clone());
+
             // Create new request with function results
             // The server maintains function call context via previous_interaction_id
             request.previous_interaction_id = Some(response.id);
             request.input = InteractionInput::Content(function_results);
         }
 
-        Err(GenaiError::Internal(format!(
-            "Exceeded maximum function call loops ({max_loops}). \
-             The model may be stuck in a loop. Check your function implementations, \
-             increase the limit using with_max_function_call_loops(), \
-             or use manual function calling for more control."
-        )))
+        // Max loops reached - return partial result with whatever we have
+        // This preserves execution history for debugging instead of discarding it
+        warn!(
+            "Reached maximum function call loops ({max_loops}). \
+             Returning partial result with {} executions. \
+             The model may be stuck in a loop.",
+            all_executions.len()
+        );
+
+        // If we never made it through even one iteration (shouldn't happen with max_loops > 0),
+        // return an error since we have no response to return
+        let response = last_response.ok_or_else(|| {
+            GenaiError::InvalidInput(format!(
+                "max_function_call_loops ({max_loops}) must be at least 1"
+            ))
+        })?;
+
+        Ok(AutoFunctionResult {
+            response,
+            executions: all_executions,
+            reached_max_loops: true,
+        })
     }
 
     /// Creates a streaming interaction with automatic function call handling.
@@ -258,6 +309,15 @@ impl<'a> InteractionBuilder<'a> {
     /// # }
     /// ```
     ///
+    /// # Max Loops Behavior
+    ///
+    /// When the maximum number of iterations is reached, the stream yields a
+    /// `MaxLoopsReached(response)` chunk instead of returning an error. This
+    /// preserves access to prior `FunctionResults` chunks that were already yielded.
+    ///
+    /// The `AutoFunctionResultAccumulator` handles `MaxLoopsReached` automatically
+    /// and returns an `AutoFunctionResult` with `reached_max_loops: true`.
+    ///
     /// # Errors
     ///
     /// Returns errors if:
@@ -265,7 +325,7 @@ impl<'a> InteractionBuilder<'a> {
     /// - Neither model nor agent was specified
     /// - The API request fails
     /// - A function call is missing its required `call_id` field
-    /// - Maximum function call loops is exceeded
+    /// - `max_function_call_loops` is set to 0 (invalid configuration)
     pub fn create_stream_with_auto_functions(
         self,
     ) -> BoxStream<'a, Result<AutoFunctionStreamChunk, GenaiError>> {
@@ -288,6 +348,9 @@ impl<'a> InteractionBuilder<'a> {
                     );
                 }
             }
+
+            // Track the last response for returning partial results if max loops is reached
+            let mut last_response: Option<InteractionResponse> = None;
 
             // Main auto-function streaming loop
             for _loop_count in 0..max_loops {
@@ -417,18 +480,32 @@ impl<'a> InteractionBuilder<'a> {
                 // Yield function results
                 yield AutoFunctionStreamChunk::FunctionResults(execution_results);
 
+                // Save this response before moving to next iteration
+                // (in case we hit max loops, we want to return the last response)
+                last_response = Some(response.clone());
+
                 // Create new request with function results
                 request.previous_interaction_id = Some(response.id);
                 request.input = InteractionInput::Content(function_results_content);
             }
 
-            // If we get here, we exceeded max loops
-            Err(GenaiError::Internal(format!(
-                "Exceeded maximum function call loops ({max_loops}). \
-                 The model may be stuck in a loop. Check your function implementations, \
-                 increase the limit using with_max_function_call_loops(), \
-                 or use manual function calling for more control."
-            )))?;
+            // Max loops reached - yield partial result with the last response
+            // This preserves all prior FunctionResults chunks that were already yielded
+            warn!(
+                "Reached maximum function call loops ({max_loops}). \
+                 Yielding MaxLoopsReached with last response. \
+                 The model may be stuck in a loop."
+            );
+
+            // If we never made it through even one iteration (shouldn't happen with max_loops > 0),
+            // return an error since we have no response to return
+            let response = last_response.ok_or_else(|| {
+                GenaiError::InvalidInput(format!(
+                    "max_function_call_loops ({max_loops}) must be at least 1"
+                ))
+            })?;
+
+            yield AutoFunctionStreamChunk::MaxLoopsReached(response);
         })
     }
 }

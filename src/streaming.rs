@@ -94,6 +94,20 @@ pub enum AutoFunctionStreamChunk {
     /// a response that doesn't request any function calls.
     Complete(InteractionResponse),
 
+    /// Maximum function call loops reached.
+    ///
+    /// This event is yielded when the auto-function loop has reached the maximum
+    /// number of iterations (set via `with_max_function_call_loops()`) without
+    /// the model returning a response without function calls.
+    ///
+    /// The response contains the last response from the model, which likely still
+    /// contains pending function calls. Use [`AutoFunctionResultAccumulator`] to
+    /// collect all function execution results from prior `FunctionResults` chunks.
+    ///
+    /// This allows debugging why the model is stuck in a loop while preserving
+    /// all partial results.
+    MaxLoopsReached(InteractionResponse),
+
     /// Unknown event type (for forward compatibility).
     ///
     /// This variant is used when deserializing JSON that contains an unrecognized
@@ -169,6 +183,12 @@ impl Serialize for AutoFunctionStreamChunk {
             Self::Complete(response) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("chunk_type", "complete")?;
+                map.serialize_entry("data", response)?;
+                map.end()
+            }
+            Self::MaxLoopsReached(response) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("chunk_type", "max_loops_reached")?;
                 map.serialize_entry("data", response)?;
                 map.end()
             }
@@ -287,6 +307,25 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                     ))
                 })?;
                 Ok(Self::Complete(response))
+            }
+            "max_loops_reached" => {
+                let data = match value.get("data").cloned() {
+                    Some(d) => d,
+                    None => {
+                        log::warn!(
+                            "AutoFunctionStreamChunk::MaxLoopsReached is missing the 'data' field. \
+                             This may indicate a malformed API response."
+                        );
+                        serde_json::Value::Null
+                    }
+                };
+                let response: InteractionResponse = serde_json::from_value(data).map_err(|e| {
+                    serde::de::Error::custom(format!(
+                        "Failed to deserialize AutoFunctionStreamChunk::MaxLoopsReached data: {}",
+                        e
+                    ))
+                })?;
+                Ok(Self::MaxLoopsReached(response))
             }
             other => {
                 log::warn!(
@@ -413,6 +452,18 @@ pub struct AutoFunctionResult {
     pub response: InteractionResponse,
     /// All functions that were executed during the auto-function loop
     pub executions: Vec<FunctionExecutionResult>,
+    /// Whether the auto-function loop was terminated due to reaching the maximum
+    /// number of iterations (set via `with_max_function_call_loops()`).
+    ///
+    /// When `true`, the `response` contains the last response from the model before
+    /// hitting the limit, which likely still contains pending function calls.
+    /// The `executions` vector contains all functions that were successfully executed
+    /// before the limit was reached.
+    ///
+    /// This allows debugging why the model is stuck in a loop and preserves
+    /// partial results that may still be useful.
+    #[serde(default)]
+    pub reached_max_loops: bool,
 }
 
 /// Accumulator for building [`AutoFunctionResult`] from a stream of [`AutoFunctionStreamChunk`].
@@ -474,11 +525,14 @@ impl AutoFunctionResultAccumulator {
 
     /// Feeds a chunk to the accumulator.
     ///
-    /// Returns `Some(AutoFunctionResult)` when the stream is complete (i.e., when
-    /// a `Complete` chunk is received). Returns `None` for all other chunk types.
+    /// Returns `Some(AutoFunctionResult)` when the stream ends, either:
+    /// - With a `Complete` chunk (normal completion, `reached_max_loops: false`)
+    /// - With a `MaxLoopsReached` chunk (limit hit, `reached_max_loops: true`)
+    ///
+    /// Returns `None` for all other chunk types.
     ///
     /// The accumulator collects all `FunctionResults` chunks and combines them
-    /// with the final `Complete` response.
+    /// with the final response.
     #[allow(unreachable_patterns)] // Handle future variants from #[non_exhaustive] enum
     pub fn push(&mut self, chunk: AutoFunctionStreamChunk) -> Option<AutoFunctionResult> {
         match chunk {
@@ -489,6 +543,12 @@ impl AutoFunctionResultAccumulator {
             AutoFunctionStreamChunk::Complete(response) => Some(AutoFunctionResult {
                 response,
                 executions: std::mem::take(&mut self.executions),
+                reached_max_loops: false,
+            }),
+            AutoFunctionStreamChunk::MaxLoopsReached(response) => Some(AutoFunctionResult {
+                response,
+                executions: std::mem::take(&mut self.executions),
+                reached_max_loops: true,
             }),
             AutoFunctionStreamChunk::Delta(_) | AutoFunctionStreamChunk::ExecutingFunctions(_) => {
                 None
@@ -704,6 +764,7 @@ mod tests {
                     Duration::from_millis(95),
                 ),
             ],
+            reached_max_loops: false,
         };
 
         // Serialize
@@ -767,5 +828,187 @@ mod tests {
         assert_eq!(deserialized.executions[1].name, "get_weather");
         assert_eq!(deserialized.executions[1].call_id, "call-002");
         assert_eq!(deserialized.executions[1].result["city"], "London");
+
+        // Verify reached_max_loops
+        assert!(!deserialized.reached_max_loops);
+    }
+
+    #[test]
+    fn test_auto_function_result_reached_max_loops() {
+        use genai_client::InteractionStatus;
+
+        // Create an AutoFunctionResult with reached_max_loops: true
+        let result = AutoFunctionResult {
+            response: genai_client::InteractionResponse {
+                id: "interaction-stuck".to_string(),
+                model: Some("gemini-3-flash-preview".to_string()),
+                agent: None,
+                input: vec![InteractionContent::Text {
+                    text: Some("What's the weather?".to_string()),
+                }],
+                outputs: vec![InteractionContent::FunctionCall {
+                    id: Some("call-stuck".to_string()),
+                    name: "get_weather".to_string(),
+                    args: json!({"city": "Tokyo"}),
+                    thought_signature: None,
+                }],
+                status: InteractionStatus::Completed,
+                usage: None,
+                tools: None,
+                grounding_metadata: None,
+                url_context_metadata: None,
+                previous_interaction_id: None,
+            },
+            executions: vec![FunctionExecutionResult::new(
+                "get_weather",
+                "call-1",
+                json!({"temp": 25}),
+                Duration::from_millis(50),
+            )],
+            reached_max_loops: true,
+        };
+
+        // Serialize
+        let json_str = serde_json::to_string(&result).expect("Serialization should succeed");
+        assert!(
+            json_str.contains("reached_max_loops"),
+            "Should contain reached_max_loops field"
+        );
+        assert!(json_str.contains("true"), "Should contain true value");
+
+        // Deserialize
+        let deserialized: AutoFunctionResult =
+            serde_json::from_str(&json_str).expect("Deserialization should succeed");
+        assert!(deserialized.reached_max_loops);
+        assert_eq!(deserialized.executions.len(), 1);
+    }
+
+    #[test]
+    fn test_auto_function_result_backwards_compatibility() {
+        // Test that JSON without reached_max_loops (from older versions) still deserializes
+        let legacy_json = r#"{
+            "response": {
+                "id": "interaction-old",
+                "model": "gemini-3-flash-preview",
+                "agent": null,
+                "input": [],
+                "outputs": [],
+                "status": "COMPLETED",
+                "usage": null,
+                "tools": null,
+                "grounding_metadata": null,
+                "url_context_metadata": null,
+                "previous_interaction_id": null
+            },
+            "executions": []
+        }"#;
+
+        let deserialized: AutoFunctionResult =
+            serde_json::from_str(legacy_json).expect("Should deserialize legacy JSON");
+
+        // reached_max_loops should default to false
+        assert!(
+            !deserialized.reached_max_loops,
+            "Missing field should default to false"
+        );
+    }
+
+    #[test]
+    fn test_max_loops_reached_chunk_roundtrip() {
+        use genai_client::InteractionStatus;
+
+        // Create a MaxLoopsReached chunk
+        let response = genai_client::InteractionResponse {
+            id: "interaction-max-loops".to_string(),
+            model: Some("gemini-3-flash-preview".to_string()),
+            agent: None,
+            input: vec![],
+            outputs: vec![InteractionContent::FunctionCall {
+                id: Some("call-pending".to_string()),
+                name: "stuck_function".to_string(),
+                args: json!({}),
+                thought_signature: None,
+            }],
+            status: InteractionStatus::Completed,
+            usage: None,
+            tools: None,
+            grounding_metadata: None,
+            url_context_metadata: None,
+            previous_interaction_id: None,
+        };
+
+        let chunk = AutoFunctionStreamChunk::MaxLoopsReached(response);
+
+        // Serialize
+        let json_str = serde_json::to_string(&chunk).expect("Serialization should succeed");
+        assert!(
+            json_str.contains("max_loops_reached"),
+            "Should contain chunk_type"
+        );
+        assert!(
+            json_str.contains("interaction-max-loops"),
+            "Should contain response data"
+        );
+
+        // Deserialize
+        let deserialized: AutoFunctionStreamChunk =
+            serde_json::from_str(&json_str).expect("Deserialization should succeed");
+
+        match deserialized {
+            AutoFunctionStreamChunk::MaxLoopsReached(resp) => {
+                assert_eq!(resp.id, "interaction-max-loops");
+                assert_eq!(resp.function_calls().len(), 1);
+                assert_eq!(resp.function_calls()[0].name, "stuck_function");
+            }
+            other => panic!("Expected MaxLoopsReached, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_accumulator_handles_max_loops_reached() {
+        use genai_client::InteractionStatus;
+
+        let mut accumulator = AutoFunctionResultAccumulator::new();
+
+        // Simulate function results being yielded
+        let results = AutoFunctionStreamChunk::FunctionResults(vec![FunctionExecutionResult::new(
+            "test_func",
+            "call-1",
+            json!({"ok": true}),
+            Duration::from_millis(10),
+        )]);
+
+        assert!(
+            accumulator.push(results).is_none(),
+            "Should not complete yet"
+        );
+        assert_eq!(accumulator.executions().len(), 1);
+
+        // Simulate MaxLoopsReached being yielded
+        let response = genai_client::InteractionResponse {
+            id: "max-loops-response".to_string(),
+            model: Some("gemini-3-flash-preview".to_string()),
+            agent: None,
+            input: vec![],
+            outputs: vec![],
+            status: InteractionStatus::Completed,
+            usage: None,
+            tools: None,
+            grounding_metadata: None,
+            url_context_metadata: None,
+            previous_interaction_id: None,
+        };
+
+        let max_loops_chunk = AutoFunctionStreamChunk::MaxLoopsReached(response);
+        let result = accumulator.push(max_loops_chunk);
+
+        assert!(result.is_some(), "Should complete on MaxLoopsReached");
+        let result = result.unwrap();
+        assert!(
+            result.reached_max_loops,
+            "Should have reached_max_loops: true"
+        );
+        assert_eq!(result.executions.len(), 1);
+        assert_eq!(result.response.id, "max-loops-response");
     }
 }
