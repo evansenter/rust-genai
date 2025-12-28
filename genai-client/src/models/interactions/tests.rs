@@ -1114,6 +1114,104 @@ fn test_deserialize_code_execution_call_direct_fields() {
 }
 
 #[test]
+fn test_deserialize_code_execution_call_malformed_becomes_unknown() {
+    // Issue #186: Malformed CodeExecutionCall (missing both direct fields and arguments)
+    // should become Unknown variant per Evergreen philosophy, not silently fall back to empty code.
+    let json =
+        r#"{"type": "code_execution_call", "id": "call_malformed", "extra_field": "unexpected"}"#;
+    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+    // Should be Unknown, not a CodeExecutionCall with empty code
+    match &content {
+        InteractionContent::Unknown { content_type, data } => {
+            assert_eq!(content_type, "code_execution_call");
+            // Verify the original data is preserved for debugging
+            assert_eq!(data["id"], "call_malformed");
+            assert_eq!(data["extra_field"], "unexpected");
+            assert_eq!(data["type"], "code_execution_call");
+        }
+        InteractionContent::CodeExecutionCall { code, .. } => {
+            panic!(
+                "Should NOT be CodeExecutionCall with empty code (got code={:?}). \
+                 Malformed responses should become Unknown variant.",
+                code
+            );
+        }
+        _ => panic!("Expected Unknown variant, got {:?}", content),
+    }
+
+    assert!(content.is_unknown());
+    assert!(!content.is_code_execution_call());
+    assert_eq!(content.unknown_content_type(), Some("code_execution_call"));
+}
+
+#[test]
+fn test_deserialize_code_execution_call_malformed_roundtrip() {
+    // Verify malformed CodeExecutionCall can roundtrip through Unknown variant
+    let json =
+        r#"{"type": "code_execution_call", "id": "call_malformed", "custom": {"nested": true}}"#;
+    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+    assert!(content.is_unknown());
+
+    // Serialize back
+    let reserialized = serde_json::to_string(&content).expect("Should serialize");
+    let value: serde_json::Value =
+        serde_json::from_str(&reserialized).expect("Should parse as JSON");
+
+    // Verify key fields are preserved
+    assert_eq!(value["type"], "code_execution_call");
+    assert_eq!(value["id"], "call_malformed");
+    assert_eq!(value["custom"]["nested"], true);
+}
+
+#[test]
+fn test_deserialize_code_execution_call_arguments_missing_code_becomes_unknown() {
+    // Arguments path: when arguments object exists but code is missing, treat as Unknown
+    // This is the same Evergreen pattern as the direct fields path
+    let json = r#"{"type": "code_execution_call", "id": "call_args_no_code", "arguments": {"language": "PYTHON"}}"#;
+    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+    // Should be Unknown, not CodeExecutionCall with empty code
+    match &content {
+        InteractionContent::Unknown { content_type, data } => {
+            assert_eq!(content_type, "code_execution_call");
+            assert_eq!(data["id"], "call_args_no_code");
+            assert_eq!(data["arguments"]["language"], "PYTHON");
+        }
+        InteractionContent::CodeExecutionCall { code, .. } => {
+            panic!(
+                "Should NOT be CodeExecutionCall with empty code (got code={:?}). \
+                 Arguments path should also treat missing code as Unknown.",
+                code
+            );
+        }
+        _ => panic!("Expected Unknown variant, got {:?}", content),
+    }
+
+    assert!(content.is_unknown());
+}
+
+#[test]
+fn test_deserialize_code_execution_call_arguments_valid() {
+    // Arguments path: when arguments object has code, should work normally
+    let json = r#"{"type": "code_execution_call", "id": "call_valid", "arguments": {"language": "PYTHON", "code": "print('hi')"}}"#;
+    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+    match &content {
+        InteractionContent::CodeExecutionCall { id, language, code } => {
+            assert_eq!(id, "call_valid");
+            assert_eq!(*language, CodeExecutionLanguage::Python);
+            assert_eq!(code, "print('hi')");
+        }
+        _ => panic!("Expected CodeExecutionCall variant, got {:?}", content),
+    }
+
+    assert!(content.is_code_execution_call());
+    assert!(!content.is_unknown());
+}
+
+#[test]
 fn test_deserialize_code_execution_result() {
     // Test deserialization from old API format (is_error + result)
     let json = r#"{"type": "code_execution_result", "call_id": "call_123", "is_error": false, "result": "42\n"}"#;
