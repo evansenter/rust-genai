@@ -2,6 +2,7 @@
 
 use crate::errors::GenaiError;
 use reqwest::Response;
+use serde::de::DeserializeOwned;
 
 /// Maximum characters to include from error body in context messages
 const ERROR_BODY_PREVIEW_LENGTH: usize = 200;
@@ -77,6 +78,56 @@ pub async fn read_error_with_context(response: Response) -> GenaiError {
 pub fn format_json_parse_error(json_str: &str, error: serde_json::Error) -> String {
     let preview = truncate_for_context(json_str, ERROR_BODY_PREVIEW_LENGTH);
     format!("JSON parse error: {} | Context: {}", error, preview)
+}
+
+/// Deserializes JSON with context-rich error messages.
+///
+/// This function wraps `serde_json::from_str` and converts deserialization errors
+/// to `GenaiError::Json` with additional context about what type failed to parse
+/// and a preview of the JSON that caused the error.
+///
+/// # Arguments
+///
+/// * `json_str` - The JSON string to deserialize
+/// * `type_context` - A human-readable description of what's being deserialized
+///   (e.g., "InteractionResponse", "create interaction response")
+///
+/// # Returns
+///
+/// The deserialized value on success, or a context-rich `GenaiError` on failure.
+///
+/// # Example
+///
+/// ```
+/// # use genai_client::error_helpers::deserialize_with_context;
+/// # use serde::Deserialize;
+/// #[derive(Deserialize, Debug)]
+/// struct Response { id: String }
+///
+/// let json = r#"{"id": "test123"}"#;
+/// let result: Result<Response, _> = deserialize_with_context(json, "API response");
+/// assert!(result.is_ok());
+///
+/// let bad_json = r#"{"missing_id": true}"#;
+/// let result: Result<Response, _> = deserialize_with_context(bad_json, "API response");
+/// let err = result.unwrap_err();
+/// assert!(err.to_string().contains("API response"));
+/// ```
+pub fn deserialize_with_context<T: DeserializeOwned>(
+    json_str: &str,
+    type_context: &str,
+) -> Result<T, GenaiError> {
+    serde_json::from_str(json_str).map_err(|e| {
+        let preview = truncate_for_context(json_str, ERROR_BODY_PREVIEW_LENGTH);
+        let message = format!(
+            "Failed to parse {}: {} | JSON: {}",
+            type_context, e, preview
+        );
+        GenaiError::Json(serde_json::Error::io(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            message,
+        )))
+    })
 }
 
 /// Truncates a string to specified length, adding "..." if truncated.
@@ -163,5 +214,76 @@ mod tests {
         for ch in result.chars() {
             assert!(ch.is_ascii() || !ch.is_ascii()); // Tautology, but ensures no panic
         }
+    }
+
+    #[test]
+    fn test_deserialize_with_context_success() {
+        #[derive(serde::Deserialize, Debug, PartialEq)]
+        struct TestData {
+            id: String,
+            value: i32,
+        }
+
+        let json = r#"{"id": "test123", "value": 42}"#;
+        let result: Result<TestData, _> = deserialize_with_context(json, "test data");
+        assert!(result.is_ok());
+        let data = result.unwrap();
+        assert_eq!(data.id, "test123");
+        assert_eq!(data.value, 42);
+    }
+
+    #[test]
+    fn test_deserialize_with_context_error_includes_context() {
+        #[derive(serde::Deserialize, Debug)]
+        #[allow(dead_code)]
+        struct TestData {
+            required_field: String,
+        }
+
+        let json = r#"{"wrong_field": "value"}"#;
+        let result: Result<TestData, _> = deserialize_with_context(json, "InteractionResponse");
+        assert!(result.is_err());
+
+        let err = result.unwrap_err();
+        let err_str = err.to_string();
+
+        // Should include the type context
+        assert!(
+            err_str.contains("InteractionResponse"),
+            "Error should mention the type: {}",
+            err_str
+        );
+        // Should include JSON preview
+        assert!(
+            err_str.contains("wrong_field"),
+            "Error should include JSON preview: {}",
+            err_str
+        );
+    }
+
+    #[test]
+    fn test_deserialize_with_context_truncates_long_json() {
+        #[derive(serde::Deserialize, Debug)]
+        #[allow(dead_code)]
+        struct TestData {
+            id: String,
+        }
+
+        // Create JSON longer than 200 chars
+        let long_value = "x".repeat(300);
+        let json = format!(r#"{{"long_field": "{}"}}"#, long_value);
+
+        let result: Result<TestData, _> = deserialize_with_context(&json, "test");
+        assert!(result.is_err());
+
+        let err = result.unwrap_err();
+        let err_str = err.to_string();
+
+        // Should be truncated (contains "...")
+        assert!(
+            err_str.contains("..."),
+            "Long JSON should be truncated: {}",
+            err_str
+        );
     }
 }

@@ -160,7 +160,7 @@ impl<'de> Deserialize<'de> for Tool {
                 KnownTool::UrlContext => Tool::UrlContext,
                 KnownTool::McpServer { name, url } => Tool::McpServer { name, url },
             }),
-            Err(_) => {
+            Err(parse_error) => {
                 // Unknown type - extract type name and preserve data
                 let tool_type = value
                     .get("type")
@@ -168,11 +168,15 @@ impl<'de> Deserialize<'de> for Tool {
                     .unwrap_or("<missing type>")
                     .to_string();
 
+                // Log the actual parse error for debugging - this helps distinguish
+                // between truly unknown types and malformed known types
                 log::warn!(
                     "Encountered unknown Tool type '{}'. \
-                     This may indicate a new API feature not yet supported by this library. \
+                     Parse error: {}. \
+                     This may indicate a new API feature or a malformed response. \
                      The tool will be preserved in the Unknown variant.",
-                    tool_type
+                    tool_type,
+                    parse_error
                 );
 
                 Ok(Tool::Unknown {

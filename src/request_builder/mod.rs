@@ -540,6 +540,13 @@ impl<'a> InteractionBuilder<'a> {
     /// # }
     /// ```
     pub fn with_max_function_call_loops(mut self, max_loops: usize) -> Self {
+        if max_loops == 0 {
+            log::warn!(
+                "max_function_call_loops set to 0 - auto function calling will immediately fail \
+                 if the model returns any function calls. Consider using create() instead of \
+                 create_with_auto_functions() if you don't want automatic function execution."
+            );
+        }
         self.max_function_call_loops = max_loops;
         self
     }
@@ -1043,11 +1050,20 @@ impl<'a> InteractionBuilder<'a> {
             GenaiError::InvalidInput("Input is required for interaction".to_string())
         })?;
 
-        // Validate that we have either model or agent
-        if self.model.is_none() && self.agent.is_none() {
-            return Err(GenaiError::InvalidInput(
-                "Either model or agent must be specified".to_string(),
-            ));
+        // Validate that we have either model or agent (but not both)
+        match (&self.model, &self.agent) {
+            (None, None) => {
+                return Err(GenaiError::InvalidInput(
+                    "Either model or agent must be specified".to_string(),
+                ));
+            }
+            (Some(model), Some(agent)) => {
+                return Err(GenaiError::InvalidInput(format!(
+                    "Cannot specify both model ('{}') and agent ('{}') - use one or the other",
+                    model, agent
+                )));
+            }
+            _ => {} // Valid: exactly one is set
         }
 
         Ok(CreateInteractionRequest {
