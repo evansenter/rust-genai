@@ -4,12 +4,11 @@
 //! multi-step research tasks by executing iterative searches, synthesizing information
 //! across multiple sources, and generating comprehensive research reports.
 //!
-//! The Deep Research agent operates as a long-running asynchronous operation. This
-//! example shows two modes of operation:
-//!
-//! 1. **Synchronous mode**: Waits for the research to complete (simpler, may timeout)
-//! 2. **Background mode with polling**: Starts research asynchronously and polls for
-//!    completion (recommended for long-running research tasks)
+//! The Deep Research agent operates as a long-running asynchronous operation that
+//! requires background mode. The workflow is:
+//! 1. Start the research task with `background=true`
+//! 2. Poll for completion using the interaction ID
+//! 3. Retrieve the final research report
 //!
 //! **Expected runtime**: Deep research queries typically take 30-120 seconds depending
 //! on query complexity. Simple queries may complete in under 30 seconds. This example
@@ -37,13 +36,8 @@ const INITIAL_POLL_DELAY: Duration = Duration::from_secs(2);
 /// Maximum delay between polls
 const MAX_POLL_DELAY: Duration = Duration::from_secs(10);
 
-/// Maximum characters to display for synchronous mode results.
-/// Sync mode uses a shorter limit since it's the "simple" demo.
-const SYNC_DISPLAY_LIMIT: usize = 1500;
-
-/// Maximum characters to display for background mode results.
-/// Background mode shows more since it's the "full" demo with polling.
-const BACKGROUND_DISPLAY_LIMIT: usize = 2000;
+/// Maximum characters to display in results
+const DISPLAY_LIMIT: usize = 2000;
 
 /// Truncates text at a safe UTF-8 boundary for display.
 fn truncate_for_display(text: &str, limit: usize) -> String {
@@ -78,90 +72,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("=== Deep Research Agent Example ===\n");
 
-    // 2. First, demonstrate synchronous mode (simple but may timeout for complex queries)
-    println!("--- Part 1: Synchronous Research ---\n");
-    synchronous_research(&client, agent_name).await?;
-
-    println!("\n--- Part 2: Background Mode with Polling ---\n");
-    background_research_with_polling(&client, agent_name).await?;
-
-    Ok(())
-}
-
-/// Demonstrates synchronous deep research (waits for completion).
-///
-/// This is simpler but may timeout for complex research queries that take a long time.
-async fn synchronous_research(client: &Client, agent_name: &str) -> Result<(), Box<dyn Error>> {
-    let prompt = "What are the key differences between Rust's ownership model and \
-                  C++'s RAII pattern? Focus on memory safety guarantees.";
-
-    println!("Research query: {prompt}\n");
-    println!("Starting synchronous research (waiting for completion)...\n");
-
-    // 3. Create an interaction with the Deep Research agent
-    let result = client
-        .interaction()
-        .with_agent(agent_name)
-        .with_text(prompt)
-        .with_store(true) // Required for background mode and polling by interaction ID
-        .create()
-        .await;
-
-    match result {
-        Ok(response) => {
-            println!("Research completed!");
-            println!("Status: {:?}", response.status);
-            println!("Interaction ID: {}\n", response.id);
-
-            // 4. Display the research results
-            if let Some(text) = response.text() {
-                let display_text = truncate_for_display(text, SYNC_DISPLAY_LIMIT);
-                println!("Research Results:\n{display_text}\n");
-            } else {
-                println!("No text response received.");
-            }
-
-            // 5. Show token usage if available
-            if let Some(usage) = response.usage {
-                println!("--- Token Usage ---");
-                if let Some(input) = usage.total_input_tokens {
-                    println!("  Input tokens: {input}");
-                }
-                if let Some(output) = usage.total_output_tokens {
-                    println!("  Output tokens: {output}");
-                }
-            }
-        }
-        Err(e) => {
-            handle_research_error(&e);
-            return Err(e.into());
-        }
-    }
-
-    Ok(())
-}
-
-/// Demonstrates background mode with polling for long-running research.
-///
-/// This approach is recommended for complex research queries that may take
-/// significant time to complete. The research runs asynchronously, and we
-/// poll for status updates with exponential backoff.
-async fn background_research_with_polling(
-    client: &Client,
-    agent_name: &str,
-) -> Result<(), Box<dyn Error>> {
+    // 2. Define the research query
     let prompt = "What are the current best practices for building production-ready \
                   REST APIs in Rust? Include framework comparisons and security considerations.";
 
     println!("Research query: {prompt}\n");
-    println!("Starting background research...\n");
+    println!("Starting deep research (this may take 30-120 seconds)...\n");
 
-    // 6. Start the research in background mode
+    // 3. Start the research in background mode (required for agent interactions)
     let result = client
         .interaction()
         .with_agent(agent_name)
         .with_text(prompt)
-        .with_background(true) // Enable background mode
+        .with_background(true) // Required for agent interactions
         .with_store(true) // Required for background mode and polling by interaction ID
         .create()
         .await;
@@ -172,7 +95,7 @@ async fn background_research_with_polling(
             println!("Initial status: {:?}", initial_response.status);
             println!("Interaction ID: {}\n", initial_response.id);
 
-            // 7. If already completed (fast response), display results
+            // 4. If already completed (fast response), display results
             if initial_response.status == InteractionStatus::Completed {
                 println!("Research completed immediately (very fast response).\n");
                 display_research_results(&initial_response);
@@ -186,13 +109,13 @@ async fn background_research_with_polling(
                 return Err("Interaction requires action".into());
             }
 
-            // 8. Poll for completion with exponential backoff
+            // 5. Poll for completion with exponential backoff
             println!(
                 "Polling for completion (max wait: {:?})...\n",
                 MAX_POLL_DURATION
             );
 
-            match poll_for_completion(client, &initial_response.id).await {
+            match poll_for_completion(&client, &initial_response.id).await {
                 Ok(final_response) => {
                     println!("\nResearch completed!");
                     display_research_results(&final_response);
@@ -324,7 +247,7 @@ fn display_research_results(response: &rust_genai::InteractionResponse) {
     println!("Interaction ID: {}\n", response.id);
 
     if let Some(text) = response.text() {
-        let display_text = truncate_for_display(text, BACKGROUND_DISPLAY_LIMIT);
+        let display_text = truncate_for_display(text, DISPLAY_LIMIT);
         println!("Research Results:\n{display_text}\n");
     } else {
         println!("No text response received.\n");
