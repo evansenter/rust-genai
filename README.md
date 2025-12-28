@@ -681,20 +681,22 @@ This library follows the [Evergreen spec](https://github.com/google-deepmind/eve
 
 - **Unknown types are preserved, not rejected**: When the API returns content types this library doesn't recognize yet, they're captured in `Unknown` variants rather than causing deserialization errors.
 - **Non-exhaustive enums**: Key types like `InteractionContent` and `Tool` use `#[non_exhaustive]`, so your match statements should include wildcard arms.
-- **Roundtrip preservation**: Unknown content can be serialized back without data loss.
+- **Roundtrip preservation**: Unknown content can be serialized back without data loss - the `Unknown` variants store both the type name and full JSON data.
 
 ```rust
 // Handle unknown content gracefully
 for output in response.outputs {
     match output {
         InteractionContent::Text { text } => println!("{}", text.unwrap_or_default()),
-        InteractionContent::Unknown { content_type, .. } => {
-            log::warn!("Unknown content type '{}', skipping", content_type);
+        InteractionContent::Unknown { type_name, data } => {
+            log::warn!("Unknown content type '{}': {:?}", type_name, data);
         }
         _ => {} // Future variants
     }
 }
 ```
+
+**Design principle**: All `Unknown` variants use a data-preserving pattern with `type_name: String` and `data: serde_json::Value` fields. This ensures you can always inspect what the API sent and roundtrip serialize it. See [CLAUDE.md](CLAUDE.md) for implementation details.
 
 For strict validation during development, enable the `strict-unknown` feature flag - unknown types will error instead of being captured.
 

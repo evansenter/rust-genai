@@ -430,4 +430,116 @@ mod tests {
             serde_json::from_str(unknown_json).expect("Should deserialize unknown variant");
         assert!(matches!(deserialized, AutoFunctionStreamChunk::Unknown));
     }
+
+    #[test]
+    fn test_auto_function_result_roundtrip() {
+        use genai_client::InteractionStatus;
+
+        // Create a realistic AutoFunctionResult with multiple executions
+        let result = AutoFunctionResult {
+            response: genai_client::InteractionResponse {
+                id: "interaction-abc123".to_string(),
+                model: Some("gemini-3-flash-preview".to_string()),
+                agent: None,
+                input: vec![InteractionContent::Text {
+                    text: Some("What's the weather in Paris and London?".to_string()),
+                }],
+                outputs: vec![
+                    InteractionContent::Text {
+                        text: Some("Based on the weather data:".to_string()),
+                    },
+                    InteractionContent::Text {
+                        text: Some("Paris is 18°C and London is 15°C.".to_string()),
+                    },
+                ],
+                status: InteractionStatus::Completed,
+                usage: Some(genai_client::UsageMetadata {
+                    total_input_tokens: Some(50),
+                    total_output_tokens: Some(30),
+                    total_tokens: Some(80),
+                    ..Default::default()
+                }),
+                tools: None,
+                grounding_metadata: None,
+                url_context_metadata: None,
+                previous_interaction_id: Some("prev-interaction-xyz".to_string()),
+            },
+            executions: vec![
+                FunctionExecutionResult::new(
+                    "get_weather",
+                    "call-001",
+                    json!({"city": "Paris", "temp": 18, "unit": "celsius"}),
+                    Duration::from_millis(120),
+                ),
+                FunctionExecutionResult::new(
+                    "get_weather",
+                    "call-002",
+                    json!({"city": "London", "temp": 15, "unit": "celsius"}),
+                    Duration::from_millis(95),
+                ),
+            ],
+        };
+
+        // Serialize
+        let json_str = serde_json::to_string(&result).expect("Serialization should succeed");
+
+        // Verify key data is present in JSON
+        assert!(
+            json_str.contains("interaction-abc123"),
+            "Should contain interaction ID"
+        );
+        assert!(
+            json_str.contains("gemini-3-flash-preview"),
+            "Should contain model name"
+        );
+        assert!(
+            json_str.contains("get_weather"),
+            "Should contain function name"
+        );
+        assert!(
+            json_str.contains("call-001"),
+            "Should contain first call_id"
+        );
+        assert!(
+            json_str.contains("call-002"),
+            "Should contain second call_id"
+        );
+        assert!(json_str.contains("Paris"), "Should contain Paris");
+        assert!(json_str.contains("London"), "Should contain London");
+        assert!(
+            json_str.contains("prev-interaction-xyz"),
+            "Should contain previous interaction ID"
+        );
+
+        // Deserialize
+        let deserialized: AutoFunctionResult =
+            serde_json::from_str(&json_str).expect("Deserialization should succeed");
+
+        // Verify response fields
+        assert_eq!(deserialized.response.id, "interaction-abc123");
+        assert_eq!(
+            deserialized.response.model,
+            Some("gemini-3-flash-preview".to_string())
+        );
+        assert_eq!(deserialized.response.status, InteractionStatus::Completed);
+        assert_eq!(
+            deserialized.response.previous_interaction_id,
+            Some("prev-interaction-xyz".to_string())
+        );
+
+        // Verify usage metadata
+        let usage = deserialized.response.usage.expect("Should have usage");
+        assert_eq!(usage.total_input_tokens, Some(50));
+        assert_eq!(usage.total_output_tokens, Some(30));
+        assert_eq!(usage.total_tokens, Some(80));
+
+        // Verify executions
+        assert_eq!(deserialized.executions.len(), 2);
+        assert_eq!(deserialized.executions[0].name, "get_weather");
+        assert_eq!(deserialized.executions[0].call_id, "call-001");
+        assert_eq!(deserialized.executions[0].result["city"], "Paris");
+        assert_eq!(deserialized.executions[1].name, "get_weather");
+        assert_eq!(deserialized.executions[1].call_id, "call-002");
+        assert_eq!(deserialized.executions[1].result["city"], "London");
+    }
 }
