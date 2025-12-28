@@ -12,8 +12,8 @@
 //!    completion (recommended for long-running research tasks)
 //!
 //! **Expected runtime**: Deep research queries typically take 30-120 seconds depending
-//! on query complexity. Simple queries may complete in under 30 seconds, while complex
-//! multi-source research can take several minutes.
+//! on query complexity. Simple queries may complete in under 30 seconds. This example
+//! polls for up to 2 minutes; very complex research may require longer timeouts.
 //!
 //! Note: The Deep Research agent may not be available in all accounts or regions.
 //!
@@ -30,8 +30,8 @@ const MAX_POLL_DURATION: Duration = Duration::from_secs(120);
 
 /// Initial delay between polls (will increase with exponential backoff).
 ///
-/// Note: This is intentionally more conservative (2s) than test utilities (1s)
-/// to reduce API calls in production usage where research typically takes longer.
+/// A conservative 2-second initial delay reduces API calls since deep research
+/// tasks typically take 30+ seconds to complete.
 const INITIAL_POLL_DELAY: Duration = Duration::from_secs(2);
 
 /// Maximum delay between polls
@@ -44,6 +44,26 @@ const SYNC_DISPLAY_LIMIT: usize = 1500;
 /// Maximum characters to display for background mode results.
 /// Background mode shows more since it's the "full" demo with polling.
 const BACKGROUND_DISPLAY_LIMIT: usize = 2000;
+
+/// Truncates text at a safe UTF-8 boundary for display.
+fn truncate_for_display(text: &str, limit: usize) -> String {
+    if text.len() > limit {
+        // Find a safe truncation point at a UTF-8 character boundary
+        let safe_limit = text
+            .char_indices()
+            .take_while(|(i, _)| *i < limit)
+            .last()
+            .map(|(i, c)| i + c.len_utf8())
+            .unwrap_or(0);
+        format!(
+            "{}...\n\n[Response truncated, {} total chars]",
+            &text[..safe_limit],
+            text.len()
+        )
+    } else {
+        text.to_string()
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -83,7 +103,7 @@ async fn synchronous_research(client: &Client, agent_name: &str) -> Result<(), B
         .interaction()
         .with_agent(agent_name)
         .with_text(prompt)
-        .with_store(true) // Required for agent interactions
+        .with_store(true) // Required for background mode and polling by interaction ID
         .create()
         .await;
 
@@ -95,16 +115,7 @@ async fn synchronous_research(client: &Client, agent_name: &str) -> Result<(), B
 
             // 4. Display the research results
             if let Some(text) = response.text() {
-                // Truncate for display if very long
-                let display_text = if text.len() > SYNC_DISPLAY_LIMIT {
-                    format!(
-                        "{}...\n\n[Response truncated, {} total chars]",
-                        &text[..SYNC_DISPLAY_LIMIT],
-                        text.len()
-                    )
-                } else {
-                    text.to_string()
-                };
+                let display_text = truncate_for_display(text, SYNC_DISPLAY_LIMIT);
                 println!("Research Results:\n{display_text}\n");
             } else {
                 println!("No text response received.");
@@ -123,6 +134,7 @@ async fn synchronous_research(client: &Client, agent_name: &str) -> Result<(), B
         }
         Err(e) => {
             handle_research_error(&e);
+            return Err(e.into());
         }
     }
 
@@ -150,7 +162,7 @@ async fn background_research_with_polling(
         .with_agent(agent_name)
         .with_text(prompt)
         .with_background(true) // Enable background mode
-        .with_store(true) // Required for stateful interactions
+        .with_store(true) // Required for background mode and polling by interaction ID
         .create()
         .await;
 
@@ -167,6 +179,13 @@ async fn background_research_with_polling(
                 return Ok(());
             }
 
+            // Handle unusual initial statuses
+            if initial_response.status == InteractionStatus::RequiresAction {
+                eprintln!("Research requires action before continuing.");
+                eprintln!("This is unusual for deep research. Check the API response for details.");
+                return Err("Interaction requires action".into());
+            }
+
             // 8. Poll for completion with exponential backoff
             println!(
                 "Polling for completion (max wait: {:?})...\n",
@@ -178,26 +197,31 @@ async fn background_research_with_polling(
                     println!("\nResearch completed!");
                     display_research_results(&final_response);
                 }
-                Err(PollError::Timeout) => {
-                    println!(
+                Err(PollError::Timeout { interaction_id }) => {
+                    eprintln!(
                         "\nPolling timed out after {:?}. The research may still be running.",
                         MAX_POLL_DURATION
                     );
-                    println!(
-                        "You can retrieve results later using interaction ID: {}",
-                        initial_response.id
+                    eprintln!(
+                        "You can retrieve results later using interaction ID: {interaction_id}"
+                    );
+                    return Err(
+                        format!("Research timed out (interaction: {interaction_id})").into(),
                     );
                 }
-                Err(PollError::Failed) => {
-                    println!("\nResearch task failed. Check the interaction for error details.");
+                Err(PollError::Failed { interaction_id }) => {
+                    eprintln!("\nResearch task failed (interaction: {interaction_id}).");
+                    return Err(format!("Research failed (interaction: {interaction_id})").into());
                 }
                 Err(PollError::Api(e)) => {
-                    println!("\nAPI error during polling: {:?}", e);
+                    eprintln!("\nAPI error during polling: {e:?}");
+                    return Err(e.into());
                 }
             }
         }
         Err(e) => {
             handle_research_error(&e);
+            return Err(e.into());
         }
     }
 
@@ -208,9 +232,9 @@ async fn background_research_with_polling(
 #[derive(Debug)]
 enum PollError {
     /// Polling timed out before completion
-    Timeout,
-    /// The interaction failed
-    Failed,
+    Timeout { interaction_id: String },
+    /// The interaction failed or was cancelled
+    Failed { interaction_id: String },
     /// An API error occurred
     Api(GenaiError),
 }
@@ -226,10 +250,8 @@ impl From<GenaiError> for PollError {
 /// This function queries the API for the interaction status, using exponential
 /// backoff to reduce API calls while still detecting completion quickly.
 ///
-/// Note: This polling logic is intentionally implemented inline rather than
-/// importing from test utilities. Examples should be self-contained so users
-/// can copy them directly. Similar logic exists in `tests/common/mod.rs` for
-/// internal test use with slightly different parameters.
+/// Note: This polling logic is implemented inline so users can copy this
+/// example directly without external dependencies.
 async fn poll_for_completion(
     client: &Client,
     interaction_id: &str,
@@ -241,7 +263,9 @@ async fn poll_for_completion(
     loop {
         // Check if we've exceeded the maximum wait time
         if start.elapsed() > MAX_POLL_DURATION {
-            return Err(PollError::Timeout);
+            return Err(PollError::Timeout {
+                interaction_id: interaction_id.to_string(),
+            });
         }
 
         // Wait before polling (skip on first iteration for instant detection)
@@ -265,7 +289,11 @@ async fn poll_for_completion(
         // Check the status
         match response.status {
             InteractionStatus::Completed => return Ok(response),
-            InteractionStatus::Failed => return Err(PollError::Failed),
+            InteractionStatus::Failed => {
+                return Err(PollError::Failed {
+                    interaction_id: interaction_id.to_string(),
+                });
+            }
             InteractionStatus::InProgress => {
                 // Continue polling
             }
@@ -274,11 +302,13 @@ async fn poll_for_completion(
             }
             InteractionStatus::Cancelled => {
                 println!("    Interaction was cancelled");
-                return Err(PollError::Failed);
+                return Err(PollError::Failed {
+                    interaction_id: interaction_id.to_string(),
+                });
             }
-            _ => {
-                // Unknown status - continue polling but log it
-                println!("    Unknown status, continuing to poll...");
+            other => {
+                // Unknown or new status variant - continue polling but log it
+                println!("    Unhandled status {:?}, continuing to poll...", other);
             }
         }
     }
@@ -290,16 +320,7 @@ fn display_research_results(response: &rust_genai::InteractionResponse) {
     println!("Interaction ID: {}\n", response.id);
 
     if let Some(text) = response.text() {
-        // Truncate for display if very long
-        let display_text = if text.len() > BACKGROUND_DISPLAY_LIMIT {
-            format!(
-                "{}...\n\n[Response truncated, {} total chars]",
-                &text[..BACKGROUND_DISPLAY_LIMIT],
-                text.len()
-            )
-        } else {
-            text.to_string()
-        };
+        let display_text = truncate_for_display(text, BACKGROUND_DISPLAY_LIMIT);
         println!("Research Results:\n{display_text}\n");
     } else {
         println!("No text response received.\n");
