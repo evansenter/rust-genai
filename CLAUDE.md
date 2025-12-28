@@ -186,12 +186,23 @@ let content: InteractionContent = serde_json::from_str(json)?;
 
 ### Standard Unknown Variant Pattern
 
-All enums with `Unknown` variants should use the **data-preserving pattern**:
+All enums with `Unknown` variants use the **data-preserving pattern** with consistent naming:
+
+**Field names** follow `<context>_type`:
+- `InteractionContent`: `content_type`
+- `Tool`: `tool_type`
+- `InteractionStatus`: `status_type`
+- `StreamChunk` / `AutoFunctionStreamChunk`: `chunk_type`
+
+**Helper methods** are consistent across all types:
+- `is_unknown()` - Check if this is an Unknown variant
+- `unknown_<context>_type()` - Get the unrecognized type name
+- `unknown_data()` - Get the preserved JSON data
 
 ```rust
 Unknown {
-    /// The unrecognized type name from the API (field name varies by context)
-    type_name: String,  // or tool_type, chunk_type, etc.
+    /// The unrecognized type from the API
+    <context>_type: String,
     /// The full JSON data, preserved for debugging and roundtrip serialization
     data: serde_json::Value,
 }
@@ -203,11 +214,11 @@ This requires a custom `Deserialize` implementation. See `InteractionContent` in
 
 ### Implementation Locations
 
-- `InteractionContent` (content.rs): Has `Unknown` variant, custom deserializer ✅
-- `Tool` (shared.rs): Has `Unknown` variant, custom deserializer ✅
-- `InteractionStatus` (response.rs): Unit variant ⚠️ (see issue #181)
-- `StreamChunk` (streaming.rs): Unit variant ⚠️ (see issue #181)
-- `AutoFunctionStreamChunk` (streaming.rs): Unit variant ⚠️ (see issue #181)
+- `InteractionContent` (content.rs): `content_type` field, `unknown_content_type()` helper ✅
+- `Tool` (shared.rs): `tool_type` field, `unknown_tool_type()` helper ✅
+- `InteractionStatus` (response.rs): `status_type` field, `unknown_status_type()` helper ✅
+- `StreamChunk` (streaming.rs): `chunk_type` field, `unknown_chunk_type()` helper ✅
+- `AutoFunctionStreamChunk` (streaming.rs): `chunk_type` field, `unknown_chunk_type()` helper ✅
 - `strict-unknown` feature flag: Optional strict mode for development/testing
 
 ## Test Organization

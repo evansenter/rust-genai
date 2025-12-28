@@ -691,15 +691,15 @@ This library follows the [Evergreen spec](https://github.com/google-deepmind/eve
 for output in response.outputs {
     match output {
         InteractionContent::Text { text } => println!("{}", text.unwrap_or_default()),
-        InteractionContent::Unknown { type_name, data } => {
-            log::warn!("Unknown content type '{}': {:?}", type_name, data);
+        InteractionContent::Unknown { content_type, data } => {
+            log::warn!("Unknown content type '{}': {:?}", content_type, data);
         }
         _ => {} // Future variants
     }
 }
 ```
 
-**Design principle**: All `Unknown` variants use a data-preserving pattern with `type_name: String` and `data: serde_json::Value` fields. This ensures you can always inspect what the API sent and roundtrip serialize it. See [CLAUDE.md](CLAUDE.md) for implementation details.
+**Design principle**: All `Unknown` variants use a data-preserving pattern with `<context>_type: String` and `data: serde_json::Value` fields. This ensures you can always inspect what the API sent and roundtrip serialize it. Helper methods like `is_unknown()`, `unknown_content_type()`, and `unknown_data()` provide convenient access. See [CLAUDE.md](CLAUDE.md) for implementation details.
 
 For strict validation during development, enable the `strict-unknown` feature flag - unknown types will error instead of being captured.
 

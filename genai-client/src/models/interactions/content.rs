@@ -134,8 +134,8 @@ impl fmt::Display for CodeExecutionLanguage {
 ///     match content {
 ///         InteractionContent::Text { text } => println!("Text: {:?}", text),
 ///         InteractionContent::FunctionCall { name, .. } => println!("Function: {}", name),
-///         InteractionContent::Unknown { type_name, .. } => {
-///             println!("Unknown content type: {}", type_name);
+///         InteractionContent::Unknown { content_type, .. } => {
+///             println!("Unknown content type: {}", content_type);
 ///         }
 ///         // Required due to #[non_exhaustive] - handles future variants
 ///         _ => {}
@@ -291,7 +291,7 @@ pub enum InteractionContent {
     /// This can happen when Google adds new features to the API before this library
     /// is updated to support them.
     ///
-    /// The `type_name` field contains the unrecognized type string from the API,
+    /// The `content_type` field contains the unrecognized type string from the API,
     /// and `data` contains the full JSON object for inspection or debugging.
     ///
     /// # When This Occurs
@@ -305,8 +305,8 @@ pub enum InteractionContent {
     /// ```no_run
     /// # use genai_client::models::interactions::InteractionContent;
     /// # let content: InteractionContent = todo!();
-    /// if let InteractionContent::Unknown { type_name, data } = content {
-    ///     eprintln!("Encountered unknown type '{}': {:?}", type_name, data);
+    /// if let InteractionContent::Unknown { content_type, data } = content {
+    ///     eprintln!("Encountered unknown type '{}': {:?}", content_type, data);
     /// }
     /// ```
     ///
@@ -315,7 +315,7 @@ pub enum InteractionContent {
     /// Unknown variants can be serialized back to JSON, enabling round-trip in
     /// multi-turn conversations. The serialization follows these rules:
     ///
-    /// 1. **Type field**: The `type_name` becomes the `"type"` field in output
+    /// 1. **Type field**: The `content_type` becomes the `"type"` field in output
     /// 2. **Object data**: If `data` is a JSON object, its fields are flattened
     ///    into the output (excluding any existing `"type"` field to avoid duplicates)
     /// 3. **Non-object data**: If `data` is a non-object value (array, string, etc.),
@@ -328,7 +328,7 @@ pub enum InteractionContent {
     /// # use genai_client::models::interactions::InteractionContent;
     /// # use serde_json::json;
     /// let content = InteractionContent::Unknown {
-    ///     type_name: "new_feature".to_string(),
+    ///     content_type: "new_feature".to_string(),
     ///     data: json!({"field1": "value1", "field2": 42}),
     /// };
     /// // Serializes to: {"type": "new_feature", "field1": "value1", "field2": 42}
@@ -337,13 +337,13 @@ pub enum InteractionContent {
     /// ## Example: Duplicate Type Field
     ///
     /// If `data` contains a `"type"` field, it's excluded during serialization
-    /// (the `type_name` takes precedence):
+    /// (the `content_type` takes precedence):
     ///
     /// ```
     /// # use genai_client::models::interactions::InteractionContent;
     /// # use serde_json::json;
     /// let content = InteractionContent::Unknown {
-    ///     type_name: "my_type".to_string(),
+    ///     content_type: "my_type".to_string(),
     ///     data: json!({"type": "ignored", "value": 123}),
     /// };
     /// // Serializes to: {"type": "my_type", "value": 123}
@@ -356,7 +356,7 @@ pub enum InteractionContent {
     /// # use genai_client::models::interactions::InteractionContent;
     /// # use serde_json::json;
     /// let content = InteractionContent::Unknown {
-    ///     type_name: "array_type".to_string(),
+    ///     content_type: "array_type".to_string(),
     ///     data: json!([1, 2, 3]),
     /// };
     /// // Serializes to: {"type": "array_type", "data": [1, 2, 3]}
@@ -383,19 +383,19 @@ pub enum InteractionContent {
     /// While Unknown variants are typically created by deserialization, you can
     /// construct them manually for testing or edge cases. Note that:
     ///
-    /// - The `type_name` can be any string (including empty, though not recommended)
+    /// - The `content_type` can be any string (including empty, though not recommended)
     /// - The `data` can be any valid JSON value
     /// - For multi-turn conversations, the serialized form must match what the API expects
     Unknown {
         /// The unrecognized type name from the API
-        type_name: String,
+        content_type: String,
         /// The full JSON data for this content, preserved for debugging
         data: serde_json::Value,
     },
 }
 
 // Custom Serialize implementation for InteractionContent.
-// This handles the Unknown variant specially by merging type_name into the data.
+// This handles the Unknown variant specially by merging content_type into the data.
 impl Serialize for InteractionContent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -575,10 +575,10 @@ impl Serialize for InteractionContent {
                 }
                 map.end()
             }
-            Self::Unknown { type_name, data } => {
-                // For Unknown, merge the type_name into the data object
+            Self::Unknown { content_type, data } => {
+                // For Unknown, merge the content_type into the data object
                 let mut map = serializer.serialize_map(None)?;
-                map.serialize_entry("type", type_name)?;
+                map.serialize_entry("type", content_type)?;
                 // Flatten the data fields into the map if it's an object
                 match data {
                     serde_json::Value::Object(obj) => {
@@ -648,6 +648,7 @@ impl InteractionContent {
     ///
     /// Use this to check for content types that the library doesn't recognize.
     /// See [`InteractionContent::Unknown`] for more details.
+    #[must_use]
     pub const fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown { .. })
     }
@@ -682,12 +683,13 @@ impl InteractionContent {
         matches!(self, Self::UrlContextResult { .. })
     }
 
-    /// Returns the type name if this is an unknown content type.
+    /// Returns the content type name if this is an unknown content type.
     ///
     /// Returns `None` for known content types.
-    pub fn unknown_type(&self) -> Option<&str> {
+    #[must_use]
+    pub fn unknown_content_type(&self) -> Option<&str> {
         match self {
-            Self::Unknown { type_name, .. } => Some(type_name),
+            Self::Unknown { content_type, .. } => Some(content_type),
             _ => None,
         }
     }
@@ -695,6 +697,7 @@ impl InteractionContent {
     /// Returns the raw JSON data if this is an unknown content type.
     ///
     /// Returns `None` for known content types.
+    #[must_use]
     pub fn unknown_data(&self) -> Option<&serde_json::Value> {
         match self {
             Self::Unknown { data, .. } => Some(data),
@@ -945,7 +948,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
             }),
             Err(parse_error) => {
                 // Unknown type - extract type name and preserve data
-                let type_name = value
+                let content_type = value
                     .get("type")
                     .and_then(|v| v.as_str())
                     .unwrap_or("<missing type>")
@@ -958,7 +961,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                      Parse error: {}. \
                      This may indicate a new API feature or a malformed response. \
                      The content will be preserved in the Unknown variant.",
-                    type_name,
+                    content_type,
                     parse_error
                 );
 
@@ -968,14 +971,14 @@ impl<'de> Deserialize<'de> for InteractionContent {
                         "Unknown InteractionContent type '{}'. \
                          Strict mode is enabled via the 'strict-unknown' feature flag. \
                          Either update the library or disable strict mode.",
-                        type_name
+                        content_type
                     )))
                 }
 
                 #[cfg(not(feature = "strict-unknown"))]
                 {
                     Ok(InteractionContent::Unknown {
-                        type_name,
+                        content_type,
                         data: value,
                     })
                 }

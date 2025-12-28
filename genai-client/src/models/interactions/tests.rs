@@ -553,8 +553,8 @@ fn test_deserialize_unknown_interaction_content() {
         serde_json::from_str(unknown_json).expect("Should deserialize as Unknown");
 
     match &content {
-        InteractionContent::Unknown { type_name, data } => {
-            assert_eq!(type_name, "future_api_feature");
+        InteractionContent::Unknown { content_type, data } => {
+            assert_eq!(content_type, "future_api_feature");
             assert_eq!(data["data_field"], "some_value");
             assert_eq!(data["count"], 42);
         }
@@ -562,7 +562,7 @@ fn test_deserialize_unknown_interaction_content() {
     }
 
     assert!(content.is_unknown());
-    assert_eq!(content.unknown_type(), Some("future_api_feature"));
+    assert_eq!(content.unknown_content_type(), Some("future_api_feature"));
     assert!(content.unknown_data().is_some());
 }
 
@@ -576,11 +576,11 @@ fn test_deserialize_unknown_streaming_content() {
         serde_json::from_str(unknown_json).expect("Should deserialize as Unknown");
 
     assert!(content.is_unknown());
-    assert_eq!(content.unknown_type(), Some("new_feature_delta"));
+    assert_eq!(content.unknown_content_type(), Some("new_feature_delta"));
 
     match &content {
-        InteractionContent::Unknown { type_name, data } => {
-            assert_eq!(type_name, "new_feature_delta");
+        InteractionContent::Unknown { content_type, data } => {
+            assert_eq!(content_type, "new_feature_delta");
             assert_eq!(data["data"], "some_value");
         }
         _ => panic!("Expected Unknown variant"),
@@ -626,7 +626,7 @@ fn test_interaction_response_has_unknown() {
                 text: Some("Here's the result:".to_string()),
             },
             InteractionContent::Unknown {
-                type_name: "code_execution_result".to_string(),
+                content_type: "code_execution_result".to_string(),
                 data: serde_json::json!({
                     "type": "code_execution_result",
                     "outcome": "success",
@@ -697,15 +697,15 @@ fn test_content_summary() {
                 thought_signature: None,
             },
             InteractionContent::Unknown {
-                type_name: "type_a".to_string(),
+                content_type: "type_a".to_string(),
                 data: serde_json::json!({"type": "type_a"}),
             },
             InteractionContent::Unknown {
-                type_name: "type_b".to_string(),
+                content_type: "type_b".to_string(),
                 data: serde_json::json!({"type": "type_b"}),
             },
             InteractionContent::Unknown {
-                type_name: "type_a".to_string(), // Duplicate type
+                content_type: "type_a".to_string(), // Duplicate type
                 data: serde_json::json!({"type": "type_a", "extra": true}),
             },
         ],
@@ -794,7 +794,7 @@ fn test_content_summary_display_with_unknown() {
 fn test_serialize_unknown_content_roundtrip() {
     // Create an Unknown content (simulating what we'd receive from API)
     let unknown = InteractionContent::Unknown {
-        type_name: "code_execution_result".to_string(),
+        content_type: "code_execution_result".to_string(),
         data: serde_json::json!({
             "outcome": "success",
             "output": "42"
@@ -922,7 +922,7 @@ fn test_serialize_known_variant_with_none_fields() {
 fn test_serialize_unknown_with_non_object_data() {
     // Test that Unknown with non-object data (array, string, number) is preserved
     let unknown_array = InteractionContent::Unknown {
-        type_name: "weird_type".to_string(),
+        content_type: "weird_type".to_string(),
         data: serde_json::json!([1, 2, 3]),
     };
     let json = serde_json::to_string(&unknown_array).unwrap();
@@ -931,7 +931,7 @@ fn test_serialize_unknown_with_non_object_data() {
     assert_eq!(value["data"], serde_json::json!([1, 2, 3]));
 
     let unknown_string = InteractionContent::Unknown {
-        type_name: "string_type".to_string(),
+        content_type: "string_type".to_string(),
         data: serde_json::json!("just a string"),
     };
     let json = serde_json::to_string(&unknown_string).unwrap();
@@ -940,7 +940,7 @@ fn test_serialize_unknown_with_non_object_data() {
     assert_eq!(value["data"], "just a string");
 
     let unknown_null = InteractionContent::Unknown {
-        type_name: "null_type".to_string(),
+        content_type: "null_type".to_string(),
         data: serde_json::Value::Null,
     };
     let json = serde_json::to_string(&unknown_null).unwrap();
@@ -953,9 +953,9 @@ fn test_serialize_unknown_with_non_object_data() {
 #[test]
 fn test_serialize_unknown_with_duplicate_type_field() {
     // When data contains a "type" field, it should be ignored in serialization
-    // (the type_name takes precedence)
+    // (the content_type takes precedence)
     let unknown = InteractionContent::Unknown {
-        type_name: "correct_type".to_string(),
+        content_type: "correct_type".to_string(),
         data: serde_json::json!({
             "type": "should_be_ignored",
             "field1": "value1",
@@ -966,7 +966,7 @@ fn test_serialize_unknown_with_duplicate_type_field() {
     let json = serde_json::to_string(&unknown).expect("Serialization should work");
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-    // The type should be from type_name, not from data
+    // The type should be from content_type, not from data
     assert_eq!(value["type"], "correct_type");
     // Other fields should be preserved
     assert_eq!(value["field1"], "value1");
@@ -978,10 +978,10 @@ fn test_serialize_unknown_with_duplicate_type_field() {
 }
 
 #[test]
-fn test_serialize_unknown_with_empty_type_name() {
-    // Empty type_name is allowed but not recommended
+fn test_serialize_unknown_with_empty_content_type() {
+    // Empty content_type is allowed but not recommended
     let unknown = InteractionContent::Unknown {
-        type_name: String::new(),
+        content_type: String::new(),
         data: serde_json::json!({"field": "value"}),
     };
 
@@ -996,7 +996,7 @@ fn test_serialize_unknown_with_empty_type_name() {
 fn test_serialize_unknown_with_special_characters() {
     // Type names with special characters should be preserved
     let unknown = InteractionContent::Unknown {
-        type_name: "special/type:with.chars-and_underscores".to_string(),
+        content_type: "special/type:with.chars-and_underscores".to_string(),
         data: serde_json::json!({"key": "value"}),
     };
 
@@ -1011,7 +1011,7 @@ fn test_serialize_unknown_with_special_characters() {
 fn test_unknown_manual_construction_roundtrip() {
     // Test that manually constructed Unknown variants can round-trip through JSON
     let original = InteractionContent::Unknown {
-        type_name: "manual_test".to_string(),
+        content_type: "manual_test".to_string(),
         data: serde_json::json!({
             "nested": {"deeply": {"nested": "value"}},
             "array": [1, 2, 3],
@@ -1030,7 +1030,7 @@ fn test_unknown_manual_construction_roundtrip() {
 
     // Verify it's still Unknown with same type
     assert!(deserialized.is_unknown());
-    assert_eq!(deserialized.unknown_type(), Some("manual_test"));
+    assert_eq!(deserialized.unknown_content_type(), Some("manual_test"));
 
     // Verify the data was preserved (check a few fields)
     if let InteractionContent::Unknown { data, .. } = deserialized {
@@ -1052,8 +1052,8 @@ fn test_deserialize_unknown_with_missing_type() {
     let malformed_json = r#"{"foo": "bar", "baz": 42}"#;
     let content: InteractionContent = serde_json::from_str(malformed_json).unwrap();
     match content {
-        InteractionContent::Unknown { type_name, data } => {
-            assert_eq!(type_name, "<missing type>");
+        InteractionContent::Unknown { content_type, data } => {
+            assert_eq!(content_type, "<missing type>");
             assert_eq!(data["foo"], "bar");
             assert_eq!(data["baz"], 42);
         }
@@ -1068,8 +1068,8 @@ fn test_deserialize_unknown_with_null_type() {
     let null_type_json = r#"{"type": null, "content": "test"}"#;
     let content: InteractionContent = serde_json::from_str(null_type_json).unwrap();
     match content {
-        InteractionContent::Unknown { type_name, data } => {
-            assert_eq!(type_name, "<missing type>");
+        InteractionContent::Unknown { content_type, data } => {
+            assert_eq!(content_type, "<missing type>");
             assert_eq!(data["content"], "test");
         }
         _ => panic!("Expected Unknown variant"),
@@ -2550,4 +2550,79 @@ fn test_interaction_response_complex_roundtrip() {
     assert_eq!(tools.len(), 2);
     assert!(matches!(tools[0], crate::Tool::GoogleSearch));
     assert!(matches!(tools[1], crate::Tool::CodeExecution));
+}
+
+// --- InteractionStatus Unknown Variant Tests ---
+
+#[test]
+fn test_interaction_status_unknown_deserialize() {
+    // Simulate a new API status that this library doesn't know about
+    let json = r#""future_pending_state""#;
+    let status: InteractionStatus = serde_json::from_str(json).expect("Should deserialize");
+
+    assert!(status.is_unknown());
+    assert_eq!(status.unknown_status_type(), Some("future_pending_state"));
+    assert!(status.unknown_data().is_some());
+}
+
+#[test]
+fn test_interaction_status_unknown_roundtrip() {
+    // Deserialize unknown status
+    let json = r#""new_background_processing""#;
+    let status: InteractionStatus = serde_json::from_str(json).expect("Should deserialize");
+
+    assert!(status.is_unknown());
+
+    // Serialize back
+    let reserialized = serde_json::to_string(&status).expect("Should serialize");
+    assert_eq!(reserialized, r#""new_background_processing""#);
+
+    // Deserialize again to verify roundtrip
+    let status2: InteractionStatus =
+        serde_json::from_str(&reserialized).expect("Should deserialize again");
+    assert!(status2.is_unknown());
+    assert_eq!(
+        status2.unknown_status_type(),
+        Some("new_background_processing")
+    );
+}
+
+#[test]
+fn test_interaction_status_known_types_not_unknown() {
+    // Verify known types don't trigger Unknown
+    let completed: InteractionStatus =
+        serde_json::from_str(r#""completed""#).expect("Should deserialize");
+    assert!(!completed.is_unknown());
+    assert_eq!(completed.unknown_status_type(), None);
+    assert_eq!(completed.unknown_data(), None);
+
+    let in_progress: InteractionStatus =
+        serde_json::from_str(r#""in_progress""#).expect("Should deserialize");
+    assert!(!in_progress.is_unknown());
+
+    let failed: InteractionStatus =
+        serde_json::from_str(r#""failed""#).expect("Should deserialize");
+    assert!(!failed.is_unknown());
+
+    let requires_action: InteractionStatus =
+        serde_json::from_str(r#""requires_action""#).expect("Should deserialize");
+    assert!(!requires_action.is_unknown());
+}
+
+#[test]
+fn test_interaction_status_non_string_handled() {
+    // Edge case: API returns non-string (shouldn't happen but code handles it)
+    let json = r#"42"#;
+    let status: InteractionStatus = serde_json::from_str(json).expect("Should deserialize");
+
+    assert!(status.is_unknown());
+    // The status_type should indicate it was non-string
+    let status_type = status
+        .unknown_status_type()
+        .expect("Should have status_type");
+    assert!(status_type.contains("non-string"));
+
+    // The data should preserve the original value
+    let data = status.unknown_data().expect("Should have data");
+    assert_eq!(*data, serde_json::json!(42));
 }
