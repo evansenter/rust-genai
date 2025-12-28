@@ -344,10 +344,7 @@ fn test_interaction_builder_with_empty_text() {
     // Test with empty string input
     let client = Client::new("test-api-key".to_string());
 
-    let _builder = client
-        .interaction()
-        .with_model(DEFAULT_MODEL)
-        .with_text("");
+    let _builder = client.interaction().with_model(DEFAULT_MODEL).with_text("");
 
     // Builder allows empty string inputs without validation
 }
@@ -754,10 +751,7 @@ fn test_interaction_builder_empty_text_allowed() {
     // Verify that empty text is allowed (API will validate)
     let client = Client::new("test-api-key".to_string());
 
-    let builder = client
-        .interaction()
-        .with_model(DEFAULT_MODEL)
-        .with_text("");
+    let builder = client.interaction().with_model(DEFAULT_MODEL).with_text("");
 
     let result = builder.build_request();
     // Empty text should be accepted at builder level

@@ -20,8 +20,8 @@ mod common;
 
 use common::{
     DEFAULT_MAX_RETRIES, EXTENDED_TEST_TIMEOUT, PollError, TEST_TIMEOUT, consume_stream,
-    get_client, poll_until_complete, retry_on_transient, with_timeout,
-    interaction_builder, stateful_builder,
+    get_client, interaction_builder, poll_until_complete, retry_on_transient, stateful_builder,
+    with_timeout,
 };
 use rust_genai::{FunctionDeclaration, InteractionStatus, ThinkingLevel, function_result_content};
 use serde_json::json;

@@ -32,8 +32,9 @@
 
 mod common;
 
-use common::{EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_stream, with_timeout,
-    interaction_builder, stateful_builder,
+use common::{
+    EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_stream, interaction_builder, stateful_builder,
+    with_timeout,
 };
 use rust_genai::{
     CallableFunction, Client, CreateInteractionRequest, FunctionDeclaration, GenerationConfig,
@@ -982,8 +983,7 @@ async fn test_long_conversation_chain() {
         let mut previous_id: Option<String> = None;
 
         for (i, message) in messages.iter().enumerate() {
-            let mut builder = stateful_builder(&client)
-                .with_text(*message);
+            let mut builder = stateful_builder(&client).with_text(*message);
 
             if let Some(ref prev_id) = previous_id {
                 builder = builder.with_previous_interaction(prev_id);

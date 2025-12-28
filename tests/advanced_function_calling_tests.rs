@@ -15,8 +15,7 @@ mod common;
 
 use common::{
     EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_auto_function_stream, consume_stream, get_client,
-    with_timeout,
-    interaction_builder, stateful_builder,
+    interaction_builder, stateful_builder, with_timeout,
 };
 use rust_genai::{CallableFunction, FunctionDeclaration, function_result_content};
 use rust_genai_macros::tool;
