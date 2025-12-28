@@ -65,6 +65,7 @@ jobs:
           shared-key: integration-${{ matrix.group }}
       - name: Run integration tests (${{ matrix.group }})
         run: |
+          set -e
           for test in ${{ matrix.tests }}; do
             echo "::group::Running $test"
             cargo test --test $test --verbose -- --include-ignored

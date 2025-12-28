@@ -237,7 +237,7 @@ This requires a custom `Deserialize` implementation. See `InteractionContent` in
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/rust.yml`) runs 6 parallel jobs: check, test, test-integration, fmt, clippy, doc. Integration tests require same-repo origin (protects API key). CI runs on all PRs regardless of file type.
+GitHub Actions (`.github/workflows/rust.yml`) runs 9 parallel jobs: check, test, test-strict-unknown, 4× test-integration (core, tools, functions, multimodal), fmt, clippy, doc, security. Integration tests are split into 4 matrix jobs for faster execution (~2.5 min vs ~4 min). Integration tests require same-repo origin (protects API key). CI runs on all PRs regardless of file type.
 
 ## Project Conventions
 
