@@ -11,6 +11,8 @@ mod streaming;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod unknown_content_tests;
 
 // Re-export all public types at module root for backwards compatibility
 pub use content::{CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};

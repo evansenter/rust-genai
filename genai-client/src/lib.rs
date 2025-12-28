@@ -10,7 +10,6 @@
 //! - [`models`]: JSON types for API requests/responses
 //! - [`interactions`]: HTTP client functions for the Interactions API
 //! - [`errors`]: Error types with structured API error information
-//! - [`sse_parser`]: Server-Sent Events parsing for streaming responses
 //!
 //! ## Forward Compatibility
 //!
@@ -19,13 +18,13 @@
 //! - These capture unrecognized API types without deserialization failures
 //! - Use `#[non_exhaustive]` to ensure match statements handle future variants
 
-// Declare the models, errors, common, interactions, and sse_parser modules
-pub mod common;
-pub mod error_helpers;
+// Declare modules (common, error_helpers, sse_parser are crate-internal)
+pub(crate) mod common;
+pub(crate) mod error_helpers;
 pub mod errors;
 pub mod interactions;
 pub mod models;
-pub mod sse_parser;
+pub(crate) mod sse_parser;
 
 // Import and selectively re-export the necessary structs from the models module
 
@@ -65,11 +64,6 @@ pub use models::interactions::WebSource;
 
 // Re-export GenaiError from the errors module
 pub use errors::GenaiError;
-
-// Re-export ApiVersion, Endpoint, and URL construction functions from the common module
-pub use common::ApiVersion;
-pub use common::Endpoint;
-pub use common::construct_endpoint_url;
 
 // Re-export Interactions API functions from the interactions module
 pub use interactions::create_interaction;

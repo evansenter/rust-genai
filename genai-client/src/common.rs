@@ -1,7 +1,10 @@
 /// Represents the API version to target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApiVersion {
+    /// V1 Alpha API version (reserved for future use)
+    #[allow(dead_code)]
     V1Alpha,
+    /// V1 Beta API version (current)
     V1Beta,
 }
 
@@ -19,6 +22,7 @@ const BASE_URL_PREFIX: &str = "https://generativelanguage.googleapis.com";
 
 /// Represents different API endpoints for the Interactions API
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)] // Postfix is intentional for clarity
 pub enum Endpoint<'a> {
     /// Create a new interaction
     CreateInteraction { stream: bool },
