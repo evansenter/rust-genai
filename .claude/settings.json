@@ -1,38 +1,4 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(cargo check:*)",
-      "Bash(cargo clippy:*)",
-      "Bash(cargo test:*)",
-      "Bash(cargo build:*)",
-      "Bash(cargo fmt:*)",
-      "Bash(cargo doc:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(git fetch:*)",
-      "Bash(git pull:*)",
-      "Bash(git checkout:*)",
-      "Bash(git reset:*)",
-      "Bash(git stash:*)",
-      "Bash(git rebase:*)",
-      "Bash(git rm:*)",
-      "Bash(gh pr create:*)",
-      "Bash(gh pr checks:*)",
-      "Bash(gh pr view:*)",
-      "Bash(gh pr list:*)",
-      "Bash(gh pr edit:*)",
-      "Bash(gh pr close:*)",
-      "Bash(gh pr merge:*)",
-      "Bash(gh issue view:*)",
-      "Bash(gh issue list:*)",
-      "Bash(gh issue create:*)",
-      "Bash(gh api:*)",
-      "Bash(gh run view:*)",
-      "Bash(gh run rerun:*)",
-      "WebSearch"
-    ]
-  },
   "hooks": {
     "SessionStart": [
       {
@@ -40,16 +6,6 @@
           {
             "type": "command",
             "command": ".claude/hooks/session_init.sh"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/stop-hook.sh"
           }
         ]
       }

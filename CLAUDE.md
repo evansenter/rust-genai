@@ -229,7 +229,7 @@ This requires a custom `Deserialize` implementation. See `InteractionContent` in
 ### Hooks (automatic)
 
 - **SessionStart** (`.claude/hooks/session_init.sh`): Shows recent PRs, open issues, recent commits, and build status at session start
-- **Stop** (`.claude/hooks/stop-hook.sh`): Provides context for auto-continue decisions (recent push, CI status, pending feedback)
+- **Stop** (`~/.claude/hooks/stop-hook.sh`): Global hook providing context for auto-continue decisions
 
 ### Commands (manual)
 
