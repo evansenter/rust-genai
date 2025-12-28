@@ -81,6 +81,9 @@ async fn test_deep_research_agent() {
                     }
                 }
                 Err(PollError::Timeout) => {
+                    // Timeout is acceptable - deep research on complex queries can exceed
+                    // our test timeout. We're verifying the polling mechanism works, not
+                    // that every query completes within the time limit.
                     println!(
                         "Polling timed out after {:?} - task may still be running",
                         BACKGROUND_TASK_TIMEOUT
@@ -165,6 +168,8 @@ async fn test_background_mode_polling() {
                     }
                 }
                 Err(PollError::Timeout) => {
+                    // Timeout is acceptable - we're testing the polling mechanism, not
+                    // guaranteeing completion within the time limit.
                     println!(
                         "Polling timed out after {:?} - task may still be running",
                         BACKGROUND_TASK_TIMEOUT
