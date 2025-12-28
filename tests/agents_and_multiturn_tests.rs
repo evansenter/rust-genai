@@ -20,7 +20,8 @@ mod common;
 
 use common::{
     DEFAULT_MAX_RETRIES, EXTENDED_TEST_TIMEOUT, PollError, TEST_TIMEOUT, consume_stream,
-    get_client, poll_until_complete, retry_on_transient, with_timeout,
+    get_client, interaction_builder, poll_until_complete, retry_on_transient, stateful_builder,
+    with_timeout,
 };
 use rust_genai::{FunctionDeclaration, InteractionStatus, ThinkingLevel, function_result_content};
 use serde_json::json;
@@ -85,11 +86,8 @@ async fn test_very_long_conversation() {
 
     // Build up context over 10 turns
     for (i, fact) in facts.iter().enumerate() {
-        let mut builder = client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
-            .with_text(*fact)
-            .with_store(true);
+        let mut builder = stateful_builder(&client)
+            .with_text(*fact);
 
         if let Some(ref prev_id) = previous_id {
             builder = builder.with_previous_interaction(prev_id);
@@ -127,12 +125,9 @@ async fn test_very_long_conversation() {
     }
 
     // Final turn: ask about everything
-    let final_result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let final_result = stateful_builder(&client)
         .with_previous_interaction(previous_id.as_ref().unwrap())
         .with_text("What do you know about me? List everything you can remember.")
-        .with_store(true)
         .create()
         .await;
 
@@ -222,12 +217,9 @@ async fn test_conversation_function_then_text() {
         .build();
 
     // Turn 1: Trigger function call
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response1 = stateful_builder(&client)
         .with_text("What's the weather in Tokyo?")
         .with_function(get_weather.clone())
-        .with_store(true)
         .create()
         .await
         .expect("Turn 1 failed");
@@ -249,13 +241,10 @@ async fn test_conversation_function_then_text() {
         json!({"temperature": "25°C", "conditions": "sunny"}),
     );
 
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response2 = stateful_builder(&client)
         .with_previous_interaction(&response1.id)
         .with_content(vec![result])
         .with_function(get_weather.clone())
-        .with_store(true)
         .create()
         .await
         .expect("Turn 2 failed");
@@ -266,13 +255,10 @@ async fn test_conversation_function_then_text() {
     }
 
     // Turn 3: Follow-up text question (no function call expected)
-    let response3 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response3 = stateful_builder(&client)
         .with_previous_interaction(&response2.id)
         .with_text("Should I bring a jacket?")
         .with_function(get_weather)
-        .with_store(true)
         .create()
         .await
         .expect("Turn 3 failed");
@@ -318,11 +304,8 @@ async fn test_conversation_branch() {
         retry_on_transient(DEFAULT_MAX_RETRIES, || {
             let client = client.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_text("My favorite color is red.")
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -338,12 +321,9 @@ async fn test_conversation_branch() {
             let client = client.clone();
             let prev_id = prev_id.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_previous_interaction(&prev_id)
                     .with_text("My favorite number is 7.")
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -359,12 +339,9 @@ async fn test_conversation_branch() {
             let client = client.clone();
             let prev_id = prev_id.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_previous_interaction(&prev_id)
                     .with_text("My favorite animal is a cat.")
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -381,12 +358,9 @@ async fn test_conversation_branch() {
             let client = client.clone();
             let prev_id = prev_id.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_previous_interaction(&prev_id) // Branch from turn 2
                     .with_text("What do you know about my favorites so far?")
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -424,12 +398,9 @@ async fn test_conversation_branch() {
             let client = client.clone();
             let prev_id = prev_id.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_previous_interaction(&prev_id)
                     .with_text("And what's my favorite animal?")
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -465,7 +436,6 @@ async fn test_deep_research_agent() {
             .interaction()
             .with_agent("deep-research-pro-preview-12-2025")
             .with_text("What are the main differences between Rust and Go programming languages?")
-            .with_store(true)
             .create()
             .await;
 
@@ -523,7 +493,6 @@ async fn test_background_mode_polling() {
             .with_agent("deep-research-pro-preview-12-2025")
             .with_text("Briefly explain what machine learning is.")
             .with_background(true)
-            .with_store(true)
             .create()
             .await;
 
@@ -594,11 +563,8 @@ async fn test_usage_metadata_returned() {
         return;
     };
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_text("What is the capital of France? Answer briefly.")
-        .with_store(true)
         .create()
         .await
         .expect("Interaction failed");
@@ -642,21 +608,15 @@ async fn test_usage_longer_response() {
     };
 
     // Short response
-    let short_response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let short_response = stateful_builder(&client)
         .with_text("Say 'hello'")
-        .with_store(true)
         .create()
         .await
         .expect("Short interaction failed");
 
     // Longer response
-    let long_response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let long_response = stateful_builder(&client)
         .with_text("Write a 100-word paragraph about space exploration.")
-        .with_store(true)
         .create()
         .await
         .expect("Long interaction failed");
@@ -706,13 +666,10 @@ async fn test_streaming_multi_turn_basic() {
         retry_on_transient(DEFAULT_MAX_RETRIES, || {
             let client = client.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_text(
                         "My favorite programming language is Python. Please acknowledge this.",
                     )
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -725,12 +682,9 @@ async fn test_streaming_multi_turn_basic() {
     assert_eq!(response1.status, InteractionStatus::Completed);
 
     // Turn 2: Stream a question that requires context from Turn 1
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = stateful_builder(&client)
         .with_previous_interaction(&response1.id)
         .with_text("What is my favorite programming language? Answer in one word.")
-        .with_store(true)
         .create_stream();
 
     let result = consume_stream(stream).await;
@@ -784,12 +738,9 @@ async fn test_streaming_multi_turn_function_calling() {
             let client = client.clone();
             let get_weather = get_weather.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_text("What's the weather in Paris?")
                     .with_function(get_weather)
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -826,13 +777,10 @@ async fn test_streaming_multi_turn_function_calling() {
             let result = result.clone();
             let get_weather = get_weather.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_previous_interaction(&prev_id)
                     .with_content(vec![result])
                     .with_function(get_weather)
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -847,13 +795,10 @@ async fn test_streaming_multi_turn_function_calling() {
     }
 
     // Turn 3: Stream a follow-up question about the weather context
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = stateful_builder(&client)
         .with_previous_interaction(&response2.id)
         .with_text("Should I bring an umbrella? Answer briefly.")
         .with_function(get_weather)
-        .with_store(true)
         .create_stream();
 
     let result = consume_stream(stream).await;
@@ -942,13 +887,10 @@ async fn test_thinking_with_function_calling_multi_turn() {
             let client = client.clone();
             let get_weather = get_weather.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_text("What's the weather in Tokyo? Should I bring an umbrella?")
                     .with_function(get_weather)
                     .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -1022,14 +964,11 @@ async fn test_thinking_with_function_calling_multi_turn() {
             let get_weather = get_weather.clone();
             let function_result = function_result.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_previous_interaction(&prev_id)
                     .with_content(vec![function_result])
                     .with_function(get_weather)
                     .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -1092,16 +1031,13 @@ async fn test_thinking_with_function_calling_multi_turn() {
             let prev_id = prev_id.clone();
             let get_weather = get_weather.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_previous_interaction(&prev_id)
                     .with_text(
                         "Given this weather, what indoor activities would you recommend in Tokyo?",
                     )
                     .with_function(get_weather)
                     .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -1214,16 +1150,13 @@ async fn test_thinking_with_parallel_function_calls() {
             let get_weather = get_weather.clone();
             let get_time = get_time.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_text(
                         "What's the weather in Tokyo and what time is it there? \
                          I need both pieces of information.",
                     )
                     .with_functions(vec![get_weather, get_time])
                     .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -1308,14 +1241,11 @@ async fn test_thinking_with_parallel_function_calls() {
             let get_time = get_time.clone();
             let results = results.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_previous_interaction(&prev_id)
                     .with_content(results)
                     .with_functions(vec![get_weather, get_time])
                     .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -1448,9 +1378,7 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
             let client = client.clone();
             let functions = functions.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_text(
                         "I'm planning a trip to Tokyo. I need to know the current weather, \
                          current local time, the forecast for the next few days, and what \
@@ -1458,7 +1386,6 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
                     )
                     .with_functions(functions)
                     .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -1541,14 +1468,11 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
             let functions = functions.clone();
             let results = results.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_previous_interaction(&prev_id)
                     .with_content(results)
                     .with_functions(functions)
                     .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -1625,14 +1549,11 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
                 let functions = functions.clone();
                 let results = results.clone();
                 async move {
-                    client
-                        .interaction()
-                        .with_model("gemini-3-flash-preview")
+                    stateful_builder(&client)
                         .with_previous_interaction(&prev_id)
                         .with_content(results)
                         .with_functions(functions)
                         .with_thinking_level(ThinkingLevel::Medium)
-                        .with_store(true)
                         .create()
                         .await
                 }
@@ -1732,13 +1653,10 @@ async fn test_thinking_levels_with_function_calling() {
                 let client = client.clone();
                 let get_weather = get_weather.clone();
                 async move {
-                    client
-                        .interaction()
-                        .with_model("gemini-3-flash-preview")
+                    stateful_builder(&client)
                         .with_text("What's the weather in Paris?")
                         .with_function(get_weather)
                         .with_thinking_level(level)
-                        .with_store(true)
                         .create()
                         .await
                 }
@@ -1787,9 +1705,7 @@ async fn test_thinking_levels_with_function_calling() {
                 let get_weather = get_weather.clone();
                 let function_result = function_result.clone();
                 async move {
-                    client
-                        .interaction()
-                        .with_model("gemini-3-flash-preview")
+                    interaction_builder(&client)
                         .with_previous_interaction(&prev_id)
                         .with_content(vec![function_result])
                         .with_function(get_weather)
@@ -1868,13 +1784,10 @@ async fn test_function_calling_without_thinking() {
             let client = client.clone();
             let get_weather = get_weather.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_text("What's the weather in Tokyo?")
                     .with_function(get_weather)
                     // Note: NO with_thinking_level() call
-                    .with_store(true)
                     .create()
                     .await
             }
@@ -1940,9 +1853,7 @@ async fn test_function_calling_without_thinking() {
             let get_weather = get_weather.clone();
             let function_result = function_result.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                interaction_builder(&client)
                     .with_previous_interaction(&prev_id)
                     .with_content(vec![function_result])
                     .with_function(get_weather)
@@ -2042,13 +1953,10 @@ async fn test_streaming_with_thinking_and_function_calling() {
     // =========================================================================
     println!("=== Turn 1: Streaming with thinking + function call ===");
 
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = stateful_builder(&client)
         .with_text("What's the weather in Tokyo? I need to know if I should bring an umbrella.")
         .with_function(get_weather.clone())
         .with_thinking_level(ThinkingLevel::Medium)
-        .with_store(true)
         .create_stream();
 
     let result = consume_stream(stream).await;
@@ -2130,14 +2038,11 @@ async fn test_streaming_with_thinking_and_function_calling() {
         }),
     );
 
-    let stream2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream2 = stateful_builder(&client)
         .with_previous_interaction(&response1.id)
         .with_content(vec![function_result])
         .with_function(get_weather)
         .with_thinking_level(ThinkingLevel::Medium)
-        .with_store(true)
         .create_stream();
 
     let result2 = consume_stream(stream2).await;
@@ -2202,9 +2107,7 @@ async fn test_streaming_with_thinking_only() {
 
     println!("=== Streaming with thinking (no function calling) ===");
 
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = stateful_builder(&client)
         .with_text("Explain briefly why the sky is blue.")
         .with_thinking_level(ThinkingLevel::Medium)
         .create_stream();
@@ -2278,14 +2181,11 @@ async fn test_google_search_multi_turn() {
 
     // Turn 1: Ask about current weather (requires real-time data)
     println!("\n--- Turn 1: Initial search query ---");
-    let result1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result1 = stateful_builder(&client)
         .with_text(
             "What is the current weather in Tokyo, Japan today? Use search to find current data.",
         )
         .with_google_search()
-        .with_store(true)
         .create()
         .await;
 
@@ -2329,12 +2229,9 @@ async fn test_google_search_multi_turn() {
     // Turn 2: Ask follow-up referencing the search results
     println!("\n--- Turn 2: Follow-up about search ---");
     let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
-        client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        stateful_builder(&client)
             .with_previous_interaction(&response1.id)
             .with_text("Based on the weather information you just found, should I bring an umbrella if I visit Tokyo today?")
-            .with_store(true)
             .create()
             .await
     })
@@ -2402,14 +2299,11 @@ async fn test_url_context_multi_turn() {
 
     // Turn 1: Fetch example.com content
     println!("\n--- Turn 1: Fetch URL content ---");
-    let result1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result1 = stateful_builder(&client)
         .with_text(
             "Fetch and summarize the main content from https://example.com using URL context.",
         )
         .with_url_context()
-        .with_store(true)
         .create()
         .await;
 
@@ -2454,9 +2348,7 @@ async fn test_url_context_multi_turn() {
     // Turn 2: Ask follow-up about the fetched content
     println!("\n--- Turn 2: Follow-up about URL content ---");
     let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
-        client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        interaction_builder(&client)
             .with_previous_interaction(&response1.id)
             .with_text("What is the main purpose of that website you just fetched? Is it a real company or an example domain?")
             .create()
@@ -2526,12 +2418,9 @@ async fn test_code_execution_multi_turn() {
     // Turn 1: Calculate factorial of 5
     println!("\n--- Turn 1: Calculate factorial ---");
     let result1 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
-        client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        stateful_builder(&client)
             .with_text("Calculate the factorial of 5 using code execution. Return just the number.")
             .with_code_execution()
-            .with_store(true)
             .create()
             .await
     })
@@ -2574,15 +2463,12 @@ async fn test_code_execution_multi_turn() {
     // Turn 2: Multiply the result by 2
     println!("\n--- Turn 2: Multiply result by 2 ---");
     let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
-        client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        stateful_builder(&client)
             .with_previous_interaction(&response1.id)
             .with_text(
                 "Multiply the factorial result you just calculated by 2. What is the answer?",
             )
             .with_code_execution()
-            .with_store(true)
             .create()
             .await
     })

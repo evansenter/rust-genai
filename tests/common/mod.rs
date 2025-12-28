@@ -550,7 +550,6 @@ pub const TINY_PDF_BASE64: &str = "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZ
 // =============================================================================
 
 /// Default model used across all tests.
-#[allow(dead_code)]
 pub const DEFAULT_MODEL: &str = "gemini-3-flash-preview";
 
 /// Creates a pre-configured interaction builder with the default model.
