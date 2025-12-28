@@ -224,22 +224,6 @@ This requires a custom `Deserialize` implementation. See `InteractionContent` in
   - `api_canary_tests.rs`: API compatibility checks
   - `common/`: Shared test utilities
 
-## Claude Code Configuration
-
-### Hooks (automatic)
-
-- **PostToolUse**: Auto-runs `cargo fmt` after editing Rust files
-- **SessionStart**: Verifies `GEMINI_API_KEY` and build status (`.claude/hooks/session_init.sh`)
-- **Stop**: Pre-push validation matching CI (`.claude/hooks/stop.sh`)
-
-### Skills (manual)
-
-Available via `/skill-name` in conversations:
-- **`test-full`**: Complete test suite with `--include-ignored`
-- **`review-workspace`**: Health check (cargo check, clippy, unit tests)
-- **`check-docs`**: Documentation build with warning checks
-- **`run-examples`**: Verify all examples work
-
 ## CI/CD
 
 GitHub Actions (`.github/workflows/rust.yml`) runs 6 parallel jobs: check, test, test-integration, fmt, clippy, doc. Integration tests require same-repo origin (protects API key). CI runs on all PRs regardless of file type.
