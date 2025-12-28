@@ -880,34 +880,69 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     arguments,
                 } => {
                     // Prefer direct fields, fall back to parsing arguments
-                    let (lang, source) = if let (Some(l), Some(c)) = (language, code) {
-                        (l, c)
+                    if let (Some(lang), Some(source)) = (language, code) {
+                        InteractionContent::CodeExecutionCall {
+                            id,
+                            language: lang,
+                            code: source,
+                        }
                     } else if let Some(args) = arguments {
                         // Parse old format: {"language": "PYTHON", "code": "..."}
-                        let lang = args
-                            .get("language")
-                            .and_then(|v| {
-                                serde_json::from_value::<CodeExecutionLanguage>(v.clone()).ok()
-                            })
-                            .unwrap_or(CodeExecutionLanguage::Python);
-                        let source = args
-                            .get("code")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string();
-                        (lang, source)
+                        // Code is required - if missing, treat as Unknown per Evergreen philosophy
+                        let source = match args.get("code").and_then(|v| v.as_str()) {
+                            Some(code) => code.to_string(),
+                            None => {
+                                log::warn!(
+                                    "CodeExecutionCall arguments missing required 'code' field for id: {}. \
+                                     Treating as Unknown variant to preserve data for debugging.",
+                                    id
+                                );
+                                return Ok(InteractionContent::Unknown {
+                                    content_type: "code_execution_call".to_string(),
+                                    data: value.clone(),
+                                });
+                            }
+                        };
+
+                        // Language defaults to Python if missing or malformed (most common case)
+                        let lang = match args.get("language") {
+                            Some(lang_value) => {
+                                match serde_json::from_value::<CodeExecutionLanguage>(
+                                    lang_value.clone(),
+                                ) {
+                                    Ok(lang) => lang,
+                                    Err(e) => {
+                                        log::warn!(
+                                            "CodeExecutionCall has invalid language value for id: {}, \
+                                             defaulting to Python. Parse error: {}",
+                                            id,
+                                            e
+                                        );
+                                        CodeExecutionLanguage::Python
+                                    }
+                                }
+                            }
+                            None => CodeExecutionLanguage::Python,
+                        };
+
+                        InteractionContent::CodeExecutionCall {
+                            id,
+                            language: lang,
+                            code: source,
+                        }
                     } else {
+                        // Malformed CodeExecutionCall - treat as Unknown to preserve data
+                        // per Evergreen philosophy (see CLAUDE.md). This avoids silently
+                        // degrading to an empty code string which could cause subtle bugs.
                         log::warn!(
-                            "CodeExecutionCall missing both direct fields and arguments for id: {}",
+                            "CodeExecutionCall missing both direct fields and arguments for id: {}. \
+                             Treating as Unknown variant to preserve data for debugging.",
                             id
                         );
-                        (CodeExecutionLanguage::Python, String::new())
-                    };
-
-                    InteractionContent::CodeExecutionCall {
-                        id,
-                        language: lang,
-                        code: source,
+                        InteractionContent::Unknown {
+                            content_type: "code_execution_call".to_string(),
+                            data: value.clone(),
+                        }
                     }
                 }
                 KnownContent::CodeExecutionResult {
