@@ -70,11 +70,8 @@ pub fn is_transient_error(err: &GenaiError) -> bool {
 ///
 /// ```ignore
 /// let response = retry_on_transient(3, || async {
-///     client
-///         .interaction()
-///         .with_model("gemini-3-flash-preview")
+///     stateful_builder(&client)
 ///         .with_text("Hello")
-///         .with_store(true)
 ///         .create()
 ///         .await
 /// }).await.expect("Request failed after retries");
@@ -165,8 +162,7 @@ pub const EXTENDED_TEST_TIMEOUT: Duration = Duration::from_secs(120);
 ///
 ///     with_timeout(TEST_TIMEOUT, async {
 ///         // test logic that might hang
-///         let response = client.interaction()
-///             .with_model("gemini-3-flash-preview")
+///         let response = interaction_builder(&client)
 ///             .with_text("Hello")
 ///             .create()
 ///             .await
@@ -330,8 +326,7 @@ impl StreamResult {
 /// # Example
 ///
 /// ```ignore
-/// let stream = client.interaction()
-///     .with_model("gemini-3-flash-preview")
+/// let stream = interaction_builder(&client)
 ///     .with_text("Hello")
 ///     .create_stream();
 ///
