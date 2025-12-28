@@ -18,7 +18,7 @@
 
 mod common;
 
-use common::get_client;
+use common::{get_client, interaction_builder, stateful_builder};
 use rust_genai::{GenerationConfig, InteractionStatus, ThinkingLevel, Tool};
 use serde_json::json;
 
@@ -35,14 +35,11 @@ async fn test_google_search() {
         return;
     };
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_text(
             "What is the current weather in New York City today? Use search to find current data.",
         )
         .with_google_search() // Use convenience method
-        .with_store(true)
         .create()
         .await;
 
@@ -105,9 +102,7 @@ async fn test_google_search_streaming() {
         return;
     };
 
-    let mut stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let mut stream = interaction_builder(&client)
         .with_text("What's the latest news about Rust programming language?")
         .with_google_search()
         .create_stream();
@@ -170,12 +165,9 @@ async fn test_code_execution() {
         return;
     };
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_text("Calculate the factorial of 10 using Python code execution.")
         .with_code_execution() // Use the new convenience method
-        .with_store(true)
         .create()
         .await;
 
@@ -268,9 +260,7 @@ async fn test_code_execution_complex() {
         return;
     };
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = interaction_builder(&client)
         .with_text(
             "Using Python, calculate the sum of the first 100 prime numbers. Execute the code to get the answer.",
         )
@@ -313,9 +303,7 @@ async fn test_code_execution_streaming() {
         return;
     };
 
-    let mut stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let mut stream = interaction_builder(&client)
         .with_text("Calculate 15 factorial using Python code execution.")
         .with_code_execution()
         .create_stream();
@@ -416,9 +404,7 @@ async fn test_url_context() {
         return;
     };
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_text(
             "Fetch and summarize the main content from https://example.com using URL context.",
         )
@@ -481,9 +467,7 @@ async fn test_url_context_streaming() {
         return;
     };
 
-    let mut stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let mut stream = interaction_builder(&client)
         .with_text("Fetch https://example.com and describe the page structure.")
         .with_url_context()
         .create_stream();
@@ -566,12 +550,9 @@ async fn test_structured_output() {
         "required": ["name", "age", "email"]
     });
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_text("Generate a fake user profile with a name, age, and email address.")
         .with_response_format(schema)
-        .with_store(true)
         .create()
         .await;
 
@@ -621,12 +602,9 @@ async fn test_structured_output_enum() {
         "required": ["sentiment", "confidence"]
     });
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_text("Analyze the sentiment of: 'I love this product, it's amazing!'")
         .with_response_format(schema)
-        .with_store(true)
         .create()
         .await;
 
@@ -685,13 +663,10 @@ async fn test_structured_output_with_google_search() {
         "required": ["answer"]
     });
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_text("What is the current population of Tokyo, Japan?")
         .with_google_search()
         .with_response_format(schema)
-        .with_store(true)
         .create()
         .await;
 
@@ -742,13 +717,10 @@ async fn test_structured_output_with_url_context() {
         "required": ["title", "description"]
     });
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_text("Analyze the page at https://example.com and extract metadata.")
         .with_url_context()
         .with_response_format(schema)
-        .with_store(true)
         .create()
         .await;
 
@@ -818,12 +790,9 @@ async fn test_structured_output_nested() {
         "required": ["company", "employees"]
     });
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_text("Generate data for a fictional tech startup called 'CloudAI' founded in 2023 with 3 employees: a CEO, CTO, and designer.")
         .with_response_format(schema)
-        .with_store(true)
         .create()
         .await;
 
@@ -887,9 +856,7 @@ async fn test_structured_output_streaming() {
         "required": ["color", "hex_code"]
     });
 
-    let mut stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let mut stream = interaction_builder(&client)
         .with_text("Describe the color blue with its hex code and RGB values.")
         .with_response_format(schema)
         .create_stream();
@@ -1026,12 +993,9 @@ async fn test_generation_config_thinking_level_minimal() {
         thinking_level: Some(ThinkingLevel::Minimal),
     };
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_text("What is 2 + 2?")
         .with_generation_config(config)
-        .with_store(true)
         .create()
         .await
         .expect("Minimal thinking interaction failed");
@@ -1060,12 +1024,9 @@ async fn test_generation_config_thinking_level_high() {
         thinking_level: Some(ThinkingLevel::High),
     };
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_text("Explain step by step how to solve: If x + 3 = 7, what is x?")
         .with_generation_config(config)
-        .with_store(true)
         .create()
         .await
         .expect("High thinking interaction failed");
@@ -1106,12 +1067,9 @@ async fn test_generation_config_top_p() {
         thinking_level: None,
     };
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_text("What is the capital of France? Answer in one word.")
         .with_generation_config(config)
-        .with_store(true)
         .create()
         .await
         .expect("Top-p interaction failed");
@@ -1143,12 +1101,9 @@ async fn test_generation_config_top_k() {
         thinking_level: None,
     };
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_text("What is 10 + 5? Answer with just the number.")
         .with_generation_config(config)
-        .with_store(true)
         .create()
         .await;
 
@@ -1199,12 +1154,9 @@ async fn test_generation_config_combined() {
         thinking_level: Some(ThinkingLevel::Medium),
     };
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_text("Write a haiku about programming.")
         .with_generation_config(config)
-        .with_store(true)
         .create()
         .await
         .expect("Combined config interaction failed");
@@ -1255,12 +1207,9 @@ async fn test_structured_output_multi_turn() {
     });
 
     println!("\n--- Turn 1: Generate user profile ---");
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response1 = stateful_builder(&client)
         .with_text("Create a user profile for a software developer. Choose any name and age you like. Output as JSON.")
         .with_response_format(schema1)
-        .with_store(true)
         .create()
         .await
         .expect("Turn 1 should succeed");
@@ -1296,13 +1245,10 @@ async fn test_structured_output_multi_turn() {
     });
 
     println!("\n--- Turn 2: Extend profile ---");
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response2 = stateful_builder(&client)
         .with_previous_interaction(&response1.id)
         .with_text("Based on the user profile you just created, output a new JSON with the original name and age, plus add an email address and occupation that fits the profile.")
         .with_response_format(schema2)
-        .with_store(true)
         .create()
         .await
         .expect("Turn 2 should succeed");

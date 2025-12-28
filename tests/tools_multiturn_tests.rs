@@ -13,7 +13,7 @@
 
 mod common;
 
-use common::{DEFAULT_MAX_RETRIES, get_client, retry_on_transient};
+use common::{DEFAULT_MAX_RETRIES, get_client, retry_on_transient, stateful_builder};
 use rust_genai::InteractionStatus;
 
 /// Checks if an error is a known API limitation for long conversation chains.
@@ -49,9 +49,7 @@ async fn test_google_search_multi_turn() {
 
     // Turn 1: Ask about current weather (requires real-time data)
     println!("\n--- Turn 1: Initial search query ---");
-    let result1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result1 = stateful_builder(&client)
         .with_text(
             "What is the current weather in Tokyo, Japan today? Use search to find current data.",
         )
@@ -100,9 +98,7 @@ async fn test_google_search_multi_turn() {
     // Turn 2: Ask follow-up referencing the search results
     println!("\n--- Turn 2: Follow-up about search ---");
     let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
-        client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        stateful_builder(&client)
             .with_previous_interaction(&response1.id)
             .with_text("Based on the weather information you just found, should I bring an umbrella if I visit Tokyo today?")
             .with_store(true)
@@ -173,9 +169,7 @@ async fn test_url_context_multi_turn() {
 
     // Turn 1: Fetch example.com content
     println!("\n--- Turn 1: Fetch URL content ---");
-    let result1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result1 = stateful_builder(&client)
         .with_text(
             "Fetch and summarize the main content from https://example.com using URL context.",
         )
@@ -225,9 +219,7 @@ async fn test_url_context_multi_turn() {
     // Turn 2: Ask follow-up about the fetched content
     println!("\n--- Turn 2: Follow-up about URL content ---");
     let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
-        client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        stateful_builder(&client)
             .with_previous_interaction(&response1.id)
             .with_text("What is the main purpose of that website you just fetched? Is it a real company or an example domain?")
             .create()
@@ -297,9 +289,7 @@ async fn test_code_execution_multi_turn() {
     // Turn 1: Calculate factorial of 5
     println!("\n--- Turn 1: Calculate factorial ---");
     let result1 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
-        client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        stateful_builder(&client)
             .with_text("Calculate the factorial of 5 using code execution. Return just the number.")
             .with_code_execution()
             .with_store(true)
@@ -345,9 +335,7 @@ async fn test_code_execution_multi_turn() {
     // Turn 2: Multiply the result by 2
     println!("\n--- Turn 2: Multiply result by 2 ---");
     let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
-        client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        stateful_builder(&client)
             .with_previous_interaction(&response1.id)
             .with_text(
                 "Multiply the factorial result you just calculated by 2. What is the answer?",

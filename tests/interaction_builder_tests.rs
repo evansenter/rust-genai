@@ -2,6 +2,9 @@
 //!
 //! This file contains tests for InteractionBuilder edge cases and validation.
 
+mod common;
+
+use common::DEFAULT_MODEL;
 use genai_client::{GenerationConfig, InteractionContent, InteractionInput, ThinkingLevel};
 use rust_genai::{Client, FunctionDeclaration, detect_mime_type};
 use serde_json::json;
@@ -30,7 +33,7 @@ fn test_interaction_builder_with_complex_content_input() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_input(complex_input);
 
     // Verify the builder stored the complex input correctly
@@ -54,7 +57,7 @@ fn test_interaction_builder_with_both_model_and_agent_set() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_agent("my-agent")
         .with_text("Hello");
 
@@ -73,7 +76,7 @@ fn test_interaction_builder_with_very_long_text() {
 
     let _builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text(&long_text);
 
     // Builder accepts large text inputs without size validation
@@ -88,7 +91,7 @@ fn test_interaction_builder_with_unicode_and_emojis() {
 
     let _builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text(unicode_text);
 
     // Builder handles Unicode and multi-byte characters correctly
@@ -99,10 +102,7 @@ fn test_interaction_builder_with_empty_text() {
     // Test with empty string input
     let client = Client::new("test-api-key".to_string());
 
-    let _builder = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("");
+    let _builder = client.interaction().with_model(DEFAULT_MODEL).with_text("");
 
     // Builder allows empty string inputs without validation
 }
@@ -114,7 +114,7 @@ fn test_interaction_builder_with_multiple_functions() {
 
     let mut builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Test");
 
     // Add 10 functions
@@ -145,7 +145,7 @@ fn test_interaction_builder_with_complex_generation_config() {
 
     let _builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Test")
         .with_generation_config(config);
 
@@ -180,7 +180,7 @@ fn test_interaction_builder_with_response_format_json_schema() {
 
     let _builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Generate a person")
         .with_response_format(complex_schema);
 
@@ -206,7 +206,7 @@ fn test_interaction_builder_with_all_features_combined() {
 
     let _builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Complex query")
         .with_system_instruction("Be helpful")
         .with_function(func)
@@ -225,7 +225,7 @@ fn test_interaction_builder_method_chaining() {
 
     let _builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Test 1")
         .with_text("Test 2") // Overwrites previous text
         .with_system_instruction("Instruction 1")
@@ -245,7 +245,7 @@ fn test_interaction_builder_validation_missing_input() {
     // Verify that build_request fails when no input is provided
     let client = Client::new("test-api-key".to_string());
 
-    let builder = client.interaction().with_model("gemini-3-flash-preview");
+    let builder = client.interaction().with_model(DEFAULT_MODEL);
 
     let result = builder.build_request();
 
@@ -285,14 +285,14 @@ fn test_interaction_builder_validation_success_with_model() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Hello");
 
     let result = builder.build_request();
     assert!(result.is_ok());
 
     let request = result.unwrap();
-    assert_eq!(request.model.as_deref(), Some("gemini-3-flash-preview"));
+    assert_eq!(request.model.as_deref(), Some(DEFAULT_MODEL));
     assert!(request.agent.is_none());
 }
 
@@ -305,7 +305,7 @@ fn test_interaction_builder_with_google_search() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("What's the weather today?")
         .with_google_search();
 
@@ -334,7 +334,7 @@ fn test_interaction_builder_with_google_search_and_functions() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("What's the weather today?")
         .with_function(func)
         .with_google_search();
@@ -361,7 +361,7 @@ fn test_interaction_builder_with_code_execution() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Calculate the factorial of 10")
         .with_code_execution();
 
@@ -386,7 +386,7 @@ fn test_interaction_builder_with_code_execution_and_google_search() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Search for prime numbers and calculate the first 10")
         .with_code_execution()
         .with_google_search();
@@ -413,7 +413,7 @@ fn test_interaction_builder_with_url_context() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Summarize the content from https://example.com")
         .with_url_context();
 
@@ -441,7 +441,7 @@ fn test_interaction_builder_with_url_context_and_functions() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Fetch and analyze https://example.com")
         .with_function(func)
         .with_url_context();
@@ -509,10 +509,7 @@ fn test_interaction_builder_empty_text_allowed() {
     // Verify that empty text is allowed (API will validate)
     let client = Client::new("test-api-key".to_string());
 
-    let builder = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("");
+    let builder = client.interaction().with_model(DEFAULT_MODEL).with_text("");
 
     let result = builder.build_request();
     // Empty text should be accepted at builder level
@@ -526,7 +523,7 @@ fn test_interaction_builder_previous_interaction_id() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Continue conversation")
         .with_previous_interaction("prev-interaction-123");
 
@@ -551,7 +548,7 @@ fn test_interaction_builder_max_function_call_loops() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Call functions")
         .with_function(func)
         .with_max_function_call_loops(5);
@@ -570,7 +567,7 @@ fn test_interaction_builder_all_three_tools_combined() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Use all tools")
         .with_google_search()
         .with_code_execution()
@@ -614,7 +611,7 @@ fn test_add_image_data_creates_content_from_empty() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .add_image_data("base64data", "image/jpeg");
 
     let result = builder.build_request();
@@ -642,7 +639,7 @@ fn test_add_image_data_converts_text_to_content() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Analyze this image")
         .add_image_data("base64data", "image/png");
 
@@ -677,7 +674,7 @@ fn test_multiple_add_calls_accumulate() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .add_image_data("img1", "image/jpeg")
         .add_image_data("img2", "image/png")
         .add_audio_data("audio1", "audio/mp3");
@@ -705,7 +702,7 @@ fn test_add_methods_after_with_content() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_content(initial_content)
         .add_image_data("imagedata", "image/gif");
 
@@ -727,7 +724,7 @@ fn test_add_image_uri_works() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Describe this image")
         .add_image_uri("gs://bucket/image.jpg", "image/jpeg");
 
@@ -755,7 +752,7 @@ fn test_add_audio_data_works() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .add_audio_data("audiodata", "audio/wav");
 
     let result = builder.build_request();
@@ -781,7 +778,7 @@ fn test_add_video_data_works() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .add_video_data("videodata", "video/mp4");
 
     let result = builder.build_request();
@@ -807,7 +804,7 @@ fn test_add_document_data_works() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .add_document_data("pdfdata", "application/pdf");
 
     let result = builder.build_request();
@@ -833,7 +830,7 @@ fn test_add_document_uri_works() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Summarize this document")
         .add_document_uri("gs://bucket/report.pdf", "application/pdf");
 
@@ -860,7 +857,7 @@ fn test_add_audio_uri_works() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Describe this audio")
         .add_audio_uri("gs://bucket/audio.mp3", "audio/mp3");
 
@@ -888,7 +885,7 @@ fn test_add_video_uri_works() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Describe this video")
         .add_video_uri("gs://bucket/video.mp4", "video/mp4");
 
@@ -931,7 +928,7 @@ fn test_add_methods_combine_with_all_builder_features() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("Analyze this image and describe it")
         .add_image_data("imagedata", "image/jpeg")
         .with_system_instruction("Be descriptive")
@@ -973,7 +970,7 @@ fn test_add_methods_order_preserves_sequence() {
 
     let builder = client
         .interaction()
-        .with_model("gemini-3-flash-preview")
+        .with_model(DEFAULT_MODEL)
         .with_text("First")
         .add_image_data("second", "image/jpeg")
         .add_audio_data("third", "audio/mp3")

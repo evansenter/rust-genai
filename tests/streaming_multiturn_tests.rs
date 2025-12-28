@@ -13,7 +13,7 @@
 
 mod common;
 
-use common::{DEFAULT_MAX_RETRIES, consume_stream, get_client, retry_on_transient};
+use common::{DEFAULT_MAX_RETRIES, consume_stream, get_client, retry_on_transient, stateful_builder};
 use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 
@@ -37,9 +37,7 @@ async fn test_streaming_multi_turn_basic() {
         retry_on_transient(DEFAULT_MAX_RETRIES, || {
             let client = client.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_text(
                         "My favorite programming language is Python. Please acknowledge this.",
                     )
@@ -56,9 +54,7 @@ async fn test_streaming_multi_turn_basic() {
     assert_eq!(response1.status, InteractionStatus::Completed);
 
     // Turn 2: Stream a question that requires context from Turn 1
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = stateful_builder(&client)
         .with_previous_interaction(&response1.id)
         .with_text("What is my favorite programming language? Answer in one word.")
         .with_store(true)
@@ -115,9 +111,7 @@ async fn test_streaming_multi_turn_function_calling() {
             let client = client.clone();
             let get_weather = get_weather.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_text("What's the weather in Paris?")
                     .with_function(get_weather)
                     .with_store(true)
@@ -157,9 +151,7 @@ async fn test_streaming_multi_turn_function_calling() {
             let result = result.clone();
             let get_weather = get_weather.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
+                stateful_builder(&client)
                     .with_previous_interaction(&prev_id)
                     .with_content(vec![result])
                     .with_function(get_weather)
@@ -178,9 +170,7 @@ async fn test_streaming_multi_turn_function_calling() {
     }
 
     // Turn 3: Stream a follow-up question about the weather context
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = stateful_builder(&client)
         .with_previous_interaction(&response2.id)
         .with_text("Should I bring an umbrella? Answer briefly.")
         .with_function(get_weather)

@@ -21,7 +21,7 @@ mod common;
 use common::{
     SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TEST_TIMEOUT, TINY_BLUE_PNG_BASE64,
     TINY_MP4_BASE64, TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, consume_stream,
-    get_client, with_timeout,
+    get_client, interaction_builder, stateful_builder, with_timeout,
 };
 use rust_genai::{
     InteractionInput, InteractionStatus, audio_data_content, audio_uri_content,
@@ -50,11 +50,8 @@ async fn test_image_input_gcs_uri_unsupported() {
         image_uri_content(SAMPLE_IMAGE_URL, "image/jpeg"),
     ];
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_input(InteractionInput::Content(contents))
-        .with_store(true)
         .create()
         .await;
 
@@ -96,11 +93,8 @@ async fn test_image_input_from_base64() {
         image_data_content(TINY_RED_PNG_BASE64, "image/png"),
     ];
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_input(InteractionInput::Content(contents))
-        .with_store(true)
         .create()
         .await
         .expect("Base64 image interaction failed");
@@ -135,11 +129,8 @@ async fn test_multiple_images_single_request() {
         image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
     ];
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_input(InteractionInput::Content(contents))
-        .with_store(true)
         .create()
         .await
         .expect("Multiple images interaction failed");
@@ -176,11 +167,8 @@ async fn test_image_with_follow_up_question() {
             image_data_content(TINY_RED_PNG_BASE64, "image/png"),
         ];
 
-        let response1 = client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        let response1 = stateful_builder(&client)
             .with_input(InteractionInput::Content(contents))
-            .with_store(true)
             .create()
             .await
             .expect("First interaction failed");
@@ -189,12 +177,9 @@ async fn test_image_with_follow_up_question() {
         println!("First response: {:?}", response1.text());
 
         // Second turn: ask follow-up about the same image
-        let response2 = client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        let response2 = stateful_builder(&client)
             .with_previous_interaction(&response1.id)
             .with_text("Is that a warm or cool color?")
-            .with_store(true)
             .create()
             .await
             .expect("Follow-up interaction failed");
@@ -234,11 +219,8 @@ async fn test_audio_input_from_uri() {
         audio_uri_content(SAMPLE_AUDIO_URL, "audio/mpeg"),
     ];
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_input(InteractionInput::Content(contents))
-        .with_store(true)
         .create()
         .await;
 
@@ -278,11 +260,8 @@ async fn test_audio_input_from_base64() {
         rust_genai::audio_data_content(TINY_WAV_BASE64, "audio/wav"),
     ];
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_input(InteractionInput::Content(contents))
-        .with_store(true)
         .create()
         .await;
 
@@ -324,11 +303,8 @@ async fn test_video_input_from_uri() {
         video_uri_content(SAMPLE_VIDEO_URL, "video/mp4"),
     ];
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_input(InteractionInput::Content(contents))
-        .with_store(true)
         .create()
         .await;
 
@@ -370,11 +346,8 @@ async fn test_video_input_from_base64() {
         video_data_content(TINY_MP4_BASE64, "video/mp4"),
     ];
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_input(InteractionInput::Content(contents))
-        .with_store(true)
         .create()
         .await;
 
@@ -417,11 +390,8 @@ async fn test_multimodal_text_and_image_interleaved() {
         text_content("Based on the color above, what emotion might it represent?"),
     ];
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_input(InteractionInput::Content(contents))
-        .with_store(true)
         .create()
         .await
         .expect("Interleaved content interaction failed");
@@ -464,11 +434,8 @@ async fn test_multimodal_comparison() {
         image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
     ];
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_input(InteractionInput::Content(contents))
-        .with_store(true)
         .create()
         .await
         .expect("Comparison interaction failed");
@@ -523,11 +490,8 @@ async fn test_mixed_image_and_audio() {
         audio_data_content(TINY_WAV_BASE64, "audio/wav"),
     ];
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_input(InteractionInput::Content(contents))
-        .with_store(true)
         .create()
         .await;
 
@@ -606,11 +570,8 @@ async fn test_mixed_image_audio_video() {
         video_data_content(TINY_MP4_BASE64, "video/mp4"),
     ];
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_input(InteractionInput::Content(contents))
-        .with_store(true)
         .create()
         .await;
 
@@ -659,11 +620,8 @@ async fn test_pdf_document_input_from_base64() {
         document_data_content(TINY_PDF_BASE64, "application/pdf"),
     ];
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_input(InteractionInput::Content(contents))
-        .with_store(true)
         .create()
         .await;
 
@@ -708,11 +666,8 @@ async fn test_pdf_with_question() {
         text_content("Is this a valid PDF? What can you tell me about its structure?"),
     ];
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = stateful_builder(&client)
         .with_input(InteractionInput::Content(contents))
-        .with_store(true)
         .create()
         .await;
 
@@ -763,11 +718,8 @@ async fn test_multimodal_streaming() {
         ];
 
         // Stream the response using with_input for multimodal content
-        let stream = client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        let stream = interaction_builder(&client)
             .with_input(InteractionInput::Content(contents))
-            .with_store(true)
             .create_stream();
 
         let result = consume_stream(stream).await;

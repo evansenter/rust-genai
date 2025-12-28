@@ -13,7 +13,7 @@
 
 mod common;
 
-use common::{DEFAULT_MAX_RETRIES, get_client, retry_on_transient};
+use common::{DEFAULT_MAX_RETRIES, get_client, retry_on_transient, stateful_builder};
 use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 
@@ -72,11 +72,7 @@ async fn test_very_long_conversation() {
 
     // Build up context over 10 turns
     for (i, fact) in facts.iter().enumerate() {
-        let mut builder = client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
-            .with_text(*fact)
-            .with_store(true);
+        let mut builder = stateful_builder(&client).with_text(*fact);
 
         if let Some(ref prev_id) = previous_id {
             builder = builder.with_previous_interaction(prev_id);
@@ -114,12 +110,9 @@ async fn test_very_long_conversation() {
     }
 
     // Final turn: ask about everything
-    let final_result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let final_result = stateful_builder(&client)
         .with_previous_interaction(previous_id.as_ref().unwrap())
         .with_text("What do you know about me? List everything you can remember.")
-        .with_store(true)
         .create()
         .await;
 
@@ -207,12 +200,9 @@ async fn test_conversation_function_then_text() {
         .build();
 
     // Turn 1: Trigger function call
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response1 = stateful_builder(&client)
         .with_text("What's the weather in Tokyo?")
         .with_function(get_weather.clone())
-        .with_store(true)
         .create()
         .await
         .expect("Turn 1 failed");
@@ -234,13 +224,10 @@ async fn test_conversation_function_then_text() {
         json!({"temperature": "25°C", "conditions": "sunny"}),
     );
 
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_previous_interaction(&response1.id)
+    let response2 = stateful_builder(&client).with_previous_interaction(&response1.id)
         .with_content(vec![result])
         .with_function(get_weather.clone())
-        .with_store(true)
+        
         .create()
         .await
         .expect("Turn 2 failed");
@@ -251,13 +238,10 @@ async fn test_conversation_function_then_text() {
     }
 
     // Turn 3: Follow-up text question (no function call expected)
-    let response3 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_previous_interaction(&response2.id)
+    let response3 = stateful_builder(&client).with_previous_interaction(&response2.id)
         .with_text("Should I bring a jacket?")
         .with_function(get_weather)
-        .with_store(true)
+        
         .create()
         .await
         .expect("Turn 3 failed");
@@ -303,11 +287,8 @@ async fn test_conversation_branch() {
         retry_on_transient(DEFAULT_MAX_RETRIES, || {
             let client = client.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
-                    .with_text("My favorite color is red.")
-                    .with_store(true)
+                stateful_builder(&client).with_text("My favorite color is red.")
+                    
                     .create()
                     .await
             }
@@ -323,12 +304,9 @@ async fn test_conversation_branch() {
             let client = client.clone();
             let prev_id = prev_id.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
-                    .with_previous_interaction(&prev_id)
+                stateful_builder(&client).with_previous_interaction(&prev_id)
                     .with_text("My favorite number is 7.")
-                    .with_store(true)
+                    
                     .create()
                     .await
             }
@@ -344,12 +322,9 @@ async fn test_conversation_branch() {
             let client = client.clone();
             let prev_id = prev_id.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
-                    .with_previous_interaction(&prev_id)
+                stateful_builder(&client).with_previous_interaction(&prev_id)
                     .with_text("My favorite animal is a cat.")
-                    .with_store(true)
+                    
                     .create()
                     .await
             }
@@ -366,12 +341,9 @@ async fn test_conversation_branch() {
             let client = client.clone();
             let prev_id = prev_id.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
-                    .with_previous_interaction(&prev_id) // Branch from turn 2
+                stateful_builder(&client).with_previous_interaction(&prev_id) // Branch from turn 2
                     .with_text("What do you know about my favorites so far?")
-                    .with_store(true)
+                    
                     .create()
                     .await
             }
@@ -409,12 +381,9 @@ async fn test_conversation_branch() {
             let client = client.clone();
             let prev_id = prev_id.clone();
             async move {
-                client
-                    .interaction()
-                    .with_model("gemini-3-flash-preview")
-                    .with_previous_interaction(&prev_id)
+                stateful_builder(&client).with_previous_interaction(&prev_id)
                     .with_text("And what's my favorite animal?")
-                    .with_store(true)
+                    
                     .create()
                     .await
             }
@@ -444,11 +413,8 @@ async fn test_usage_metadata_returned() {
         return;
     };
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("What is the capital of France? Answer briefly.")
-        .with_store(true)
+    let response = stateful_builder(&client).with_text("What is the capital of France? Answer briefly.")
+        
         .create()
         .await
         .expect("Interaction failed");
@@ -492,21 +458,15 @@ async fn test_usage_longer_response() {
     };
 
     // Short response
-    let short_response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("Say 'hello'")
-        .with_store(true)
+    let short_response = stateful_builder(&client).with_text("Say 'hello'")
+        
         .create()
         .await
         .expect("Short interaction failed");
 
     // Longer response
-    let long_response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("Write a 100-word paragraph about space exploration.")
-        .with_store(true)
+    let long_response = stateful_builder(&client).with_text("Write a 100-word paragraph about space exploration.")
+        
         .create()
         .await
         .expect("Long interaction failed");
