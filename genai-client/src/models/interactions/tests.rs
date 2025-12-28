@@ -2328,3 +2328,226 @@ fn test_interaction_response_no_url_context_results() {
     assert!(!response.has_url_context_results());
     assert!(response.url_context_results().is_empty());
 }
+
+/// Comprehensive roundtrip test for InteractionResponse with all content types.
+///
+/// This test verifies that complex responses with multiple content types,
+/// function calls, thoughts, and metadata can be serialized and deserialized
+/// without data loss. This is critical for save/resume semantics.
+#[test]
+fn test_interaction_response_complex_roundtrip() {
+    // Build a response with many different content types
+    let response = InteractionResponse {
+        id: "complex-interaction-xyz".to_string(),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![
+            InteractionContent::Text {
+                text: Some("Analyze this and call the weather function".to_string()),
+            },
+            InteractionContent::Image {
+                mime_type: Some("image/png".to_string()),
+                data: Some("base64encodeddata".to_string()),
+                uri: None,
+            },
+        ],
+        outputs: vec![
+            // Thought with signature (thinking models)
+            InteractionContent::Thought {
+                text: Some("Let me think about this request...".to_string()),
+            },
+            InteractionContent::ThoughtSignature {
+                signature: "thought-sig-abc123".to_string(),
+            },
+            // Function call
+            InteractionContent::FunctionCall {
+                id: Some("call-func-001".to_string()),
+                name: "get_weather".to_string(),
+                args: serde_json::json!({"city": "Tokyo", "units": "celsius"}),
+                thought_signature: Some("thought-sig-for-call".to_string()),
+            },
+            // Function result
+            InteractionContent::FunctionResult {
+                call_id: "call-func-001".to_string(),
+                name: "get_weather".to_string(),
+                result: serde_json::json!({"temp": 22, "conditions": "sunny"}),
+            },
+            // Code execution
+            InteractionContent::CodeExecutionCall {
+                id: "code-exec-001".to_string(),
+                language: CodeExecutionLanguage::Python,
+                code: "print(2 + 2)".to_string(),
+            },
+            InteractionContent::CodeExecutionResult {
+                call_id: "code-exec-001".to_string(),
+                outcome: CodeExecutionOutcome::Ok,
+                output: "4".to_string(),
+            },
+            // Google search
+            InteractionContent::GoogleSearchCall {
+                query: "weather in Tokyo".to_string(),
+            },
+            InteractionContent::GoogleSearchResult {
+                results: serde_json::json!({"query": "weather tokyo", "results": []}),
+            },
+            // URL context
+            InteractionContent::UrlContextCall {
+                url: "https://example.com".to_string(),
+            },
+            InteractionContent::UrlContextResult {
+                url: "https://example.com".to_string(),
+                content: Some("<html>Example content</html>".to_string()),
+            },
+            // Final text response
+            InteractionContent::Text {
+                text: Some("The weather in Tokyo is 22°C and sunny.".to_string()),
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: Some(UsageMetadata {
+            total_input_tokens: Some(150),
+            total_output_tokens: Some(200),
+            total_tokens: Some(350),
+            total_cached_tokens: Some(50),
+            total_reasoning_tokens: Some(30),
+            total_tool_use_tokens: Some(20),
+        }),
+        tools: Some(vec![crate::Tool::GoogleSearch, crate::Tool::CodeExecution]),
+        previous_interaction_id: Some("previous-interaction-abc".to_string()),
+        grounding_metadata: Some(GroundingMetadata {
+            grounding_chunks: vec![GroundingChunk {
+                web: WebSource {
+                    title: "Weather Report".to_string(),
+                    uri: "https://weather.example.com".to_string(),
+                    domain: "weather.example.com".to_string(),
+                },
+            }],
+            web_search_queries: vec!["tokyo weather".to_string()],
+        }),
+        url_context_metadata: Some(UrlContextMetadata {
+            url_metadata: vec![UrlMetadataEntry {
+                retrieved_url: "https://example.com".to_string(),
+                url_retrieval_status: UrlRetrievalStatus::UrlRetrievalStatusSuccess,
+            }],
+        }),
+    };
+
+    // Serialize to JSON
+    let json_str = serde_json::to_string(&response).expect("Serialization should succeed");
+
+    // Verify key data is present in serialized JSON
+    assert!(
+        json_str.contains("complex-interaction-xyz"),
+        "Should contain ID"
+    );
+    assert!(
+        json_str.contains("gemini-3-flash-preview"),
+        "Should contain model"
+    );
+    assert!(
+        json_str.contains("get_weather"),
+        "Should contain function name"
+    );
+    assert!(
+        json_str.contains("call-func-001"),
+        "Should contain function call ID"
+    );
+    assert!(json_str.contains("Tokyo"), "Should contain city");
+    assert!(
+        json_str.contains("thought-sig-abc123"),
+        "Should contain thought signature"
+    );
+    assert!(json_str.contains("print(2 + 2)"), "Should contain code");
+    assert!(
+        json_str.contains("weather.example.com"),
+        "Should contain grounding URI"
+    );
+    assert!(
+        json_str.contains("previous-interaction-abc"),
+        "Should contain previous ID"
+    );
+
+    // Deserialize back
+    let deserialized: InteractionResponse =
+        serde_json::from_str(&json_str).expect("Deserialization should succeed");
+
+    // Verify top-level fields
+    assert_eq!(deserialized.id, "complex-interaction-xyz");
+    assert_eq!(
+        deserialized.model,
+        Some("gemini-3-flash-preview".to_string())
+    );
+    assert_eq!(deserialized.status, InteractionStatus::Completed);
+    assert_eq!(
+        deserialized.previous_interaction_id,
+        Some("previous-interaction-abc".to_string())
+    );
+
+    // Verify input
+    assert_eq!(deserialized.input.len(), 2);
+
+    // Verify outputs have correct count
+    assert_eq!(deserialized.outputs.len(), 11);
+
+    // Verify function calls are accessible
+    let function_calls = deserialized.function_calls();
+    assert_eq!(function_calls.len(), 1);
+    assert_eq!(function_calls[0].name, "get_weather");
+    assert_eq!(function_calls[0].id, Some("call-func-001"));
+    assert_eq!(function_calls[0].args["city"], "Tokyo");
+
+    // Verify code execution results
+    let code_results = deserialized.code_execution_results();
+    assert_eq!(code_results.len(), 1);
+    assert_eq!(code_results[0].outcome, CodeExecutionOutcome::Ok);
+    assert_eq!(code_results[0].output, "4");
+
+    // Verify URL context results
+    let url_results = deserialized.url_context_results();
+    assert_eq!(url_results.len(), 1);
+    assert_eq!(url_results[0].url, "https://example.com");
+
+    // Verify usage metadata
+    let usage = deserialized.usage.expect("Should have usage");
+    assert_eq!(usage.total_input_tokens, Some(150));
+    assert_eq!(usage.total_output_tokens, Some(200));
+    assert_eq!(usage.total_tokens, Some(350));
+    assert_eq!(usage.total_cached_tokens, Some(50));
+    assert_eq!(usage.total_reasoning_tokens, Some(30));
+    assert_eq!(usage.total_tool_use_tokens, Some(20));
+
+    // Verify grounding metadata
+    let grounding = deserialized
+        .grounding_metadata
+        .expect("Should have grounding");
+    assert_eq!(grounding.grounding_chunks.len(), 1);
+    assert_eq!(grounding.grounding_chunks[0].web.title, "Weather Report");
+    assert_eq!(
+        grounding.grounding_chunks[0].web.uri,
+        "https://weather.example.com"
+    );
+    assert_eq!(
+        grounding.web_search_queries,
+        vec!["tokyo weather".to_string()]
+    );
+
+    // Verify URL context metadata
+    let url_meta = deserialized
+        .url_context_metadata
+        .expect("Should have URL metadata");
+    assert_eq!(url_meta.url_metadata.len(), 1);
+    assert_eq!(
+        url_meta.url_metadata[0].retrieved_url,
+        "https://example.com"
+    );
+    assert_eq!(
+        url_meta.url_metadata[0].url_retrieval_status,
+        UrlRetrievalStatus::UrlRetrievalStatusSuccess
+    );
+
+    // Verify tools
+    let tools = deserialized.tools.expect("Should have tools");
+    assert_eq!(tools.len(), 2);
+    assert!(matches!(tools[0], crate::Tool::GoogleSearch));
+    assert!(matches!(tools[1], crate::Tool::CodeExecution));
+}

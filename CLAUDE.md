@@ -184,10 +184,30 @@ let content: InteractionContent = serde_json::from_str(json)?;
 // If json has type "future_feature", this should NOT error
 ```
 
+### Standard Unknown Variant Pattern
+
+All enums with `Unknown` variants should use the **data-preserving pattern**:
+
+```rust
+Unknown {
+    /// The unrecognized type name from the API (field name varies by context)
+    type_name: String,  // or tool_type, chunk_type, etc.
+    /// The full JSON data, preserved for debugging and roundtrip serialization
+    data: serde_json::Value,
+}
+```
+
+This requires a custom `Deserialize` implementation. See `InteractionContent` in `content.rs` for the reference implementation.
+
+**Why not `#[serde(other)] Unknown`?** The unit variant pattern loses all data - you can't inspect what the API sent or roundtrip serialize it. Always prefer the data-preserving pattern.
+
 ### Implementation Locations
 
-- `InteractionContent` (content.rs): Has `Unknown` variant, custom deserializer
-- `Tool` (shared.rs): Has `Unknown` variant with `#[non_exhaustive]`
+- `InteractionContent` (content.rs): Has `Unknown` variant, custom deserializer ✅
+- `Tool` (shared.rs): Has `Unknown` variant, custom deserializer ✅
+- `InteractionStatus` (response.rs): Unit variant ⚠️ (see issue #181)
+- `StreamChunk` (streaming.rs): Unit variant ⚠️ (see issue #181)
+- `AutoFunctionStreamChunk` (streaming.rs): Unit variant ⚠️ (see issue #181)
 - `strict-unknown` feature flag: Optional strict mode for development/testing
 
 ## Test Organization
