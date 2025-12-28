@@ -134,10 +134,16 @@ impl<'de> Deserialize<'de> for StreamChunk {
 
         match chunk_type {
             "delta" => {
-                let data = value
-                    .get("data")
-                    .cloned()
-                    .unwrap_or(serde_json::Value::Null);
+                let data = match value.get("data").cloned() {
+                    Some(d) => d,
+                    None => {
+                        log::warn!(
+                            "StreamChunk::Delta is missing the 'data' field. \
+                             This may indicate a malformed API response."
+                        );
+                        serde_json::Value::Null
+                    }
+                };
                 let content: InteractionContent = serde_json::from_value(data).map_err(|e| {
                     serde::de::Error::custom(format!(
                         "Failed to deserialize StreamChunk::Delta data: {}",
@@ -147,10 +153,16 @@ impl<'de> Deserialize<'de> for StreamChunk {
                 Ok(Self::Delta(content))
             }
             "complete" => {
-                let data = value
-                    .get("data")
-                    .cloned()
-                    .unwrap_or(serde_json::Value::Null);
+                let data = match value.get("data").cloned() {
+                    Some(d) => d,
+                    None => {
+                        log::warn!(
+                            "StreamChunk::Complete is missing the 'data' field. \
+                             This may indicate a malformed API response."
+                        );
+                        serde_json::Value::Null
+                    }
+                };
                 let response: InteractionResponse = serde_json::from_value(data).map_err(|e| {
                     serde::de::Error::custom(format!(
                         "Failed to deserialize StreamChunk::Complete data: {}",

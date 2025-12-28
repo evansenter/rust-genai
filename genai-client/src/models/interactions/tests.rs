@@ -2551,3 +2551,78 @@ fn test_interaction_response_complex_roundtrip() {
     assert!(matches!(tools[0], crate::Tool::GoogleSearch));
     assert!(matches!(tools[1], crate::Tool::CodeExecution));
 }
+
+// --- InteractionStatus Unknown Variant Tests ---
+
+#[test]
+fn test_interaction_status_unknown_deserialize() {
+    // Simulate a new API status that this library doesn't know about
+    let json = r#""future_pending_state""#;
+    let status: InteractionStatus = serde_json::from_str(json).expect("Should deserialize");
+
+    assert!(status.is_unknown());
+    assert_eq!(status.unknown_status_type(), Some("future_pending_state"));
+    assert!(status.unknown_data().is_some());
+}
+
+#[test]
+fn test_interaction_status_unknown_roundtrip() {
+    // Deserialize unknown status
+    let json = r#""new_background_processing""#;
+    let status: InteractionStatus = serde_json::from_str(json).expect("Should deserialize");
+
+    assert!(status.is_unknown());
+
+    // Serialize back
+    let reserialized = serde_json::to_string(&status).expect("Should serialize");
+    assert_eq!(reserialized, r#""new_background_processing""#);
+
+    // Deserialize again to verify roundtrip
+    let status2: InteractionStatus =
+        serde_json::from_str(&reserialized).expect("Should deserialize again");
+    assert!(status2.is_unknown());
+    assert_eq!(
+        status2.unknown_status_type(),
+        Some("new_background_processing")
+    );
+}
+
+#[test]
+fn test_interaction_status_known_types_not_unknown() {
+    // Verify known types don't trigger Unknown
+    let completed: InteractionStatus =
+        serde_json::from_str(r#""completed""#).expect("Should deserialize");
+    assert!(!completed.is_unknown());
+    assert_eq!(completed.unknown_status_type(), None);
+    assert_eq!(completed.unknown_data(), None);
+
+    let in_progress: InteractionStatus =
+        serde_json::from_str(r#""in_progress""#).expect("Should deserialize");
+    assert!(!in_progress.is_unknown());
+
+    let failed: InteractionStatus =
+        serde_json::from_str(r#""failed""#).expect("Should deserialize");
+    assert!(!failed.is_unknown());
+
+    let requires_action: InteractionStatus =
+        serde_json::from_str(r#""requires_action""#).expect("Should deserialize");
+    assert!(!requires_action.is_unknown());
+}
+
+#[test]
+fn test_interaction_status_non_string_handled() {
+    // Edge case: API returns non-string (shouldn't happen but code handles it)
+    let json = r#"42"#;
+    let status: InteractionStatus = serde_json::from_str(json).expect("Should deserialize");
+
+    assert!(status.is_unknown());
+    // The status_type should indicate it was non-string
+    let status_type = status
+        .unknown_status_type()
+        .expect("Should have status_type");
+    assert!(status_type.contains("non-string"));
+
+    // The data should preserve the original value
+    let data = status.unknown_data().expect("Should have data");
+    assert_eq!(*data, serde_json::json!(42));
+}

@@ -529,4 +529,50 @@ mod tests {
             _ => panic!("Expected Unknown variant"),
         }
     }
+
+    #[test]
+    fn test_tool_unknown_helper_methods() {
+        // Test Unknown variant
+        let unknown_tool = Tool::Unknown {
+            tool_type: "future_tool".to_string(),
+            data: serde_json::json!({"type": "future_tool", "setting": 123}),
+        };
+
+        assert!(unknown_tool.is_unknown());
+        assert_eq!(unknown_tool.unknown_tool_type(), Some("future_tool"));
+        let data = unknown_tool.unknown_data().expect("Should have data");
+        assert_eq!(data.get("setting").unwrap(), 123);
+    }
+
+    #[test]
+    fn test_tool_known_types_helper_methods() {
+        // Test known types return None for unknown helpers
+        let google_search = Tool::GoogleSearch;
+        assert!(!google_search.is_unknown());
+        assert_eq!(google_search.unknown_tool_type(), None);
+        assert_eq!(google_search.unknown_data(), None);
+
+        let code_execution = Tool::CodeExecution;
+        assert!(!code_execution.is_unknown());
+        assert_eq!(code_execution.unknown_tool_type(), None);
+        assert_eq!(code_execution.unknown_data(), None);
+
+        let url_context = Tool::UrlContext;
+        assert!(!url_context.is_unknown());
+        assert_eq!(url_context.unknown_tool_type(), None);
+        assert_eq!(url_context.unknown_data(), None);
+
+        let function = Tool::Function {
+            name: "test".to_string(),
+            description: "Test function".to_string(),
+            parameters: FunctionParameters::new(
+                "object".to_string(),
+                serde_json::json!({}),
+                vec![],
+            ),
+        };
+        assert!(!function.is_unknown());
+        assert_eq!(function.unknown_tool_type(), None);
+        assert_eq!(function.unknown_data(), None);
+    }
 }

@@ -212,10 +212,16 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
 
         match chunk_type {
             "delta" => {
-                let data = value
-                    .get("data")
-                    .cloned()
-                    .unwrap_or(serde_json::Value::Null);
+                let data = match value.get("data").cloned() {
+                    Some(d) => d,
+                    None => {
+                        log::warn!(
+                            "AutoFunctionStreamChunk::Delta is missing the 'data' field. \
+                             This may indicate a malformed API response."
+                        );
+                        serde_json::Value::Null
+                    }
+                };
                 let content: InteractionContent = serde_json::from_value(data).map_err(|e| {
                     serde::de::Error::custom(format!(
                         "Failed to deserialize AutoFunctionStreamChunk::Delta data: {}",
@@ -225,10 +231,16 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 Ok(Self::Delta(content))
             }
             "executing_functions" => {
-                let data = value
-                    .get("data")
-                    .cloned()
-                    .unwrap_or(serde_json::Value::Null);
+                let data = match value.get("data").cloned() {
+                    Some(d) => d,
+                    None => {
+                        log::warn!(
+                            "AutoFunctionStreamChunk::ExecutingFunctions is missing the 'data' field. \
+                             This may indicate a malformed API response."
+                        );
+                        serde_json::Value::Null
+                    }
+                };
                 let response: InteractionResponse = serde_json::from_value(data).map_err(|e| {
                     serde::de::Error::custom(format!(
                         "Failed to deserialize AutoFunctionStreamChunk::ExecutingFunctions data: {}",
@@ -238,10 +250,16 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 Ok(Self::ExecutingFunctions(response))
             }
             "function_results" => {
-                let data = value
-                    .get("data")
-                    .cloned()
-                    .unwrap_or(serde_json::Value::Null);
+                let data = match value.get("data").cloned() {
+                    Some(d) => d,
+                    None => {
+                        log::warn!(
+                            "AutoFunctionStreamChunk::FunctionResults is missing the 'data' field. \
+                             This may indicate a malformed API response."
+                        );
+                        serde_json::Value::Null
+                    }
+                };
                 let results: Vec<FunctionExecutionResult> =
                     serde_json::from_value(data).map_err(|e| {
                         serde::de::Error::custom(format!(
@@ -252,10 +270,16 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 Ok(Self::FunctionResults(results))
             }
             "complete" => {
-                let data = value
-                    .get("data")
-                    .cloned()
-                    .unwrap_or(serde_json::Value::Null);
+                let data = match value.get("data").cloned() {
+                    Some(d) => d,
+                    None => {
+                        log::warn!(
+                            "AutoFunctionStreamChunk::Complete is missing the 'data' field. \
+                             This may indicate a malformed API response."
+                        );
+                        serde_json::Value::Null
+                    }
+                };
                 let response: InteractionResponse = serde_json::from_value(data).map_err(|e| {
                     serde::de::Error::custom(format!(
                         "Failed to deserialize AutoFunctionStreamChunk::Complete data: {}",
