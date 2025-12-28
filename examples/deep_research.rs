@@ -11,6 +11,10 @@
 //! 2. **Background mode with polling**: Starts research asynchronously and polls for
 //!    completion (recommended for long-running research tasks)
 //!
+//! **Expected runtime**: Deep research queries typically take 30-120 seconds depending
+//! on query complexity. Simple queries may complete in under 30 seconds, while complex
+//! multi-source research can take several minutes.
+//!
 //! Note: The Deep Research agent may not be available in all accounts or regions.
 //!
 //! Run with: cargo run --example deep_research
@@ -24,11 +28,22 @@ use tokio::time::sleep;
 /// Maximum time to wait for research to complete when polling
 const MAX_POLL_DURATION: Duration = Duration::from_secs(120);
 
-/// Initial delay between polls (will increase with exponential backoff)
+/// Initial delay between polls (will increase with exponential backoff).
+///
+/// Note: This is intentionally more conservative (2s) than test utilities (1s)
+/// to reduce API calls in production usage where research typically takes longer.
 const INITIAL_POLL_DELAY: Duration = Duration::from_secs(2);
 
 /// Maximum delay between polls
 const MAX_POLL_DELAY: Duration = Duration::from_secs(10);
+
+/// Maximum characters to display for synchronous mode results.
+/// Sync mode uses a shorter limit since it's the "simple" demo.
+const SYNC_DISPLAY_LIMIT: usize = 1500;
+
+/// Maximum characters to display for background mode results.
+/// Background mode shows more since it's the "full" demo with polling.
+const BACKGROUND_DISPLAY_LIMIT: usize = 2000;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -81,10 +96,10 @@ async fn synchronous_research(client: &Client, agent_name: &str) -> Result<(), B
             // 4. Display the research results
             if let Some(text) = response.text() {
                 // Truncate for display if very long
-                let display_text = if text.len() > 1500 {
+                let display_text = if text.len() > SYNC_DISPLAY_LIMIT {
                     format!(
                         "{}...\n\n[Response truncated, {} total chars]",
-                        &text[..1500],
+                        &text[..SYNC_DISPLAY_LIMIT],
                         text.len()
                     )
                 } else {
@@ -210,6 +225,11 @@ impl From<GenaiError> for PollError {
 ///
 /// This function queries the API for the interaction status, using exponential
 /// backoff to reduce API calls while still detecting completion quickly.
+///
+/// Note: This polling logic is intentionally implemented inline rather than
+/// importing from test utilities. Examples should be self-contained so users
+/// can copy them directly. Similar logic exists in `tests/common/mod.rs` for
+/// internal test use with slightly different parameters.
 async fn poll_for_completion(
     client: &Client,
     interaction_id: &str,
@@ -271,10 +291,10 @@ fn display_research_results(response: &rust_genai::InteractionResponse) {
 
     if let Some(text) = response.text() {
         // Truncate for display if very long
-        let display_text = if text.len() > 2000 {
+        let display_text = if text.len() > BACKGROUND_DISPLAY_LIMIT {
             format!(
                 "{}...\n\n[Response truncated, {} total chars]",
-                &text[..2000],
+                &text[..BACKGROUND_DISPLAY_LIMIT],
                 text.len()
             )
         } else {
