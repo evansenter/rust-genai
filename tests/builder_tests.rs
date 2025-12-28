@@ -290,17 +290,20 @@ fn test_interaction_builder_with_complex_content_input() {
 
 #[test]
 fn test_interaction_builder_with_both_model_and_agent_set() {
-    // Test that setting both model AND agent is allowed (builder doesn't validate this)
+    // Test that setting both model AND agent fails validation
     let client = Client::new("test-api-key".to_string());
 
-    let _builder = client
+    let builder = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_agent("my-agent")
         .with_text("Hello");
 
-    // Builder allows setting both model and agent without validation
-    // The API will reject this at request time, not during builder construction
+    // Builder validates that only one of model/agent can be set
+    let result = builder.build_request();
+    assert!(result.is_err());
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("Cannot specify both model"));
 }
 
 #[test]
@@ -739,25 +742,8 @@ fn test_interaction_builder_agent_overwrites_previous_agent() {
     assert_eq!(request.agent.as_deref(), Some("second-agent"));
 }
 
-#[test]
-fn test_interaction_builder_model_and_agent_both_set() {
-    // Verify that setting both model and agent works (API allows this)
-    let client = Client::new("test-api-key".to_string());
-
-    let builder = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_agent("some-agent")
-        .with_text("Hello");
-
-    let result = builder.build_request();
-    assert!(result.is_ok());
-
-    let request = result.unwrap();
-    // Both should be present
-    assert!(request.model.is_some());
-    assert!(request.agent.is_some());
-}
+// NOTE: test_interaction_builder_model_and_agent_both_set was removed
+// Setting both model and agent is now an error - tested in test_interaction_builder_with_both_model_and_agent_set
 
 #[test]
 fn test_interaction_builder_empty_text_allowed() {

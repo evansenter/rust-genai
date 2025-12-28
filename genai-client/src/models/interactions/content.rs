@@ -927,7 +927,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     InteractionContent::UrlContextResult { url, content }
                 }
             }),
-            Err(_) => {
+            Err(parse_error) => {
                 // Unknown type - extract type name and preserve data
                 let type_name = value
                     .get("type")
@@ -935,11 +935,15 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     .unwrap_or("<missing type>")
                     .to_string();
 
+                // Log the actual parse error for debugging - this helps distinguish
+                // between truly unknown types and malformed known types
                 log::warn!(
                     "Encountered unknown InteractionContent type '{}'. \
-                     This may indicate a new API feature not yet supported by this library. \
+                     Parse error: {}. \
+                     This may indicate a new API feature or a malformed response. \
                      The content will be preserved in the Unknown variant.",
-                    type_name
+                    type_name,
+                    parse_error
                 );
 
                 #[cfg(feature = "strict-unknown")]

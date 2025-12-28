@@ -1,5 +1,5 @@
 use crate::common::{Endpoint, construct_endpoint_url};
-use crate::error_helpers::check_response;
+use crate::error_helpers::{check_response, deserialize_with_context};
 use crate::errors::GenaiError;
 use crate::models::interactions::{
     CreateInteractionRequest, InteractionResponse, InteractionStreamEvent, StreamChunk,
@@ -32,7 +32,8 @@ pub async fn create_interaction(
     let response = http_client.post(&url).json(&request).send().await?;
     let response = check_response(response).await?;
     let response_text = response.text().await.map_err(GenaiError::Http)?;
-    let interaction_response: InteractionResponse = serde_json::from_str(&response_text)?;
+    let interaction_response: InteractionResponse =
+        deserialize_with_context(&response_text, "InteractionResponse from create")?;
 
     Ok(interaction_response)
 }
@@ -158,7 +159,8 @@ pub async fn get_interaction(
     let response = http_client.get(&url).send().await?;
     let response = check_response(response).await?;
     let response_text = response.text().await.map_err(GenaiError::Http)?;
-    let interaction_response: InteractionResponse = serde_json::from_str(&response_text)?;
+    let interaction_response: InteractionResponse =
+        deserialize_with_context(&response_text, "InteractionResponse from get")?;
 
     Ok(interaction_response)
 }
