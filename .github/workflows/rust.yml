@@ -42,15 +42,34 @@ jobs:
         run: cargo test --workspace --features strict-unknown --verbose
 
   test-integration:
-    name: Integration Tests
+    name: Integration Tests (${{ matrix.group }})
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: core
+            tests: "interactions_api_tests multiturn_tests streaming_multiturn_tests"
+          - group: tools
+            tests: "tools_and_config_tests tools_multiturn_tests"
+          - group: functions
+            tests: "advanced_function_calling_tests thinking_function_tests"
+          - group: multimodal
+            tests: "multimodal_tests agents_tests api_canary_tests"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Run integration tests
-        run: cargo test --workspace --verbose -- --include-ignored
+        with:
+          shared-key: integration-${{ matrix.group }}
+      - name: Run integration tests (${{ matrix.group }})
+        run: |
+          for test in ${{ matrix.tests }}; do
+            echo "::group::Running $test"
+            cargo test --test $test --verbose -- --include-ignored
+            echo "::endgroup::"
+          done
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
