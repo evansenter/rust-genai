@@ -537,7 +537,7 @@ fn test_interaction_builder_validation_success_with_model() {
     assert!(result.is_ok());
 
     let request = result.unwrap();
-    assert_eq!(request.model.as_deref(), Some("DEFAULT_MODEL"));
+    assert_eq!(request.model.as_deref(), Some(DEFAULT_MODEL));
     assert!(request.agent.is_none());
 }
 
