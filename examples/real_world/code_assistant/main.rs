@@ -247,10 +247,8 @@ impl CodeAssistant {
             .create()
             .await?;
 
-        Ok(response
-            .text()
-            .unwrap_or("Unable to generate explanation.")
-            .to_string())
+        let text = response.text().ok_or("No response text")?;
+        Ok(text.to_string())
     }
 
     /// Suggest refactoring improvements
@@ -285,10 +283,8 @@ impl CodeAssistant {
             .create()
             .await?;
 
-        Ok(response
-            .text()
-            .unwrap_or("Unable to generate suggestions.")
-            .to_string())
+        let text = response.text().ok_or("No response text")?;
+        Ok(text.to_string())
     }
 }
 
