@@ -205,12 +205,14 @@ async fn background_research_with_polling(
                     eprintln!(
                         "You can retrieve results later using interaction ID: {interaction_id}"
                     );
+                    // Include interaction_id in error message since Box<dyn Error> loses the typed variant
                     return Err(
                         format!("Research timed out (interaction: {interaction_id})").into(),
                     );
                 }
                 Err(PollError::Failed { interaction_id }) => {
                     eprintln!("\nResearch task failed (interaction: {interaction_id}).");
+                    // Include interaction_id in error message since Box<dyn Error> loses the typed variant
                     return Err(format!("Research failed (interaction: {interaction_id})").into());
                 }
                 Err(PollError::Api(e)) => {
@@ -298,17 +300,19 @@ async fn poll_for_completion(
                 // Continue polling
             }
             InteractionStatus::RequiresAction => {
-                println!("    Note: Interaction requires action (unusual for deep research)");
+                eprintln!("    Note: Interaction requires action (unusual for deep research)");
             }
             InteractionStatus::Cancelled => {
-                println!("    Interaction was cancelled");
+                eprintln!("    Interaction was cancelled");
                 return Err(PollError::Failed {
                     interaction_id: interaction_id.to_string(),
                 });
             }
             other => {
-                // Unknown or new status variant - continue polling but log it
-                println!("    Unhandled status {:?}, continuing to poll...", other);
+                // Unknown or new status variant - continue polling but log it.
+                // We favor robustness over failing on unrecognized variants; the
+                // MAX_POLL_DURATION timeout protects against infinite loops.
+                eprintln!("    Unhandled status {:?}, continuing to poll...", other);
             }
         }
     }
