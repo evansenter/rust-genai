@@ -77,6 +77,9 @@ Note: `async-trait` and `inventory` are already included as dependencies of `rus
 > - `video_input.rs` - Video input handling
 > - `pdf_input.rs` - PDF document processing
 > - `image_generation.rs` - Image generation
+> - `deep_research.rs` - Long-running research tasks
+> - `thought_echo.rs` - Thought continuation across turns
+> - `streaming_auto_functions.rs` - Streaming with automatic function calling
 
 You'll need a Google API key from [Google AI Studio](https://ai.dev/).
 
