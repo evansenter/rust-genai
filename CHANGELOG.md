@@ -55,6 +55,16 @@ for exec in &result.executions {
 
 ### Added
 
+- **Partial results when max_function_call_loops exceeded** (#172):
+  - `create_with_auto_functions()` now returns partial results instead of error when limit is hit
+  - New `reached_max_loops: bool` field on `AutoFunctionResult` indicates if limit was reached
+  - The `response` field contains the last API response (likely with pending function calls)
+  - The `executions` vector preserves all function calls that were executed before hitting the limit
+  - Enables debugging stuck function loops and accessing partial work
+  - New `AutoFunctionStreamChunk::MaxLoopsReached` variant for streaming (parallel change)
+  - `AutoFunctionResultAccumulator` now handles `MaxLoopsReached` and sets `reached_max_loops: true`
+  - Legacy JSON without `reached_max_loops` field deserializes with default `false`
+
 - **Function execution timing** (#148):
   - `FunctionExecutionResult.duration` tracks how long each function took to execute
   - Duration is serialized as milliseconds for JSON compatibility
