@@ -224,10 +224,10 @@ async fn test_conversation_function_then_text() {
         json!({"temperature": "25°C", "conditions": "sunny"}),
     );
 
-    let response2 = stateful_builder(&client).with_previous_interaction(&response1.id)
+    let response2 = stateful_builder(&client)
+        .with_previous_interaction(&response1.id)
         .with_content(vec![result])
         .with_function(get_weather.clone())
-        
         .create()
         .await
         .expect("Turn 2 failed");
@@ -238,10 +238,10 @@ async fn test_conversation_function_then_text() {
     }
 
     // Turn 3: Follow-up text question (no function call expected)
-    let response3 = stateful_builder(&client).with_previous_interaction(&response2.id)
+    let response3 = stateful_builder(&client)
+        .with_previous_interaction(&response2.id)
         .with_text("Should I bring a jacket?")
         .with_function(get_weather)
-        
         .create()
         .await
         .expect("Turn 3 failed");
@@ -287,8 +287,8 @@ async fn test_conversation_branch() {
         retry_on_transient(DEFAULT_MAX_RETRIES, || {
             let client = client.clone();
             async move {
-                stateful_builder(&client).with_text("My favorite color is red.")
-                    
+                stateful_builder(&client)
+                    .with_text("My favorite color is red.")
                     .create()
                     .await
             }
@@ -304,9 +304,9 @@ async fn test_conversation_branch() {
             let client = client.clone();
             let prev_id = prev_id.clone();
             async move {
-                stateful_builder(&client).with_previous_interaction(&prev_id)
+                stateful_builder(&client)
+                    .with_previous_interaction(&prev_id)
                     .with_text("My favorite number is 7.")
-                    
                     .create()
                     .await
             }
@@ -322,9 +322,9 @@ async fn test_conversation_branch() {
             let client = client.clone();
             let prev_id = prev_id.clone();
             async move {
-                stateful_builder(&client).with_previous_interaction(&prev_id)
+                stateful_builder(&client)
+                    .with_previous_interaction(&prev_id)
                     .with_text("My favorite animal is a cat.")
-                    
                     .create()
                     .await
             }
@@ -341,9 +341,9 @@ async fn test_conversation_branch() {
             let client = client.clone();
             let prev_id = prev_id.clone();
             async move {
-                stateful_builder(&client).with_previous_interaction(&prev_id) // Branch from turn 2
+                stateful_builder(&client)
+                    .with_previous_interaction(&prev_id) // Branch from turn 2
                     .with_text("What do you know about my favorites so far?")
-                    
                     .create()
                     .await
             }
@@ -381,9 +381,9 @@ async fn test_conversation_branch() {
             let client = client.clone();
             let prev_id = prev_id.clone();
             async move {
-                stateful_builder(&client).with_previous_interaction(&prev_id)
+                stateful_builder(&client)
+                    .with_previous_interaction(&prev_id)
                     .with_text("And what's my favorite animal?")
-                    
                     .create()
                     .await
             }
@@ -413,8 +413,8 @@ async fn test_usage_metadata_returned() {
         return;
     };
 
-    let response = stateful_builder(&client).with_text("What is the capital of France? Answer briefly.")
-        
+    let response = stateful_builder(&client)
+        .with_text("What is the capital of France? Answer briefly.")
         .create()
         .await
         .expect("Interaction failed");
@@ -458,15 +458,15 @@ async fn test_usage_longer_response() {
     };
 
     // Short response
-    let short_response = stateful_builder(&client).with_text("Say 'hello'")
-        
+    let short_response = stateful_builder(&client)
+        .with_text("Say 'hello'")
         .create()
         .await
         .expect("Short interaction failed");
 
     // Longer response
-    let long_response = stateful_builder(&client).with_text("Write a 100-word paragraph about space exploration.")
-        
+    let long_response = stateful_builder(&client)
+        .with_text("Write a 100-word paragraph about space exploration.")
         .create()
         .await
         .expect("Long interaction failed");

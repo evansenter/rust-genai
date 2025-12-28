@@ -13,7 +13,9 @@
 
 mod common;
 
-use common::{DEFAULT_MAX_RETRIES, consume_stream, get_client, retry_on_transient, stateful_builder};
+use common::{
+    DEFAULT_MAX_RETRIES, consume_stream, get_client, retry_on_transient, stateful_builder,
+};
 use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 
