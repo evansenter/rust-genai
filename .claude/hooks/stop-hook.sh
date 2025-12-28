@@ -1,17 +1,10 @@
 #!/bin/bash
-# Stop hook: Determines if Claude should auto-continue after completing a response
+# Stop hook: Provides context for Claude to decide whether to auto-continue
 #
-# This hook checks for obvious follow-up work and suggests continuing.
-# Returns JSON: {"decision": "block", "reason": "..."} to continue
-#         or: {"decision": "approve"} to stop
+# Outputs JSON with current git/PR state. Claude uses this context to determine
+# if there's obvious follow-up work (e.g., CI running, pending feedback).
 
 set -e
-
-# Read the stop hook input from stdin
-INPUT=$(cat)
-
-# Extract relevant info from the transcript if available
-TRANSCRIPT_PATH="${CLAUDE_TRANSCRIPT_PATH:-}"
 
 # Check for recent git/gh activity to determine context
 RECENT_PUSH=$(git log --oneline -1 --since="5 minutes ago" 2>/dev/null | head -1)
@@ -31,6 +24,7 @@ check_ci_status() {
 check_pr_feedback() {
     if [ -n "$PR_NUMBER" ]; then
         # Count review comments
+        # Note: {owner}/{repo} placeholders are auto-resolved by gh CLI from git remote
         COMMENT_COUNT=$(gh api "repos/{owner}/{repo}/pulls/$PR_NUMBER/comments" --jq 'length' 2>/dev/null || echo "0")
         echo "$COMMENT_COUNT"
     else
