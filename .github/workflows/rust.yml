@@ -100,3 +100,21 @@ jobs:
         run: cargo install cargo-audit --locked
       - name: Run security audit
         run: cargo audit
+
+  benchmark:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    # Only run on main branch pushes to avoid slowing down PR feedback
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run benchmarks
+        run: cargo bench --workspace -- --noplot
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: target/criterion
+          retention-days: 30

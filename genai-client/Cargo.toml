@@ -27,3 +27,13 @@ strict-unknown = []
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
+criterion = { workspace = true }
+futures-util = { workspace = true }
+
+[[bench]]
+name = "sse_parser"
+harness = false
+
+[[bench]]
+name = "content_serialization"
+harness = false
