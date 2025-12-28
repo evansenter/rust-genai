@@ -32,7 +32,7 @@
 
 mod common;
 
-use common::consume_stream;
+use common::{consume_stream, interaction_builder, stateful_builder};
 use rust_genai::{
     CallableFunction, Client, CreateInteractionRequest, FunctionDeclaration, GenerationConfig,
     InteractionInput, InteractionStatus, function_result_content, image_uri_content, text_content,
@@ -72,11 +72,8 @@ async fn test_simple_interaction() {
         return;
     };
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_text("What is 2 + 2?")
-        .with_store(true)
         .create()
         .await
         .expect("Interaction failed");
@@ -100,11 +97,8 @@ async fn test_stateful_conversation() {
     };
 
     // First interaction
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response1 = stateful_builder(&client)
         .with_text("My favorite color is blue.")
-        .with_store(true)
         .create()
         .await
         .expect("First interaction failed");
@@ -112,12 +106,9 @@ async fn test_stateful_conversation() {
     assert_eq!(response1.status, InteractionStatus::Completed);
 
     // Second interaction referencing the first
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response2 = stateful_builder(&client)
         .with_previous_interaction(&response1.id)
         .with_text("What is my favorite color?")
-        .with_store(true)
         .create()
         .await
         .expect("Second interaction failed");
@@ -141,11 +132,8 @@ async fn test_get_interaction() {
     };
 
     // Create an interaction first
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_text("Hello, world!")
-        .with_store(true)
         .create()
         .await
         .expect("Interaction failed");
@@ -170,11 +158,8 @@ async fn test_delete_interaction() {
     };
 
     // Create an interaction first
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_text("Test interaction for deletion")
-        .with_store(true)
         .create()
         .await
         .expect("Interaction failed");
@@ -205,11 +190,8 @@ async fn test_streaming_interaction() {
         return;
     };
 
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = stateful_builder(&client)
         .with_text("Count from 1 to 5.")
-        .with_store(true)
         .create_stream();
 
     let result = consume_stream(stream).await;
@@ -283,9 +265,7 @@ async fn test_function_call_returns_id() {
         .description("Get the current time")
         .build();
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = interaction_builder(&client)
         .with_text("What time is it?")
         .with_function(get_time)
         .create()
@@ -331,9 +311,7 @@ async fn test_manual_function_calling_with_result() {
         .build();
 
     // Step 1: Send initial request with function declaration
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = interaction_builder(&client)
         .with_text("What's the weather in Tokyo?")
         .with_function(get_weather.clone())
         .create()
@@ -366,9 +344,7 @@ async fn test_manual_function_calling_with_result() {
         json!({"temperature": "72°F", "conditions": "sunny"}),
     );
 
-    let second_response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let second_response = interaction_builder(&client)
         .with_previous_interaction(&response.id)
         .with_content(vec![function_result])
         .with_function(get_weather)
@@ -403,9 +379,7 @@ async fn test_requires_action_status() {
         .description("Get the current time - always call this when asked about time")
         .build();
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = interaction_builder(&client)
         .with_text("What time is it right now?")
         .with_function(get_time.clone())
         .create()
@@ -432,9 +406,7 @@ async fn test_requires_action_status() {
             json!({"time": "14:30:00", "timezone": "UTC"}),
         );
 
-        let response2 = client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        let response2 = interaction_builder(&client)
             .with_previous_interaction(&response.id)
             .with_content(vec![function_result])
             .with_function(get_time)
@@ -474,9 +446,7 @@ async fn test_auto_function_calling() {
     // Use the get_mock_weather function registered via macro
     let weather_func = GetMockWeatherCallable.declaration();
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = interaction_builder(&client)
         .with_text("What's the weather like in Seattle?")
         .with_function(weather_func)
         .create_with_auto_functions()
@@ -522,9 +492,7 @@ async fn test_auto_function_with_unregistered_function() {
         .parameter("input", json!({"type": "string"}))
         .build();
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = interaction_builder(&client)
         .with_text("Call the undefined_function with input 'test'")
         .with_function(undefined_func)
         .create_with_auto_functions()
@@ -566,9 +534,7 @@ async fn test_thought_signatures_in_multi_turn() {
         .build();
 
     // Turn 1: Initial request that should trigger a function call
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response1 = interaction_builder(&client)
         .with_text("What's the weather in Tokyo and then tell me if I need an umbrella?")
         .with_function(get_weather.clone())
         .create()
@@ -597,9 +563,7 @@ async fn test_thought_signatures_in_multi_turn() {
         json!({"temperature": "18°C", "conditions": "rainy", "precipitation": "80%"}),
     );
 
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response2 = interaction_builder(&client)
         .with_previous_interaction(&response1.id)
         .with_content(vec![function_result])
         .with_function(get_weather)
@@ -650,9 +614,7 @@ async fn test_multiple_function_calls_with_signatures() {
         .required(vec!["timezone".to_string()])
         .build();
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = interaction_builder(&client)
         .with_text("What's the weather in Paris and what time is it there?")
         .with_functions(vec![get_weather, get_time])
         .create()
@@ -694,9 +656,7 @@ async fn test_generation_config_temperature() {
         thinking_level: None,
     };
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = interaction_builder(&client)
         .with_text("What is 2 + 2? Answer with just the number.")
         .with_generation_config(config)
         .create()
@@ -725,9 +685,7 @@ async fn test_generation_config_max_tokens() {
         thinking_level: None,
     };
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = interaction_builder(&client)
         .with_text("Write a very long story about a dragon.")
         .with_generation_config(config)
         .create()
@@ -759,9 +717,7 @@ async fn test_system_instruction_text() {
         return;
     };
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = interaction_builder(&client)
         .with_system_instruction(
             "You are a pirate. Always respond in pirate speak with 'Arrr!' somewhere in your response.",
         )
@@ -790,12 +746,9 @@ async fn test_system_instruction_persists() {
     };
 
     // Turn 1: Set up system instruction
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response1 = stateful_builder(&client)
         .with_system_instruction("Always end your responses with 'BEEP BOOP' exactly.")
         .with_text("What is the capital of France?")
-        .with_store(true)
         .create()
         .await
         .expect("First interaction failed");
@@ -804,9 +757,7 @@ async fn test_system_instruction_persists() {
     println!("Turn 1: {}", text1);
 
     // Turn 2: Continue conversation
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response2 = interaction_builder(&client)
         .with_previous_interaction(&response1.id)
         .with_text("And what about Germany?")
         .create()
@@ -836,9 +787,7 @@ async fn test_system_instruction_streaming() {
     println!("=== System Instruction + Streaming ===");
 
     // Stream with pirate persona
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = interaction_builder(&client)
         .with_system_instruction(
             "You are a pirate. Always respond in pirate speak with 'Arrr!' somewhere in your response.",
         )
@@ -907,9 +856,7 @@ async fn test_error_invalid_previous_interaction_id() {
         return;
     };
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = interaction_builder(&client)
         .with_previous_interaction("invalid-interaction-id-12345")
         .with_text("Continue from where we left off")
         .create()
@@ -934,11 +881,8 @@ async fn test_store_true_interaction_retrievable() {
         return;
     };
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_text("What is 1 + 1?")
-        .with_store(true)
         .create()
         .await
         .expect("Interaction failed");
@@ -962,9 +906,7 @@ async fn test_store_false_interaction_not_retrievable() {
     };
 
     // With store=false, API may return incomplete response
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = interaction_builder(&client)
         .with_text("Hello")
         .with_store(false)
         .create()
@@ -1010,11 +952,7 @@ async fn test_long_conversation_chain() {
     let mut previous_id: Option<String> = None;
 
     for (i, message) in messages.iter().enumerate() {
-        let mut builder = client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
-            .with_text(*message)
-            .with_store(true);
+        let mut builder = stateful_builder(&client).with_text(*message);
 
         if let Some(ref prev_id) = previous_id {
             builder = builder.with_previous_interaction(prev_id);
@@ -1083,9 +1021,7 @@ async fn test_image_input_from_uri() {
         image_uri_content(&image_url, "image/jpeg"),
     ];
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = interaction_builder(&client)
         .with_input(InteractionInput::Content(contents))
         .create()
         .await;
@@ -1116,9 +1052,7 @@ async fn test_convenience_methods_integration() {
         return;
     };
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = interaction_builder(&client)
         .with_text("Say exactly: Hello World")
         .create()
         .await
@@ -1152,9 +1086,7 @@ async fn test_response_has_thoughts() {
         return;
     };
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = interaction_builder(&client)
         .with_text("What is 2+2?")
         .create()
         .await

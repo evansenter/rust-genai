@@ -13,7 +13,9 @@
 
 mod common;
 
-use common::{consume_auto_function_stream, consume_stream, get_client};
+use common::{
+    consume_auto_function_stream, consume_stream, get_client, interaction_builder, stateful_builder,
+};
 use rust_genai::{CallableFunction, FunctionDeclaration, function_result_content};
 use rust_genai_macros::tool;
 use serde_json::json;
@@ -128,12 +130,9 @@ async fn test_parallel_function_calls() {
         .required(vec!["timezone".to_string()])
         .build();
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_text("What's the weather in Tokyo and what time is it there (JST timezone)?")
         .with_functions(vec![get_weather, get_time])
-        .with_store(true)
         .create()
         .await
         .expect("Interaction failed");
@@ -197,14 +196,11 @@ async fn test_thought_signature_parallel_only_first() {
         .build();
 
     // Ask a question that should trigger both functions
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_text(
             "I need BOTH the weather in Paris AND the current time in CET. Call both functions.",
         )
         .with_functions(vec![func1, func2])
-        .with_store(true)
         .create()
         .await
         .expect("Interaction failed");
@@ -280,12 +276,9 @@ async fn test_sequential_function_chain() {
         .build();
 
     // Step 1: Initial request
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response1 = stateful_builder(&client)
         .with_text("What's the weather in Tokyo? Tell me the temperature in Fahrenheit.")
         .with_functions(vec![get_weather.clone(), convert_temp.clone()])
-        .with_store(true)
         .create()
         .await
         .expect("First interaction failed");
@@ -313,13 +306,10 @@ async fn test_sequential_function_chain() {
         json!({"city": "Tokyo", "temperature": 22.0, "unit": "celsius"}),
     );
 
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response2 = stateful_builder(&client)
         .with_previous_interaction(&response1.id)
         .with_content(vec![result1])
         .with_functions(vec![get_weather.clone(), convert_temp.clone()])
-        .with_store(true)
         .create()
         .await
         .expect("Second interaction failed");
@@ -344,13 +334,10 @@ async fn test_sequential_function_chain() {
             json!({"value": 71.6, "unit": "fahrenheit"}),
         );
 
-        let response3 = client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        let response3 = stateful_builder(&client)
             .with_previous_interaction(&response2.id)
             .with_content(vec![result2])
             .with_functions(vec![get_weather, convert_temp])
-            .with_store(true)
             .create()
             .await
             .expect("Third interaction failed");
@@ -388,12 +375,9 @@ async fn test_thought_signature_sequential_each_step() {
         .build();
 
     // Step 1
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response1 = stateful_builder(&client)
         .with_text("What's the weather in Tokyo?")
         .with_function(get_weather.clone())
-        .with_store(true)
         .create()
         .await
         .expect("First interaction failed");
@@ -417,14 +401,11 @@ async fn test_thought_signature_sequential_each_step() {
         json!({"temperature": "22°C"}),
     );
 
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response2 = stateful_builder(&client)
         .with_previous_interaction(&response1.id)
         .with_content(vec![result1])
         .with_text("Now what about Paris?")
         .with_function(get_weather.clone())
-        .with_store(true)
         .create()
         .await
         .expect("Second interaction failed");
@@ -464,12 +445,9 @@ async fn test_streaming_with_function_calls() {
         .required(vec!["city".to_string()])
         .build();
 
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = stateful_builder(&client)
         .with_text("What's the weather in London?")
         .with_function(get_weather)
-        .with_store(true)
         .create_stream();
 
     let result = consume_stream(stream).await;
@@ -514,11 +492,8 @@ async fn test_streaming_long_response() {
         return;
     };
 
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = stateful_builder(&client)
         .with_text("Write a detailed 500-word essay about the history of the Internet.")
-        .with_store(true)
         .create_stream();
 
     let result = consume_stream(stream).await;
@@ -561,12 +536,9 @@ async fn test_function_call_error_response() {
         .build();
 
     // Step 1: Get function call
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response1 = stateful_builder(&client)
         .with_text("Get the secret data for key 'test123'")
         .with_function(failing_func.clone())
-        .with_store(true)
         .create()
         .await
         .expect("First interaction failed");
@@ -586,13 +558,10 @@ async fn test_function_call_error_response() {
         json!({"error": "Access denied: insufficient permissions"}),
     );
 
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response2 = stateful_builder(&client)
         .with_previous_interaction(&response1.id)
         .with_content(vec![error_result])
         .with_function(failing_func)
-        .with_store(true)
         .create()
         .await
         .expect("Second interaction failed");
@@ -633,12 +602,9 @@ async fn test_function_call_no_args() {
         .description("Get the current server status (no parameters needed)")
         .build();
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_text("Check the server status")
         .with_function(status_func.clone())
-        .with_store(true)
         .create()
         .await
         .expect("Interaction failed");
@@ -657,13 +623,10 @@ async fn test_function_call_no_args() {
             json!({"status": "online", "uptime": "99.9%"}),
         );
 
-        let response2 = client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
+        let response2 = stateful_builder(&client)
             .with_previous_interaction(&response.id)
             .with_content(vec![result])
             .with_function(status_func)
-            .with_store(true)
             .create()
             .await
             .expect("Second interaction failed");
@@ -703,14 +666,11 @@ async fn test_function_call_complex_args() {
         .required(vec!["user_id".to_string()])
         .build();
 
-    let response = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let response = stateful_builder(&client)
         .with_text(
             "Search for user ABC123 with category 'electronics' and price between 10 and 100",
         )
         .with_function(search_func)
-        .with_store(true)
         .create()
         .await
         .expect("Interaction failed");
@@ -746,9 +706,7 @@ async fn test_auto_function_calling_registered() {
     // Use a function registered via the macro
     let weather_func = GetWeatherTestCallable.declaration();
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = interaction_builder(&client)
         .with_text("What's the weather in Seattle?")
         .with_function(weather_func)
         .create_with_auto_functions()
@@ -799,9 +757,7 @@ async fn test_auto_function_calling_max_loops() {
     // Use a very low max loops
     let weather_func = GetWeatherTestCallable.declaration();
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = interaction_builder(&client)
         .with_text("What's the weather in Tokyo?")
         .with_function(weather_func)
         .with_max_function_call_loops(1)
@@ -842,9 +798,7 @@ async fn test_auto_function_calling_multi_round_accumulation() {
     // Ask for weather in Fahrenheit - model should:
     // Round 1: Call get_weather_test (returns 22°C)
     // Round 2: Call convert_temperature to convert 22°C to Fahrenheit
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let result = interaction_builder(&client)
         .with_text(
             "What's the weather in Tokyo? I need the temperature in Fahrenheit, not Celsius. \
              Use the convert_temperature function to convert the result.",
@@ -911,9 +865,7 @@ async fn test_streaming_auto_functions_simple() {
     // Use a registered function via the macro
     let weather_func = GetWeatherTestCallable.declaration();
 
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = interaction_builder(&client)
         .with_text("What's the weather in Tokyo?")
         .with_function(weather_func)
         .create_stream_with_auto_functions();
@@ -993,9 +945,7 @@ async fn test_streaming_auto_functions_no_function_call() {
     };
 
     // Ask a question that doesn't need a function
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = interaction_builder(&client)
         .with_text("What is 2 + 2?")
         .create_stream_with_auto_functions();
 
@@ -1034,9 +984,7 @@ async fn test_streaming_auto_functions_multiple_calls() {
     let weather_func = GetWeatherTestCallable.declaration();
     let time_func = GetTimeTestCallable.declaration();
 
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = interaction_builder(&client)
         .with_text("What's the weather in London and what time is it there (GMT timezone)?")
         .with_functions(vec![weather_func, time_func])
         .create_stream_with_auto_functions();
@@ -1074,9 +1022,7 @@ async fn test_streaming_auto_functions_max_loops() {
     let weather_func = GetWeatherTestCallable.declaration();
 
     // Use a very low max loops
-    let stream = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
+    let stream = interaction_builder(&client)
         .with_text("What's the weather in Paris?")
         .with_function(weather_func)
         .with_max_function_call_loops(1)
