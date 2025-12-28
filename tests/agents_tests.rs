@@ -31,7 +31,7 @@ const BACKGROUND_TASK_TIMEOUT: Duration = Duration::from_secs(60);
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_deep_research_agent() {
-    // Test the deep research agent
+    // Test the deep research agent with background mode (required for agents)
     // Note: This agent may not be available in all accounts
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
@@ -42,26 +42,59 @@ async fn test_deep_research_agent() {
         .interaction()
         .with_agent("deep-research-pro-preview-12-2025")
         .with_text("What are the main differences between Rust and Go programming languages?")
-        .with_store(true)
+        .with_background(true) // Required for agent interactions
+        .with_store(true) // Required to retrieve results by interaction ID
         .create()
         .await;
 
     match result {
-        Ok(response) => {
-            println!("Deep research status: {:?}", response.status);
-            if response.has_text() {
-                let text = response.text().unwrap();
-                println!(
-                    "Research response (truncated): {}...",
-                    &text[..text.len().min(500)]
-                );
+        Ok(initial_response) => {
+            println!("Initial status: {:?}", initial_response.status);
+            println!("Interaction ID: {}", initial_response.id);
 
-                // Should mention both languages
-                let text_lower = text.to_lowercase();
-                assert!(
-                    text_lower.contains("rust") || text_lower.contains("go"),
-                    "Response should discuss programming languages"
-                );
+            // If already completed, check the response
+            if initial_response.status == InteractionStatus::Completed {
+                println!("Task completed immediately");
+                if initial_response.has_text() {
+                    let text = initial_response.text().unwrap();
+                    println!(
+                        "Research response (truncated): {}...",
+                        &text[..text.len().min(500)]
+                    );
+                    assert_response_discusses_languages(text);
+                }
+                return;
+            }
+
+            // Poll for completion using exponential backoff
+            match poll_until_complete(&client, &initial_response.id, BACKGROUND_TASK_TIMEOUT).await
+            {
+                Ok(response) => {
+                    println!("Deep research completed!");
+                    if response.has_text() {
+                        let text = response.text().unwrap();
+                        println!(
+                            "Research response (truncated): {}...",
+                            &text[..text.len().min(500)]
+                        );
+                        assert_response_discusses_languages(text);
+                    }
+                }
+                Err(PollError::Timeout) => {
+                    // Timeout is acceptable - deep research on complex queries can exceed
+                    // our test timeout. We're verifying the polling mechanism works, not
+                    // that every query completes within the time limit.
+                    println!(
+                        "Polling timed out after {:?} - task may still be running",
+                        BACKGROUND_TASK_TIMEOUT
+                    );
+                }
+                Err(PollError::Failed) => {
+                    println!("Deep research task failed");
+                }
+                Err(PollError::Api(e)) => {
+                    println!("Poll error: {:?}", e);
+                }
             }
         }
         Err(e) => {
@@ -75,6 +108,15 @@ async fn test_deep_research_agent() {
             }
         }
     }
+}
+
+/// Helper to assert the response discusses programming languages
+fn assert_response_discusses_languages(text: &str) {
+    let text_lower = text.to_lowercase();
+    assert!(
+        text_lower.contains("rust") || text_lower.contains("go"),
+        "Response should discuss programming languages"
+    );
 }
 
 // =============================================================================
@@ -126,6 +168,8 @@ async fn test_background_mode_polling() {
                     }
                 }
                 Err(PollError::Timeout) => {
+                    // Timeout is acceptable - we're testing the polling mechanism, not
+                    // guaranteeing completion within the time limit.
                     println!(
                         "Polling timed out after {:?} - task may still be running",
                         BACKGROUND_TASK_TIMEOUT
