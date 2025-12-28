@@ -19,6 +19,9 @@ use crate::streaming::{AutoFunctionResult, AutoFunctionStreamChunk, FunctionExec
 
 use super::InteractionBuilder;
 
+/// Default maximum iterations for auto function calling.
+pub(crate) const DEFAULT_MAX_FUNCTION_CALL_LOOPS: usize = 5;
+
 /// Validates that a function call has a call_id and returns it.
 fn validate_call_id(call_id: Option<&str>, function_name: &str) -> Result<String, GenaiError> {
     call_id

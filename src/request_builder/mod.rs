@@ -1,5 +1,7 @@
 mod auto_functions;
 
+use auto_functions::DEFAULT_MAX_FUNCTION_CALL_LOOPS;
+
 use crate::GenaiError;
 use crate::client::Client;
 
@@ -8,9 +10,6 @@ use genai_client::{
     self, CreateInteractionRequest, FunctionDeclaration, GenerationConfig, InteractionContent,
     InteractionInput, InteractionResponse, StreamChunk, ThinkingLevel, Tool as InternalTool,
 };
-
-/// Default maximum iterations for auto function calling
-pub const DEFAULT_MAX_FUNCTION_CALL_LOOPS: usize = 5;
 
 /// Builder for creating interactions with the Gemini Interactions API.
 ///
