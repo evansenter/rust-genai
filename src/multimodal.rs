@@ -181,6 +181,10 @@ fn validate_mime_category(
 /// Reads the file, encodes it as base64, and detects the MIME type from
 /// the file extension.
 ///
+/// # Supported Formats
+///
+/// JPEG, PNG, GIF, WebP, HEIC, HEIF
+///
 /// # Arguments
 ///
 /// * `path` - Path to the image file
@@ -375,6 +379,10 @@ pub async fn video_from_file_with_mime(
 /// Loads a document file with automatic MIME type detection.
 ///
 /// Currently only PDF is supported. Use `document_from_file_with_mime()` for other formats.
+///
+/// # Supported Formats
+///
+/// PDF
 ///
 /// # Example
 ///
