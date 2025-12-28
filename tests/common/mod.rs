@@ -263,8 +263,15 @@ pub async fn poll_until_complete(
         match response.status {
             InteractionStatus::Completed => return Ok(response),
             InteractionStatus::Failed => return Err(PollError::Failed),
-            _ => {
+            InteractionStatus::InProgress => {
                 // Continue polling with exponential backoff
+            }
+            InteractionStatus::Cancelled => return Err(PollError::Failed),
+            InteractionStatus::RequiresAction => return Err(PollError::Failed),
+            other => {
+                // Following Evergreen principles (see CLAUDE.md) - continue polling
+                // on unknown status variants for forward compatibility.
+                eprintln!("    Unhandled status {:?}, continuing to poll...", other);
             }
         }
     }

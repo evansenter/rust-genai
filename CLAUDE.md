@@ -133,6 +133,7 @@ This library follows the [Evergreen spec](https://github.com/google-deepmind/eve
 2. **Non-Exhaustive Enums**: Use `#[non_exhaustive]` on enums that may grow (e.g., `InteractionContent`, `Tool`)
 3. **Soft-Typed Where Appropriate**: Use `serde_json::Value` for evolving structures (e.g., function args)
 4. **Preserve Data Roundtrip**: `Unknown` variants serialize back with their original data intact
+5. **Continue on Unknown Status**: When polling for interaction completion, continue polling on unrecognized status variants rather than failing immediately. This ensures forward compatibility when the API adds new transient states. Use timeouts to protect against infinite loops (see `examples/deep_research.rs`).
 
 ### DO:
 ```rust
@@ -155,6 +156,17 @@ match tool {
 pub struct FunctionCall {
     pub name: String,
     pub args: serde_json::Value,  // Schema may change
+}
+
+// Continue polling on unknown status variants
+match response.status {
+    InteractionStatus::Completed => return Ok(response),
+    InteractionStatus::Failed => return Err(...),
+    InteractionStatus::InProgress => { /* continue */ }
+    other => {
+        // Don't fail - continue polling with timeout protection
+        eprintln!("Unhandled status {:?}, continuing...", other);
+    }
 }
 ```
 
