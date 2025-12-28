@@ -15,8 +15,14 @@ use crate::models::shared::Tool;
 ///
 /// This enum is marked `#[non_exhaustive]` for forward compatibility.
 /// New status values may be added by the API in future versions.
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
-#[serde(rename_all = "snake_case")]
+///
+/// # Unknown Status Handling
+///
+/// When the API returns a status value that this library doesn't recognize,
+/// it will be captured in the `Unknown` variant with the original status
+/// string preserved. This follows the Evergreen philosophy of graceful
+/// degradation and data preservation.
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum InteractionStatus {
     Completed,
@@ -28,8 +34,103 @@ pub enum InteractionStatus {
     ///
     /// This variant captures any unrecognized status values from the API,
     /// allowing the library to handle new statuses gracefully.
-    #[serde(other, rename = "unknown")]
-    Unknown,
+    ///
+    /// The `status_type` field contains the unrecognized status string,
+    /// and `data` contains the JSON value (typically the same string).
+    Unknown {
+        /// The unrecognized status string from the API
+        status_type: String,
+        /// The raw JSON value, preserved for debugging
+        data: serde_json::Value,
+    },
+}
+
+impl InteractionStatus {
+    /// Check if this is an unknown status.
+    #[must_use]
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown { .. })
+    }
+
+    /// Returns the status type name if this is an unknown status.
+    ///
+    /// Returns `None` for known statuses.
+    #[must_use]
+    pub fn unknown_status_type(&self) -> Option<&str> {
+        match self {
+            Self::Unknown { status_type, .. } => Some(status_type),
+            _ => None,
+        }
+    }
+
+    /// Returns the raw JSON data if this is an unknown status.
+    ///
+    /// Returns `None` for known statuses.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::Unknown { data, .. } => Some(data),
+            _ => None,
+        }
+    }
+}
+
+impl Serialize for InteractionStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Completed => serializer.serialize_str("completed"),
+            Self::InProgress => serializer.serialize_str("in_progress"),
+            Self::RequiresAction => serializer.serialize_str("requires_action"),
+            Self::Failed => serializer.serialize_str("failed"),
+            Self::Cancelled => serializer.serialize_str("cancelled"),
+            Self::Unknown { status_type, .. } => serializer.serialize_str(status_type),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for InteractionStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        match value.as_str() {
+            Some("completed") => Ok(Self::Completed),
+            Some("in_progress") => Ok(Self::InProgress),
+            Some("requires_action") => Ok(Self::RequiresAction),
+            Some("failed") => Ok(Self::Failed),
+            Some("cancelled") => Ok(Self::Cancelled),
+            Some(other) => {
+                log::warn!(
+                    "Encountered unknown InteractionStatus '{}'. \
+                     This may indicate a new API feature. \
+                     The status will be preserved in the Unknown variant.",
+                    other
+                );
+                Ok(Self::Unknown {
+                    status_type: other.to_string(),
+                    data: value,
+                })
+            }
+            None => {
+                // Non-string value - preserve it in Unknown
+                let status_type = format!("<non-string: {}>", value);
+                log::warn!(
+                    "InteractionStatus received non-string value: {}. \
+                     Preserving in Unknown variant.",
+                    value
+                );
+                Ok(Self::Unknown {
+                    status_type,
+                    data: value,
+                })
+            }
+        }
+    }
 }
 
 /// Token usage information from the Interactions API
@@ -504,8 +605,8 @@ impl InteractionResponse {
     /// # let response: InteractionResponse = todo!();
     /// if response.has_unknown() {
     ///     eprintln!("Warning: Response contains unknown content types");
-    ///     for (type_name, data) in response.unknown_content() {
-    ///         eprintln!("  - {}: {:?}", type_name, data);
+    ///     for (content_type, data) in response.unknown_content() {
+    ///         eprintln!("  - {}: {:?}", content_type, data);
     ///     }
     /// }
     /// ```
@@ -516,7 +617,7 @@ impl InteractionResponse {
             .any(|c| matches!(c, InteractionContent::Unknown { .. }))
     }
 
-    /// Get all unknown content as (type_name, data) tuples.
+    /// Get all unknown content as (content_type, data) tuples.
     ///
     /// Returns a vector of references to the type names and JSON data for all
     /// [`InteractionContent::Unknown`] variants in the outputs.
@@ -526,16 +627,16 @@ impl InteractionResponse {
     /// ```no_run
     /// # use genai_client::models::interactions::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
-    /// for (type_name, data) in response.unknown_content() {
-    ///     println!("Unknown type '{}': {}", type_name, data);
+    /// for (content_type, data) in response.unknown_content() {
+    ///     println!("Unknown type '{}': {}", content_type, data);
     /// }
     /// ```
     pub fn unknown_content(&self) -> Vec<(&str, &serde_json::Value)> {
         self.outputs
             .iter()
             .filter_map(|content| {
-                if let InteractionContent::Unknown { type_name, data } = content {
-                    Some((type_name.as_str(), data))
+                if let InteractionContent::Unknown { content_type, data } = content {
+                    Some((content_type.as_str(), data))
                 } else {
                     None
                 }
@@ -1050,9 +1151,9 @@ impl InteractionResponse {
                 InteractionContent::UrlContextResult { .. } => {
                     summary.url_context_result_count += 1
                 }
-                InteractionContent::Unknown { type_name, .. } => {
+                InteractionContent::Unknown { content_type, .. } => {
                     summary.unknown_count += 1;
-                    unknown_types_set.insert(type_name.clone());
+                    unknown_types_set.insert(content_type.clone());
                 }
             }
         }

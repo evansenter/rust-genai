@@ -188,6 +188,36 @@ impl<'de> Deserialize<'de> for Tool {
     }
 }
 
+impl Tool {
+    /// Check if this is an unknown tool type.
+    #[must_use]
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown { .. })
+    }
+
+    /// Returns the tool type name if this is an unknown tool type.
+    ///
+    /// Returns `None` for known tool types.
+    #[must_use]
+    pub fn unknown_tool_type(&self) -> Option<&str> {
+        match self {
+            Self::Unknown { tool_type, .. } => Some(tool_type),
+            _ => None,
+        }
+    }
+
+    /// Returns the raw JSON data if this is an unknown tool type.
+    ///
+    /// Returns `None` for known tool types.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::Unknown { data, .. } => Some(data),
+            _ => None,
+        }
+    }
+}
+
 /// Represents a function that can be called by the model.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct FunctionDeclaration {

@@ -59,14 +59,13 @@ use serde::{Deserialize, Serialize};
 ///
 /// This enum uses `#[non_exhaustive]` to allow adding new event types in future
 /// versions without breaking existing code. Always include a wildcard arm in
-/// match statements.
+/// match statements. Unknown variants are preserved with their data for debugging.
 ///
 /// # Serialization
 ///
 /// This enum implements `Serialize` and `Deserialize` for logging, persistence,
-/// and replay of streaming events. Unknown variants deserialize to `Unknown`.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "chunk_type", content = "data", rename_all = "snake_case")]
+/// and replay of streaming events.
+#[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum AutoFunctionStreamChunk {
     /// Incremental content from the model (text, thoughts, etc.)
@@ -101,10 +100,188 @@ pub enum AutoFunctionStreamChunk {
     /// `chunk_type`. This allows the library to gracefully handle new event types
     /// added by the API in future versions without failing deserialization.
     ///
-    /// When encountering an `Unknown` variant, code should typically log a warning
-    /// and continue processing, as the stream may still contain useful events.
-    #[serde(other)]
-    Unknown,
+    /// The `chunk_type` field contains the unrecognized type string, and `data`
+    /// contains the full JSON data for inspection or debugging.
+    Unknown {
+        /// The unrecognized chunk type from the API
+        chunk_type: String,
+        /// The raw JSON data, preserved for debugging and roundtrip serialization
+        data: serde_json::Value,
+    },
+}
+
+impl AutoFunctionStreamChunk {
+    /// Check if this is an unknown chunk type.
+    #[must_use]
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown { .. })
+    }
+
+    /// Returns the chunk type name if this is an unknown chunk type.
+    ///
+    /// Returns `None` for known chunk types.
+    #[must_use]
+    pub fn unknown_chunk_type(&self) -> Option<&str> {
+        match self {
+            Self::Unknown { chunk_type, .. } => Some(chunk_type),
+            _ => None,
+        }
+    }
+
+    /// Returns the raw JSON data if this is an unknown chunk type.
+    ///
+    /// Returns `None` for known chunk types.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::Unknown { data, .. } => Some(data),
+            _ => None,
+        }
+    }
+}
+
+impl Serialize for AutoFunctionStreamChunk {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        match self {
+            Self::Delta(content) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("chunk_type", "delta")?;
+                map.serialize_entry("data", content)?;
+                map.end()
+            }
+            Self::ExecutingFunctions(response) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("chunk_type", "executing_functions")?;
+                map.serialize_entry("data", response)?;
+                map.end()
+            }
+            Self::FunctionResults(results) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("chunk_type", "function_results")?;
+                map.serialize_entry("data", results)?;
+                map.end()
+            }
+            Self::Complete(response) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("chunk_type", "complete")?;
+                map.serialize_entry("data", response)?;
+                map.end()
+            }
+            Self::Unknown { chunk_type, data } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("chunk_type", chunk_type)?;
+                if !data.is_null() {
+                    map.serialize_entry("data", data)?;
+                }
+                map.end()
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        let chunk_type = match value.get("chunk_type") {
+            Some(serde_json::Value::String(s)) => s.as_str(),
+            Some(other) => {
+                log::warn!(
+                    "AutoFunctionStreamChunk received non-string chunk_type: {}. \
+                     This may indicate a malformed API response.",
+                    other
+                );
+                "<non-string chunk_type>"
+            }
+            None => {
+                log::warn!(
+                    "AutoFunctionStreamChunk is missing required chunk_type field. \
+                     This may indicate a malformed API response."
+                );
+                "<missing chunk_type>"
+            }
+        };
+
+        match chunk_type {
+            "delta" => {
+                let data = value
+                    .get("data")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+                let content: InteractionContent = serde_json::from_value(data).map_err(|e| {
+                    serde::de::Error::custom(format!(
+                        "Failed to deserialize AutoFunctionStreamChunk::Delta data: {}",
+                        e
+                    ))
+                })?;
+                Ok(Self::Delta(content))
+            }
+            "executing_functions" => {
+                let data = value
+                    .get("data")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+                let response: InteractionResponse = serde_json::from_value(data).map_err(|e| {
+                    serde::de::Error::custom(format!(
+                        "Failed to deserialize AutoFunctionStreamChunk::ExecutingFunctions data: {}",
+                        e
+                    ))
+                })?;
+                Ok(Self::ExecutingFunctions(response))
+            }
+            "function_results" => {
+                let data = value
+                    .get("data")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+                let results: Vec<FunctionExecutionResult> =
+                    serde_json::from_value(data).map_err(|e| {
+                        serde::de::Error::custom(format!(
+                            "Failed to deserialize AutoFunctionStreamChunk::FunctionResults data: {}",
+                            e
+                        ))
+                    })?;
+                Ok(Self::FunctionResults(results))
+            }
+            "complete" => {
+                let data = value
+                    .get("data")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+                let response: InteractionResponse = serde_json::from_value(data).map_err(|e| {
+                    serde::de::Error::custom(format!(
+                        "Failed to deserialize AutoFunctionStreamChunk::Complete data: {}",
+                        e
+                    ))
+                })?;
+                Ok(Self::Complete(response))
+            }
+            other => {
+                log::warn!(
+                    "Encountered unknown AutoFunctionStreamChunk type '{}'. \
+                     This may indicate a new API feature. \
+                     The chunk will be preserved in the Unknown variant.",
+                    other
+                );
+                let data = value
+                    .get("data")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+                Ok(Self::Unknown {
+                    chunk_type: other.to_string(),
+                    data,
+                })
+            }
+        }
+    }
 }
 
 /// Result of executing a function locally.
@@ -425,10 +602,35 @@ mod tests {
         }
 
         // Test Unknown variant handling (forward compatibility)
-        let unknown_json = r#"{"chunk_type": "future_event_type"}"#;
+        let unknown_json = r#"{"chunk_type": "future_event_type", "data": {"key": "value"}}"#;
         let deserialized: AutoFunctionStreamChunk =
             serde_json::from_str(unknown_json).expect("Should deserialize unknown variant");
-        assert!(matches!(deserialized, AutoFunctionStreamChunk::Unknown));
+
+        // Verify it's an Unknown variant with data preserved
+        assert!(deserialized.is_unknown());
+        assert_eq!(deserialized.unknown_chunk_type(), Some("future_event_type"));
+        let data = deserialized.unknown_data().expect("Should have data");
+        assert_eq!(data["key"], "value");
+
+        // Verify roundtrip serialization
+        let reserialized = serde_json::to_string(&deserialized).expect("Should serialize");
+        assert!(reserialized.contains("future_event_type"));
+        assert!(reserialized.contains("value"));
+    }
+
+    #[test]
+    fn test_auto_function_stream_chunk_unknown_without_data() {
+        // Test unknown chunk type without data field
+        let unknown_json = r#"{"chunk_type": "no_data_chunk"}"#;
+        let deserialized: AutoFunctionStreamChunk =
+            serde_json::from_str(unknown_json).expect("Should deserialize unknown variant");
+
+        assert!(deserialized.is_unknown());
+        assert_eq!(deserialized.unknown_chunk_type(), Some("no_data_chunk"));
+
+        // Data should be null when not provided
+        let data = deserialized.unknown_data().expect("Should have data field");
+        assert!(data.is_null());
     }
 
     #[test]

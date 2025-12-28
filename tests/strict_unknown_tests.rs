@@ -54,8 +54,8 @@ mod graceful_handling {
 
         let content = result.unwrap();
         assert!(
-            matches!(&content, InteractionContent::Unknown { type_name, .. } if type_name == "future_feature"),
-            "Should be Unknown variant with correct type_name"
+            matches!(&content, InteractionContent::Unknown { content_type, .. } if content_type == "future_feature"),
+            "Should be Unknown variant with correct content_type"
         );
     }
 
@@ -70,8 +70,8 @@ mod graceful_handling {
 
         let content: InteractionContent = serde_json::from_value(json.clone()).unwrap();
 
-        if let InteractionContent::Unknown { type_name, data } = content {
-            assert_eq!(type_name, "new_api_feature");
+        if let InteractionContent::Unknown { content_type, data } = content {
+            assert_eq!(content_type, "new_api_feature");
             assert_eq!(data["field1"], "value1");
             assert_eq!(data["field2"], 42);
             assert_eq!(data["nested"]["a"], 1);
@@ -114,7 +114,7 @@ mod graceful_handling {
         // First is unknown
         assert!(matches!(
             &items[0],
-            InteractionContent::Unknown { type_name, .. } if type_name == "unknown_type_a"
+            InteractionContent::Unknown { content_type, .. } if content_type == "unknown_type_a"
         ));
 
         // Second is known (Text)
@@ -123,7 +123,7 @@ mod graceful_handling {
         // Third is unknown
         assert!(matches!(
             &items[2],
-            InteractionContent::Unknown { type_name, .. } if type_name == "unknown_type_b"
+            InteractionContent::Unknown { content_type, .. } if content_type == "unknown_type_b"
         ));
     }
 
@@ -140,16 +140,16 @@ mod graceful_handling {
     }
 
     #[test]
-    fn unknown_type_accessor_returns_type_name() {
+    fn unknown_type_accessor_returns_content_type() {
         let content: InteractionContent =
             serde_json::from_value(json!({"type": "brand_new_type", "x": 1})).unwrap();
 
-        assert_eq!(content.unknown_type(), Some("brand_new_type"));
+        assert_eq!(content.unknown_content_type(), Some("brand_new_type"));
 
         let text: InteractionContent =
             serde_json::from_value(json!({"type": "text", "text": "hi"})).unwrap();
 
-        assert_eq!(text.unknown_type(), None);
+        assert_eq!(text.unknown_content_type(), None);
     }
 
     #[test]
@@ -173,8 +173,8 @@ mod graceful_handling {
 
         // Should succeed but result in Unknown with "<missing type>" marker
         assert!(result.is_ok());
-        if let InteractionContent::Unknown { type_name, .. } = result.unwrap() {
-            assert_eq!(type_name, "<missing type>");
+        if let InteractionContent::Unknown { content_type, .. } = result.unwrap() {
+            assert_eq!(content_type, "<missing type>");
         } else {
             panic!("Expected Unknown variant for missing type");
         }
@@ -201,7 +201,7 @@ mod strict_mode {
     }
 
     #[test]
-    fn error_message_contains_unknown_type_name() {
+    fn error_message_contains_unknown_content_type() {
         let json = r#"{"type": "experimental_api_type", "data": "test"}"#;
         let result: Result<InteractionContent, _> = serde_json::from_str(json);
 
