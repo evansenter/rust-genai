@@ -539,7 +539,10 @@ fn test_content_thought_accessor() {
 }
 
 // --- Unknown Variant Tests ---
+// Note: Tests that rely on graceful unknown handling are disabled when strict-unknown is enabled,
+// since strict mode causes deserialization errors for unknown types instead of capturing them.
 
+#[cfg(not(feature = "strict-unknown"))]
 #[test]
 fn test_deserialize_unknown_interaction_content() {
     // Simulate a new API content type that this library doesn't know about
@@ -563,6 +566,7 @@ fn test_deserialize_unknown_interaction_content() {
     assert!(content.unknown_data().is_some());
 }
 
+#[cfg(not(feature = "strict-unknown"))]
 #[test]
 fn test_deserialize_unknown_streaming_content() {
     // Simulate a new streaming content type that this library doesn't know about
@@ -840,6 +844,7 @@ fn test_deserialize_response_with_built_in_tool_outputs() {
     assert_eq!(summary.unknown_count, 0);
 }
 
+#[cfg(not(feature = "strict-unknown"))]
 #[test]
 fn test_deserialize_response_with_unknown_in_outputs() {
     // Test deserializing a full response that contains truly unknown content
@@ -1001,6 +1006,7 @@ fn test_serialize_unknown_with_special_characters() {
     assert_eq!(value["type"], "special/type:with.chars-and_underscores");
 }
 
+#[cfg(not(feature = "strict-unknown"))]
 #[test]
 fn test_unknown_manual_construction_roundtrip() {
     // Test that manually constructed Unknown variants can round-trip through JSON
@@ -1039,6 +1045,7 @@ fn test_unknown_manual_construction_roundtrip() {
     }
 }
 
+#[cfg(not(feature = "strict-unknown"))]
 #[test]
 fn test_deserialize_unknown_with_missing_type() {
     // Edge case: JSON object without a type field
@@ -1054,6 +1061,7 @@ fn test_deserialize_unknown_with_missing_type() {
     }
 }
 
+#[cfg(not(feature = "strict-unknown"))]
 #[test]
 fn test_deserialize_unknown_with_null_type() {
     // Edge case: JSON object with null type field
