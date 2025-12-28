@@ -224,22 +224,6 @@ This requires a custom `Deserialize` implementation. See `InteractionContent` in
   - `api_canary_tests.rs`: API compatibility checks
   - `common/`: Shared test utilities
 
-## Claude Code Configuration
-
-### Plugins
-
-This project uses official Claude plugins:
-- **`pr-review-toolkit`**: Comprehensive PR review with specialized agents
-- **`feature-dev`**: Guided feature development
-- **`commit-commands`**: Git commit workflows
-
-### Workflow Integration
-
-See global `~/.claude/CLAUDE.md` for:
-- Decision-making guidelines (what requires discussion vs autonomous)
-- PR feedback handling process (categorize → opine → implement/discuss)
-- CI flaky test handling
-
 ## CI/CD
 
 GitHub Actions (`.github/workflows/rust.yml`) runs 6 parallel jobs: check, test, test-integration, fmt, clippy, doc. Integration tests require same-repo origin (protects API key). CI runs on all PRs regardless of file type.
