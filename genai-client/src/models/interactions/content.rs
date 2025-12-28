@@ -362,6 +362,22 @@ pub enum InteractionContent {
     /// // Serializes to: {"type": "array_type", "data": [1, 2, 3]}
     /// ```
     ///
+    /// # Field Ordering
+    ///
+    /// **Note:** Field ordering is not preserved during round-trip serialization,
+    /// but all field **values** are fully preserved. When serializing an `Unknown`
+    /// variant, the `"type"` field is always written first, followed by the remaining
+    /// fields from `data`. This means the output field order may differ from the
+    /// original API response.
+    ///
+    /// This has **no practical impact** on API compatibility because JSON objects
+    /// are inherently unordered per RFC 8259. The Gemini API does not depend on
+    /// field ordering.
+    ///
+    /// If you need to preserve the exact original field ordering (e.g., for logging
+    /// or debugging purposes), access the raw `data` field directly via
+    /// [`unknown_data()`](Self::unknown_data) instead of re-serializing the variant.
+    ///
     /// # Manual Construction
     ///
     /// While Unknown variants are typically created by deserialization, you can
