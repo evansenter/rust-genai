@@ -85,7 +85,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_agent(agent_name)
         .with_text(prompt)
         .with_background(true) // Required for agent interactions
-        .with_store(true) // Required for background mode and polling by interaction ID
+        .with_store(true) // Required to retrieve results by interaction ID
         .create()
         .await;
 
@@ -232,8 +232,9 @@ async fn poll_for_completion(
                 });
             }
             other => {
-                // Unknown or new status variant - continue polling but log it.
-                // We favor robustness over failing on unrecognized variants; the
+                // Following Evergreen principles (see CLAUDE.md), we continue polling
+                // on unknown statuses rather than failing. This ensures forward
+                // compatibility when the API adds new status variants.
                 // MAX_POLL_DURATION timeout protects against infinite loops.
                 eprintln!("    Unhandled status {:?}, continuing to poll...", other);
             }

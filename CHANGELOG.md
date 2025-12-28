@@ -160,6 +160,7 @@ if let Some(text) = delta.text() { /* ... */ }
 
 ### Changed
 - **`InteractionContent` is now `#[non_exhaustive]`** (#44): Match statements must include a wildcard arm (`_ => {}`). This allows adding new variants in minor version updates without breaking downstream code.
+- **Deep Research example now requires background mode** (#179): Updated `deep_research.rs` example to reflect API requirement that `background=true` is mandatory for agent interactions. Removed synchronous mode demonstration since it is no longer supported by the API.
 
 ### Fixed
 - **Streaming with function calls now works** (#27): Function call deltas are now properly parsed instead of causing errors
