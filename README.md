@@ -21,6 +21,7 @@ A Rust client library for interacting with Google's Generative AI (Gemini) API u
 - [Error Handling](#error-handling)
 - [Logging](#logging)
 - [Troubleshooting](#troubleshooting)
+- [Claude Code Integration](#claude-code-integration)
 - [License](#license)
 - [Contributing](#contributing)
 
@@ -765,6 +766,16 @@ match result {
 **Rate limiting errors**
 - The free tier has request limits; wait and retry
 - Consider adding delays between requests in batch operations
+
+## Claude Code Integration
+
+This project includes configuration for [Claude Code](https://claude.ai/code) to assist with development:
+
+- **Session initialization**: Displays recent PRs, open issues, and build status
+- **PR feedback processing**: Automated review comment handling with critical thinking
+- **Quality gates**: Automatic formatting and linting checks
+
+See `CLAUDE.md` for detailed guidance and `.claude/` for configuration files.
 
 ## License
 

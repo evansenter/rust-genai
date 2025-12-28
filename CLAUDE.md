@@ -228,17 +228,27 @@ This requires a custom `Deserialize` implementation. See `InteractionContent` in
 
 ### Hooks (automatic)
 
-- **PostToolUse**: Auto-runs `cargo fmt` after editing Rust files
-- **SessionStart**: Verifies `GEMINI_API_KEY` and build status (`.claude/hooks/session_init.sh`)
-- **Stop**: Pre-push validation matching CI (`.claude/hooks/stop.sh`)
+- **SessionStart** (`.claude/hooks/session_init.sh`): Shows recent PRs, open issues, recent commits, and build status at session start
+- **Stop** (`.claude/hooks/stop-hook.sh`): Provides context for auto-continue decisions (recent push, CI status, pending feedback)
 
-### Skills (manual)
+### Commands (manual)
 
-Available via `/skill-name` in conversations:
-- **`test-full`**: Complete test suite with `--include-ignored`
-- **`review-workspace`**: Health check (cargo check, clippy, unit tests)
-- **`check-docs`**: Documentation build with warning checks
-- **`run-examples`**: Verify all examples work
+Available via `/command-name` in conversations:
+- **`/pr-feedback [PR#]`**: Process PR review feedback with critical thinking - categorizes feedback, forms opinions, presents table, implements agreed items
+
+### Plugins
+
+This project uses official Claude plugins:
+- **`pr-review-toolkit`**: Comprehensive PR review with specialized agents
+- **`feature-dev`**: Guided feature development
+- **`commit-commands`**: Git commit workflows
+
+### Workflow Integration
+
+See global `~/.claude/CLAUDE.md` for:
+- Decision-making guidelines (what requires discussion vs autonomous)
+- PR feedback handling process (categorize → opine → implement/discuss)
+- CI flaky test handling
 
 ## CI/CD
 
