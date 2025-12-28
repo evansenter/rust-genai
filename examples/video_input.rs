@@ -7,7 +7,7 @@
 //!
 //! Run with: cargo run --example video_input
 
-use rust_genai::{Client, GenaiError, InteractionInput, text_content, video_data_content};
+use rust_genai::{Client, GenaiError};
 use std::env;
 use std::error::Error;
 
@@ -23,24 +23,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let model_name = "gemini-3-flash-preview";
 
     // =========================================================================
-    // Example 1: Basic Video Analysis
+    // Example 1: Basic Video Analysis (Fluent Builder Pattern)
     // =========================================================================
     println!("=== Example 1: Video Analysis ===\n");
 
     // Note: This uses a minimal MP4 header for demonstration.
-    // In real usage, you would provide actual video content.
-    let contents = vec![
-        text_content(
-            "This is a demo video file. In real usage, describe what you see. \
-             If the video is empty or corrupted, just say 'No video content detected.'",
-        ),
-        video_data_content(DEMO_MP4_BASE64, "video/mp4"),
-    ];
-
+    // In real usage, you would use add_video_file() for automatic file loading:
+    //   .add_video_file("video.mp4").await?
     let response = client
         .interaction()
         .with_model(model_name)
-        .with_input(InteractionInput::Content(contents))
+        .with_text(
+            "This is a demo video file. In real usage, describe what you see. \
+             If the video is empty or corrupted, just say 'No video content detected.'",
+        )
+        .add_video_data(DEMO_MP4_BASE64, "video/mp4")
         .create()
         .await;
 
@@ -62,18 +59,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Here are common patterns for working with video:\n");
 
-    println!("1. SCENE DESCRIPTION:");
+    println!("1. SCENE DESCRIPTION (Fluent Pattern):");
     println!(
         r#"
-   let contents = vec![
-       text_content("Describe the key scenes in this video. What's happening?"),
-       video_data_content(&base64_video, "video/mp4"),
-   ];
-
+   // Most ergonomic: fluent builder pattern
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_input(InteractionInput::Content(contents))
+       .with_text("Describe the key scenes in this video. What's happening?")
+       .add_video_data(&base64_video, "video/mp4")
+       .create()
+       .await?;
+
+   // Or load from file with automatic MIME detection:
+   let response = client
+       .interaction()
+       .with_model("gemini-3-flash-preview")
+       .with_text("Describe the key scenes in this video.")
+       .add_video_file("video.mp4").await?
        .create()
        .await?;
 "#
@@ -82,16 +85,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("2. OBJECT/PERSON DETECTION:");
     println!(
         r#"
-   let contents = vec![
-       text_content("List all the objects and people visible in this video.
-           For each, note when they first appear (approximate timestamp)."),
-       video_data_content(&base64_video, "video/mp4"),
-   ];
-
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_input(InteractionInput::Content(contents))
+       .with_text("List all the objects and people visible in this video.
+           For each, note when they first appear (approximate timestamp).")
+       .add_video_data(&base64_video, "video/mp4")
        .create()
        .await?;
 "#
@@ -100,16 +99,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("3. ACTION RECOGNITION:");
     println!(
         r#"
-   let contents = vec![
-       text_content("What actions or activities are being performed in this video?
-           Describe the sequence of events."),
-       video_data_content(&base64_video, "video/mp4"),
-   ];
-
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_input(InteractionInput::Content(contents))
+       .with_text("What actions or activities are being performed in this video?
+           Describe the sequence of events.")
+       .add_video_data(&base64_video, "video/mp4")
        .create()
        .await?;
 "#
@@ -118,15 +113,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("4. VIDEO Q&A:");
     println!(
         r#"
-   let contents = vec![
-       text_content("How many people are in this video? What are they wearing?"),
-       video_data_content(&base64_video, "video/mp4"),
-   ];
-
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_input(InteractionInput::Content(contents))
+       .with_text("How many people are in this video? What are they wearing?")
+       .add_video_data(&base64_video, "video/mp4")
        .create()
        .await?;
 "#
@@ -141,15 +132,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!(
         r#"
    // First turn: Send video and get initial analysis
-   let contents = vec![
-       text_content("Describe what's happening in this video."),
-       video_data_content(&base64_video, "video/mp4"),
-   ];
-
    let first = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_input(InteractionInput::Content(contents))
+       .with_text("Describe what's happening in this video.")
+       .add_video_data(&base64_video, "video/mp4")
        .with_store(true)  // Enable conversation storage
        .create()
        .await?;
@@ -182,18 +169,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Gemini can analyze both video and audio tracks:\n");
     println!(
         r#"
-   let contents = vec![
-       text_content("Analyze this video:
-           1. What is shown visually?
-           2. What sounds or speech can you hear?
-           3. How do the visuals and audio relate?"),
-       video_data_content(&base64_video, "video/mp4"),
-   ];
-
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_input(InteractionInput::Content(contents))
+       .with_text("Analyze this video:
+           1. What is shown visually?
+           2. What sounds or speech can you hear?
+           3. How do the visuals and audio relate?")
+       .add_video_data(&base64_video, "video/mp4")
        .create()
        .await?;
 "#
@@ -207,15 +190,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Demonstrate error handling with invalid video
     let invalid_base64 = "not_valid_video_data_at_all";
 
-    let invalid_contents = vec![
-        text_content("Describe this video."),
-        video_data_content(invalid_base64, "video/mp4"),
-    ];
-
     match client
         .interaction()
         .with_model(model_name)
-        .with_input(InteractionInput::Content(invalid_contents))
+        .with_text("Describe this video.")
+        .add_video_data(invalid_base64, "video/mp4")
         .create()
         .await
     {
@@ -261,29 +240,52 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Reference: Loading Video Files
     // =========================================================================
     println!("=== Loading Video Files ===\n");
-    println!("To load a video file and encode it as base64:\n");
-    println!("Note: Add `base64 = \"0.22\"` to your Cargo.toml\n");
+    println!("Option 1: Use the built-in file loading helper (recommended):\n");
     println!(
         r#"
-   use std::fs;
+   use rust_genai::video_from_file;
 
-   // Read the file (warning: large files may exceed memory limits)
-   let video_bytes = fs::read("path/to/video.mp4")?;
+   // Load video file with automatic MIME detection and base64 encoding
+   let video_content = video_from_file("path/to/video.mp4").await?;
 
-   // Encode as base64 (requires `base64` crate)
-   use base64::Engine;
-   let base64_video = base64::engine::general_purpose::STANDARD.encode(&video_bytes);
-
-   // Send to Gemini
-   let contents = vec![
-       text_content("Describe what's happening in this video."),
-       video_data_content(&base64_video, "video/mp4"),
-   ];
-
+   // Build the request using with_content
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_input(InteractionInput::Content(contents))
+       .with_content(vec![
+           text_content("Describe what's happening in this video."),
+           video_content,
+       ])
+       .create()
+       .await?;
+
+   // Or use the async builder method directly
+   let response = client
+       .interaction()
+       .with_model("gemini-3-flash-preview")
+       .with_text("Describe what's happening in this video.")
+       .add_video_file("path/to/video.mp4").await?
+       .create()
+       .await?;
+"#
+    );
+
+    println!("Option 2: Manual file loading and encoding:\n");
+    println!(
+        r#"
+   use std::fs;
+   use base64::Engine;
+
+   // Read and encode
+   let video_bytes = fs::read("path/to/video.mp4")?;
+   let base64_video = base64::engine::general_purpose::STANDARD.encode(&video_bytes);
+
+   // Send with fluent builder
+   let response = client
+       .interaction()
+       .with_model("gemini-3-flash-preview")
+       .with_text("Describe what's happening in this video.")
+       .add_video_data(&base64_video, "video/mp4")
        .create()
        .await?;
 "#

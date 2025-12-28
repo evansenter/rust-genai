@@ -15,6 +15,7 @@ A Rust client library for interacting with Google's Generative AI (Gemini) API u
   - [Automatic Function Calling](#automatic-function-calling)
   - [Built-in Tools](#built-in-tools)
   - [Thinking Mode](#thinking-mode)
+  - [Multimodal Input](#multimodal-input)
 - [API Reference](#api-reference)
 - [Project Structure](#project-structure)
 - [Error Handling](#error-handling)
@@ -435,6 +436,80 @@ for thought in response.thoughts() {
 println!("Answer: {}", response.text().unwrap_or(""));
 ```
 
+### Multimodal Input
+
+Send images, audio, video, and documents to the model for analysis:
+
+```rust
+use rust_genai::Client;
+use std::env;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api_key = env::var("GEMINI_API_KEY")?;
+    let client = Client::builder(api_key).build();
+
+    // Method 1: Fluent builder pattern (recommended)
+    let response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What's in this image?")
+        .add_image_file("photo.jpg").await?  // Auto-detects MIME type
+        .create()
+        .await?;
+
+    println!("{}", response.text().unwrap_or("No response"));
+
+    // Add multiple media files
+    let response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Compare these two images")
+        .add_image_file("photo1.jpg").await?
+        .add_image_file("photo2.png").await?
+        .create()
+        .await?;
+
+    // Use base64 data directly
+    let response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Describe this image")
+        .add_image_data(base64_encoded_image, "image/jpeg")
+        .create()
+        .await?;
+
+    Ok(())
+}
+```
+
+All media types use the same pattern:
+- **Images**: `add_image_file()`, `add_image_data()`, `add_image_uri()`
+- **Audio**: `add_audio_file()`, `add_audio_data()`, `add_audio_uri()`
+- **Video**: `add_video_file()`, `add_video_data()`, `add_video_uri()`
+- **Documents**: `add_document_file()`, `add_document_data()`, `add_document_uri()`
+
+For programmatic content building, use the helper functions:
+
+```rust
+use rust_genai::{image_from_file, text_content};
+
+// Load files with automatic MIME detection
+let image = image_from_file("photo.jpg").await?;
+
+let contents = vec![
+    text_content("Analyze this image"),
+    image,
+];
+
+let response = client
+    .interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_content(contents)
+    .create()
+    .await?;
+```
+
 ## API Reference
 
 ### Client Builder
@@ -471,6 +546,14 @@ client
     .with_response_format(schema)               // Set JSON schema for output
     .with_store(true)                           // Whether to store the interaction
     .with_background(false)                     // Run in background mode
+    // Multimodal content (accumulate, don't replace)
+    .add_image_file("path").await?              // Add image from file
+    .add_image_data(base64, "image/png")        // Add image from base64
+    .add_image_uri(uri, "image/jpeg")           // Add image from URI
+    .add_audio_file("path").await?              // Add audio from file
+    .add_video_file("path").await?              // Add video from file
+    .add_document_file("path").await?           // Add document from file
+    // Execute
     .create()                                   // Execute and get response
     .create_stream()                            // Get streaming response
     .create_with_auto_functions()               // Execute with auto function calling

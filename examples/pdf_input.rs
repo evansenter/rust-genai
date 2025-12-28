@@ -25,7 +25,7 @@
 //! Gemini's image pricing (see <https://ai.google.dev/gemini-api/docs/document-processing>).
 
 use futures_util::StreamExt;
-use rust_genai::{Client, InteractionInput, StreamChunk, document_data_content, text_content};
+use rust_genai::{Client, StreamChunk, document_data_content, text_content};
 use std::env;
 use std::io::{Write, stdout};
 
@@ -43,28 +43,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== PDF DOCUMENT INPUT EXAMPLE ===\n");
 
     // ==========================================================================
-    // Example 1: Basic PDF Analysis
+    // Example 1: Basic PDF Analysis (Fluent Builder Pattern)
     // ==========================================================================
     println!("--- Example 1: Basic PDF Analysis ---\n");
 
-    // Build content with text prompt and PDF document
-    // In a real application, you would read the PDF file and base64 encode it:
+    // Using the fluent builder pattern with add_document_data()
+    // In a real application, use add_document_file() for automatic file loading:
+    //   .add_document_file("document.pdf").await?
     //
-    //   use base64::Engine;
-    //   let pdf_bytes = std::fs::read("document.pdf")?;
-    //   let pdf_base64 = base64::engine::general_purpose::STANDARD.encode(&pdf_bytes);
-    //
-    let contents = vec![
-        text_content("What text content does this PDF document contain?"),
-        document_data_content(SAMPLE_PDF_BASE64, "application/pdf"),
-    ];
-
     println!("Sending PDF to Gemini for analysis...\n");
 
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_input(InteractionInput::Content(contents))
+        .with_text("What text content does this PDF document contain?")
+        .add_document_data(SAMPLE_PDF_BASE64, "application/pdf")
         .with_store(true)
         .create()
         .await?;
@@ -99,19 +92,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ==========================================================================
     println!("--- Example 3: Streaming PDF Analysis ---\n");
 
+    print!("Streaming Response: ");
+    // Flush to ensure the prompt appears before streaming starts (stdout is line-buffered)
+    stdout().flush()?;
+
+    // Alternative: Using with_content() for dynamic content construction
     let stream_contents = vec![
         text_content("Describe the structure of this PDF document in detail."),
         document_data_content(SAMPLE_PDF_BASE64, "application/pdf"),
     ];
 
-    print!("Streaming Response: ");
-    // Flush to ensure the prompt appears before streaming starts (stdout is line-buffered)
-    stdout().flush()?;
-
     let mut stream = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_input(InteractionInput::Content(stream_contents))
+        .with_content(stream_contents)
         .create_stream();
 
     while let Some(result) = stream.next().await {
@@ -149,16 +143,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ==========================================================================
     println!("\n--- Usage Notes ---\n");
     println!("PDF Document Input Tips:");
-    println!("  1. Use base64 encoding for inline PDF data");
-    println!("  2. Set mime_type to 'application/pdf'");
+    println!("  1. Use add_document_file() for automatic file loading");
+    println!("  2. Use add_document_data() for inline base64 data");
     println!("  3. PDFs up to 1000 pages are supported");
     println!("  4. Each page costs approximately 258 tokens");
     println!("  5. Native text extraction works for most PDFs");
     println!("  6. OCR is applied automatically to scanned pages");
-    println!("\nTo encode a PDF file:");
-    println!("  use base64::Engine;");
-    println!("  let bytes = std::fs::read(\"doc.pdf\")?;");
-    println!("  let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);");
+    println!("\nRecommended: Use built-in file helpers:");
+    println!("  .add_document_file(\"doc.pdf\").await?");
+    println!("  ");
+    println!("Or use document_from_file() for programmatic loading:");
+    println!("  use rust_genai::document_from_file;");
+    println!("  let doc = document_from_file(\"doc.pdf\").await?;");
 
     println!("\n=== END EXAMPLE ===");
 

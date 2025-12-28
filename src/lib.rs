@@ -88,6 +88,14 @@ pub use interactions_api::{
     thought_content, video_data_content, video_uri_content,
 };
 
+// Multimodal file loading utilities
+pub mod multimodal;
+pub use multimodal::{
+    audio_from_file, audio_from_file_with_mime, detect_mime_type, document_from_file,
+    document_from_file_with_mime, image_from_file, image_from_file_with_mime, video_from_file,
+    video_from_file_with_mime,
+};
+
 pub mod client;
 pub use client::{Client, ClientBuilder};
 
