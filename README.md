@@ -771,11 +771,10 @@ match result {
 
 This project includes configuration for [Claude Code](https://claude.ai/code) to assist with development:
 
-- **Session initialization**: Displays recent PRs, open issues, and build status
-- **PR feedback processing**: Automated review comment handling with critical thinking
+- **PR feedback processing**: `/pr-feedback` command for review comment handling with critical thinking
 - **Quality gates**: Automatic formatting and linting checks
 
-See `CLAUDE.md` for detailed guidance and `.claude/` for configuration files.
+See `CLAUDE.md` for detailed guidance and `.claude/commands/` for available commands.
 
 ## License
 
