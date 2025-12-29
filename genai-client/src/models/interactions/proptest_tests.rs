@@ -18,6 +18,21 @@ use crate::models::shared::{FunctionParameters, Tool};
 // Strategy Generators for Arbitrary Types
 // =============================================================================
 
+/// Strategy for generating "clean" floating point numbers that roundtrip reliably.
+/// Uses integer-based construction to avoid precision issues.
+fn arb_clean_float() -> impl Strategy<Value = serde_json::Value> {
+    // Generate floats from integer components to ensure clean roundtrip
+    // e.g., 123 / 100 = 1.23, -456 / 1000 = -0.456
+    (
+        any::<i32>(),
+        prop_oneof![Just(1i64), Just(10), Just(100), Just(1000)],
+    )
+        .prop_filter_map("must be representable", |(n, divisor)| {
+            let f = (n as f64) / (divisor as f64);
+            serde_json::Number::from_f64(f).map(serde_json::Value::Number)
+        })
+}
+
 /// Strategy for generating arbitrary serde_json::Value for function args/results.
 /// Limited in depth to avoid overly complex nested structures.
 fn arb_json_value() -> impl Strategy<Value = serde_json::Value> {
@@ -26,6 +41,8 @@ fn arb_json_value() -> impl Strategy<Value = serde_json::Value> {
         Just(serde_json::Value::Null),
         any::<bool>().prop_map(serde_json::Value::Bool),
         any::<i64>().prop_map(|n| serde_json::Value::Number(n.into())),
+        // Float numbers using clean construction for reliable roundtrip
+        arb_clean_float(),
         ".*".prop_map(serde_json::Value::String),
         // Simple arrays
         prop::collection::vec(
@@ -652,5 +669,76 @@ proptest! {
         let json = serde_json::to_string(&usage).expect("Serialization should succeed");
         let restored: UsageMetadata = serde_json::from_str(&json).expect("Deserialization should succeed");
         prop_assert_eq!(usage, restored);
+    }
+
+    /// Test deeply nested JSON in function call arguments (3-4 levels).
+    #[test]
+    fn deeply_nested_json_in_function_call(_unused in Just(())) {
+        let nested_args = serde_json::json!({
+            "level1": {
+                "level2": {
+                    "level3": {
+                        "level4": [1, 2, 3, "four", true, null]
+                    },
+                    "another_level3": {
+                        "data": "value",
+                        "numbers": [1.5, 2.5, 3.5]
+                    }
+                },
+                "array_at_level2": [
+                    {"nested_in_array": "works"},
+                    [1, 2, [3, 4, 5]]
+                ]
+            }
+        });
+
+        let content = InteractionContent::FunctionCall {
+            id: Some("call_123".to_string()),
+            name: "deep_function".to_string(),
+            args: nested_args,
+            thought_signature: None,
+        };
+
+        let json = serde_json::to_string(&content).expect("Serialization should succeed");
+        let restored: InteractionContent = serde_json::from_str(&json).expect("Deserialization should succeed");
+        let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test deeply nested JSON in function result.
+    #[test]
+    fn deeply_nested_json_in_function_result(_unused in Just(())) {
+        let nested_result = serde_json::json!({
+            "success": true,
+            "data": {
+                "items": [
+                    {
+                        "id": 1,
+                        "metadata": {
+                            "created": "2024-01-01",
+                            "tags": ["tag1", "tag2", {"complex": "tag"}]
+                        }
+                    },
+                    {
+                        "id": 2,
+                        "metadata": {
+                            "created": "2024-01-02",
+                            "nested_array": [[1, 2], [3, 4], [[5, 6], [7, 8]]]
+                        }
+                    }
+                ]
+            }
+        });
+
+        let content = InteractionContent::FunctionResult {
+            name: "deep_function".to_string(),
+            call_id: "call_123".to_string(),
+            result: nested_result,
+        };
+
+        let json = serde_json::to_string(&content).expect("Serialization should succeed");
+        let restored: InteractionContent = serde_json::from_str(&json).expect("Deserialization should succeed");
+        let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
     }
 }

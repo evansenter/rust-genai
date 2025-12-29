@@ -50,7 +50,7 @@ criterion = { workspace = true }
 tempfile = "3.15"
 bytes = { workspace = true }
 futures-util = { workspace = true }
-proptest = "1.4"
+proptest = "1.9"
 
 [[bench]]
 name = "serialization"
