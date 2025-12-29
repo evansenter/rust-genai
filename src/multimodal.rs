@@ -107,6 +107,12 @@ use std::path::Path;
 ///
 /// ## Documents
 /// - `pdf` → `application/pdf`
+/// - `txt` → `text/plain`
+/// - `md` → `text/markdown`
+/// - `json` → `application/json`
+/// - `csv` → `text/csv`
+/// - `html` → `text/html`
+/// - `xml` → `application/xml`
 ///
 /// # Example
 ///
@@ -143,6 +149,12 @@ pub fn detect_mime_type(path: &Path) -> Option<&'static str> {
         "mkv" => Some("video/x-matroska"),
         // Documents
         "pdf" => Some("application/pdf"),
+        "txt" => Some("text/plain"),
+        "md" => Some("text/markdown"),
+        "json" => Some("application/json"),
+        "csv" => Some("text/csv"),
+        "html" => Some("text/html"),
+        "xml" => Some("application/xml"),
         _ => None,
     }
 }
@@ -479,19 +491,12 @@ pub async fn video_from_file_with_mime(
 /// | Extension | MIME Type |
 /// |-----------|-----------|
 /// | `.pdf` | `application/pdf` |
-///
-/// Currently only PDF is supported for auto-detection. For other document types
-/// (e.g., plain text), use [`document_from_file_with_mime()`] to specify the
-/// MIME type explicitly:
-///
-/// ```no_run
-/// use rust_genai::document_from_file_with_mime;
-///
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let doc = document_from_file_with_mime("notes.txt", "text/plain").await?;
-/// # Ok(())
-/// # }
-/// ```
+/// | `.txt` | `text/plain` |
+/// | `.md` | `text/markdown` |
+/// | `.json` | `application/json` |
+/// | `.csv` | `text/csv` |
+/// | `.html` | `text/html` |
+/// | `.xml` | `application/xml` |
 ///
 /// # Errors
 ///
@@ -521,15 +526,32 @@ pub async fn document_from_file(path: impl AsRef<Path>) -> Result<InteractionCon
     let mime_type = detect_mime_type(path).ok_or_else(|| {
         GenaiError::InvalidInput(format!(
             "Unsupported document extension '.{}' for file '{}'. \
-             Supported extensions: pdf. \
+             Supported extensions: pdf, txt, md, json, csv, html, xml. \
              Use document_from_file_with_mime() to override.",
             ext,
             path.display()
         ))
     })?;
 
-    // Validate this is actually a document MIME type
-    validate_mime_category(mime_type, "application/", path, "a document")?;
+    // Validate this is actually a document MIME type (application/* or text/*)
+    if !mime_type.starts_with("application/") && !mime_type.starts_with("text/") {
+        let suggestion = if mime_type.starts_with("image/") {
+            "image_from_file()"
+        } else if mime_type.starts_with("audio/") {
+            "audio_from_file()"
+        } else if mime_type.starts_with("video/") {
+            "video_from_file()"
+        } else {
+            "the appropriate *_from_file() function"
+        };
+
+        return Err(GenaiError::InvalidInput(format!(
+            "File '{}' has MIME type '{}' which is not a document type. Did you mean to use {}?",
+            path.display(),
+            mime_type,
+            suggestion
+        )));
+    }
 
     document_from_file_with_mime(path, mime_type).await
 }
@@ -626,13 +648,31 @@ mod tests {
             detect_mime_type(Path::new("doc.pdf")),
             Some("application/pdf")
         );
+        assert_eq!(
+            detect_mime_type(Path::new("readme.txt")),
+            Some("text/plain")
+        );
+        assert_eq!(
+            detect_mime_type(Path::new("README.md")),
+            Some("text/markdown")
+        );
+        assert_eq!(
+            detect_mime_type(Path::new("config.json")),
+            Some("application/json")
+        );
+        assert_eq!(detect_mime_type(Path::new("data.csv")), Some("text/csv"));
+        assert_eq!(detect_mime_type(Path::new("page.html")), Some("text/html"));
+        assert_eq!(
+            detect_mime_type(Path::new("config.xml")),
+            Some("application/xml")
+        );
     }
 
     #[test]
     fn test_detect_mime_type_unknown() {
         assert_eq!(detect_mime_type(Path::new("file.xyz")), None);
         assert_eq!(detect_mime_type(Path::new("file.doc")), None);
-        assert_eq!(detect_mime_type(Path::new("file.txt")), None);
+        assert_eq!(detect_mime_type(Path::new("file.docx")), None);
         assert_eq!(detect_mime_type(Path::new("noextension")), None);
     }
 
