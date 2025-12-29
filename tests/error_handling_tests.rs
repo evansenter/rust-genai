@@ -21,8 +21,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 // =============================================================================
 
 #[test]
-fn test_genai_error_http_display() {
-    // We can't easily create a reqwest::Error, so we test other error types instead
+fn test_genai_error_parse_display() {
+    // We can't easily create a reqwest::Error, so we test Parse error instead
     let error = GenaiError::Parse("Connection reset".to_string());
     let display = format!("{}", error);
     assert!(display.contains("SSE parsing error"));
