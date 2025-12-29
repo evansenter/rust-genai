@@ -56,7 +56,7 @@ jobs:
           - group: functions
             tests: "advanced_function_calling_tests thinking_function_tests"
           - group: multimodal
-            tests: "multimodal_tests agents_tests api_canary_tests"
+            tests: "multimodal_tests agents_tests api_canary_tests temp_file_tests"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
