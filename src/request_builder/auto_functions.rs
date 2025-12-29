@@ -155,6 +155,24 @@ impl<'a> InteractionBuilder<'a> {
         if request.tools.is_none() {
             let mut all_declarations = function_registry.all_declarations();
 
+            // Service functions take precedence over global registry
+            // Filter out global declarations that would be shadowed by service functions
+            let service_names: std::collections::HashSet<&str> =
+                service_functions.keys().map(|s| s.as_str()).collect();
+
+            // Log warnings for shadowed functions and filter them out
+            all_declarations.retain(|decl| {
+                if service_names.contains(decl.name()) {
+                    log::warn!(
+                        "Tool service function '{}' shadows global registry function with same name",
+                        decl.name()
+                    );
+                    false
+                } else {
+                    true
+                }
+            });
+
             // Add declarations from tool service
             for func in service_functions.values() {
                 all_declarations.push(func.declaration());
@@ -386,6 +404,26 @@ impl<'a> InteractionBuilder<'a> {
             let function_registry = get_global_function_registry();
             if request.tools.is_none() {
                 let mut all_declarations = function_registry.all_declarations();
+
+                // Service functions take precedence over global registry
+                // Filter out global declarations that would be shadowed by service functions
+                let service_names: std::collections::HashSet<&str> = service_functions
+                    .keys()
+                    .map(|s| s.as_str())
+                    .collect();
+
+                // Log warnings for shadowed functions and filter them out
+                all_declarations.retain(|decl| {
+                    if service_names.contains(decl.name()) {
+                        log::warn!(
+                            "Tool service function '{}' shadows global registry function with same name",
+                            decl.name()
+                        );
+                        false
+                    } else {
+                        true
+                    }
+                });
 
                 // Add declarations from tool service
                 for func in service_functions.values() {

@@ -80,6 +80,13 @@ for exec in &result.executions {
 
 ### Added
 
+- **ToolService trait for dependency injection** (#197):
+  - New `ToolService` trait enables tools to access shared state (DB connections, API clients, config)
+  - Use `with_tool_service(Arc<dyn ToolService>)` on `InteractionBuilder` to provide tools
+  - Service-provided functions take precedence over global `#[tool]` registry functions
+  - When a service function shadows a global function, a warning is logged
+  - Works with both `create_with_auto_functions()` and `create_stream_with_auto_functions()`
+
 - **Partial results when max_function_call_loops exceeded** (#172):
   - `create_with_auto_functions()` now returns partial results instead of error when limit is hit
   - New `reached_max_loops: bool` field on `AutoFunctionResult` indicates if limit was reached
