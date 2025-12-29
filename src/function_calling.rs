@@ -4,6 +4,7 @@ use log::warn;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
+use std::sync::Arc;
 
 use crate::FunctionDeclaration;
 
@@ -46,6 +47,44 @@ pub trait CallableFunction: Send + Sync {
     /// The arguments are provided as a serde_json::Value,
     /// and the function should return a serde_json::Value.
     async fn call(&self, args: Value) -> Result<Value, FunctionError>;
+}
+
+/// A provider of callable functions with shared state/dependencies.
+///
+/// Implement this trait on structs that need to provide tools with access to
+/// shared resources like databases, APIs, or configuration. This enables
+/// dependency injection for tool functions.
+///
+/// # Example
+///
+/// ```ignore
+/// use rust_genai::{CallableFunction, ToolService, FunctionDeclaration};
+/// use std::sync::Arc;
+///
+/// struct WeatherService {
+///     api_key: String,
+/// }
+///
+/// impl ToolService for WeatherService {
+///     fn tools(&self) -> Vec<Arc<dyn CallableFunction>> {
+///         vec![
+///             Arc::new(GetWeatherTool { api_key: self.api_key.clone() }),
+///         ]
+///     }
+/// }
+///
+/// // Use with InteractionBuilder:
+/// let service = Arc::new(WeatherService { api_key: "...".into() });
+/// client.interaction()
+///     .with_tool_service(service)
+///     .create_with_auto_functions()
+///     .await?;
+/// ```
+pub trait ToolService: Send + Sync {
+    /// Returns the callable functions provided by this service.
+    ///
+    /// Each function can hold references to shared state from the service.
+    fn tools(&self) -> Vec<Arc<dyn CallableFunction>>;
 }
 
 /// A factory for creating instances of `CallableFunction`.
@@ -198,5 +237,98 @@ mod tests {
             result.unwrap(),
             json!({ "result": "Global says: Hello, GlobalInventoryWorld" })
         );
+    }
+
+    // Test ToolService trait for dependency injection
+
+    /// A tool that holds shared state from its service.
+    struct GreetTool {
+        greeting_prefix: String,
+    }
+
+    #[async_trait]
+    impl CallableFunction for GreetTool {
+        fn declaration(&self) -> FunctionDeclaration {
+            FunctionDeclaration::new(
+                "greet".to_string(),
+                "Greets a person with a custom prefix".to_string(),
+                genai_client::FunctionParameters::new(
+                    "object".to_string(),
+                    json!({"name": {"type": "string"}}),
+                    vec!["name".to_string()],
+                ),
+            )
+        }
+
+        async fn call(&self, args: Value) -> Result<Value, FunctionError> {
+            args.get("name").and_then(Value::as_str).map_or_else(
+                || {
+                    Err(FunctionError::ArgumentMismatch(
+                        "Missing 'name' argument".to_string(),
+                    ))
+                },
+                |name| Ok(json!({ "message": format!("{} {name}!", self.greeting_prefix) })),
+            )
+        }
+    }
+
+    /// A service that provides tools with shared configuration.
+    struct GreetingService {
+        prefix: String,
+    }
+
+    impl ToolService for GreetingService {
+        fn tools(&self) -> Vec<Arc<dyn CallableFunction>> {
+            vec![Arc::new(GreetTool {
+                greeting_prefix: self.prefix.clone(),
+            })]
+        }
+    }
+
+    #[test]
+    fn test_tool_service_returns_tools() {
+        let service = GreetingService {
+            prefix: "Hello".to_string(),
+        };
+        let tools = service.tools();
+
+        assert_eq!(tools.len(), 1);
+        assert_eq!(tools[0].declaration().name(), "greet");
+    }
+
+    #[tokio::test]
+    async fn test_tool_service_tool_can_be_called() {
+        let service = GreetingService {
+            prefix: "Howdy".to_string(),
+        };
+        let tools = service.tools();
+        let greet_tool = &tools[0];
+
+        let result = greet_tool.call(json!({ "name": "Partner" })).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), json!({ "message": "Howdy Partner!" }));
+    }
+
+    #[tokio::test]
+    async fn test_tool_service_with_different_config() {
+        // Demonstrate that different service instances produce different tool behavior
+        let formal_service = GreetingService {
+            prefix: "Good morning, Mr.".to_string(),
+        };
+        let casual_service = GreetingService {
+            prefix: "Hey".to_string(),
+        };
+
+        let formal_tools = formal_service.tools();
+        let casual_tools = casual_service.tools();
+
+        let formal_result = formal_tools[0].call(json!({ "name": "Smith" })).await;
+        let casual_result = casual_tools[0].call(json!({ "name": "Joe" })).await;
+
+        assert_eq!(
+            formal_result.unwrap(),
+            json!({ "message": "Good morning, Mr. Smith!" })
+        );
+        assert_eq!(casual_result.unwrap(), json!({ "message": "Hey Joe!" }));
     }
 }
