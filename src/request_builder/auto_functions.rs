@@ -30,9 +30,8 @@ fn validate_call_id(call_id: Option<&str>, function_name: &str) -> Result<String
                 "Function call '{}' is missing required call_id field.",
                 function_name
             );
-            GenaiError::InvalidInput(format!(
-                "Function call '{}' is missing required call_id field. \
-                 This may indicate an API response format change.",
+            GenaiError::MalformedResponse(format!(
+                "Function call '{}' is missing required call_id field",
                 function_name
             ))
         })
@@ -382,7 +381,7 @@ impl<'a> InteractionBuilder<'a> {
 
                 // Get the complete response (should always be present after stream ends)
                 let response = complete_response.ok_or_else(|| {
-                    GenaiError::Internal(
+                    GenaiError::MalformedResponse(
                         "Stream ended without Complete event".to_string()
                     )
                 })?;
