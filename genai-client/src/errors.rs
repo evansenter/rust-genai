@@ -43,6 +43,14 @@ pub enum GenaiError {
     Internal(String),
     #[error("Invalid input: {0}")]
     InvalidInput(String),
+    /// API returned a successful response but with unexpected or invalid content.
+    ///
+    /// This indicates the API response didn't match the expected schema,
+    /// possibly due to API evolution or an undocumented response format.
+    /// Unlike `InvalidInput` (user's fault), this represents an issue with
+    /// the API response itself.
+    #[error("Malformed API response: {0}")]
+    MalformedResponse(String),
 }
 
 #[cfg(test)]
@@ -170,5 +178,24 @@ mod tests {
         assert!(display.contains("500"));
         // Should still display properly even with empty message
         assert!(display.contains("API error"));
+    }
+
+    #[test]
+    fn test_genai_error_malformed_response_display() {
+        let error = GenaiError::MalformedResponse(
+            "Function call 'get_weather' is missing required call_id field".to_string(),
+        );
+        let display = format!("{}", error);
+        assert!(display.contains("Malformed API response"));
+        assert!(display.contains("call_id"));
+    }
+
+    #[test]
+    fn test_genai_error_malformed_response_stream() {
+        let error =
+            GenaiError::MalformedResponse("Stream ended without Complete event".to_string());
+        let display = format!("{}", error);
+        assert!(display.contains("Malformed API response"));
+        assert!(display.contains("Complete event"));
     }
 }
