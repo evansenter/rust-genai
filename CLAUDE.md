@@ -78,6 +78,7 @@ cargo run --example thought_echo
 1. Manual: User provides `FunctionDeclaration` and handles calls
 2. Semi-automatic: Macro generates declarations, user controls execution
 3. Fully automatic: `create_with_auto_functions()` discovers and executes via `inventory` crate
+4. Dependency-injected: `ToolService` trait provides tools with access to shared state (DB, APIs, config)
 
 **Streaming**: Uses `async-stream` generators and `futures-util::Stream`
 

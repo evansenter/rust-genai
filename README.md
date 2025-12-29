@@ -80,6 +80,7 @@ Note: `async-trait` and `inventory` are already included as dependencies of `rus
 > - `deep_research.rs` - Long-running research tasks
 > - `thought_echo.rs` - Thought continuation across turns
 > - `streaming_auto_functions.rs` - Streaming with automatic function calling
+> - `tool_service.rs` - Dependency injection for function calling
 
 You'll need a Google API key from [Google AI Studio](https://ai.dev/).
 
@@ -341,6 +342,74 @@ Key features of automatic function calling:
 - Error handling is built-in - function errors are reported back to the model
 - Maximum of 5 conversation turns to prevent infinite loops
 
+### Dependency Injection with ToolService
+
+For functions that need access to shared state (database connections, API clients, configuration), use the `ToolService` trait:
+
+```rust
+use rust_genai::{Client, CallableFunction, FunctionDeclaration, FunctionError, ToolService};
+use async_trait::async_trait;
+use serde_json::{json, Value};
+use std::sync::Arc;
+
+// A tool that uses injected configuration
+struct CalculatorTool {
+    precision: u32,  // Shared config from service
+}
+
+#[async_trait]
+impl CallableFunction for CalculatorTool {
+    fn declaration(&self) -> FunctionDeclaration {
+        FunctionDeclaration::builder("calculate")
+            .description("Performs arithmetic calculations")
+            .parameter("expression", json!({"type": "string"}))
+            .required(vec!["expression".to_string()])
+            .build()
+    }
+
+    async fn call(&self, args: Value) -> Result<Value, FunctionError> {
+        // Use self.precision from injected config
+        Ok(json!({ "result": "42", "precision": self.precision }))
+    }
+}
+
+// Service that provides tools with dependencies
+struct MathService {
+    precision: u32,
+}
+
+impl ToolService for MathService {
+    fn tools(&self) -> Vec<Arc<dyn CallableFunction>> {
+        vec![Arc::new(CalculatorTool { precision: self.precision })]
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = Client::builder(std::env::var("GEMINI_API_KEY")?).build();
+
+    // Create service with specific configuration
+    let service = Arc::new(MathService { precision: 4 });
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Calculate 2 + 2")
+        .with_tool_service(service)  // Inject the service
+        .create_with_auto_functions()
+        .await?;
+
+    println!("{}", result.response.text().unwrap_or("No response"));
+    Ok(())
+}
+```
+
+Key benefits of `ToolService`:
+- **Dependency injection**: Tools can access databases, APIs, configuration
+- **Instance-specific state**: Each service instance can have different configuration
+- **Override global functions**: Service functions shadow same-named global `#[tool]` functions
+- **Works with streaming**: Compatible with `create_stream_with_auto_functions()`
+
 ### Using the Procedural Macro
 
 The `#[tool]` macro provides an ergonomic way to create function declarations:
@@ -540,6 +609,7 @@ client
     .with_previous_interaction("id")            // Link to previous interaction
     .with_function(func_decl)                   // Add a function declaration
     .with_functions(vec![...])                  // Add multiple function declarations
+    .with_tool_service(service)                 // Inject dependency-providing service
     .with_google_search()                       // Enable Google Search grounding
     .with_code_execution()                      // Enable Python code execution
     .with_url_context()                         // Enable URL content fetching
