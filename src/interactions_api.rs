@@ -2,6 +2,25 @@
 ///
 /// This module provides ergonomic builders for InteractionContent and InteractionInput.
 ///
+/// # Module Organization
+///
+/// Functions are organized into two categories:
+///
+/// ## User Input Constructors (re-exported from crate root)
+///
+/// These are for content YOU send to the API:
+/// - **Text & Thought**: `text_content`, `thought_content`
+/// - **Function Calling**: `function_call_content`, `function_call_content_with_signature`, `function_result_content`
+/// - **Multimodal**: `image_*`, `audio_*`, `video_*`, `document_*`
+///
+/// ## Model Output Constructors (internal use)
+///
+/// These represent content the MODEL generates. Access via response methods
+/// (e.g., `response.google_search_results()`), not these constructors:
+/// - **Code Execution**: `code_execution_*`
+/// - **Google Search**: `google_search_*`
+/// - **URL Context**: `url_context_*`
+///
 /// # Thought Signatures
 ///
 /// When using function calling with Gemini 3 models, thought signatures are critical for
@@ -22,6 +41,17 @@
 /// [`function_call_content_with_signature`] to include the signature when echoing function calls.
 use genai_client::{CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
 use serde_json::Value;
+
+// ============================================================================
+// USER INPUT CONSTRUCTORS
+// ============================================================================
+//
+// These functions create content that users send to the API.
+// Re-exported from crate root for convenience.
+
+// ----------------------------------------------------------------------------
+// Text & Thought
+// ----------------------------------------------------------------------------
 
 /// Creates text content
 ///
@@ -50,6 +80,10 @@ pub fn thought_content(text: impl Into<String>) -> InteractionContent {
         text: Some(text.into()),
     }
 }
+
+// ----------------------------------------------------------------------------
+// Function Calling
+// ----------------------------------------------------------------------------
 
 /// Creates a function call content with optional thought signature and call ID
 ///
@@ -161,6 +195,10 @@ pub fn function_result_content(
         result,
     }
 }
+
+// ----------------------------------------------------------------------------
+// Multimodal Content (Images, Audio, Video, Documents)
+// ----------------------------------------------------------------------------
 
 /// Creates image content from base64-encoded data
 ///
@@ -362,6 +400,20 @@ pub fn document_uri_content(
     }
 }
 
+// ============================================================================
+// MODEL OUTPUT CONSTRUCTORS
+// ============================================================================
+//
+// These functions create content that represents MODEL-generated outputs.
+// NOT re-exported from crate root - access via response methods instead
+// (e.g., response.google_search_results(), response.code_execution_results()).
+//
+// Available via rust_genai::interactions_api::* if direct construction is needed.
+
+// ----------------------------------------------------------------------------
+// Code Execution (built-in tool output)
+// ----------------------------------------------------------------------------
+
 /// Creates code execution call content
 ///
 /// This variant appears when the model initiates code execution
@@ -443,6 +495,10 @@ pub fn code_execution_error(
     code_execution_result_content(call_id, CodeExecutionOutcome::Failed, error_output)
 }
 
+// ----------------------------------------------------------------------------
+// Google Search (built-in tool output)
+// ----------------------------------------------------------------------------
+
 /// Creates Google Search call content
 ///
 /// Appears when the model initiates a Google Search via the `GoogleSearch` tool.
@@ -475,6 +531,10 @@ pub fn google_search_call_content(query: impl Into<String>) -> InteractionConten
 pub fn google_search_result_content(results: serde_json::Value) -> InteractionContent {
     InteractionContent::GoogleSearchResult { results }
 }
+
+// ----------------------------------------------------------------------------
+// URL Context (built-in tool output)
+// ----------------------------------------------------------------------------
 
 /// Creates URL context call content
 ///
@@ -544,6 +604,10 @@ pub fn url_context_success(
 pub fn url_context_failure(url: impl Into<String>) -> InteractionContent {
     url_context_result_content(url, None)
 }
+
+// ============================================================================
+// TESTS
+// ============================================================================
 
 #[cfg(test)]
 mod tests {
