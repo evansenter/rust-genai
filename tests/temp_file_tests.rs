@@ -17,9 +17,13 @@
 mod common;
 
 use base64::Engine;
-use common::{TINY_PDF_BASE64, TINY_RED_PNG_BASE64, get_client, stateful_builder};
+use common::{
+    TINY_MP4_BASE64, TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, get_client,
+    stateful_builder,
+};
 use rust_genai::{
-    InteractionInput, InteractionStatus, document_from_file, image_from_file, text_content,
+    InteractionInput, InteractionStatus, audio_from_file, document_from_file, image_from_file,
+    text_content, video_from_file,
 };
 use std::io::Write;
 use tempfile::TempDir;
@@ -345,6 +349,88 @@ async fn test_csv_from_temp_file() {
         "Response should identify Alice as highest: {}",
         text
     );
+}
+
+// =============================================================================
+// Audio File Tests
+// =============================================================================
+
+/// Tests loading an audio file from a temp file using audio_from_file().
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_audio_from_temp_file() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let audio_path = temp_dir.path().join("test_audio.wav");
+
+    let audio_bytes = base64::engine::general_purpose::STANDARD
+        .decode(TINY_WAV_BASE64)
+        .expect("Failed to decode base64");
+    std::fs::write(&audio_path, &audio_bytes).expect("Failed to write audio");
+
+    let audio_content = audio_from_file(&audio_path)
+        .await
+        .expect("Failed to load audio from file");
+
+    let contents = vec![
+        text_content("Is this an audio file? Answer yes or no."),
+        audio_content,
+    ];
+
+    let response = stateful_builder(&client)
+        .with_input(InteractionInput::Content(contents))
+        .create()
+        .await
+        .expect("Audio interaction failed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+    println!("Audio response: {:?}", response.text());
+}
+
+// =============================================================================
+// Video File Tests
+// =============================================================================
+
+/// Tests loading a video file from a temp file using video_from_file().
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_video_from_temp_file() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let video_path = temp_dir.path().join("test_video.mp4");
+
+    let video_bytes = base64::engine::general_purpose::STANDARD
+        .decode(TINY_MP4_BASE64)
+        .expect("Failed to decode base64");
+    std::fs::write(&video_path, &video_bytes).expect("Failed to write video");
+
+    let video_content = video_from_file(&video_path)
+        .await
+        .expect("Failed to load video from file");
+
+    let contents = vec![
+        text_content("Is this a video file? Answer yes or no."),
+        video_content,
+    ];
+
+    let response = stateful_builder(&client)
+        .with_input(InteractionInput::Content(contents))
+        .create()
+        .await
+        .expect("Video interaction failed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+    println!("Video response: {:?}", response.text());
 }
 
 // =============================================================================
