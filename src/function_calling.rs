@@ -430,4 +430,21 @@ mod tests {
             "Last registered function should win"
         );
     }
+
+    #[test]
+    fn test_empty_tool_service() {
+        // A tool service that provides no tools
+        struct EmptyService;
+
+        impl ToolService for EmptyService {
+            fn tools(&self) -> Vec<Arc<dyn CallableFunction>> {
+                vec![]
+            }
+        }
+
+        let service = EmptyService;
+        let tools = service.tools();
+
+        assert!(tools.is_empty(), "Empty service should return no tools");
+    }
 }
