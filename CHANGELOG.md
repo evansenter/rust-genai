@@ -200,9 +200,17 @@ if let Some(text) = delta.text() { /* ... */ }
   - `function_results()` now returns `Vec<FunctionResultInfo>` with fields: `name`, `call_id`, `result`
   - New `has_function_results()` method on `InteractionResponse` for parity with `has_function_calls()`
 
+- **Logging strategy documentation** (#203): New `docs/LOGGING_STRATEGY.md` with comprehensive guidelines
+  - Log level definitions (error/warn/debug) with concrete examples
+  - Sensitive data handling (API keys redacted, user content at debug only)
+  - Evergreen pattern logging (Unknown variants log at warn level)
+  - Debug logging for auto-function loop lifecycle (iteration tracking, execution timing)
+  - Enable with `RUST_LOG=rust_genai=debug`
+
 ### Changed
 - **`InteractionContent` is now `#[non_exhaustive]`** (#44): Match statements must include a wildcard arm (`_ => {}`). This allows adding new variants in minor version updates without breaking downstream code.
 - **Deep Research example now requires background mode** (#179): Updated `deep_research.rs` example to reflect API requirement that `background=true` is mandatory for agent interactions. Removed synchronous mode demonstration since it is no longer supported by the API.
+- **Function execution failures now log at `warn!` instead of `error!`** (#203): Since function failures are recoverable (the error is sent to the model which can retry or adapt), they are now correctly logged as warnings rather than errors. This aligns with the new logging strategy documented in `docs/LOGGING_STRATEGY.md`.
 
 ### Fixed
 - **Streaming with function calls now works** (#27): Function call deltas are now properly parsed instead of causing errors
