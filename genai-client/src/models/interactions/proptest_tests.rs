@@ -63,6 +63,22 @@ fn arb_text() -> impl Strategy<Value = String> {
 // InteractionStatus Strategies
 // =============================================================================
 
+/// Strategy for known InteractionStatus variants only.
+/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
+#[cfg(feature = "strict-unknown")]
+fn arb_interaction_status() -> impl Strategy<Value = InteractionStatus> {
+    prop_oneof![
+        Just(InteractionStatus::Completed),
+        Just(InteractionStatus::InProgress),
+        Just(InteractionStatus::RequiresAction),
+        Just(InteractionStatus::Failed),
+        Just(InteractionStatus::Cancelled),
+    ]
+}
+
+/// Strategy for all InteractionStatus variants including Unknown.
+/// Used in normal mode (Unknown variants are gracefully handled).
+#[cfg(not(feature = "strict-unknown"))]
 fn arb_interaction_status() -> impl Strategy<Value = InteractionStatus> {
     prop_oneof![
         Just(InteractionStatus::Completed),
@@ -136,7 +152,8 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
 // InteractionContent Strategy
 // =============================================================================
 
-fn arb_interaction_content() -> impl Strategy<Value = InteractionContent> {
+/// Helper to create the known InteractionContent variants (used by both strict and non-strict modes).
+fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> {
     prop_oneof![
         // Text content
         proptest::option::of(arb_text()).prop_map(|text| InteractionContent::Text { text }),
@@ -232,6 +249,22 @@ fn arb_interaction_content() -> impl Strategy<Value = InteractionContent> {
         // UrlContextResult content
         (arb_text(), proptest::option::of(arb_text()))
             .prop_map(|(url, content)| InteractionContent::UrlContextResult { url, content }),
+    ]
+}
+
+/// Strategy for known InteractionContent variants only.
+/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
+#[cfg(feature = "strict-unknown")]
+fn arb_interaction_content() -> impl Strategy<Value = InteractionContent> {
+    arb_known_interaction_content()
+}
+
+/// Strategy for all InteractionContent variants including Unknown.
+/// Used in normal mode (Unknown variants are gracefully handled).
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_interaction_content() -> impl Strategy<Value = InteractionContent> {
+    prop_oneof![
+        arb_known_interaction_content(),
         // Unknown content (for forward compatibility testing)
         (arb_identifier(), arb_json_value()).prop_map(|(content_type, data)| {
             InteractionContent::Unknown { content_type, data }
@@ -305,7 +338,8 @@ fn arb_function_parameters() -> impl Strategy<Value = FunctionParameters> {
         })
 }
 
-fn arb_tool() -> impl Strategy<Value = Tool> {
+/// Helper to create the known Tool variants (used by both strict and non-strict modes).
+fn arb_known_tool() -> impl Strategy<Value = Tool> {
     prop_oneof![
         // Function tool
         (arb_identifier(), arb_text(), arb_function_parameters()).prop_map(
@@ -321,6 +355,22 @@ fn arb_tool() -> impl Strategy<Value = Tool> {
         Just(Tool::UrlContext),
         // MCP Server
         (arb_identifier(), arb_text()).prop_map(|(name, url)| Tool::McpServer { name, url }),
+    ]
+}
+
+/// Strategy for known Tool variants only.
+/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
+#[cfg(feature = "strict-unknown")]
+fn arb_tool() -> impl Strategy<Value = Tool> {
+    arb_known_tool()
+}
+
+/// Strategy for all Tool variants including Unknown.
+/// Used in normal mode (Unknown variants are gracefully handled).
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_tool() -> impl Strategy<Value = Tool> {
+    prop_oneof![
+        arb_known_tool(),
         // Unknown tool
         (arb_identifier(), arb_json_value())
             .prop_map(|(tool_type, data)| Tool::Unknown { tool_type, data }),
@@ -380,6 +430,21 @@ fn arb_interaction_response() -> impl Strategy<Value = InteractionResponse> {
 // StreamChunk Strategy
 // =============================================================================
 
+/// Strategy for known StreamChunk variants only.
+/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
+#[cfg(feature = "strict-unknown")]
+fn arb_stream_chunk() -> impl Strategy<Value = StreamChunk> {
+    prop_oneof![
+        // Delta variant
+        arb_interaction_content().prop_map(StreamChunk::Delta),
+        // Complete variant
+        arb_interaction_response().prop_map(StreamChunk::Complete),
+    ]
+}
+
+/// Strategy for all StreamChunk variants including Unknown.
+/// Used in normal mode (Unknown variants are gracefully handled).
+#[cfg(not(feature = "strict-unknown"))]
 fn arb_stream_chunk() -> impl Strategy<Value = StreamChunk> {
     prop_oneof![
         // Delta variant
