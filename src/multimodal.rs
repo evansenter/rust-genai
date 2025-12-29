@@ -4,6 +4,44 @@
 //! (images, audio, video, documents) by handling file loading, base64 encoding,
 //! and MIME type detection automatically.
 //!
+//! # File Size Recommendations
+//!
+//! The `*_from_file()` functions load files entirely into memory before base64
+//! encoding. This approach works well for typical use cases but has memory
+//! implications for large files:
+//!
+//! - **Memory usage**: The file is loaded into memory, then base64 encoded
+//!   (which increases size by ~33%), resulting in temporary peak memory usage
+//!   of approximately 2.3× the original file size
+//! - **Recommended limit**: ~20MB per file for inline data
+//! - **API limits**: The Gemini API has its own limits on inline data size
+//!
+//! ## Handling Large Files
+//!
+//! For files larger than 20MB, consider these alternatives:
+//!
+//! 1. **URI-based methods**: Upload files to Google Cloud Storage and use
+//!    the `add_*_uri()` builder methods instead:
+//!
+//!    ```no_run
+//!    # use rust_genai::Client;
+//!    # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//!    # let client = Client::new("key".to_string());
+//!    let response = client
+//!        .interaction()
+//!        .with_model("gemini-3-flash-preview")
+//!        .with_text("Describe this video")
+//!        .add_video_uri("gs://bucket/large-video.mp4", "video/mp4")
+//!        .create()
+//!        .await?;
+//!    # Ok(())
+//!    # }
+//!    ```
+//!
+//! 2. **Files API** (coming soon): For files that need to be referenced across
+//!    multiple interactions, the Files API allows uploading once and referencing
+//!    by URI. See issue #93 for tracking.
+//!
 //! # Example
 //!
 //! ```no_run
@@ -49,7 +87,8 @@ use std::path::Path;
 /// - `png` → `image/png`
 /// - `gif` → `image/gif`
 /// - `webp` → `image/webp`
-/// - `heic`, `heif` → `image/heic`
+/// - `heic` → `image/heic`
+/// - `heif` → `image/heif`
 ///
 /// ## Audio
 /// - `mp3` → `audio/mp3`
@@ -87,7 +126,8 @@ pub fn detect_mime_type(path: &Path) -> Option<&'static str> {
         "png" => Some("image/png"),
         "gif" => Some("image/gif"),
         "webp" => Some("image/webp"),
-        "heic" | "heif" => Some("image/heic"),
+        "heic" => Some("image/heic"),
+        "heif" => Some("image/heif"),
         // Audio
         "mp3" => Some("audio/mp3"),
         "wav" => Some("audio/wav"),
@@ -183,7 +223,14 @@ fn validate_mime_category(
 ///
 /// # Supported Formats
 ///
-/// JPEG, PNG, GIF, WebP, HEIC, HEIF
+/// | Extension | MIME Type |
+/// |-----------|-----------|
+/// | `.jpg`, `.jpeg` | `image/jpeg` |
+/// | `.png` | `image/png` |
+/// | `.gif` | `image/gif` |
+/// | `.webp` | `image/webp` |
+/// | `.heic` | `image/heic` |
+/// | `.heif` | `image/heif` |
 ///
 /// # Arguments
 ///
@@ -191,9 +238,14 @@ fn validate_mime_category(
 ///
 /// # Errors
 ///
-/// Returns an error if:
-/// - The file cannot be read
-/// - The file extension is not recognized as an image type
+/// Returns [`GenaiError::InvalidInput`] if:
+/// - The file cannot be read (with a suggestion based on the error type)
+/// - The file has no extension
+/// - The extension is not recognized as an image type
+/// - The extension maps to a non-image MIME type (e.g., `.mp3`)
+///
+/// For unsupported extensions, use [`image_from_file_with_mime()`] to specify
+/// the MIME type explicitly.
 ///
 /// # Example
 ///
@@ -252,9 +304,30 @@ pub async fn image_from_file_with_mime(
 
 /// Loads an audio file with automatic MIME type detection.
 ///
+/// Reads the file, encodes it as base64, and detects the MIME type from
+/// the file extension.
+///
 /// # Supported Formats
 ///
-/// WAV, MP3, OGG, FLAC, AAC, M4A
+/// | Extension | MIME Type |
+/// |-----------|-----------|
+/// | `.mp3` | `audio/mp3` |
+/// | `.wav` | `audio/wav` |
+/// | `.ogg` | `audio/ogg` |
+/// | `.flac` | `audio/flac` |
+/// | `.aac` | `audio/aac` |
+/// | `.m4a` | `audio/m4a` |
+///
+/// # Errors
+///
+/// Returns [`GenaiError::InvalidInput`] if:
+/// - The file cannot be read (with a suggestion based on the error type)
+/// - The file has no extension
+/// - The extension is not recognized as an audio type
+/// - The extension maps to a non-audio MIME type (e.g., `.jpg`)
+///
+/// For unsupported extensions, use [`audio_from_file_with_mime()`] to specify
+/// the MIME type explicitly.
 ///
 /// # Example
 ///
@@ -315,9 +388,29 @@ pub async fn audio_from_file_with_mime(
 
 /// Loads a video file with automatic MIME type detection.
 ///
+/// Reads the file, encodes it as base64, and detects the MIME type from
+/// the file extension.
+///
 /// # Supported Formats
 ///
-/// MP4, WebM, MOV, AVI, MKV
+/// | Extension | MIME Type |
+/// |-----------|-----------|
+/// | `.mp4` | `video/mp4` |
+/// | `.webm` | `video/webm` |
+/// | `.mov` | `video/quicktime` |
+/// | `.avi` | `video/x-msvideo` |
+/// | `.mkv` | `video/x-matroska` |
+///
+/// # Errors
+///
+/// Returns [`GenaiError::InvalidInput`] if:
+/// - The file cannot be read (with a suggestion based on the error type)
+/// - The file has no extension
+/// - The extension is not recognized as a video type
+/// - The extension maps to a non-video MIME type (e.g., `.jpg`)
+///
+/// For unsupported extensions, use [`video_from_file_with_mime()`] to specify
+/// the MIME type explicitly.
 ///
 /// # Example
 ///
@@ -378,11 +471,35 @@ pub async fn video_from_file_with_mime(
 
 /// Loads a document file with automatic MIME type detection.
 ///
-/// Currently only PDF is supported. Use `document_from_file_with_mime()` for other formats.
+/// Reads the file, encodes it as base64, and detects the MIME type from
+/// the file extension.
 ///
 /// # Supported Formats
 ///
-/// PDF
+/// | Extension | MIME Type |
+/// |-----------|-----------|
+/// | `.pdf` | `application/pdf` |
+///
+/// Currently only PDF is supported for auto-detection. For other document types
+/// (e.g., plain text), use [`document_from_file_with_mime()`] to specify the
+/// MIME type explicitly:
+///
+/// ```no_run
+/// use rust_genai::document_from_file_with_mime;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let doc = document_from_file_with_mime("notes.txt", "text/plain").await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Errors
+///
+/// Returns [`GenaiError::InvalidInput`] if:
+/// - The file cannot be read (with a suggestion based on the error type)
+/// - The file has no extension
+/// - The extension is not recognized as a document type
+/// - The extension maps to a non-document MIME type (e.g., `.jpg`)
 ///
 /// # Example
 ///
@@ -465,7 +582,7 @@ mod tests {
         );
         assert_eq!(
             detect_mime_type(Path::new("photo.heif")),
-            Some("image/heic")
+            Some("image/heif")
         );
     }
 
