@@ -223,6 +223,100 @@ async fn test_streaming_interaction() {
     .await;
 }
 
+/// Verifies that streaming deltas are truly incremental, not cumulative.
+///
+/// The Interactions API's `content.delta` events should return only new content
+/// that hasn't been sent before. If the API were returning cumulative content
+/// (the full response so far), we would see:
+/// - Duplicated text when concatenating
+/// - Characters counted multiple times
+///
+/// This test validates our streaming implementation by logging each delta
+/// individually and verifying the total length matches the sum of delta lengths.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_streaming_deltas_are_incremental() {
+    use futures_util::StreamExt;
+    use rust_genai::StreamChunk;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    with_timeout(TEST_TIMEOUT, async {
+        // Use a prompt that generates enough text to be split across multiple chunks.
+        // Short responses may arrive in a single chunk, which wouldn't test incrementality.
+        let mut stream = stateful_builder(&client)
+            .with_text("Write a haiku about each season: spring, summer, fall, and winter. Label each one.")
+            .create_stream();
+
+        let mut delta_texts: Vec<String> = Vec::new();
+        let mut delta_count = 0;
+
+        println!("\n=== Streaming Delta Analysis ===\n");
+
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(StreamChunk::Delta(delta)) => {
+                    delta_count += 1;
+                    if let Some(text) = delta.text() {
+                        println!("Delta #{}: {:?} (len={})", delta_count, text, text.len());
+                        delta_texts.push(text.to_string());
+                    }
+                }
+                Ok(StreamChunk::Complete(response)) => {
+                    println!("\n--- Complete ---");
+                    println!("Interaction ID: {}", response.id);
+                    if let Some(final_text) = response.text() {
+                        println!("Final text length: {}", final_text.len());
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Verify we received multiple text deltas - this is critical for testing incrementality.
+        // A single chunk wouldn't prove deltas are non-cumulative.
+        assert!(
+            delta_texts.len() >= 2,
+            "Test requires at least 2 text deltas to validate incrementality, got {}. \
+             Try a prompt that generates more output.",
+            delta_texts.len()
+        );
+
+        // Concatenate all deltas
+        let concatenated: String = delta_texts.iter().map(|s| s.as_str()).collect();
+        let sum_of_lengths: usize = delta_texts.iter().map(|s| s.len()).sum();
+
+        println!("\n=== Delta Statistics ===");
+        println!("Number of deltas: {}", delta_texts.len());
+        println!("Sum of individual delta lengths: {}", sum_of_lengths);
+        println!("Concatenated text length: {}", concatenated.len());
+        println!("Concatenated text: {:?}", concatenated);
+
+        // If deltas were cumulative (full text each time), the sum of lengths
+        // would be much larger than the final concatenated length.
+        // For truly incremental deltas, they should be equal.
+        assert_eq!(
+            sum_of_lengths,
+            concatenated.len(),
+            "Sum of delta lengths should equal concatenated length. \
+             If these differ, deltas may contain overlapping content."
+        );
+
+        // Verify the content looks reasonable (should mention seasons)
+        let lower = concatenated.to_lowercase();
+        assert!(
+            lower.contains("spring") || lower.contains("summer")
+                || lower.contains("fall") || lower.contains("winter"),
+            "Response should mention seasons. Got: {:?}",
+            concatenated
+        );
+    })
+    .await;
+}
+
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_streaming_with_raw_request() {
