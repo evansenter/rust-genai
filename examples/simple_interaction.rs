@@ -69,6 +69,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 GenaiError::Internal(i_err) => eprintln!("Internal Error: {i_err}"),
                 GenaiError::InvalidInput(input_err) => eprintln!("Invalid Input: {input_err}"),
                 GenaiError::MalformedResponse(msg) => eprintln!("Malformed Response: {msg}"),
+                // Wildcard arm required for #[non_exhaustive] forward compatibility
+                _ => eprintln!("Error: {e}"),
             }
             return Err(e.into());
         }
