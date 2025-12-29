@@ -11,7 +11,7 @@ use std::time::Instant;
 use futures_util::StreamExt;
 use futures_util::stream::BoxStream;
 use genai_client::{InteractionInput, InteractionResponse, StreamChunk};
-use log::{error, warn};
+use log::{debug, error, warn};
 use serde_json::{Value, json};
 
 use crate::GenaiError;
@@ -73,8 +73,9 @@ async fn execute_function(
         match function.call(args).await {
             Ok(result) => result,
             Err(e) => {
-                error!(
-                    "Function execution failed: function='{}', error='{}'",
+                warn!(
+                    "Function execution failed (recoverable): function='{}', error='{}'. \
+                     The error will be sent to the model, which may retry or adapt.",
                     name, e
                 );
                 json!({ "error": e.to_string() })
@@ -85,8 +86,9 @@ async fn execute_function(
         match function.call(args).await {
             Ok(result) => result,
             Err(e) => {
-                error!(
-                    "Function execution failed: function='{}', error='{}'",
+                warn!(
+                    "Function execution failed (recoverable): function='{}', error='{}'. \
+                     The error will be sent to the model, which may retry or adapt.",
                     name, e
                 );
                 json!({ "error": e.to_string() })
@@ -218,7 +220,7 @@ impl<'a> InteractionBuilder<'a> {
             // Log warnings for shadowed functions and filter them out
             all_declarations.retain(|decl| {
                 if service_names.contains(decl.name()) {
-                    log::warn!(
+                    warn!(
                         "Tool service function '{}' shadows global registry function with same name",
                         decl.name()
                     );
@@ -247,7 +249,12 @@ impl<'a> InteractionBuilder<'a> {
         let mut last_response: Option<InteractionResponse> = None;
 
         // Main auto-function loop (configurable iterations to prevent infinite loops)
-        for _loop_count in 0..max_loops {
+        for loop_count in 0..max_loops {
+            debug!(
+                "Auto-function loop iteration {}/{}",
+                loop_count + 1,
+                max_loops
+            );
             let response = client.create_interaction(request.clone()).await?;
 
             // Extract function calls using convenience method
@@ -255,6 +262,7 @@ impl<'a> InteractionBuilder<'a> {
 
             // If no function calls, we're done!
             if function_calls.is_empty() {
+                debug!("No function calls in response, completing auto-function loop");
                 return Ok(AutoFunctionResult {
                     response,
                     executions: all_executions,
@@ -264,6 +272,7 @@ impl<'a> InteractionBuilder<'a> {
 
             // Build function results for next iteration
             let mut function_results = Vec::new();
+            debug!("Executing {} function call(s)", function_calls.len());
 
             for call in function_calls {
                 // Validate that we have a call_id (required by API)
@@ -279,6 +288,7 @@ impl<'a> InteractionBuilder<'a> {
                 )
                 .await;
                 let duration = start.elapsed();
+                debug!("Function '{}' executed in {:?}", call.name, duration);
 
                 // Track execution for the result
                 all_executions.push(FunctionExecutionResult::new(
@@ -428,7 +438,7 @@ impl<'a> InteractionBuilder<'a> {
                 // Log warnings for shadowed functions and filter them out
                 all_declarations.retain(|decl| {
                     if service_names.contains(decl.name()) {
-                        log::warn!(
+                        warn!(
                             "Tool service function '{}' shadows global registry function with same name",
                             decl.name()
                         );
@@ -457,7 +467,8 @@ impl<'a> InteractionBuilder<'a> {
             let mut last_response: Option<InteractionResponse> = None;
 
             // Main auto-function streaming loop
-            for _loop_count in 0..max_loops {
+            for loop_count in 0..max_loops {
+                debug!("Auto-function streaming loop iteration {}/{}", loop_count + 1, max_loops);
                 // Enable streaming for this request
                 request.stream = Some(true);
 
@@ -505,11 +516,18 @@ impl<'a> InteractionBuilder<'a> {
 
                 // If no function calls, we're done!
                 if !has_function_calls {
+                    debug!("No function calls in response, completing auto-function streaming loop");
                     yield AutoFunctionStreamChunk::Complete(response);
                     return;
                 }
 
                 // Signal that we're executing functions (pass the response for inspection)
+                let call_count = if !response_function_calls.is_empty() {
+                    response_function_calls.len()
+                } else {
+                    accumulated_calls.len()
+                };
+                debug!("Executing {} function call(s)", call_count);
                 yield AutoFunctionStreamChunk::ExecutingFunctions(response.clone());
 
                 // Determine which function calls to execute.
@@ -546,6 +564,10 @@ impl<'a> InteractionBuilder<'a> {
                     )
                     .await;
                     let duration = start.elapsed();
+                    debug!(
+                        "Function '{}' executed in {:?}",
+                        name, duration
+                    );
 
                     // Track result for yielding
                     execution_results.push(FunctionExecutionResult::new(
