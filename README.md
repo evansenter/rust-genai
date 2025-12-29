@@ -350,11 +350,11 @@ For functions that need access to shared state (database connections, API client
 use rust_genai::{Client, CallableFunction, FunctionDeclaration, FunctionError, ToolService};
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
-// A tool that uses injected configuration
+// A tool that reads from shared mutable state
 struct CalculatorTool {
-    precision: u32,  // Shared config from service
+    precision: Arc<RwLock<u32>>,  // Shared config, can change at runtime
 }
 
 #[async_trait]
@@ -368,19 +368,29 @@ impl CallableFunction for CalculatorTool {
     }
 
     async fn call(&self, args: Value) -> Result<Value, FunctionError> {
-        // Use self.precision from injected config
-        Ok(json!({ "result": "42", "precision": self.precision }))
+        let precision = *self.precision.read().unwrap();
+        Ok(json!({ "result": "42", "precision": precision }))
     }
 }
 
-// Service that provides tools with dependencies
+// Service that provides tools with shared dependencies
 struct MathService {
-    precision: u32,
+    precision: Arc<RwLock<u32>>,
+}
+
+impl MathService {
+    fn new(precision: u32) -> Self {
+        Self { precision: Arc::new(RwLock::new(precision)) }
+    }
+
+    fn set_precision(&self, precision: u32) {
+        *self.precision.write().unwrap() = precision;
+    }
 }
 
 impl ToolService for MathService {
     fn tools(&self) -> Vec<Arc<dyn CallableFunction>> {
-        vec![Arc::new(CalculatorTool { precision: self.precision })]
+        vec![Arc::new(CalculatorTool { precision: self.precision.clone() })]
     }
 }
 
@@ -388,26 +398,62 @@ impl ToolService for MathService {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::builder(std::env::var("GEMINI_API_KEY")?).build();
 
-    // Create service with specific configuration
-    let service = Arc::new(MathService { precision: 4 });
+    // Create a single service instance
+    let service = Arc::new(MathService::new(2));
 
-    let result = client
-        .interaction()
+    // First request uses precision=2
+    let result1 = client.interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Calculate 2 + 2")
-        .with_tool_service(service)  // Inject the service
+        .with_tool_service(service.clone())  // Clone the Arc
         .create_with_auto_functions()
         .await?;
 
-    println!("{}", result.response.text().unwrap_or("No response"));
+    // Change precision on the SAME service instance
+    service.set_precision(8);
+
+    // Second request uses precision=8
+    let result2 = client.interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Calculate 3 * 3")
+        .with_tool_service(service.clone())  // Same service
+        .create_with_auto_functions()
+        .await?;
+
     Ok(())
 }
 ```
 
+### Choosing Your Approach
+
+| Approach | When to Use |
+|----------|-------------|
+| **`#[tool]` macro** | Simple stateless functions; no external dependencies; same behavior for all requests |
+| **`ToolService`** | Need shared state (DB pools, API clients); need dynamic config; need per-request context (user ID, tracing) |
+| **Manual (`with_function`)** | Full control over function execution; custom error handling; one-off declarations |
+
+**Use `#[tool]` macro** (simplest):
+```rust
+#[tool]
+fn get_weather(city: String) -> String {
+    format!("Weather in {}", city)  // Stateless, no dependencies
+}
+```
+
+**Use `ToolService`** (shared state):
+```rust
+impl ToolService for MyService {
+    fn tools(&self) -> Vec<Arc<dyn CallableFunction>> {
+        vec![Arc::new(DbQueryTool { pool: self.db_pool.clone() })]
+    }
+}
+```
+
 Key benefits of `ToolService`:
-- **Dependency injection**: Tools can access databases, APIs, configuration
-- **Instance-specific state**: Each service instance can have different configuration
-- **Override global functions**: Service functions shadow same-named global `#[tool]` functions
+- **Shared mutable state**: Use `Arc<RwLock<T>>` for config that changes at runtime
+- **Dependency injection**: Tools access databases, API clients, feature flags
+- **Same instance across requests**: Reuse connections, share caches
+- **Override global functions**: Service functions shadow same-named `#[tool]` functions
 - **Works with streaming**: Compatible with `create_stream_with_auto_functions()`
 
 ### Using the Procedural Macro

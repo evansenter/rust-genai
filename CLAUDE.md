@@ -80,6 +80,13 @@ cargo run --example thought_echo
 3. Fully automatic: `create_with_auto_functions()` discovers and executes via `inventory` crate
 4. Dependency-injected: `ToolService` trait provides tools with access to shared state (DB, APIs, config)
 
+**Choosing Function Calling Approach**:
+- **`#[tool]` macro**: Simple stateless functions, no external dependencies, same behavior for all requests
+- **`ToolService`**: Shared mutable state (`Arc<RwLock<T>>`), DB pools, API clients, per-request context, dynamic config
+- **Manual**: Full control over execution, custom error handling, one-off declarations
+
+**ToolService Pattern**: Use `Arc<RwLock<T>>` for interior mutability. Same service instance reused across requests via `service.clone()` (clones the Arc, not the service). See `examples/tool_service.rs`.
+
 **Streaming**: Uses `async-stream` generators and `futures-util::Stream`
 
 ### Error Types
