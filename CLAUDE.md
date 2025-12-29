@@ -55,6 +55,7 @@ cargo run --example multimodal_image
 cargo run --example audio_input
 cargo run --example video_input
 cargo run --example pdf_input
+cargo run --example text_input
 cargo run --example image_generation
 cargo run --example deep_research
 cargo run --example thought_echo
