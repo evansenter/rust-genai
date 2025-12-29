@@ -342,7 +342,9 @@ impl<'a> InteractionBuilder<'a> {
             }
             // Required by #[non_exhaustive] but unreachable: InteractionInput uses
             // #[serde(untagged)] so only Text/Content can exist at runtime.
-            Some(_) => unreachable!("InteractionInput is untagged; only Text/Content variants exist"),
+            Some(_) => {
+                unreachable!("InteractionInput is untagged; only Text/Content variants exist")
+            }
         }
     }
 
