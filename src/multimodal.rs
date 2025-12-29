@@ -160,8 +160,27 @@ pub fn detect_mime_type(path: &Path) -> Option<&'static str> {
 }
 
 /// Internal helper to load and encode a file.
+///
+/// Warns if file size exceeds 20MB (the recommended threshold for inline data).
+/// For large files, consider using URI-based content or the Files API.
 async fn load_and_encode_file(path: impl AsRef<Path>) -> Result<String, GenaiError> {
+    const LARGE_FILE_THRESHOLD: u64 = 20 * 1024 * 1024; // 20MB
+
     let path = path.as_ref();
+
+    // Check file size and warn if large (don't fail - let users proceed if they want)
+    if let Ok(metadata) = tokio::fs::metadata(path).await {
+        if metadata.len() > LARGE_FILE_THRESHOLD {
+            log::warn!(
+                "File '{}' is {:.1}MB which exceeds the recommended 20MB limit for inline data. \
+                 Consider using URI-based content (e.g., gs:// URLs) or the Files API for large files \
+                 to reduce memory usage. See: https://ai.google.dev/gemini-api/docs/files",
+                path.display(),
+                metadata.len() as f64 / (1024.0 * 1024.0)
+            );
+        }
+    }
+
     let bytes = tokio::fs::read(path).await.map_err(|e| {
         let suggestion = match e.kind() {
             std::io::ErrorKind::NotFound => " Check that the file path is correct.",
