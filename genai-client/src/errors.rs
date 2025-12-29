@@ -17,6 +17,7 @@ use thiserror::Error;
 /// }
 /// ```
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum GenaiError {
     #[error("HTTP request error: {0}")]
     Http(#[from] reqwest::Error),

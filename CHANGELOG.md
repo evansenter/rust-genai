@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING CHANGES
 
+#### GenaiError is Now #[non_exhaustive] (#196)
+- **`GenaiError` enum now includes `#[non_exhaustive]`**: Match statements must include a wildcard arm
+- **New `GenaiError::MalformedResponse` variant**: For cases where the API returns 200 OK but with unexpected/malformed content
+- This follows [Evergreen principles](https://github.com/google-deepmind/evergreen-spec) for forward-compatible API design
+
+**Migration guide:**
+```rust
+// Before (exhaustive match):
+match error {
+    GenaiError::Http(e) => ...,
+    GenaiError::Api { .. } => ...,
+    // etc.
+}
+
+// After (must include wildcard):
+match error {
+    GenaiError::Http(e) => ...,
+    GenaiError::Api { .. } => ...,
+    GenaiError::MalformedResponse(msg) => ...,
+    _ => ...,  // Required for forward compatibility
+}
+```
+
 #### URI Content Helpers Require mime_type (#131)
 - **Changed signatures**: `image_uri_content()`, `audio_uri_content()`, `video_uri_content()`, `document_uri_content()` now require `mime_type` as a mandatory parameter instead of `Option<String>`
 - **Rationale**: Gemini API requires mime_type for URI-based content; making this compile-time enforced prevents runtime API errors
