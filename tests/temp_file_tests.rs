@@ -354,6 +354,10 @@ async fn test_csv_from_temp_file() {
 // =============================================================================
 
 /// Tests loading an audio file from a temp file using audio_from_file().
+///
+/// Note: We only verify `has_text()` rather than specific content because the tiny
+/// synthetic audio file may not produce reliable content descriptions. The important
+/// validation is that the API accepts and processes the audio format correctly.
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_audio_from_temp_file() {
@@ -395,6 +399,10 @@ async fn test_audio_from_temp_file() {
 // =============================================================================
 
 /// Tests loading a video file from a temp file using video_from_file().
+///
+/// Note: We only verify `has_text()` rather than specific content because the tiny
+/// synthetic video file may not produce reliable content descriptions. The important
+/// validation is that the API accepts and processes the video format correctly.
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_video_from_temp_file() {
