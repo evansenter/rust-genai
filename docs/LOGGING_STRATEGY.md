@@ -257,7 +257,7 @@ log::debug!("{:?}", internal_state);
 
 ### Testing Logs
 
-Use the `test_log` crate for tests that need to verify logging behavior:
+The `test_log` crate can be used for tests that need to verify logging behavior:
 
 ```rust
 #[test_log::test]
@@ -266,6 +266,8 @@ fn test_unknown_type_logs_warning() {
     // Verify warning appears in test output
 }
 ```
+
+> **Note**: `test_log` is not currently used in the codebase. The logging changes are straightforward enough that manual verification via `RUST_LOG=rust_genai=debug` is adequate. Consider adding logging tests if regressions become an issue.
 
 ## Integration with User Code
 

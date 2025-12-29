@@ -220,7 +220,7 @@ impl<'a> InteractionBuilder<'a> {
             // Log warnings for shadowed functions and filter them out
             all_declarations.retain(|decl| {
                 if service_names.contains(decl.name()) {
-                    log::warn!(
+                    warn!(
                         "Tool service function '{}' shadows global registry function with same name",
                         decl.name()
                     );
@@ -438,7 +438,7 @@ impl<'a> InteractionBuilder<'a> {
                 // Log warnings for shadowed functions and filter them out
                 all_declarations.retain(|decl| {
                     if service_names.contains(decl.name()) {
-                        log::warn!(
+                        warn!(
                             "Tool service function '{}' shadows global registry function with same name",
                             decl.name()
                         );

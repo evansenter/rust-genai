@@ -276,6 +276,7 @@ See `docs/LOGGING_STRATEGY.md` for the full logging strategy. Key points:
 - **Log levels**: `error` for unrecoverable failures, `warn` for recoverable issues (including Evergreen unknown variants), `debug` for API lifecycle events and request bodies
 - **Sensitive data**: API keys are redacted in `Debug` output. User prompts/media logged only at `debug` level (disabled by default)
 - **Evergreen logging**: All `Unknown` variants log at `warn` level to surface API evolution
+- **Maintenance**: When adding new logging, update the strategy doc to keep examples accurate
 
 Enable debug logging with:
 ```bash
