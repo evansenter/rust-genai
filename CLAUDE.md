@@ -269,6 +269,19 @@ Breaking changes are always permitted, and preferred when they:
 
 Prefer clean breaks over backwards-compatibility shims. Don't add deprecation warnings or migration layers—just make the change.
 
+## Logging
+
+See `docs/LOGGING_STRATEGY.md` for the full logging strategy. Key points:
+
+- **Log levels**: `error` for unrecoverable failures, `warn` for recoverable issues (including Evergreen unknown variants), `debug` for API lifecycle events and request bodies
+- **Sensitive data**: API keys are redacted in `Debug` output. User prompts/media logged only at `debug` level (disabled by default)
+- **Evergreen logging**: All `Unknown` variants log at `warn` level to surface API evolution
+
+Enable debug logging with:
+```bash
+RUST_LOG=rust_genai=debug cargo run --example simple_interaction
+```
+
 ## Technical Notes
 
 - Rust edition 2024 (requires Rust 1.85+)
