@@ -420,6 +420,25 @@ mod duration_millis {
 /// This type provides visibility into which functions were called during
 /// automatic function execution, useful for debugging, logging, and evaluation.
 ///
+/// # Memory Considerations
+///
+/// The `executions` vector accumulates all [`FunctionExecutionResult`] records
+/// from each iteration of the auto-function loop. For typical use cases (1-5
+/// iterations with 1-3 functions each), this is negligible.
+///
+/// For edge cases with many function calls or large result payloads, consider:
+///
+/// - **Limit iterations**: Use [`crate::InteractionBuilder::with_max_function_call_loops()`]
+///   to cap the maximum number of iterations (default: 5)
+/// - **Extract and drop**: Extract only the data you need, then drop the result
+/// - **Manual control**: For fine-grained memory management, implement function
+///   calling manually using [`crate::InteractionBuilder::with_functions()`] and
+///   [`crate::InteractionBuilder::create()`] instead of the auto-function helpers
+///
+/// Each `FunctionExecutionResult` contains the function name, call ID, result
+/// value (as `serde_json::Value`), and execution duration. Memory usage scales
+/// primarily with the size of function result payloads.
+///
 /// # Example
 ///
 /// ```no_run
