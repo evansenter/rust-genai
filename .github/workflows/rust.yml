@@ -43,6 +43,7 @@ jobs:
 
   test-integration:
     name: Integration Tests (${{ matrix.group }})
+    needs: check
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     strategy:
