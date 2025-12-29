@@ -320,7 +320,10 @@ impl<'a> InteractionBuilder<'a> {
             Some(other) => {
                 let current = std::mem::replace(other, InteractionInput::Content(vec![]));
                 self.input = Some(InteractionInput::Content(vec![item]));
-                log::warn!("Unknown InteractionInput variant encountered, content may be lost: {:?}", current);
+                log::warn!(
+                    "Unknown InteractionInput variant encountered, content may be lost: {:?}",
+                    current
+                );
             }
         }
     }
