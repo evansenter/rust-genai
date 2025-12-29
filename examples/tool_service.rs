@@ -4,6 +4,11 @@
 //! the `ToolService` trait. This enables tools to access shared state like
 //! database connections, API clients, or configuration.
 //!
+//! Key concepts demonstrated:
+//! - Shared mutable state via `Arc<RwLock<T>>`
+//! - Same service instance reused across multiple requests
+//! - Dynamic configuration changes between requests
+//!
 //! # Running
 //!
 //! ```bash
@@ -18,26 +23,19 @@ use async_trait::async_trait;
 use rust_genai::{CallableFunction, Client, FunctionDeclaration, FunctionError, ToolService};
 use serde_json::{Value, json};
 use std::env;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 // =============================================================================
-// Example: A calculator tool with configurable precision
+// Example: A calculator tool with dynamically configurable precision
 // =============================================================================
 
-/// Configuration that will be injected into our tools
-struct CalculatorConfig {
-    precision: u32,
-}
-
-/// A calculator tool that uses injected configuration
+/// A calculator tool that reads precision from shared mutable state.
+///
+/// The precision can be changed at runtime, and all subsequent function
+/// calls will use the new value.
 struct CalculatorTool {
-    config: Arc<CalculatorConfig>,
-}
-
-impl CalculatorTool {
-    fn new(config: Arc<CalculatorConfig>) -> Self {
-        Self { config }
-    }
+    /// Shared precision config - uses RwLock for interior mutability
+    precision: Arc<RwLock<u32>>,
 }
 
 #[async_trait]
@@ -62,10 +60,10 @@ impl CallableFunction for CalculatorTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| FunctionError::ArgumentMismatch("Missing 'expression'".into()))?;
 
-        println!(
-            "  [CalculatorTool called with precision={}]",
-            self.config.precision
-        );
+        // Read current precision from shared state
+        let precision = *self.precision.read().unwrap();
+
+        println!("  [CalculatorTool called with precision={}]", precision);
 
         // Simple expression parsing (in real code, use a proper parser)
         let result = if expression.contains('+') {
@@ -91,12 +89,12 @@ impl CallableFunction for CalculatorTool {
         };
 
         // Apply precision from config
-        let formatted = format!("{:.prec$}", result, prec = self.config.precision as usize);
+        let formatted = format!("{:.prec$}", result, prec = precision as usize);
 
         Ok(json!({
             "expression": expression,
             "result": formatted,
-            "precision": self.config.precision
+            "precision": precision
         }))
     }
 }
@@ -105,22 +103,38 @@ impl CallableFunction for CalculatorTool {
 // ToolService implementation
 // =============================================================================
 
-/// A service that provides tools with injected dependencies
+/// A service that provides tools with shared mutable configuration.
+///
+/// This demonstrates how to inject dependencies that can change at runtime.
+/// Real-world examples include:
+/// - Database connection pools
+/// - API clients with refreshable auth tokens
+/// - Feature flags that can be toggled
+/// - Per-request context (user ID, tracing spans)
 struct MathToolService {
-    config: Arc<CalculatorConfig>,
+    /// Shared precision - can be modified between requests
+    precision: Arc<RwLock<u32>>,
 }
 
 impl MathToolService {
     fn new(precision: u32) -> Self {
         Self {
-            config: Arc::new(CalculatorConfig { precision }),
+            precision: Arc::new(RwLock::new(precision)),
         }
+    }
+
+    /// Update the precision setting. All subsequent function calls will use
+    /// the new value.
+    fn set_precision(&self, precision: u32) {
+        *self.precision.write().unwrap() = precision;
     }
 }
 
 impl ToolService for MathToolService {
     fn tools(&self) -> Vec<Arc<dyn CallableFunction>> {
-        vec![Arc::new(CalculatorTool::new(self.config.clone()))]
+        vec![Arc::new(CalculatorTool {
+            precision: self.precision.clone(),
+        })]
     }
 }
 
@@ -136,62 +150,58 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("=== TOOL SERVICE EXAMPLE ===\n");
 
-    // Create a tool service with specific configuration
-    // This injects the precision setting into the calculator tool
-    let service = Arc::new(MathToolService::new(4)); // 4 decimal places
+    // Create a single service instance with initial precision of 2
+    let service = Arc::new(MathToolService::new(2));
 
-    println!("Tool service created with precision=4\n");
+    println!("Created service with precision=2\n");
 
-    let prompt = "What is 123.456 + 789.012?";
-    println!("User: {}\n", prompt);
-    println!("Processing...\n");
+    // --- First request: precision=2 ---
+    let prompt1 = "What is 123.456 + 789.012?";
+    println!("User: {}\n", prompt1);
 
-    // Use the tool service with auto function calling
-    let result = client
+    let result1 = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text(prompt)
-        .with_tool_service(service)
+        .with_text(prompt1)
+        .with_tool_service(service.clone()) // Clone the Arc, not the service
         .create_with_auto_functions()
         .await?;
 
-    // Show execution details
-    if !result.executions.is_empty() {
+    if !result1.executions.is_empty() {
         println!("Function executions:");
-        for exec in &result.executions {
-            println!(
-                "  - {} ({:?}): {}",
-                exec.name,
-                exec.duration,
-                exec.result
-                    .to_string()
-                    .chars()
-                    .take(100)
-                    .collect::<String>()
-            );
+        for exec in &result1.executions {
+            println!("  - {} -> {}", exec.name, exec.result);
         }
         println!();
     }
+    println!(
+        "Assistant: {}\n",
+        result1.response.text().unwrap_or_default()
+    );
 
-    // Show the response
-    println!("Assistant: {}", result.response.text().unwrap_or_default());
+    // --- Change precision on the SAME service instance ---
+    println!("--- Updating precision to 8 on same service instance ---\n");
+    service.set_precision(8);
 
-    // Demonstrate with different configuration
-    println!("\n--- With different precision ---\n");
-
-    let service_high_precision = Arc::new(MathToolService::new(8)); // 8 decimal places
-
-    let prompt2 = "Calculate 1 + 2";
+    // --- Second request: same service, now with precision=8 ---
+    let prompt2 = "What is 1.0 * 3.0?";
     println!("User: {}\n", prompt2);
 
     let result2 = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(prompt2)
-        .with_tool_service(service_high_precision)
+        .with_tool_service(service.clone()) // Same service instance
         .create_with_auto_functions()
         .await?;
 
+    if !result2.executions.is_empty() {
+        println!("Function executions:");
+        for exec in &result2.executions {
+            println!("  - {} -> {}", exec.name, exec.result);
+        }
+        println!();
+    }
     println!("Assistant: {}", result2.response.text().unwrap_or_default());
 
     println!("\n=== END EXAMPLE ===");
