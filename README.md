@@ -81,6 +81,7 @@ Note: `async-trait` and `inventory` are already included as dependencies of `rus
 > - `thought_echo.rs` - Thought continuation across turns
 > - `streaming_auto_functions.rs` - Streaming with automatic function calling
 > - `tool_service.rs` - Dependency injection for function calling
+> - `manual_function_calling.rs` - Full control over function execution loop
 
 You'll need a Google API key from [Google AI Studio](https://ai.dev/).
 
@@ -221,7 +222,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Function Calling
 
-For manual function calling with full control over execution:
+There are two categories of tools in this library:
+
+**Client-Side Tools** - Functions YOUR code executes:
+- The model requests a function → Your code runs it → Results sent back to model
+- Use `#[tool]` macro, `ToolService`, or manual handling
+
+**Server-Side Tools** - Built-in tools the API executes:
+- The model uses the tool → API runs it → Results in response
+- Google Search, Code Execution, URL Context (see [Built-in Tools](#built-in-tools))
+
+#### Quick Decision Guide for Client-Side Tools
+
+| Need | Approach | Example |
+|------|----------|---------|
+| Simplest stateless tools | `#[tool]` macro + auto | `auto_function_calling.rs` |
+| Stateful tools (DB, APIs, config) | `ToolService` trait | `tool_service.rs` |
+| Full execution control | Manual with `create()` | `manual_function_calling.rs` |
+| Streaming + auto execution | `create_stream_with_auto_functions()` | `streaming_auto_functions.rs` |
+
+#### Manual Function Calling
+
+For full control over the execution loop:
 
 ```rust
 use rust_genai::{Client, FunctionDeclaration, function_result_content, WithFunctionCalling};
@@ -424,23 +446,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### Choosing Your Approach
+#### Choosing Your Approach
 
-| Approach | When to Use |
-|----------|-------------|
-| **`#[tool]` macro** | Simple stateless functions; no external dependencies; same behavior for all requests |
-| **`ToolService`** | Need shared state (DB pools, API clients); need dynamic config; need per-request context (user ID, tracing) |
-| **Manual (`with_function`)** | Full control over function execution; custom error handling; one-off declarations |
+| Approach | Registration | Execution | State | Best For |
+|----------|-------------|-----------|-------|----------|
+| `#[tool]` macro | Compile-time (global) | Auto | Stateless | Simple tools, clean code |
+| `ToolService` | Runtime (per-request) | Auto | Stateful | DB connections, API clients |
+| `FunctionDeclaration::builder()` | Manual | Manual | Flexible | Dynamic schemas, full control |
 
-**Use `#[tool]` macro** (simplest):
+**Use `#[tool]` macro** when you have simple, stateless functions:
 ```rust
 #[tool]
 fn get_weather(city: String) -> String {
-    format!("Weather in {}", city)  // Stateless, no dependencies
+    format!("Weather in {}", city)  // No external dependencies
 }
 ```
 
-**Use `ToolService`** (shared state):
+**Use `ToolService`** when you need shared state or dependency injection:
 ```rust
 impl ToolService for MyService {
     fn tools(&self) -> Vec<Arc<dyn CallableFunction>> {
@@ -448,6 +470,12 @@ impl ToolService for MyService {
     }
 }
 ```
+
+**Use manual handling** when you need full control over execution:
+- Custom rate limiting, caching, or circuit breakers
+- Complex error recovery logic
+- Integration with external systems requiring special handling
+- Logging, metrics, or tracing around each function call
 
 Key benefits of `ToolService`:
 - **Shared mutable state**: Use `Arc<RwLock<T>>` for config that changes at runtime

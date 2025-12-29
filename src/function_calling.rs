@@ -331,4 +331,103 @@ mod tests {
         );
         assert_eq!(casual_result.unwrap(), json!({ "message": "Hey Joe!" }));
     }
+
+    #[test]
+    fn test_registry_returns_none_for_unknown_function() {
+        let registry = get_global_function_registry();
+
+        // Looking up a function that doesn't exist should return None
+        let result = registry.get("this_function_definitely_does_not_exist_xyz123");
+        assert!(
+            result.is_none(),
+            "Registry should return None for unknown functions"
+        );
+    }
+
+    #[test]
+    fn test_registry_all_declarations_contains_registered() {
+        let registry = get_global_function_registry();
+        let declarations = registry.all_declarations();
+
+        // Our test function should be in the list
+        let names: Vec<_> = declarations.iter().map(|d| d.name()).collect();
+        assert!(
+            names.contains(&"test_function_global"),
+            "all_declarations should include registered function"
+        );
+    }
+
+    #[test]
+    fn test_tool_service_tools_are_independent() {
+        // Verify that calling tools() multiple times returns independent instances
+        let service = GreetingService {
+            prefix: "Hi".to_string(),
+        };
+
+        let tools1 = service.tools();
+        let tools2 = service.tools();
+
+        // Both should have the same declaration
+        assert_eq!(
+            tools1[0].declaration().name(),
+            tools2[0].declaration().name()
+        );
+
+        // But they should be separate Arc instances (different pointers)
+        // This ensures each call to tools() creates fresh tool instances
+        assert!(!Arc::ptr_eq(&tools1[0], &tools2[0]));
+    }
+
+    #[test]
+    fn test_registry_duplicate_registration_last_wins() {
+        // Test that when two functions with the same name are registered,
+        // the last one wins (and a warning is logged)
+        let mut registry = FunctionRegistry::new();
+
+        // First function
+        struct FirstFunc;
+        #[async_trait]
+        impl CallableFunction for FirstFunc {
+            fn declaration(&self) -> FunctionDeclaration {
+                FunctionDeclaration::new(
+                    "duplicate_name".to_string(),
+                    "First function".to_string(),
+                    genai_client::FunctionParameters::new("object".to_string(), json!({}), vec![]),
+                )
+            }
+            async fn call(&self, _args: Value) -> Result<Value, FunctionError> {
+                Ok(json!("first"))
+            }
+        }
+
+        // Second function with same name
+        struct SecondFunc;
+        #[async_trait]
+        impl CallableFunction for SecondFunc {
+            fn declaration(&self) -> FunctionDeclaration {
+                FunctionDeclaration::new(
+                    "duplicate_name".to_string(),
+                    "Second function".to_string(),
+                    genai_client::FunctionParameters::new("object".to_string(), json!({}), vec![]),
+                )
+            }
+            async fn call(&self, _args: Value) -> Result<Value, FunctionError> {
+                Ok(json!("second"))
+            }
+        }
+
+        // Register first, then second with same name
+        registry.register_raw(Box::new(FirstFunc));
+        registry.register_raw(Box::new(SecondFunc));
+
+        // Last registration should win
+        let func = registry
+            .get("duplicate_name")
+            .expect("Function should exist");
+        assert_eq!(
+            func.declaration().description(),
+            "Second function",
+            "Last registered function should win"
+        );
+    }
 }
