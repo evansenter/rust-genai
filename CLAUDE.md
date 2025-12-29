@@ -244,6 +244,15 @@ GitHub Actions (`.github/workflows/rust.yml`) runs 9 parallel jobs: check, test,
 
 - **Model name**: Always use `gemini-3-flash-preview` throughout the project (tests, examples, documentation). Do not reference other model names.
 
+## Versioning Philosophy
+
+Breaking changes are always permitted, and preferred when they:
+- Simplify the API surface
+- Remove unnecessary abstractions
+- Align with Evergreen principles
+
+Prefer clean breaks over backwards-compatibility shims. Don't add deprecation warnings or migration layers—just make the change.
+
 ## Technical Notes
 
 - Rust edition 2024 (requires Rust 1.85+)
