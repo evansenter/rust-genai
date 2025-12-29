@@ -340,15 +340,9 @@ impl<'a> InteractionBuilder<'a> {
             Some(InteractionInput::Content(contents)) => {
                 contents.push(item);
             }
-            // Future InteractionInput variants - convert to Content array
-            Some(other) => {
-                let current = std::mem::replace(other, InteractionInput::Content(vec![]));
-                self.input = Some(InteractionInput::Content(vec![item]));
-                log::warn!(
-                    "Unknown InteractionInput variant encountered, content may be lost: {:?}",
-                    current
-                );
-            }
+            // Required by #[non_exhaustive] but unreachable: InteractionInput uses
+            // #[serde(untagged)] so only Text/Content can exist at runtime.
+            Some(_) => unreachable!("InteractionInput is untagged; only Text/Content variants exist"),
         }
     }
 
