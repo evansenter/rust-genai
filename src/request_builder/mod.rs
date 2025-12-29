@@ -4,6 +4,8 @@ use auto_functions::DEFAULT_MAX_FUNCTION_CALL_LOOPS;
 
 use crate::GenaiError;
 use crate::client::Client;
+use crate::function_calling::ToolService;
+use std::sync::Arc;
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
@@ -53,7 +55,6 @@ use genai_client::{
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug)]
 pub struct InteractionBuilder<'a> {
     client: &'a Client,
     model: Option<String>,
@@ -69,11 +70,33 @@ pub struct InteractionBuilder<'a> {
     system_instruction: Option<InteractionInput>,
     /// Maximum iterations for auto function calling loop
     max_function_call_loops: usize,
+    /// Tool service for dependency-injected functions
+    tool_service: Option<Arc<dyn ToolService>>,
+}
+
+impl std::fmt::Debug for InteractionBuilder<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InteractionBuilder")
+            .field("model", &self.model)
+            .field("agent", &self.agent)
+            .field("input", &self.input)
+            .field("previous_interaction_id", &self.previous_interaction_id)
+            .field("tools", &self.tools)
+            .field("response_modalities", &self.response_modalities)
+            .field("response_format", &self.response_format)
+            .field("generation_config", &self.generation_config)
+            .field("background", &self.background)
+            .field("store", &self.store)
+            .field("system_instruction", &self.system_instruction)
+            .field("max_function_call_loops", &self.max_function_call_loops)
+            .field("tool_service", &self.tool_service.as_ref().map(|_| "..."))
+            .finish()
+    }
 }
 
 impl<'a> InteractionBuilder<'a> {
     /// Creates a new interaction builder.
-    pub(crate) const fn new(client: &'a Client) -> Self {
+    pub(crate) fn new(client: &'a Client) -> Self {
         Self {
             client,
             model: None,
@@ -88,6 +111,7 @@ impl<'a> InteractionBuilder<'a> {
             store: None,
             system_instruction: None,
             max_function_call_loops: DEFAULT_MAX_FUNCTION_CALL_LOOPS,
+            tool_service: None,
         }
     }
 
@@ -316,14 +340,10 @@ impl<'a> InteractionBuilder<'a> {
             Some(InteractionInput::Content(contents)) => {
                 contents.push(item);
             }
-            // Future InteractionInput variants - convert to Content array
-            Some(other) => {
-                let current = std::mem::replace(other, InteractionInput::Content(vec![]));
-                self.input = Some(InteractionInput::Content(vec![item]));
-                log::warn!(
-                    "Unknown InteractionInput variant encountered, content may be lost: {:?}",
-                    current
-                );
+            // Required by #[non_exhaustive] but unreachable: InteractionInput uses
+            // #[serde(untagged)] so only Text/Content can exist at runtime.
+            Some(_) => {
+                unreachable!("InteractionInput is untagged; only Text/Content variants exist")
             }
         }
     }
@@ -405,6 +425,43 @@ impl<'a> InteractionBuilder<'a> {
         for func in functions {
             self.add_tool(func.into_tool());
         }
+        self
+    }
+
+    /// Sets a tool service for dependency-injected functions.
+    ///
+    /// Use this when your tool functions need access to shared state like
+    /// database connections, API clients, or configuration. The service
+    /// provides callable functions that can access the service's internal state.
+    ///
+    /// Tools from the service are used in addition to any auto-discovered
+    /// tools from the global registry (via `#[tool]` macro).
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use rust_genai::{Client, ToolService, CallableFunction};
+    /// use std::sync::Arc;
+    ///
+    /// struct MyService { db: Database }
+    ///
+    /// impl ToolService for MyService {
+    ///     fn tools(&self) -> Vec<Arc<dyn CallableFunction>> {
+    ///         vec![Arc::new(QueryTool { db: self.db.clone() })]
+    ///     }
+    /// }
+    ///
+    /// let service = Arc::new(MyService { db: Database::new() });
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_tool_service(service)
+    ///     .with_text("Query the database for users")
+    ///     .create_with_auto_functions()
+    ///     .await?;
+    /// ```
+    pub fn with_tool_service(mut self, service: Arc<dyn ToolService>) -> Self {
+        self.tool_service = Some(service);
         self
     }
 

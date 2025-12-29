@@ -104,7 +104,7 @@ pub use request_builder::InteractionBuilder;
 
 pub mod function_calling;
 // Re-export public types from function_calling module
-pub use function_calling::{CallableFunction, FunctionError};
+pub use function_calling::{CallableFunction, FunctionError, ToolService};
 
 pub mod streaming;
 // Re-export streaming types for automatic function calling

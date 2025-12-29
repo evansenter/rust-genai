@@ -3,7 +3,19 @@
 //! This example demonstrates automatic function calling where the library
 //! handles the function execution loop for you.
 //!
-//! Shows both non-streaming (with auto-execution) and streaming usage.
+//! # How It Works
+//!
+//! 1. Functions marked with `#[tool]` are automatically registered in a global registry
+//! 2. `create_with_auto_functions()` discovers these functions and sends their declarations
+//! 3. When the model requests a function call, the library executes it automatically
+//! 4. Results are sent back to the model until it provides a final text response
+//!
+//! # When to Use Each Approach
+//!
+//! - **`#[tool]` + `create_with_auto_functions()`**: Simplest - auto-discovery, auto-execution
+//! - **`#[tool]` + `with_functions()` + `create_with_auto_functions()`**: Limit to subset of functions
+//! - **`ToolService`**: Need shared state (DB, APIs, config) - see `tool_service.rs`
+//! - **Manual**: Full control over execution - use `create()` and handle calls yourself
 //!
 //! # Running
 //!
@@ -21,8 +33,13 @@ use rust_genai_macros::tool;
 use std::env;
 use std::io::{Write, stdout};
 
-// Define a function using the macro - this automatically registers it
-// in the global function registry for auto-calling.
+// =============================================================================
+// Define functions using the #[tool] macro
+// =============================================================================
+//
+// The macro does two things:
+// 1. Generates a FunctionDeclaration from the function signature
+// 2. Registers the function in the global registry for auto-discovery
 
 /// Gets the current weather for a city
 #[tool(city(description = "The city to get weather for"))]
@@ -47,14 +64,12 @@ fn get_time(timezone: String) -> String {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Get API key from environment
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY environment variable not set");
-
     let client = Client::builder(api_key).build();
 
     println!("=== AUTO FUNCTION CALLING EXAMPLE ===\n");
 
-    // Get the function declarations from our registered functions
+    // The macro generates these callable types automatically
     let weather_func = GetWeatherCallable.declaration();
     let time_func = GetTimeCallable.declaration();
 
@@ -67,21 +82,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  - {}: {}", time_func.name(), time_func.description());
     println!();
 
-    // Ask a question that requires calling a function
+    // ==========================================================================
+    // Example 1: Auto-discovery (simplest)
+    // ==========================================================================
+    //
+    // When you don't call with_functions(), create_with_auto_functions()
+    // automatically discovers ALL registered #[tool] functions.
+
     let prompt = "What's the weather like in Tokyo and what time is it there (JST)?";
     println!("User: {}\n", prompt);
-    println!("Processing (functions will be called automatically)...\n");
+    println!("Processing (functions auto-discovered from registry)...\n");
 
-    // Use create_with_auto_functions - the library handles the entire loop:
-    // 1. Send request to model
-    // 2. If model returns function calls, execute them
-    // 3. Send results back to model
-    // 4. Repeat until model returns text
     let result = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(prompt)
-        .with_functions(vec![weather_func, time_func])
+        // No with_functions() needed - auto-discovers from registry!
         .create_with_auto_functions()
         .await?;
 
@@ -97,55 +113,73 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("\nAssistant: {}", text);
     }
 
-    println!("\n--- End Auto Function Calling ---");
+    // ==========================================================================
+    // Example 2: Limiting available functions
+    // ==========================================================================
+    //
+    // Use with_function() when you want to limit which functions are available,
+    // even if more are registered in the global registry.
 
-    // Streaming example with function calling
-    // Note: Streaming shows the response as it's generated, but function calls
-    // are typically returned as complete chunks rather than streamed piece by piece.
-    println!("\n=== STREAMING WITH FUNCTION CALLING ===\n");
+    println!("\n=== LIMITING TO SPECIFIC FUNCTIONS ===\n");
 
-    let stream_prompt = "What's the weather in London right now?";
+    let limited_prompt = "What's the weather in Paris?";
+    println!("User: {}\n", limited_prompt);
+    println!("(Only weather function available, not time)\n");
+
+    let result2 = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text(limited_prompt)
+        .with_function(weather_func) // Only weather, not time
+        .create_with_auto_functions()
+        .await?;
+
+    if let Some(text) = result2.response.text() {
+        println!("Assistant: {}", text);
+    }
+
+    // ==========================================================================
+    // Example 3: Manual streaming (for comparison)
+    // ==========================================================================
+    //
+    // Using create_stream() (not create_stream_with_auto_functions) means YOU
+    // handle function execution. This shows the raw streaming behavior.
+
+    println!("\n=== MANUAL STREAMING (no auto-execution) ===\n");
+
+    let stream_prompt = "What's the weather in London?";
     println!("User: {}\n", stream_prompt);
-    println!("Response (streaming):");
-
-    let weather_func_stream = GetWeatherCallable.declaration();
+    println!("Response (you would handle function calls manually):");
 
     let mut stream = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(stream_prompt)
-        .with_function(weather_func_stream)
-        .create_stream();
-
-    let mut saw_function_call = false;
+        .with_function(time_func) // Provide declaration but no auto-execution
+        .create_stream(); // Note: create_stream, not create_stream_with_auto_functions
 
     while let Some(result) = stream.next().await {
         match result {
             Ok(chunk) => match chunk {
                 StreamChunk::Delta(content) => {
-                    // Check for text content
                     if let Some(text) = content.text() {
                         print!("{}", text);
                         stdout().flush()?;
                     }
-                    // Check for function calls
                     if content.is_function_call() {
-                        saw_function_call = true;
-                        println!("\n  [Received function call in stream]");
+                        println!("\n  [Function call received - manual handling needed]");
                     }
                 }
                 StreamChunk::Complete(response) => {
                     println!();
                     if response.has_function_calls() {
-                        println!("\nFunction calls in final response:");
+                        println!("\nPending function calls (you execute these):");
                         for call in response.function_calls() {
                             println!("  - {}({}) [id: {:?}]", call.name, call.args, call.id);
                         }
-                        println!("\nNote: To complete the conversation, you would execute");
-                        println!("the function and send results back to the model.");
                     }
                 }
-                _ => {} // Handle unknown variants
+                _ => {}
             },
             Err(e) => {
                 eprintln!("\nStream error: {e}");
@@ -154,11 +188,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    if saw_function_call {
-        println!("\n(Function call was streamed successfully)");
-    }
-
-    println!("\n--- End Streaming ---");
+    println!("\n=== END EXAMPLE ===");
 
     Ok(())
 }

@@ -4,16 +4,19 @@
 //! `create_stream_with_auto_functions()` methods that handle
 //! automatic function discovery, execution, and multi-turn orchestration.
 
+use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Instant;
 
 use futures_util::StreamExt;
 use futures_util::stream::BoxStream;
 use genai_client::{InteractionInput, InteractionResponse, StreamChunk};
 use log::{error, warn};
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::GenaiError;
-use crate::function_calling::get_global_function_registry;
+use crate::ToolService;
+use crate::function_calling::{CallableFunction, FunctionRegistry, get_global_function_registry};
 use crate::interactions_api::function_result_content;
 use crate::streaming::{AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionResult};
 
@@ -36,6 +39,68 @@ fn validate_call_id(call_id: Option<&str>, function_name: &str) -> Result<String
             ))
         })
         .map(|id| id.to_string())
+}
+
+/// Builds a map of callable functions from a ToolService for efficient lookup.
+fn build_service_function_map(
+    tool_service: &Option<Arc<dyn ToolService>>,
+) -> HashMap<String, Arc<dyn CallableFunction>> {
+    tool_service
+        .as_ref()
+        .map(|svc| {
+            svc.tools()
+                .into_iter()
+                .map(|f| (f.declaration().name().to_string(), f))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Executes a function by looking it up in the service map first, then the global registry.
+///
+/// Returns the function result as JSON. Errors are converted to JSON error objects
+/// rather than failing the entire operation, allowing the model to recover gracefully.
+async fn execute_function(
+    name: &str,
+    args: Value,
+    service_functions: &HashMap<String, Arc<dyn CallableFunction>>,
+    function_registry: &FunctionRegistry,
+) -> Value {
+    // Function lookup order: tool service first (for dependency-injected functions),
+    // then global registry (for #[tool] macro functions).
+    if let Some(function) = service_functions.get(name) {
+        // Found in tool service (dependency-injected)
+        match function.call(args).await {
+            Ok(result) => result,
+            Err(e) => {
+                error!(
+                    "Function execution failed: function='{}', error='{}'",
+                    name, e
+                );
+                json!({ "error": e.to_string() })
+            }
+        }
+    } else if let Some(function) = function_registry.get(name) {
+        // Found in global registry (#[tool] macro)
+        match function.call(args).await {
+            Ok(result) => result,
+            Err(e) => {
+                error!(
+                    "Function execution failed: function='{}', error='{}'",
+                    name, e
+                );
+                json!({ "error": e.to_string() })
+            }
+        }
+    } else {
+        // Function not found anywhere - could be a typo in declarations or missing #[tool] macro.
+        // We inform the model rather than failing, allowing it to adapt or use other functions.
+        warn!(
+            "Function not found in registry or tool service: function='{}'. Informing model.",
+            name
+        );
+        json!({ "error": format!("Function '{}' is not available or not found.", name) })
+    }
 }
 
 impl<'a> InteractionBuilder<'a> {
@@ -131,18 +196,46 @@ impl<'a> InteractionBuilder<'a> {
     pub async fn create_with_auto_functions(self) -> Result<AutoFunctionResult, GenaiError> {
         let client = self.client;
         let max_loops = self.max_function_call_loops;
+        let tool_service = self.tool_service.clone();
         let mut request = self.build_request()?;
 
         // Track all function executions for the result
         let mut all_executions: Vec<FunctionExecutionResult> = Vec::new();
 
-        // Auto-discover functions from registry if not explicitly provided
+        // Build a map of service-provided functions for lookup during execution
+        let service_functions = build_service_function_map(&tool_service);
+
+        // Auto-discover functions from registry and tool service if not explicitly provided
         let function_registry = get_global_function_registry();
         if request.tools.is_none() {
-            let auto_discovered_declarations = function_registry.all_declarations();
-            if !auto_discovered_declarations.is_empty() {
+            let mut all_declarations = function_registry.all_declarations();
+
+            // Service functions take precedence over global registry
+            // Filter out global declarations that would be shadowed by service functions
+            let service_names: std::collections::HashSet<&str> =
+                service_functions.keys().map(|s| s.as_str()).collect();
+
+            // Log warnings for shadowed functions and filter them out
+            all_declarations.retain(|decl| {
+                if service_names.contains(decl.name()) {
+                    log::warn!(
+                        "Tool service function '{}' shadows global registry function with same name",
+                        decl.name()
+                    );
+                    false
+                } else {
+                    true
+                }
+            });
+
+            // Add declarations from tool service
+            for func in service_functions.values() {
+                all_declarations.push(func.declaration());
+            }
+
+            if !all_declarations.is_empty() {
                 request.tools = Some(
-                    auto_discovered_declarations
+                    all_declarations
                         .into_iter()
                         .map(|decl| decl.into_tool())
                         .collect(),
@@ -178,31 +271,13 @@ impl<'a> InteractionBuilder<'a> {
 
                 // Execute the function with timing
                 let start = Instant::now();
-                // Design decision: Errors are converted to JSON and sent to the model rather than
-                // failing the entire interaction. This allows the model to recover gracefully -
-                // e.g., "I couldn't get the weather, let me try something else." The error is
-                // logged for debugging, but the conversation continues. For strict error handling,
-                // use manual function calling via `create()` instead of `create_with_auto_functions()`.
-                let result = if let Some(function) = function_registry.get(call.name) {
-                    match function.call(call.args.clone()).await {
-                        Ok(result) => result,
-                        Err(e) => {
-                            error!(
-                                "Function execution failed: function='{}', error='{}'",
-                                call.name, e
-                            );
-                            json!({ "error": e.to_string() })
-                        }
-                    }
-                } else {
-                    // Function not in registry - could be a typo in declarations or missing #[tool] macro.
-                    // We inform the model rather than failing, allowing it to adapt or use other functions.
-                    warn!(
-                        "Function not found in registry: function='{}'. Informing model.",
-                        call.name
-                    );
-                    json!({ "error": format!("Function '{}' is not available or not found.", call.name) })
-                };
+                let result = execute_function(
+                    call.name,
+                    call.args.clone(),
+                    &service_functions,
+                    function_registry,
+                )
+                .await;
                 let duration = start.elapsed();
 
                 // Track execution for the result
@@ -330,17 +405,47 @@ impl<'a> InteractionBuilder<'a> {
     ) -> BoxStream<'a, Result<AutoFunctionStreamChunk, GenaiError>> {
         let client = self.client;
         let max_loops = self.max_function_call_loops;
+        let tool_service = self.tool_service.clone();
 
         Box::pin(async_stream::try_stream! {
             let mut request = self.build_request()?;
 
-            // Auto-discover functions from registry if not explicitly provided
+            // Build a map of service-provided functions for lookup during execution
+            let service_functions = build_service_function_map(&tool_service);
+
+            // Auto-discover functions from registry and tool service if not explicitly provided
             let function_registry = get_global_function_registry();
             if request.tools.is_none() {
-                let auto_discovered_declarations = function_registry.all_declarations();
-                if !auto_discovered_declarations.is_empty() {
+                let mut all_declarations = function_registry.all_declarations();
+
+                // Service functions take precedence over global registry
+                // Filter out global declarations that would be shadowed by service functions
+                let service_names: std::collections::HashSet<&str> = service_functions
+                    .keys()
+                    .map(|s| s.as_str())
+                    .collect();
+
+                // Log warnings for shadowed functions and filter them out
+                all_declarations.retain(|decl| {
+                    if service_names.contains(decl.name()) {
+                        log::warn!(
+                            "Tool service function '{}' shadows global registry function with same name",
+                            decl.name()
+                        );
+                        false
+                    } else {
+                        true
+                    }
+                });
+
+                // Add declarations from tool service
+                for func in service_functions.values() {
+                    all_declarations.push(func.declaration());
+                }
+
+                if !all_declarations.is_empty() {
                     request.tools = Some(
-                        auto_discovered_declarations
+                        all_declarations
                             .into_iter()
                             .map(|decl| decl.into_tool())
                             .collect(),
@@ -433,31 +538,13 @@ impl<'a> InteractionBuilder<'a> {
                 for (call_id, name, args) in &calls_to_execute {
                     // Execute the function with timing
                     let start = Instant::now();
-                    // Design decision: Errors are converted to JSON and sent to the model rather than
-                    // failing the entire interaction. This allows the model to recover gracefully -
-                    // e.g., "I couldn't get the weather, let me try something else." The error is
-                    // logged for debugging, but the conversation continues. For strict error handling,
-                    // use manual function calling via `create_stream()` instead of `create_stream_with_auto_functions()`.
-                    let result = if let Some(function) = function_registry.get(name) {
-                        match function.call(args.clone()).await {
-                            Ok(result) => result,
-                            Err(e) => {
-                                error!(
-                                    "Function execution failed: function='{}', error='{}'",
-                                    name, e
-                                );
-                                json!({ "error": e.to_string() })
-                            }
-                        }
-                    } else {
-                        // Function not in registry - could be a typo in declarations or missing #[tool] macro.
-                        // We inform the model rather than failing, allowing it to adapt or use other functions.
-                        warn!(
-                            "Function not found in registry: function='{}'. Informing model.",
-                            name
-                        );
-                        json!({ "error": format!("Function '{}' is not available or not found.", name) })
-                    };
+                    let result = execute_function(
+                        name,
+                        args.clone(),
+                        &service_functions,
+                        function_registry,
+                    )
+                    .await;
                     let duration = start.elapsed();
 
                     // Track result for yielding

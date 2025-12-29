@@ -46,6 +46,8 @@ cargo run --example system_instructions
 cargo run --example stateful_interaction
 cargo run --example auto_function_calling
 cargo run --example streaming_auto_functions
+cargo run --example manual_function_calling
+cargo run --example tool_service
 cargo run --example structured_output
 cargo run --example google_search
 cargo run --example code_execution
@@ -74,10 +76,24 @@ cargo run --example thought_echo
 
 **Builder API**: Fluent builders throughout (`Client::builder()`, `client.interaction().with_*()`, `FunctionDeclaration::builder()`)
 
-**Function Calling Levels**:
-1. Manual: User provides `FunctionDeclaration` and handles calls
-2. Semi-automatic: Macro generates declarations, user controls execution
-3. Fully automatic: `create_with_auto_functions()` discovers and executes via `inventory` crate
+**Function Calling - Two Categories**:
+
+*Client-Side Tools* (YOUR code executes):
+- `#[tool]` macro: Compile-time registration, stateless, auto-discovered
+- `ToolService`: Runtime registration, stateful (DB, APIs, config), dependency injection
+- Manual: Full control via `create()` + `function_result_content()` loop
+
+*Server-Side Tools* (API executes):
+- Google Search, Code Execution, URL Context - enabled via `with_tool()`
+
+**Choosing Client-Side Approach**:
+| Approach | Registration | State | Best For |
+|----------|-------------|-------|----------|
+| `#[tool]` macro | Compile-time | Stateless | Simple tools, clean code |
+| `ToolService` | Runtime | Stateful | DB pools, API clients, dynamic config |
+| Manual handling | N/A | Flexible | Custom execution logic, rate limiting |
+
+**ToolService Pattern**: Use `Arc<RwLock<T>>` for interior mutability. Same service instance reused across requests via `service.clone()` (clones the Arc, not the service). See `examples/tool_service.rs`.
 
 **Streaming**: Uses `async-stream` generators and `futures-util::Stream`
 

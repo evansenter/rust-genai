@@ -80,6 +80,8 @@ Note: `async-trait` and `inventory` are already included as dependencies of `rus
 > - `deep_research.rs` - Long-running research tasks
 > - `thought_echo.rs` - Thought continuation across turns
 > - `streaming_auto_functions.rs` - Streaming with automatic function calling
+> - `tool_service.rs` - Dependency injection for function calling
+> - `manual_function_calling.rs` - Full control over function execution loop
 
 You'll need a Google API key from [Google AI Studio](https://ai.dev/).
 
@@ -220,7 +222,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Function Calling
 
-For manual function calling with full control over execution:
+There are two categories of tools in this library:
+
+**Client-Side Tools** - Functions YOUR code executes:
+- The model requests a function → Your code runs it → Results sent back to model
+- Use `#[tool]` macro, `ToolService`, or manual handling
+
+**Server-Side Tools** - Built-in tools the API executes:
+- The model uses the tool → API runs it → Results in response
+- Google Search, Code Execution, URL Context (see [Built-in Tools](#built-in-tools))
+
+#### Quick Decision Guide for Client-Side Tools
+
+| Need | Approach | Example |
+|------|----------|---------|
+| Simplest stateless tools | `#[tool]` macro | `auto_function_calling.rs` |
+| Stateful tools (DB, APIs, config) | `ToolService` trait | `tool_service.rs` |
+| Full execution control | Manual with `create()` | `manual_function_calling.rs` |
+
+All approaches support both streaming and non-streaming execution:
+- **Non-streaming**: `create_with_auto_functions()` or `create()`
+- **Streaming**: `create_stream_with_auto_functions()` or `create_stream()`
+
+See `streaming_auto_functions.rs` for a streaming example.
+
+#### Manual Function Calling
+
+For full control over the execution loop:
 
 ```rust
 use rust_genai::{Client, FunctionDeclaration, function_result_content, WithFunctionCalling};
@@ -340,6 +368,126 @@ Key features of automatic function calling:
 - The conversation loop handles multiple function calls automatically
 - Error handling is built-in - function errors are reported back to the model
 - Maximum of 5 conversation turns to prevent infinite loops
+
+### Dependency Injection with ToolService
+
+For functions that need access to shared state (database connections, API clients, configuration), use the `ToolService` trait:
+
+```rust
+use rust_genai::{Client, CallableFunction, FunctionDeclaration, FunctionError, ToolService};
+use async_trait::async_trait;
+use serde_json::{json, Value};
+use std::sync::{Arc, RwLock};
+
+// A tool that reads from shared mutable state
+struct CalculatorTool {
+    precision: Arc<RwLock<u32>>,  // Shared config, can change at runtime
+}
+
+#[async_trait]
+impl CallableFunction for CalculatorTool {
+    fn declaration(&self) -> FunctionDeclaration {
+        FunctionDeclaration::builder("calculate")
+            .description("Performs arithmetic calculations")
+            .parameter("expression", json!({"type": "string"}))
+            .required(vec!["expression".to_string()])
+            .build()
+    }
+
+    async fn call(&self, args: Value) -> Result<Value, FunctionError> {
+        let precision = *self.precision.read().unwrap();
+        Ok(json!({ "result": "42", "precision": precision }))
+    }
+}
+
+// Service that provides tools with shared dependencies
+struct MathService {
+    precision: Arc<RwLock<u32>>,
+}
+
+impl MathService {
+    fn new(precision: u32) -> Self {
+        Self { precision: Arc::new(RwLock::new(precision)) }
+    }
+
+    fn set_precision(&self, precision: u32) {
+        *self.precision.write().unwrap() = precision;
+    }
+}
+
+impl ToolService for MathService {
+    fn tools(&self) -> Vec<Arc<dyn CallableFunction>> {
+        vec![Arc::new(CalculatorTool { precision: self.precision.clone() })]
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = Client::builder(std::env::var("GEMINI_API_KEY")?).build();
+
+    // Create a single service instance
+    let service = Arc::new(MathService::new(2));
+
+    // First request uses precision=2
+    let result1 = client.interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Calculate 2 + 2")
+        .with_tool_service(service.clone())  // Clone the Arc
+        .create_with_auto_functions()
+        .await?;
+
+    // Change precision on the SAME service instance
+    service.set_precision(8);
+
+    // Second request uses precision=8
+    let result2 = client.interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Calculate 3 * 3")
+        .with_tool_service(service.clone())  // Same service
+        .create_with_auto_functions()
+        .await?;
+
+    Ok(())
+}
+```
+
+#### Choosing Your Approach
+
+| Approach | Registration | Execution | State | Best For |
+|----------|-------------|-----------|-------|----------|
+| `#[tool]` macro | Compile-time (global) | Auto | Stateless | Simple tools, clean code |
+| `ToolService` | Runtime (per-request) | Auto | Stateful | DB connections, API clients |
+| `FunctionDeclaration::builder()` | Manual | Manual | Flexible | Dynamic schemas, full control |
+
+**Use `#[tool]` macro** when you have simple, stateless functions:
+```rust
+#[tool]
+fn get_weather(city: String) -> String {
+    format!("Weather in {}", city)  // No external dependencies
+}
+```
+
+**Use `ToolService`** when you need shared state or dependency injection:
+```rust
+impl ToolService for MyService {
+    fn tools(&self) -> Vec<Arc<dyn CallableFunction>> {
+        vec![Arc::new(DbQueryTool { pool: self.db_pool.clone() })]
+    }
+}
+```
+
+**Use manual handling** when you need full control over execution:
+- Custom rate limiting, caching, or circuit breakers
+- Complex error recovery logic
+- Integration with external systems requiring special handling
+- Logging, metrics, or tracing around each function call
+
+Key benefits of `ToolService`:
+- **Shared mutable state**: Use `Arc<RwLock<T>>` for config that changes at runtime
+- **Dependency injection**: Tools access databases, API clients, feature flags
+- **Same instance across requests**: Reuse connections, share caches
+- **Override global functions**: Service functions shadow same-named `#[tool]` functions
+- **Works with streaming**: Compatible with `create_stream_with_auto_functions()`
 
 ### Using the Procedural Macro
 
@@ -540,6 +688,7 @@ client
     .with_previous_interaction("id")            // Link to previous interaction
     .with_function(func_decl)                   // Add a function declaration
     .with_functions(vec![...])                  // Add multiple function declarations
+    .with_tool_service(service)                 // Inject dependency-providing service
     .with_google_search()                       // Enable Google Search grounding
     .with_code_execution()                      // Enable Python code execution
     .with_url_context()                         // Enable URL content fetching
