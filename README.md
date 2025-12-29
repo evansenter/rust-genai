@@ -236,10 +236,15 @@ There are two categories of tools in this library:
 
 | Need | Approach | Example |
 |------|----------|---------|
-| Simplest stateless tools | `#[tool]` macro + auto | `auto_function_calling.rs` |
+| Simplest stateless tools | `#[tool]` macro | `auto_function_calling.rs` |
 | Stateful tools (DB, APIs, config) | `ToolService` trait | `tool_service.rs` |
 | Full execution control | Manual with `create()` | `manual_function_calling.rs` |
-| Streaming + auto execution | `create_stream_with_auto_functions()` | `streaming_auto_functions.rs` |
+
+All approaches support both streaming and non-streaming execution:
+- **Non-streaming**: `create_with_auto_functions()` or `create()`
+- **Streaming**: `create_stream_with_auto_functions()` or `create_stream()`
+
+See `streaming_auto_functions.rs` for a streaming example.
 
 #### Manual Function Calling
 
