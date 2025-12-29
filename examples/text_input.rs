@@ -26,7 +26,7 @@
 //! | `.html` | `text/html` |
 //! | `.xml` | `application/xml` |
 
-use rust_genai::{Client, document_data_content, text_content};
+use rust_genai::{Client, document_data_content, document_from_file, text_content};
 use std::env;
 
 // Sample JSON data for demonstration
@@ -113,9 +113,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // ==========================================================================
-    // Example 3: Markdown Summarization
+    // Example 3: Markdown Summarization (inline data)
     // ==========================================================================
-    println!("--- Example 3: Markdown Summarization ---\n");
+    println!("--- Example 3: Markdown Summarization (inline) ---\n");
 
     let response = client
         .interaction()
@@ -129,6 +129,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(text) = response.text() {
         println!("Markdown Summary:\n{}\n", text);
+    }
+
+    // ==========================================================================
+    // Example 4: File-based Loading with document_from_file()
+    // ==========================================================================
+    println!("--- Example 4: File-based Loading ---\n");
+
+    // Load a markdown file from disk - MIME type is auto-detected from extension
+    let readme_content = document_from_file("README.md").await?;
+
+    let response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_content(vec![
+            text_content("What is the main purpose of this project based on the README?"),
+            readme_content,
+        ])
+        .create()
+        .await?;
+
+    if let Some(text) = response.text() {
+        println!("README Analysis:\n{}\n", text);
+    }
+
+    // ==========================================================================
+    // Example 5: Builder Pattern with add_document_file()
+    // ==========================================================================
+    println!("--- Example 5: Builder Pattern ---\n");
+
+    let response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("List the main sections in this markdown file.")
+        .add_document_file("CHANGELOG.md")
+        .await?
+        .create()
+        .await?;
+
+    if let Some(text) = response.text() {
+        println!("CHANGELOG Sections:\n{}\n", text);
     }
 
     // ==========================================================================
