@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING CHANGES
 
-#### GenaiError is Now #[non_exhaustive] (#196)
-- **`GenaiError` enum now includes `#[non_exhaustive]`**: Match statements must include a wildcard arm
+#### Additional Enums Now #[non_exhaustive] (#196)
+- **`GenaiError`**: Match statements must include a wildcard arm
+- **`FunctionError`**: Match statements must include a wildcard arm
+- **`InteractionInput`**: Match statements must include a wildcard arm
 - **New `GenaiError::MalformedResponse` variant**: For cases where the API returns 200 OK but with unexpected/malformed content
 - This follows [Evergreen principles](https://github.com/google-deepmind/evergreen-spec) for forward-compatible API design
 

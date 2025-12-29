@@ -8,7 +8,11 @@ use std::error::Error;
 use crate::FunctionDeclaration;
 
 /// Represents an error that can occur during function execution.
+///
+/// This enum is marked `#[non_exhaustive]` for forward compatibility.
+/// New error variants may be added in future versions.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum FunctionError {
     ArgumentMismatch(String),
     ExecutionError(Box<dyn Error + Send + Sync>),

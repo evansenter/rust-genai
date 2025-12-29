@@ -5,9 +5,13 @@ use serde::{Deserialize, Serialize};
 use super::content::InteractionContent;
 use crate::models::shared::Tool;
 
-/// Input for an interaction - can be a simple string or array of content
+/// Input for an interaction - can be a simple string or array of content.
+///
+/// This enum is marked `#[non_exhaustive]` for forward compatibility.
+/// New input types may be added in future versions.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(untagged)]
+#[non_exhaustive]
 pub enum InteractionInput {
     /// Simple text input
     Text(String),
