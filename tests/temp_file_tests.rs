@@ -1,7 +1,8 @@
 //! Integration tests for multimodal file loading functions.
 //!
-//! These tests verify that `*_from_file()` functions correctly read files from disk,
-//! encode them, and send them to the Gemini API for processing.
+//! These tests serve dual purposes:
+//! 1. Verify file loading, base64 encoding, and MIME type detection
+//! 2. Validate that the Gemini API successfully accepts and processes the encoded content
 //!
 //! # Running Tests
 //!
@@ -25,7 +26,6 @@ use rust_genai::{
     InteractionInput, InteractionStatus, audio_from_file, document_from_file, image_from_file,
     text_content, video_from_file,
 };
-use std::io::Write;
 use tempfile::TempDir;
 
 // =============================================================================
@@ -49,9 +49,7 @@ async fn test_image_from_temp_file() {
     let image_bytes = base64::engine::general_purpose::STANDARD
         .decode(TINY_RED_PNG_BASE64)
         .expect("Failed to decode base64");
-    let mut file = std::fs::File::create(&image_path).expect("Failed to create temp file");
-    file.write_all(&image_bytes)
-        .expect("Failed to write image data");
+    std::fs::write(&image_path, &image_bytes).expect("Failed to write image");
 
     // Load using image_from_file()
     let image_content = image_from_file(&image_path)
