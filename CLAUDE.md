@@ -251,6 +251,11 @@ This requires a custom `Deserialize` implementation. See `InteractionContent` in
   - `tools_and_config_tests.rs`: Built-in tools
   - `api_canary_tests.rs`: API compatibility checks
   - `common/`: Shared test utilities
+- **Property-based tests** (proptest): Serialization roundtrip verification
+  - `genai-client/src/models/interactions/proptest_tests.rs`: Strategy generators and unit proptests
+  - `tests/proptest_roundtrip_tests.rs`: Integration proptests for public API types
+  - To add coverage for a new type: create an `arb_<type>()` strategy function, then add a `<type>_roundtrip` test
+  - Use `#[cfg(feature = "strict-unknown")]` variants for strategies that include `Unknown` variants
 
 ## CI/CD
 

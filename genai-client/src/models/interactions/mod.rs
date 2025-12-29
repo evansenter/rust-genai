@@ -12,6 +12,9 @@ mod streaming;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod proptest_tests;
+
 // Re-export all public types at module root for backwards compatibility
 pub use content::{CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
 pub use metadata::{
