@@ -308,8 +308,9 @@ async fn test_streaming_deltas_are_incremental() {
         // Verify the content looks reasonable (should mention seasons)
         let lower = concatenated.to_lowercase();
         assert!(
-            lower.contains("spring") || lower.contains("summer")
-                || lower.contains("fall") || lower.contains("winter"),
+            ["spring", "summer", "fall", "winter"]
+                .iter()
+                .any(|season| lower.contains(season)),
             "Response should mention seasons. Got: {:?}",
             concatenated
         );
