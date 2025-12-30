@@ -39,28 +39,62 @@ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-it
 ### Examples
 
 All require `GEMINI_API_KEY`:
+
+**Basic Examples:**
 ```bash
 cargo run --example simple_interaction
 cargo run --example streaming
 cargo run --example system_instructions
 cargo run --example stateful_interaction
+```
+
+**Function Calling:**
+```bash
 cargo run --example auto_function_calling
 cargo run --example streaming_auto_functions
 cargo run --example manual_function_calling
 cargo run --example tool_service
+```
+
+**Advanced Features:**
+```bash
 cargo run --example structured_output
 cargo run --example google_search
 cargo run --example code_execution
 cargo run --example url_context
 cargo run --example thinking
+cargo run --example deep_research
+cargo run --example thought_echo
+```
+
+**Multimodal:**
+```bash
 cargo run --example multimodal_image
 cargo run --example audio_input
 cargo run --example video_input
 cargo run --example pdf_input
 cargo run --example text_input
 cargo run --example image_generation
-cargo run --example deep_research
-cargo run --example thought_echo
+```
+
+**Real-World Applications:**
+```bash
+cargo run --example rag_system           # RAG-based question answering
+cargo run --example multi_turn_agent     # Stateful multi-turn conversations
+cargo run --example code_assistant       # Code analysis and generation
+cargo run --example data_analysis        # Data processing with code execution
+cargo run --example web_scraper_agent    # Web scraping with URL context
+cargo run --example testing_assistant    # Test generation and validation
+```
+
+### Benchmarks
+
+Performance benchmarks (require nightly Rust):
+```bash
+cargo +nightly bench --bench serialization      # JSON serialization performance
+cargo +nightly bench --bench multimodal         # File loading and encoding
+cargo +nightly bench --bench function_registry  # Function discovery and lookup
+cargo +nightly bench --bench response_extraction # Response parsing helpers
 ```
 
 ## Architecture
@@ -92,6 +126,13 @@ cargo run --example thought_echo
 | `#[tool]` macro | Compile-time | Stateless | Simple tools, clean code |
 | `ToolService` | Runtime | Stateful | DB pools, API clients, dynamic config |
 | Manual handling | N/A | Flexible | Custom execution logic, rate limiting |
+
+**When You're Blocked - Use ToolService Instead of #[tool]**:
+- **Need database access**: `#[tool]` functions can't access connection pools → Use `ToolService` with `Arc<Pool<...>>`
+- **Need API client**: `#[tool]` functions can't share HTTP clients → Use `ToolService` with `Arc<reqwest::Client>`
+- **Need configuration**: `#[tool]` functions can't read runtime config → Use `ToolService` with `Arc<RwLock<Config>>`
+- **Need mutable state**: `#[tool]` functions are stateless → Use `ToolService` with `Arc<RwLock<T>>`
+- **Need per-request context**: `#[tool]` functions are global → Use `ToolService` to inject request-specific tools
 
 **ToolService Pattern**: Use `Arc<RwLock<T>>` for interior mutability. Same service instance reused across requests via `service.clone()` (clones the Arc, not the service). See `examples/tool_service.rs`.
 
@@ -133,6 +174,34 @@ client.interaction()
 - `image_from_file()`, `audio_from_file()`, `video_from_file()`, `document_from_file()`
 - Auto-detect MIME type from extension, load file, base64 encode
 - `*_from_file_with_mime()` variants for explicit MIME override
+
+### Multimodal Output (Image Generation)
+
+**Generate images** by setting response modalities:
+```rust
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text("Generate an image of a sunset over mountains")
+    .with_response_modalities(vec!["IMAGE".to_string()])
+    .create().await?;
+
+// Extract generated images from response
+for output in &response.outputs {
+    if let InteractionContent::ImageData { data, mime_type } = output {
+        // data is base64-encoded image
+        // mime_type is typically "image/png" or "image/jpeg"
+        let bytes = base64::decode(data)?;
+        std::fs::write("generated.png", bytes)?;
+    }
+}
+```
+
+**Response Modalities**:
+- `"TEXT"` - Text generation (default)
+- `"IMAGE"` - Image generation
+- Can specify both: `vec!["TEXT".to_string(), "IMAGE".to_string()]`
+
+See `examples/image_generation.rs` for complete example.
 
 ### Content Export Strategy
 
