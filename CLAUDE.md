@@ -263,7 +263,7 @@ GitHub Actions (`.github/workflows/rust.yml`) runs 9 parallel jobs: check, test,
 
 ## Project Conventions
 
-- **Model name**: Always use `gemini-3-flash-preview` throughout the project (tests, examples, documentation). Do not reference other model names.
+- **Model name**: Always use `gemini-3-flash-preview` throughout the project (tests, examples, documentation). Exception: Image generation examples must use `gemini-3-pro-image-preview` since it's the only model supporting image output.
 
 ## Versioning Philosophy
 

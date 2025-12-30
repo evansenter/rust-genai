@@ -5,6 +5,7 @@ use auto_functions::DEFAULT_MAX_FUNCTION_CALL_LOOPS;
 use crate::GenaiError;
 use crate::client::Client;
 use crate::function_calling::ToolService;
+use base64::Engine;
 use std::sync::Arc;
 
 use futures_util::{StreamExt, stream::BoxStream};
@@ -228,6 +229,40 @@ impl<'a> InteractionBuilder<'a> {
         self
     }
 
+    /// Adds an image from raw bytes to the content.
+    ///
+    /// The bytes are automatically base64-encoded. This is useful when you have
+    /// image data in memory (e.g., downloaded from a URL or generated programmatically).
+    ///
+    /// This method accumulates content - it can be called multiple times.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// // Read image bytes from file or network
+    /// let image_bytes = std::fs::read("photo.png")?;
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Describe this image")
+    ///     .add_image_bytes(&image_bytes, "image/png")
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn add_image_bytes(self, data: &[u8], mime_type: impl Into<String>) -> Self {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(data);
+        self.add_image_data(encoded, mime_type)
+    }
+
     /// Adds an image from a URI to the content.
     ///
     /// This method accumulates content - it can be called multiple times.
@@ -256,6 +291,38 @@ impl<'a> InteractionBuilder<'a> {
         self
     }
 
+    /// Adds audio from raw bytes to the content.
+    ///
+    /// The bytes are automatically base64-encoded. This is useful when you have
+    /// audio data in memory.
+    ///
+    /// This method accumulates content - it can be called multiple times.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    /// let audio_bytes = std::fs::read("recording.mp3")?;
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Transcribe this audio")
+    ///     .add_audio_bytes(&audio_bytes, "audio/mp3")
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn add_audio_bytes(self, data: &[u8], mime_type: impl Into<String>) -> Self {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(data);
+        self.add_audio_data(encoded, mime_type)
+    }
+
     /// Adds audio from a URI to the content.
     pub fn add_audio_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content = crate::interactions_api::audio_uri_content(uri, mime_type);
@@ -280,6 +347,38 @@ impl<'a> InteractionBuilder<'a> {
         let content = crate::interactions_api::video_data_content(data, mime_type);
         self.add_content_item(content);
         self
+    }
+
+    /// Adds video from raw bytes to the content.
+    ///
+    /// The bytes are automatically base64-encoded. This is useful when you have
+    /// video data in memory.
+    ///
+    /// This method accumulates content - it can be called multiple times.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    /// let video_bytes = std::fs::read("clip.mp4")?;
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Describe what happens in this video")
+    ///     .add_video_bytes(&video_bytes, "video/mp4")
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn add_video_bytes(self, data: &[u8], mime_type: impl Into<String>) -> Self {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(data);
+        self.add_video_data(encoded, mime_type)
     }
 
     /// Adds video from a URI to the content.
@@ -310,6 +409,38 @@ impl<'a> InteractionBuilder<'a> {
         let content = crate::interactions_api::document_data_content(data, mime_type);
         self.add_content_item(content);
         self
+    }
+
+    /// Adds a document from raw bytes to the content.
+    ///
+    /// The bytes are automatically base64-encoded. This is useful when you have
+    /// document data in memory (e.g., a PDF generated programmatically).
+    ///
+    /// This method accumulates content - it can be called multiple times.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    /// let pdf_bytes = std::fs::read("document.pdf")?;
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Summarize this document")
+    ///     .add_document_bytes(&pdf_bytes, "application/pdf")
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn add_document_bytes(self, data: &[u8], mime_type: impl Into<String>) -> Self {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(data);
+        self.add_document_data(encoded, mime_type)
     }
 
     /// Adds a document from a URI to the content.
@@ -604,6 +735,44 @@ impl<'a> InteractionBuilder<'a> {
     pub fn with_response_modalities(mut self, modalities: Vec<String>) -> Self {
         self.response_modalities = Some(modalities);
         self
+    }
+
+    /// Configures the request to return image output.
+    ///
+    /// This is a convenience method equivalent to:
+    /// ```ignore
+    /// .with_response_modalities(vec!["IMAGE".to_string()])
+    /// ```
+    ///
+    /// Use this when you want the model to generate images. Requires a model
+    /// that supports image generation (e.g., `gemini-3-pro-image-preview`).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, InteractionResponseExt};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-pro-image-preview")
+    ///     .with_text("A cute cat playing with yarn")
+    ///     .with_image_output()
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // Extract generated image
+    /// if let Some(bytes) = response.first_image_bytes()? {
+    ///     std::fs::write("cat.png", &bytes)?;
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_image_output(self) -> Self {
+        self.with_response_modalities(vec!["IMAGE".to_string()])
     }
 
     /// Sets a JSON schema to enforce structured output from the model.

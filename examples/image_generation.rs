@@ -24,30 +24,20 @@
 //! a "model not found" error, your API key may not have access to the
 //! image generation model in your region.
 
-use base64::Engine;
-use rust_genai::{Client, GenaiError, InteractionContent, InteractionStatus};
+use rust_genai::{Client, GenaiError, InteractionResponseExt, InteractionStatus};
 use std::env;
 use std::path::PathBuf;
 
-/// Save a base64-encoded image to a file and return the path
+/// Save image bytes to a file and return the path
 fn save_image(
-    base64_data: &str,
-    mime_type: Option<&str>,
+    bytes: &[u8],
+    extension: &str,
     prefix: &str,
     index: usize,
 ) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let extension = match mime_type {
-        Some("image/png") => "png",
-        Some("image/jpeg") | Some("image/jpg") => "jpg",
-        Some("image/webp") => "webp",
-        Some("image/gif") => "gif",
-        _ => "png", // Default to png
-    };
-
     let filename = format!("{}_{}.{}", prefix, index, extension);
     let path = std::env::temp_dir().join(filename);
 
-    let bytes = base64::engine::general_purpose::STANDARD.decode(base64_data)?;
     std::fs::write(&path, bytes)?;
 
     Ok(path)
@@ -63,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== IMAGE GENERATION EXAMPLE ===\n");
 
     // ==========================================================================
-    // Example 1: Basic Image Generation
+    // Example 1: Basic Image Generation (using new convenience API)
     // ==========================================================================
     println!("--- Example 1: Birman Cat ---\n");
 
@@ -77,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model(model)
         .with_text(prompt)
-        .with_response_modalities(vec!["IMAGE".to_string()])
+        .with_image_output() // New convenience method!
         .with_store(true)
         .create()
         .await;
@@ -87,36 +77,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Status: {:?}", response.status);
 
             if response.status == InteractionStatus::Completed {
-                let mut image_count = 0;
-
-                for output in response.outputs.iter() {
-                    if let InteractionContent::Image {
-                        data: Some(base64_data),
-                        mime_type,
-                        ..
-                    } = output
-                    {
-                        image_count += 1;
-                        match save_image(
-                            base64_data,
-                            mime_type.as_deref(),
-                            "birman_cat",
-                            image_count,
-                        ) {
-                            Ok(path) => {
-                                println!("\n  Image {} saved!", image_count);
-                                println!("  Size: {} bytes", base64_data.len() * 3 / 4);
-                                println!("  Path: {}", path.display());
-                                println!("  Open: file://{}", path.display());
-                            }
-                            Err(e) => {
-                                eprintln!("\n  Failed to save image {}: {}", image_count, e);
-                            }
-                        }
-                    }
-                }
-
-                if image_count == 0 {
+                // New simplified image extraction using InteractionResponseExt
+                if let Some(bytes) = response.first_image_bytes()? {
+                    let path = save_image(&bytes, "png", "birman_cat", 1)?;
+                    println!("\n  Image saved!");
+                    println!("  Size: {} bytes", bytes.len());
+                    println!("  Path: {}", path.display());
+                    println!("  Open: file://{}", path.display());
+                } else {
                     println!("\nNo image content in response.");
                 }
             }
@@ -135,7 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // ==========================================================================
-    // Example 2: Watercolor Birman with Motorcycle
+    // Example 2: Using the images() iterator (for multiple images or metadata access)
     // ==========================================================================
     println!("\n--- Example 2: Watercolor Birman with Motorcycle ---\n");
 
@@ -147,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model(model)
         .with_text(prompt)
-        .with_response_modalities(vec!["IMAGE".to_string()])
+        .with_image_output() // New convenience method!
         .with_store(true)
         .create()
         .await;
@@ -157,33 +125,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Status: {:?}", response.status);
 
             if response.status == InteractionStatus::Completed {
+                // Using images() iterator provides access to MIME type and extension
                 let mut image_count = 0;
-
-                for output in response.outputs.iter() {
-                    if let InteractionContent::Image {
-                        data: Some(base64_data),
-                        mime_type,
-                        ..
-                    } = output
-                    {
-                        image_count += 1;
-                        match save_image(
-                            base64_data,
-                            mime_type.as_deref(),
-                            "watercolor_birman_motorcycle",
-                            image_count,
-                        ) {
-                            Ok(path) => {
-                                println!("\n  Image {} saved!", image_count);
-                                println!("  Size: {} bytes", base64_data.len() * 3 / 4);
-                                println!("  Path: {}", path.display());
-                                println!("  Open: file://{}", path.display());
-                            }
-                            Err(e) => {
-                                eprintln!("\n  Failed to save image {}: {}", image_count, e);
-                            }
-                        }
-                    }
+                for image in response.images() {
+                    image_count += 1;
+                    let bytes = image.bytes()?;
+                    let path = save_image(
+                        &bytes,
+                        image.extension(),
+                        "watercolor_birman_motorcycle",
+                        image_count,
+                    )?;
+                    println!("\n  Image {} saved!", image_count);
+                    println!("  Size: {} bytes", bytes.len());
+                    println!("  MIME: {:?}", image.mime_type());
+                    println!("  Path: {}", path.display());
+                    println!("  Open: file://{}", path.display());
                 }
 
                 if image_count == 0 {

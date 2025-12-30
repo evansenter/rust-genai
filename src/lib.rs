@@ -112,3 +112,7 @@ pub use streaming::{
     AutoFunctionResult, AutoFunctionResultAccumulator, AutoFunctionStreamChunk,
     FunctionExecutionResult,
 };
+
+// Response extension trait for image extraction
+pub mod response_ext;
+pub use response_ext::{ImageInfo, InteractionResponseExt};
