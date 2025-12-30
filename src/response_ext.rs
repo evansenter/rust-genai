@@ -261,7 +261,7 @@ mod tests {
 
     fn make_response_with_image(base64_data: &str, mime_type: Option<&str>) -> InteractionResponse {
         InteractionResponse {
-            id: "test-id".to_string(),
+            id: Some("test-id".to_string()),
             model: Some("test-model".to_string()),
             agent: None,
             input: vec![],
@@ -281,7 +281,7 @@ mod tests {
 
     fn make_response_no_images() -> InteractionResponse {
         InteractionResponse {
-            id: "test-id".to_string(),
+            id: Some("test-id".to_string()),
             model: Some("test-model".to_string()),
             agent: None,
             input: vec![],
@@ -333,7 +333,7 @@ mod tests {
     fn test_images_iterator() {
         // Create response with multiple images
         let response = InteractionResponse {
-            id: "test-id".to_string(),
+            id: Some("test-id".to_string()),
             model: Some("test-model".to_string()),
             agent: None,
             input: vec![],
