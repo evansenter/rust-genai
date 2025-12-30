@@ -268,6 +268,13 @@ impl<'a> InteractionBuilder<'a> {
             );
             let response = client.create_interaction(request.clone()).await?;
 
+            // When store != false (validated at function entry), the API should always
+            // return an interaction ID. This assertion catches API contract violations.
+            debug_assert!(
+                response.id.is_some(),
+                "Response missing ID but store != false; API contract violation"
+            );
+
             // Extract function calls using convenience method
             let function_calls = response.function_calls();
 
@@ -525,6 +532,13 @@ impl<'a> InteractionBuilder<'a> {
                         "Stream ended without Complete event".to_string()
                     )
                 })?;
+
+                // When store != false (validated at function entry), the API should always
+                // return an interaction ID. This assertion catches API contract violations.
+                debug_assert!(
+                    response.id.is_some(),
+                    "Response missing ID but store != false; API contract violation"
+                );
 
                 // Check for function calls from two possible sources:
                 // 1. response.function_calls(): Populated when the Complete event includes
