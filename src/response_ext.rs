@@ -49,6 +49,7 @@ impl ImageInfo<'_> {
     /// # Errors
     ///
     /// Returns an error if the base64 data is invalid.
+    #[must_use = "this `Result` should be used to handle potential decode errors"]
     pub fn bytes(&self) -> Result<Vec<u8>, GenaiError> {
         base64::engine::general_purpose::STANDARD
             .decode(self.data)
@@ -412,5 +413,24 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("Invalid base64"));
+    }
+
+    #[test]
+    fn test_image_info_extension_unknown_mime_type() {
+        // This test documents Evergreen-compliant behavior:
+        // Unknown MIME types default to "png" and log a warning (not verified here)
+        // to surface API evolution without breaking user code.
+        let info = ImageInfo {
+            data: "",
+            mime_type: Some("image/future-format"),
+        };
+        assert_eq!(info.extension(), "png");
+
+        // Completely novel MIME type also defaults gracefully
+        let info2 = ImageInfo {
+            data: "",
+            mime_type: Some("application/octet-stream"),
+        };
+        assert_eq!(info2.extension(), "png");
     }
 }
