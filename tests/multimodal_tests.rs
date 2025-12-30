@@ -761,3 +761,139 @@ async fn test_multimodal_streaming() {
     })
     .await;
 }
+
+// =============================================================================
+// Builder Pattern File Loading Tests
+// =============================================================================
+
+/// Tests the add_image_file() builder method.
+///
+/// This validates the fluent builder pattern for loading images directly from files,
+/// which auto-detects MIME type from the file extension and base64 encodes the content.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_add_image_file_builder() {
+    use base64::Engine;
+    use tempfile::TempDir;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Create temp directory and file
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let image_path = temp_dir.path().join("test_image.png");
+
+    // Decode base64 and write to file
+    let image_bytes = base64::engine::general_purpose::STANDARD
+        .decode(TINY_RED_PNG_BASE64)
+        .expect("Failed to decode base64");
+    std::fs::write(&image_path, &image_bytes).expect("Failed to write image");
+
+    // Use the fluent builder pattern with add_image_file()
+    let response = interaction_builder(&client)
+        .with_text("What color is this image? Answer with just the color name.")
+        .add_image_file(&image_path)
+        .await
+        .expect("Failed to add image file")
+        .create()
+        .await
+        .expect("Image interaction failed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().unwrap().to_lowercase();
+    println!("Color response: {}", text);
+
+    // The tiny PNG is red
+    assert!(
+        text.contains("red") || text.contains("pink") || text.contains("magenta"),
+        "Response should identify the red color: {}",
+        text
+    );
+}
+
+/// Tests chaining multiple add_image_file() calls.
+///
+/// Validates that the builder correctly accumulates multiple images when
+/// chaining add_image_file() calls.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_add_multiple_image_files_builder() {
+    use base64::Engine;
+    use tempfile::TempDir;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+    // Create two image files
+    let red_path = temp_dir.path().join("red.png");
+    let blue_path = temp_dir.path().join("blue.png");
+
+    let red_bytes = base64::engine::general_purpose::STANDARD
+        .decode(TINY_RED_PNG_BASE64)
+        .expect("Failed to decode red PNG");
+    std::fs::write(&red_path, &red_bytes).expect("Failed to write red image");
+
+    let blue_bytes = base64::engine::general_purpose::STANDARD
+        .decode(TINY_BLUE_PNG_BASE64)
+        .expect("Failed to decode blue PNG");
+    std::fs::write(&blue_path, &blue_bytes).expect("Failed to write blue image");
+
+    // Chain multiple add_image_file() calls
+    let response = interaction_builder(&client)
+        .with_text("I'm showing you two small colored images. What colors are they? List both.")
+        .add_image_file(&red_path)
+        .await
+        .expect("Failed to add red image")
+        .add_image_file(&blue_path)
+        .await
+        .expect("Failed to add blue image")
+        .create()
+        .await
+        .expect("Multiple images interaction failed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().unwrap().to_lowercase();
+    println!("Multiple images response: {}", text);
+
+    // Should mention at least one color
+    let mentions_red = text.contains("red") || text.contains("pink");
+    let mentions_blue = text.contains("blue");
+
+    assert!(
+        mentions_red || mentions_blue,
+        "Response should describe at least one of the colors: {}",
+        text
+    );
+}
+
+/// Tests add_image_file() error handling for missing file.
+#[tokio::test]
+async fn test_add_image_file_not_found() {
+    // This test doesn't require an API key - just tests local file loading error
+    let client = rust_genai::Client::builder("fake-key-for-testing".to_string()).build();
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Describe this image")
+        .add_image_file("/nonexistent/path/image.png")
+        .await;
+
+    assert!(result.is_err(), "Should return error for missing file");
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("Failed to read file") || err.contains("No such file"),
+        "Error should mention file not found: {}",
+        err
+    );
+}

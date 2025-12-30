@@ -663,3 +663,50 @@ impl<'a> InteractionBuilder<'a> {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_call_id_with_valid_id() {
+        let result = validate_call_id(Some("call_123"), "get_weather");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "call_123");
+    }
+
+    #[test]
+    fn test_validate_call_id_with_empty_id() {
+        // Empty string is technically valid - the model controls the value
+        let result = validate_call_id(Some(""), "get_weather");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "");
+    }
+
+    #[test]
+    fn test_validate_call_id_with_none() {
+        let result = validate_call_id(None, "get_weather");
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            GenaiError::MalformedResponse(msg) => {
+                assert!(msg.contains("get_weather"));
+                assert!(msg.contains("call_id"));
+            }
+            other => panic!("Expected MalformedResponse, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_call_id_error_includes_function_name() {
+        let result = validate_call_id(None, "calculate_sum");
+        assert!(result.is_err());
+
+        let error_msg = format!("{}", result.unwrap_err());
+        assert!(
+            error_msg.contains("calculate_sum"),
+            "Error should include function name: {}",
+            error_msg
+        );
+    }
+}
