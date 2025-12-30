@@ -74,10 +74,6 @@ impl ImageInfo<'_> {
             Some("image/png") => "png",
             Some("image/webp") => "webp",
             Some("image/gif") => "gif",
-            // HEIC/HEIF included for forward-compatibility with potential
-            // future API responses (Evergreen philosophy)
-            Some("image/heic") => "heic",
-            Some("image/heif") => "heif",
             Some(unknown) => {
                 log::warn!(
                     "Unknown image MIME type '{}', defaulting to 'png' extension. \
@@ -399,8 +395,8 @@ mod tests {
         check(Some("image/png"), "png");
         check(Some("image/webp"), "webp");
         check(Some("image/gif"), "gif");
-        check(Some("image/heic"), "heic");
-        check(Some("image/heif"), "heif");
+        check(Some("image/heic"), "png"); // Unknown format, defaults to png
+        check(Some("image/heif"), "png"); // Unknown format, defaults to png
         check(Some("image/unknown"), "png"); // default
         check(None, "png"); // default
     }
