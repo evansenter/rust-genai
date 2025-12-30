@@ -77,16 +77,6 @@ cargo run --example text_input
 cargo run --example image_generation
 ```
 
-**Real-World Applications:**
-```bash
-cargo run --example rag_system           # RAG-based question answering
-cargo run --example multi_turn_agent     # Stateful multi-turn conversations
-cargo run --example code_assistant       # Code analysis and generation
-cargo run --example data_analysis        # Data processing with code execution
-cargo run --example web_scraper_agent    # Web scraping with URL context
-cargo run --example testing_assistant    # Test generation and validation
-```
-
 ### Benchmarks
 
 Performance benchmarks (require nightly Rust):
@@ -187,10 +177,14 @@ let response = client.interaction()
 
 // Extract generated images from response
 for output in &response.outputs {
-    if let InteractionContent::ImageData { data, mime_type } = output {
+    if let InteractionContent::Image {
+        data: Some(base64_data),
+        mime_type,
+        ..
+    } = output {
         // data is base64-encoded image
         // mime_type is typically "image/png" or "image/jpeg"
-        let bytes = base64::decode(data)?;
+        let bytes = base64::decode(base64_data)?;
         std::fs::write("generated.png", bytes)?;
     }
 }
