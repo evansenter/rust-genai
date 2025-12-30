@@ -170,7 +170,7 @@ client.interaction()
 **Generate images** by setting response modalities:
 ```rust
 let response = client.interaction()
-    .with_model("gemini-3-flash-preview")
+    .with_model("gemini-3-pro-image-preview")
     .with_text("Generate an image of a sunset over mountains")
     .with_response_modalities(vec!["IMAGE".to_string()])
     .create().await?;
@@ -184,7 +184,8 @@ for output in &response.outputs {
     } = output {
         // data is base64-encoded image
         // mime_type is typically "image/png" or "image/jpeg"
-        let bytes = base64::decode(base64_data)?;
+        use base64::Engine;
+        let bytes = base64::engine::general_purpose::STANDARD.decode(base64_data)?;
         std::fs::write("generated.png", bytes)?;
     }
 }
@@ -326,7 +327,7 @@ GitHub Actions (`.github/workflows/rust.yml`) runs 9 parallel jobs: check, test,
 
 ## Project Conventions
 
-- **Model name**: Always use `gemini-3-flash-preview` throughout the project (tests, examples, documentation). Do not reference other model names.
+- **Model name**: Always use `gemini-3-flash-preview` throughout the project (tests, examples, documentation). Exception: Image generation examples must use `gemini-3-pro-image-preview` since it's the only model supporting image output.
 
 ## Versioning Philosophy
 
