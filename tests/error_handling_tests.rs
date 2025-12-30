@@ -75,6 +75,30 @@ fn test_genai_error_api_400_bad_request() {
 }
 
 #[test]
+fn test_genai_error_api_request_id_in_debug() {
+    // request_id is available in Debug output (for logging) and pattern matching,
+    // but intentionally excluded from Display to keep error messages concise.
+    let error = GenaiError::Api {
+        status_code: 500,
+        message: "Server error".to_string(),
+        request_id: Some("req-debug-12345".to_string()),
+    };
+
+    // Display is concise - no request_id
+    let display = format!("{}", error);
+    assert!(display.contains("500"));
+    assert!(display.contains("Server error"));
+
+    // Debug includes request_id for logging/diagnostics
+    let debug = format!("{:?}", error);
+    assert!(
+        debug.contains("req-debug-12345"),
+        "Debug output should include request_id: {}",
+        debug
+    );
+}
+
+#[test]
 fn test_genai_error_malformed_response_patterns() {
     // Test various MalformedResponse scenarios documented in the codebase
 
