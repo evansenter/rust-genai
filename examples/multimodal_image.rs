@@ -92,7 +92,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let follow_up = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_previous_interaction(&comparison.id)
+        .with_previous_interaction(
+            comparison
+                .id
+                .as_ref()
+                .expect("id should exist when store=true"),
+        )
         .with_text("Which of those colors is warmer?")
         .with_store(true)
         .create()

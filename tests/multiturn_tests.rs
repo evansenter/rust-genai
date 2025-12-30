@@ -81,7 +81,7 @@ async fn test_very_long_conversation() {
         match builder.create().await {
             Ok(response) => {
                 println!("Turn {}: {}", i + 1, fact);
-                previous_id = Some(response.id);
+                previous_id = response.id;
                 successful_turns += 1;
             }
             Err(e) => {
@@ -225,7 +225,7 @@ async fn test_conversation_function_then_text() {
     );
 
     let response2 = stateful_builder(&client)
-        .with_previous_interaction(&response1.id)
+        .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
         .with_content(vec![result])
         .with_function(get_weather.clone())
         .create()
@@ -239,7 +239,7 @@ async fn test_conversation_function_then_text() {
 
     // Turn 3: Follow-up text question (no function call expected)
     let response3 = stateful_builder(&client)
-        .with_previous_interaction(&response2.id)
+        .with_previous_interaction(response2.id.as_ref().expect("id should exist"))
         .with_text("Should I bring a jacket?")
         .with_function(get_weather)
         .create()
@@ -305,7 +305,7 @@ async fn test_conversation_branch() {
             let prev_id = prev_id.clone();
             async move {
                 stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
+                    .with_previous_interaction(prev_id.as_ref().expect("id should exist"))
                     .with_text("My favorite number is 7.")
                     .create()
                     .await
@@ -323,7 +323,7 @@ async fn test_conversation_branch() {
             let prev_id = prev_id.clone();
             async move {
                 stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
+                    .with_previous_interaction(prev_id.as_ref().expect("id should exist"))
                     .with_text("My favorite animal is a cat.")
                     .create()
                     .await
@@ -342,7 +342,7 @@ async fn test_conversation_branch() {
             let prev_id = prev_id.clone();
             async move {
                 stateful_builder(&client)
-                    .with_previous_interaction(&prev_id) // Branch from turn 2
+                    .with_previous_interaction(prev_id.as_ref().expect("id should exist")) // Branch from turn 2
                     .with_text("What do you know about my favorites so far?")
                     .create()
                     .await
@@ -382,7 +382,7 @@ async fn test_conversation_branch() {
             let prev_id = prev_id.clone();
             async move {
                 stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
+                    .with_previous_interaction(prev_id.as_ref().expect("id should exist"))
                     .with_text("And what's my favorite animal?")
                     .create()
                     .await

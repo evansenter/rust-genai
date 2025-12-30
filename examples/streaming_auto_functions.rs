@@ -157,7 +157,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 AutoFunctionStreamChunk::Complete(response) => {
                     println!("\n\n--- Stream Complete ---");
-                    println!("Interaction ID: {}", response.id);
+                    println!("Interaction ID: {:?}", response.id);
                     println!("Status: {:?}", response.status);
                     if let Some(usage) = &response.usage {
                         println!(

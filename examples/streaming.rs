@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Final response with full metadata
                     println!("\n");
                     println!("--- Stream Complete ---");
-                    println!("Interaction ID: {}", response.id);
+                    println!("Interaction ID: {:?}", response.id);
                     println!("Status: {:?}", response.status);
                     if let Some(usage) = response.usage
                         && let Some(total) = usage.total_tokens

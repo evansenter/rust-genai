@@ -115,7 +115,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .interaction()
         .with_model(model_name)
         .with_text("Can you give me an example with cookies?")
-        .with_previous_interaction(&first_response.id)
+        .with_previous_interaction(first_response.id.as_ref().expect("id should exist"))
         .create()
         .await?;
 

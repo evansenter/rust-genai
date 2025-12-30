@@ -25,7 +25,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_store(true) // Important: Store for stateful conversation
         .create()
         .await?;
-    let interaction_id = first_response.id.clone();
+    let interaction_id = first_response
+        .id
+        .clone()
+        .expect("id should exist when store=true");
 
     println!("Interaction ID: {interaction_id}");
     println!("Status: {:?}\n", first_response.status);
@@ -54,7 +57,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .create()
         .await?;
 
-    println!("Interaction ID: {}", second_response.id);
+    println!("Interaction ID: {:?}", second_response.id);
     println!("Previous Interaction ID: {}", interaction_id);
     println!("Status: {:?}\n", second_response.status);
 
@@ -77,13 +80,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .interaction()
         .with_model(model_name)
         .with_text(third_prompt)
-        .with_previous_interaction(&second_response.id) // Reference second interaction
+        .with_previous_interaction(second_response.id.as_ref().expect("id should exist")) // Reference second interaction
         .with_store(true)
         .create()
         .await?;
 
-    println!("Interaction ID: {}", third_response.id);
-    println!("Previous Interaction ID: {}", second_response.id);
+    println!("Interaction ID: {:?}", third_response.id);
+    println!("Previous Interaction ID: {:?}", second_response.id);
     println!("Status: {:?}\n", third_response.status);
 
     if !third_response.outputs.is_empty() {
@@ -100,7 +103,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     match client.get_interaction(&interaction_id).await {
         Ok(retrieved) => {
-            println!("Retrieved Interaction ID: {}", retrieved.id);
+            println!("Retrieved Interaction ID: {:?}", retrieved.id);
             println!("Status: {:?}", retrieved.status);
             println!("Input parts: {}", retrieved.input.len());
             println!("Output parts: {}", retrieved.outputs.len());

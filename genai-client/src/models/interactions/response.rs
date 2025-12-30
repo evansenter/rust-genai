@@ -329,8 +329,12 @@ pub struct UrlContextResultInfo<'a> {
 #[derive(Clone, Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct InteractionResponse {
-    /// Unique identifier for this interaction
-    pub id: String,
+    /// Unique identifier for this interaction.
+    ///
+    /// This field is `None` when the interaction was created with `store=false`,
+    /// since non-stored interactions are not assigned an ID by the API.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 
     /// Model name if a model was used
     #[serde(skip_serializing_if = "Option::is_none")]

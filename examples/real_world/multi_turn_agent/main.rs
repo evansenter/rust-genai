@@ -266,7 +266,7 @@ impl SupportSession {
         let result = builder.create_with_auto_functions().await?;
 
         // Update session state
-        self.last_interaction_id = Some(result.response.id.clone());
+        self.last_interaction_id = result.response.id.clone();
 
         // Extract and return the text response
         Ok(result

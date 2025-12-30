@@ -400,17 +400,17 @@ fn arb_tool() -> impl Strategy<Value = Tool> {
 
 fn arb_interaction_response() -> impl Strategy<Value = InteractionResponse> {
     (
-        arb_identifier(),                                              // id
-        proptest::option::of(arb_identifier()),                        // model
-        proptest::option::of(arb_identifier()),                        // agent
-        prop::collection::vec(arb_interaction_content(), 0..3),        // input
-        prop::collection::vec(arb_interaction_content(), 0..5),        // outputs
-        arb_interaction_status(),                                      // status
-        proptest::option::of(arb_usage_metadata()),                    // usage
+        proptest::option::of(arb_identifier()),                 // id
+        proptest::option::of(arb_identifier()),                 // model
+        proptest::option::of(arb_identifier()),                 // agent
+        prop::collection::vec(arb_interaction_content(), 0..3), // input
+        prop::collection::vec(arb_interaction_content(), 0..5), // outputs
+        arb_interaction_status(),                               // status
+        proptest::option::of(arb_usage_metadata()),             // usage
         proptest::option::of(prop::collection::vec(arb_tool(), 0..3)), // tools
-        proptest::option::of(arb_grounding_metadata()),                // grounding_metadata
-        proptest::option::of(arb_url_context_metadata()),              // url_context_metadata
-        proptest::option::of(arb_identifier()),                        // previous_interaction_id
+        proptest::option::of(arb_grounding_metadata()),         // grounding_metadata
+        proptest::option::of(arb_url_context_metadata()),       // url_context_metadata
+        proptest::option::of(arb_identifier()),                 // previous_interaction_id
     )
         .prop_map(
             |(

@@ -315,7 +315,7 @@ async fn test_sequential_function_chain() {
         );
 
         let response2 = stateful_builder(&client)
-            .with_previous_interaction(&response1.id)
+            .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
             .with_content(vec![result1])
             .with_functions(vec![get_weather.clone(), convert_temp.clone()])
             .create()
@@ -343,7 +343,7 @@ async fn test_sequential_function_chain() {
             );
 
             let response3 = stateful_builder(&client)
-                .with_previous_interaction(&response2.id)
+                .with_previous_interaction(response2.id.as_ref().expect("id should exist"))
                 .with_content(vec![result2])
                 .with_functions(vec![get_weather, convert_temp])
                 .create()
@@ -413,7 +413,7 @@ async fn test_thought_signature_sequential_each_step() {
         );
 
         let response2 = stateful_builder(&client)
-            .with_previous_interaction(&response1.id)
+            .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
             .with_content(vec![result1])
             .with_text("Now what about Paris?")
             .with_function(get_weather.clone())
@@ -578,7 +578,7 @@ async fn test_function_call_error_response() {
     );
 
     let response2 = stateful_builder(&client)
-        .with_previous_interaction(&response1.id)
+        .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
         .with_content(vec![error_result])
         .with_function(failing_func)
         .create()
@@ -643,7 +643,7 @@ async fn test_function_call_no_args() {
         );
 
         let response2 = stateful_builder(&client)
-            .with_previous_interaction(&response.id)
+            .with_previous_interaction(response.id.as_ref().expect("id should exist"))
             .with_content(vec![result])
             .with_function(status_func)
             .create()

@@ -1246,7 +1246,7 @@ async fn test_structured_output_multi_turn() {
 
     println!("\n--- Turn 2: Extend profile ---");
     let response2 = stateful_builder(&client)
-        .with_previous_interaction(&response1.id)
+        .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
         .with_text("Based on the user profile you just created, output a new JSON with the original name and age, plus add an email address and occupation that fits the profile.")
         .with_response_format(schema2)
         .create()

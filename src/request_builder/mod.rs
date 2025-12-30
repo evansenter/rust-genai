@@ -739,6 +739,35 @@ impl<'a> InteractionBuilder<'a> {
     }
 
     /// Controls whether interaction data is persisted (default: true).
+    ///
+    /// When `false`, the API does not store the interaction, and the response will
+    /// not include an `id` field (`response.id` will be `None`). This means you cannot:
+    /// - Retrieve the interaction later with `get_interaction()`
+    /// - Use it with `with_previous_interaction()` in follow-up requests
+    /// - Use auto-function calling (`create_with_auto_functions()`)
+    ///
+    /// Use `store=false` for one-off requests where you don't need conversation history
+    /// or when you want to avoid storing data for privacy/compliance reasons.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Client::new("key".to_string());
+    /// // One-off request, no history needed
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Translate 'hello' to Spanish")
+    ///     .with_store(false)  // Response won't have an ID
+    ///     .create()
+    ///     .await?;
+    ///
+    /// assert!(response.id.is_none());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn with_store(mut self, store: bool) -> Self {
         self.store = Some(store);
         self
@@ -832,7 +861,7 @@ impl<'a> InteractionBuilder<'a> {
     ///             }
     ///         }
     ///         StreamChunk::Complete(response) => {
-    ///             println!("\nFinal response ID: {}", response.id);
+    ///             println!("\nFinal response ID: {:?}", response.id);
     ///         }
     ///         _ => {} // Handle unknown future variants
     ///     }

@@ -132,14 +132,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    println!("First response ID: {}", response_auto.id);
+    println!("First response ID: {:?}", response_auto.id);
 
     // Follow-up using previous_interaction_id
     let followup_auto = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Now divide that by 17.")
-        .with_previous_interaction(&response_auto.id)
+        .with_previous_interaction(
+            response_auto
+                .id
+                .as_ref()
+                .expect("id should exist when store=true"),
+        )
         .with_thinking_level(ThinkingLevel::Low)
         .with_store(true)
         .create()

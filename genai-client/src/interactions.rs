@@ -247,7 +247,7 @@ mod tests {
         let response: InteractionResponse =
             serde_json::from_str(response_json).expect("Deserialization should work");
 
-        assert_eq!(response.id, "test_interaction_123");
+        assert_eq!(response.id.as_deref(), Some("test_interaction_123"));
         assert_eq!(response.status, InteractionStatus::Completed);
         assert_eq!(response.outputs.len(), 1);
 

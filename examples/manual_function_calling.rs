@@ -128,7 +128,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("    Result: {}", result);
 
             // Build function result content
-            let call_id = call.id.expect("Function call should have an ID");
+            // Note: call_id is required for multi-turn function calling. It's always present
+            // when store=true (the default), but may be None with store=false.
+            let call_id = call.id.ok_or_else(|| {
+                format!(
+                    "Function call '{}' is missing call_id. Ensure store=true for multi-turn.",
+                    call.name
+                )
+            })?;
             results.push(function_result_content(
                 call.name.to_string(),
                 call_id,
@@ -137,10 +144,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Send results back to the model
+        // Note: previous_interaction_id requires stored interactions (store=true, the default)
+        let prev_id = response
+            .id
+            .as_ref()
+            .ok_or("Response missing ID. Multi-turn requires store=true (the default).")?;
         response = client
             .interaction()
             .with_model("gemini-3-flash-preview")
-            .with_previous_interaction(&response.id) // Continue the conversation
+            .with_previous_interaction(prev_id) // Continue the conversation
             .with_content(results)
             .with_functions(functions.clone()) // Keep functions available
             .create()

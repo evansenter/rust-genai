@@ -119,7 +119,7 @@ async fn test_thinking_with_function_calling_multi_turn() {
     // Verify storage: Explicitly confirm with_store(true) worked
     // =========================================================================
     let retrieved = client
-        .get_interaction(&response1.id)
+        .get_interaction(response1.id.as_ref().expect("id should exist"))
         .await
         .expect("Should be able to retrieve stored interaction");
     assert_eq!(
@@ -127,7 +127,7 @@ async fn test_thinking_with_function_calling_multi_turn() {
         "Retrieved interaction ID should match"
     );
     println!(
-        "✓ Storage verified: interaction {} is retrievable",
+        "✓ Storage verified: interaction {:?} is retrievable",
         response1.id
     );
 
@@ -147,7 +147,7 @@ async fn test_thinking_with_function_calling_multi_turn() {
 
     let response2 = {
         let client = client.clone();
-        let prev_id = response1.id.clone();
+        let prev_id = response1.id.clone().expect("id should exist");
         let get_weather = get_weather.clone();
         let function_result = function_result.clone();
         retry_on_transient(DEFAULT_MAX_RETRIES, || {
@@ -217,7 +217,7 @@ async fn test_thinking_with_function_calling_multi_turn() {
     // =========================================================================
     let response3 = {
         let client = client.clone();
-        let prev_id = response2.id.clone();
+        let prev_id = response2.id.clone().expect("id should exist");
         let get_weather = get_weather.clone();
         retry_on_transient(DEFAULT_MAX_RETRIES, || {
             let client = client.clone();
@@ -425,7 +425,7 @@ async fn test_thinking_with_parallel_function_calls() {
 
     let response2 = {
         let client = client.clone();
-        let prev_id = response1.id.clone();
+        let prev_id = response1.id.clone().expect("id should exist");
         let get_weather = get_weather.clone();
         let get_time = get_time.clone();
         let results = results.clone();
@@ -656,7 +656,7 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
 
     let response2 = {
         let client = client.clone();
-        let prev_id = response1.id.clone();
+        let prev_id = response1.id.clone().expect("id should exist");
         let functions = all_functions.clone();
         let results = results1.clone();
         retry_on_transient(DEFAULT_MAX_RETRIES, || {
@@ -738,7 +738,7 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
 
         let response3 = {
             let client = client.clone();
-            let prev_id = response2.id.clone();
+            let prev_id = response2.id.clone().expect("id should exist");
             let functions = all_functions.clone();
             let results = results2.clone();
             retry_on_transient(DEFAULT_MAX_RETRIES, || {
@@ -896,7 +896,7 @@ async fn test_thinking_levels_with_function_calling() {
 
         let response2 = {
             let client = client.clone();
-            let prev_id = response1.id.clone();
+            let prev_id = response1.id.clone().expect("id should exist");
             let get_weather = get_weather.clone();
             let function_result = function_result.clone();
             retry_on_transient(DEFAULT_MAX_RETRIES, || {
@@ -1045,7 +1045,7 @@ async fn test_function_calling_without_thinking() {
 
     let response2 = {
         let client = client.clone();
-        let prev_id = response1.id.clone();
+        let prev_id = response1.id.clone().expect("id should exist");
         let get_weather = get_weather.clone();
         let function_result = function_result.clone();
         retry_on_transient(DEFAULT_MAX_RETRIES, || {
@@ -1241,7 +1241,7 @@ async fn test_streaming_with_thinking_and_function_calling() {
     );
 
     let stream2 = stateful_builder(&client)
-        .with_previous_interaction(&response1.id)
+        .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
         .with_content(vec![function_result])
         .with_function(get_weather)
         .with_thinking_level(ThinkingLevel::Medium)

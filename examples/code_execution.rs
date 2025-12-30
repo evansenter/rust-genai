@@ -41,7 +41,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     {
         Ok(response) => {
             println!("--- Code Execution Response ---");
-            println!("Interaction ID: {}", response.id);
+            println!("Interaction ID: {:?}", response.id);
             println!("Status: {:?}\n", response.status);
 
             // 4. Display the model's text response

@@ -143,7 +143,7 @@ fn arb_interaction_content() -> impl Strategy<Value = InteractionContent> {
 
 fn arb_interaction_response() -> impl Strategy<Value = InteractionResponse> {
     (
-        arb_identifier(),                                       // id
+        proptest::option::of(arb_identifier()),                 // id
         proptest::option::of(arb_identifier()),                 // model
         proptest::option::of(arb_identifier()),                 // agent
         prop::collection::vec(arb_interaction_content(), 0..3), // input

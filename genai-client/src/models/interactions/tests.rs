@@ -58,7 +58,7 @@ fn test_deserialize_interaction_response_completed() {
     let response: InteractionResponse =
         serde_json::from_str(response_json).expect("Deserialization failed");
 
-    assert_eq!(response.id, "interaction_123");
+    assert_eq!(response.id.as_deref(), Some("interaction_123"));
     assert_eq!(response.model.as_deref(), Some("gemini-3-flash-preview"));
     assert_eq!(response.status, InteractionStatus::Completed);
     assert_eq!(response.input.len(), 1);
@@ -154,7 +154,7 @@ fn test_generation_config_serialization() {
 #[test]
 fn test_interaction_response_text() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -183,7 +183,7 @@ fn test_interaction_response_text() {
 #[test]
 fn test_interaction_response_thoughts() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -222,7 +222,7 @@ fn test_interaction_response_thoughts() {
 #[test]
 fn test_interaction_response_no_thoughts() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -245,7 +245,7 @@ fn test_interaction_response_no_thoughts() {
 #[test]
 fn test_interaction_response_function_calls() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -291,7 +291,7 @@ fn test_function_call_missing_id() {
     // This scenario should not normally occur (API contract requires call_id),
     // but if it does, the auto-function loop will return an error.
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -324,7 +324,7 @@ fn test_function_call_missing_id() {
 #[test]
 fn test_interaction_response_mixed_content() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -360,7 +360,7 @@ fn test_interaction_response_mixed_content() {
 #[test]
 fn test_interaction_response_empty_outputs() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -498,7 +498,7 @@ fn test_deserialize_interaction_complete_event() {
     assert!(event.delta.is_none());
 
     let interaction = event.interaction.unwrap();
-    assert_eq!(interaction.id, "interaction_456");
+    assert_eq!(interaction.id.as_deref(), Some("interaction_456"));
     assert_eq!(interaction.text(), Some("1, 2, 3"));
 }
 
@@ -617,7 +617,7 @@ fn test_known_types_still_work() {
 #[test]
 fn test_interaction_response_has_unknown() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -654,7 +654,7 @@ fn test_interaction_response_has_unknown() {
 #[test]
 fn test_interaction_response_no_unknown() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -676,7 +676,7 @@ fn test_interaction_response_no_unknown() {
 #[test]
 fn test_content_summary() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -731,7 +731,7 @@ fn test_content_summary() {
 #[test]
 fn test_content_summary_empty() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -830,7 +830,7 @@ fn test_deserialize_response_with_built_in_tool_outputs() {
     let response: InteractionResponse =
         serde_json::from_str(response_json).expect("Should deserialize with built-in tool types");
 
-    assert_eq!(response.id, "interaction_789");
+    assert_eq!(response.id.as_deref(), Some("interaction_789"));
     assert_eq!(response.outputs.len(), 3);
     assert!(response.has_text());
     assert!(response.has_code_execution_calls());
@@ -863,7 +863,7 @@ fn test_deserialize_response_with_unknown_in_outputs() {
     let response: InteractionResponse =
         serde_json::from_str(response_json).expect("Should deserialize with unknown types");
 
-    assert_eq!(response.id, "interaction_789");
+    assert_eq!(response.id.as_deref(), Some("interaction_789"));
     assert_eq!(response.outputs.len(), 3);
     assert!(response.has_text());
     assert!(response.has_unknown());
@@ -1601,7 +1601,7 @@ fn test_edge_cases_empty_values() {
 #[test]
 fn test_interaction_response_code_execution_helpers() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -1653,7 +1653,7 @@ fn test_interaction_response_code_execution_helpers() {
 #[test]
 fn test_interaction_response_google_search_helpers() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -1683,7 +1683,7 @@ fn test_interaction_response_google_search_helpers() {
 #[test]
 fn test_interaction_response_url_context_helpers() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -1710,7 +1710,7 @@ fn test_interaction_response_url_context_helpers() {
 #[test]
 fn test_content_summary_with_built_in_tools() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -1853,7 +1853,7 @@ fn test_url_retrieval_status_serialization_roundtrip() {
 #[test]
 fn test_interaction_response_function_results() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -1895,7 +1895,7 @@ fn test_interaction_response_function_results() {
 #[test]
 fn test_interaction_response_no_function_results() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -1919,7 +1919,7 @@ fn test_interaction_response_no_function_results() {
 #[test]
 fn test_interaction_response_google_search_call_helpers() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -1960,7 +1960,7 @@ fn test_interaction_response_google_search_call_helpers() {
 #[test]
 fn test_interaction_response_no_google_search_calls() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -1985,7 +1985,7 @@ fn test_interaction_response_no_google_search_calls() {
 #[test]
 fn test_interaction_response_url_context_call_helpers() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2020,7 +2020,7 @@ fn test_interaction_response_url_context_call_helpers() {
 #[test]
 fn test_interaction_response_no_url_context_calls() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2043,7 +2043,7 @@ fn test_interaction_response_no_url_context_calls() {
 #[test]
 fn test_interaction_response_code_execution_call_singular() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2079,7 +2079,7 @@ fn test_interaction_response_code_execution_call_singular() {
 #[test]
 fn test_interaction_response_no_code_execution_call() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2104,7 +2104,7 @@ fn test_interaction_response_google_search_metadata_helpers() {
     use crate::models::interactions::GroundingMetadata;
 
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2133,7 +2133,7 @@ fn test_interaction_response_google_search_metadata_helpers() {
 #[test]
 fn test_interaction_response_no_google_search_metadata() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2153,7 +2153,7 @@ fn test_interaction_response_no_google_search_metadata() {
 #[test]
 fn test_interaction_response_url_context_metadata_helpers() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2190,7 +2190,7 @@ fn test_interaction_response_url_context_metadata_helpers() {
 #[test]
 fn test_interaction_response_no_url_context_metadata() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2210,7 +2210,7 @@ fn test_interaction_response_no_url_context_metadata() {
 #[test]
 fn test_interaction_response_code_execution_calls_plural() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2252,7 +2252,7 @@ fn test_interaction_response_code_execution_calls_plural() {
 #[test]
 fn test_interaction_response_code_execution_results() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2295,7 +2295,7 @@ fn test_interaction_response_code_execution_results() {
 #[test]
 fn test_interaction_response_no_code_execution_results() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2318,7 +2318,7 @@ fn test_interaction_response_no_code_execution_results() {
 #[test]
 fn test_interaction_response_google_search_results() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2349,7 +2349,7 @@ fn test_interaction_response_google_search_results() {
 #[test]
 fn test_interaction_response_no_google_search_results() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2369,7 +2369,7 @@ fn test_interaction_response_no_google_search_results() {
 #[test]
 fn test_interaction_response_url_context_results() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2410,7 +2410,7 @@ fn test_interaction_response_url_context_results() {
 #[test]
 fn test_interaction_response_no_url_context_results() {
     let response = InteractionResponse {
-        id: "test_id".to_string(),
+        id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
@@ -2436,7 +2436,7 @@ fn test_interaction_response_no_url_context_results() {
 fn test_interaction_response_complex_roundtrip() {
     // Build a response with many different content types
     let response = InteractionResponse {
-        id: "complex-interaction-xyz".to_string(),
+        id: Some("complex-interaction-xyz".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![
@@ -2570,7 +2570,7 @@ fn test_interaction_response_complex_roundtrip() {
         serde_json::from_str(&json_str).expect("Deserialization should succeed");
 
     // Verify top-level fields
-    assert_eq!(deserialized.id, "complex-interaction-xyz");
+    assert_eq!(deserialized.id.as_deref(), Some("complex-interaction-xyz"));
     assert_eq!(
         deserialized.model,
         Some("gemini-3-flash-preview".to_string())
@@ -2723,4 +2723,107 @@ fn test_interaction_status_non_string_handled() {
     // The data should preserve the original value
     let data = status.unknown_data().expect("Should have data");
     assert_eq!(*data, serde_json::json!(42));
+}
+
+// --- Optional ID Tests (Issue #210) ---
+
+#[test]
+fn test_interaction_response_deserialize_without_id() {
+    // When store=false, the API response does not include an id field.
+    // This test verifies that we can deserialize such responses correctly.
+    let json = r#"{
+        "model": "gemini-3-flash-preview",
+        "input": [{"type": "text", "text": "Hello"}],
+        "outputs": [{"type": "text", "text": "Hi there!"}],
+        "status": "completed"
+    }"#;
+
+    let response: InteractionResponse =
+        serde_json::from_str(json).expect("Deserialization should succeed without id");
+
+    assert!(response.id.is_none(), "ID should be None when not present");
+    assert_eq!(response.model, Some("gemini-3-flash-preview".to_string()));
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(!response.outputs.is_empty());
+}
+
+#[test]
+fn test_interaction_response_deserialize_with_id() {
+    // When store=true (or by default), the API response includes an id field.
+    // This test verifies that we can still deserialize such responses correctly.
+    let json = r#"{
+        "id": "interaction-abc123",
+        "model": "gemini-3-flash-preview",
+        "input": [{"type": "text", "text": "Hello"}],
+        "outputs": [{"type": "text", "text": "Hi there!"}],
+        "status": "completed"
+    }"#;
+
+    let response: InteractionResponse =
+        serde_json::from_str(json).expect("Deserialization should succeed with id");
+
+    assert_eq!(
+        response.id.as_deref(),
+        Some("interaction-abc123"),
+        "ID should be present when included"
+    );
+    assert_eq!(response.model, Some("gemini-3-flash-preview".to_string()));
+    assert_eq!(response.status, InteractionStatus::Completed);
+}
+
+#[test]
+fn test_interaction_response_serialize_without_id() {
+    // When id is None, it should not be serialized into the JSON output.
+    // This uses skip_serializing_if to avoid "id": null in the output.
+    let response = InteractionResponse {
+        id: None,
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("Hello".to_string()),
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        previous_interaction_id: None,
+    };
+
+    let json = serde_json::to_string(&response).expect("Serialization should succeed");
+
+    assert!(
+        !json.contains(r#""id""#),
+        "JSON should not contain id field when None: {}",
+        json
+    );
+}
+
+#[test]
+fn test_interaction_response_roundtrip_without_id() {
+    // Verify roundtrip serialization works correctly when id is None.
+    let original = InteractionResponse {
+        id: None,
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("Test response".to_string()),
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        previous_interaction_id: None,
+    };
+
+    let json = serde_json::to_string(&original).expect("Serialization should succeed");
+    let restored: InteractionResponse =
+        serde_json::from_str(&json).expect("Deserialization should succeed");
+
+    assert_eq!(restored.id, original.id);
+    assert_eq!(restored.model, original.model);
+    assert_eq!(restored.status, original.status);
 }
