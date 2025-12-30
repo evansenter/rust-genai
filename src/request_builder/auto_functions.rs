@@ -269,11 +269,15 @@ impl<'a> InteractionBuilder<'a> {
             let response = client.create_interaction(request.clone()).await?;
 
             // When store != false (validated at function entry), the API should always
-            // return an interaction ID. This assertion catches API contract violations.
-            debug_assert!(
-                response.id.is_some(),
-                "Response missing ID but store != false; API contract violation"
-            );
+            // return an interaction ID. Return an error if the API violates this contract,
+            // as continuing would silently lose conversation context.
+            if response.id.is_none() {
+                return Err(GenaiError::MalformedResponse(
+                    "Response missing interaction ID. Auto-function calling requires stored \
+                     interactions (store != false) to maintain conversation context."
+                        .to_string(),
+                ));
+            }
 
             // Extract function calls using convenience method
             let function_calls = response.function_calls();
@@ -534,11 +538,15 @@ impl<'a> InteractionBuilder<'a> {
                 })?;
 
                 // When store != false (validated at function entry), the API should always
-                // return an interaction ID. This assertion catches API contract violations.
-                debug_assert!(
-                    response.id.is_some(),
-                    "Response missing ID but store != false; API contract violation"
-                );
+                // return an interaction ID. Return an error if the API violates this contract,
+                // as continuing would silently lose conversation context.
+                if response.id.is_none() {
+                    Err(GenaiError::MalformedResponse(
+                        "Response missing interaction ID. Auto-function calling requires stored \
+                         interactions (store != false) to maintain conversation context."
+                            .to_string(),
+                    ))?;
+                }
 
                 // Check for function calls from two possible sources:
                 // 1. response.function_calls(): Populated when the Complete event includes
