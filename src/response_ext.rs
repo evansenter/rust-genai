@@ -74,6 +74,8 @@ impl ImageInfo<'_> {
             Some("image/png") => "png",
             Some("image/webp") => "webp",
             Some("image/gif") => "gif",
+            // HEIC/HEIF included for forward-compatibility with potential
+            // future API responses (Evergreen philosophy)
             Some("image/heic") => "heic",
             Some("image/heif") => "heif",
             Some(unknown) => {
