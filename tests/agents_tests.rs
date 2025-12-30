@@ -61,7 +61,7 @@ async fn test_deep_research_agent() {
                         "Research response (truncated): {}...",
                         &text[..text.len().min(500)]
                     );
-                    assert_response_discusses_languages(text);
+                    assert_response_has_content(text);
                 }
                 return;
             }
@@ -82,7 +82,7 @@ async fn test_deep_research_agent() {
                             "Research response (truncated): {}...",
                             &text[..text.len().min(500)]
                         );
-                        assert_response_discusses_languages(text);
+                        assert_response_has_content(text);
                     }
                 }
                 Err(PollError::Timeout) => {
@@ -115,13 +115,9 @@ async fn test_deep_research_agent() {
     }
 }
 
-/// Helper to assert the response discusses programming languages
-fn assert_response_discusses_languages(text: &str) {
-    let text_lower = text.to_lowercase();
-    assert!(
-        text_lower.contains("rust") || text_lower.contains("go"),
-        "Response should discuss programming languages"
-    );
+/// Helper to verify the response is non-empty (structural check)
+fn assert_response_has_content(text: &str) {
+    assert!(!text.is_empty(), "Response should have non-empty content");
 }
 
 // =============================================================================

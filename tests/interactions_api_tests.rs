@@ -34,7 +34,7 @@ mod common;
 
 use common::{
     EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_stream, interaction_builder, stateful_builder,
-    with_timeout,
+    validate_response_semantically, with_timeout,
 };
 use rust_genai::{
     CallableFunction, Client, CreateInteractionRequest, FunctionDeclaration, GenerationConfig,
@@ -119,11 +119,25 @@ async fn test_stateful_conversation() {
 
         assert_eq!(response2.status, InteractionStatus::Completed);
 
-        // Verify the model remembers the color
-        let text = response2.text().unwrap_or_default().to_lowercase();
+        // Verify the model generated a response to the question
+        // The model should recall "blue" but phrasing varies, so we verify structural completeness
         assert!(
-            text.contains("blue"),
-            "Response should mention 'blue' from previous interaction"
+            response2.has_text(),
+            "Response should have text answering the question"
+        );
+        let text = response2.text().unwrap();
+        assert!(!text.is_empty(), "Response should be non-empty");
+
+        // Semantic validation: Check that the response correctly recalls the color from context
+        let is_valid = validate_response_semantically(
+            &client,
+            "In the previous turn, the user said 'My favorite color is blue.' Now they're asking 'What is my favorite color?'",
+            text,
+            "Does this response indicate that the user's favorite color is blue?"
+        ).await.expect("Semantic validation failed");
+        assert!(
+            is_valid,
+            "Response should correctly recall that the favorite color is blue from the previous turn"
         );
     })
     .await;
@@ -467,9 +481,20 @@ async fn test_manual_function_calling_with_result() {
 
         let text = second_response.text().expect("Should have text");
         println!("Final response text: {}", text);
+
+        // Verify structural response
+        assert!(!text.is_empty(), "Response should be non-empty");
+
+        // Semantic validation: Check that the response uses the function result
+        let is_valid = validate_response_semantically(
+            &client,
+            "User asked 'What's the weather in Tokyo?' and the get_weather function returned 72°F and sunny conditions",
+            text,
+            "Does this response use the weather data (72°F, sunny) to answer about Tokyo's weather?"
+        ).await.expect("Semantic validation failed");
         assert!(
-            text.contains("72") || text.contains("sunny") || text.contains("Tokyo"),
-            "Response should mention the weather data or location"
+            is_valid,
+            "Response should incorporate the function result (72°F, sunny in Tokyo)"
         );
     })
     .await;
@@ -583,11 +608,19 @@ async fn test_auto_function_calling() {
         let text = response.text().expect("Should have text");
         println!("Final text: {}", text);
 
-        // Verify the model incorporated our mock weather data in its response
+        // Verify structural response
+        assert!(!text.is_empty(), "Response should be non-empty");
+
+        // Semantic validation: Check that the auto-function result was used
+        let is_valid = validate_response_semantically(
+            &client,
+            "User asked 'What's the weather like in Seattle?' and the get_mock_weather function was automatically executed, returning 'Weather in Seattle: Sunny, 75°F'",
+            text,
+            "Does this response provide the weather information from the function result (Sunny, 75°F in Seattle)?"
+        ).await.expect("Semantic validation failed");
         assert!(
-            text.contains("75") || text.contains("Sunny") || text.contains("Seattle"),
-            "Response should reference the weather data: {}",
-            text
+            is_valid,
+            "Response should incorporate the auto-executed function result"
         );
     })
     .await;
@@ -1095,29 +1128,22 @@ async fn test_long_conversation_chain() {
 
             // On the last turn, verify the model remembers context
             if i == messages.len() - 1 {
-                let text = response.text().unwrap_or_default().to_lowercase();
+                let text = response.text().unwrap_or_default();
                 println!("Final response: {}", text);
 
-                let mentions_name = text.contains("alice");
-                let mentions_location = text.contains("new york");
-                let mentions_job = text.contains("software") || text.contains("engineer");
-                let mentions_cats =
-                    text.contains("cat") || text.contains("whiskers") || text.contains("shadow");
+                // Verify structural response
+                assert!(!text.is_empty(), "Response should be non-empty");
 
-                let facts_remembered = [
-                    mentions_name,
-                    mentions_location,
-                    mentions_job,
-                    mentions_cats,
-                ]
-                .iter()
-                .filter(|&&x| x)
-                .count();
-
-                println!("Facts remembered: {}/4", facts_remembered);
+                // Semantic validation: Check that the response recalls facts from earlier turns
+                let is_valid = validate_response_semantically(
+                    &client,
+                    "In previous turns, the user said: (1) 'My name is Alice', (2) 'I live in New York', (3) 'I work as a software engineer', (4) 'I have two cats named Whiskers and Shadow'. Now asking 'What do you know about me? List everything.'",
+                    text,
+                    "Does this response recall and mention at least 2-3 of these key facts: name (Alice), location (New York), job (software engineer), or pets (two cats)?"
+                ).await.expect("Semantic validation failed");
                 assert!(
-                    facts_remembered >= 2,
-                    "Model should remember at least 2 facts"
+                    is_valid,
+                    "Response should recall multiple facts from the conversation history"
                 );
             }
         }
