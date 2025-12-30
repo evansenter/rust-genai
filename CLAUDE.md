@@ -175,17 +175,18 @@ let response = client.interaction()
     .with_response_modalities(vec!["IMAGE".to_string()])
     .create().await?;
 
-// Extract generated images from response
+// Extract and save generated images
 for output in &response.outputs {
     if let InteractionContent::Image {
         data: Some(base64_data),
         mime_type,
         ..
     } = output {
-        // data is base64-encoded image
-        // mime_type is typically "image/png" or "image/jpeg"
+        // Decode base64 image data
         use base64::Engine;
         let bytes = base64::engine::general_purpose::STANDARD.decode(base64_data)?;
+
+        // Save to file (mime_type typically "image/png" or "image/jpeg")
         std::fs::write("generated.png", bytes)?;
     }
 }
@@ -327,7 +328,7 @@ GitHub Actions (`.github/workflows/rust.yml`) runs 9 parallel jobs: check, test,
 
 ## Project Conventions
 
-- **Model name**: Always use `gemini-3-flash-preview` throughout the project (tests, examples, documentation). Exception: Image generation examples must use `gemini-3-pro-image-preview` since it's the only model supporting image output.
+- **Model name**: Always use `gemini-3-flash-preview` throughout the project (tests, examples, documentation). Exception: Image generation requires `gemini-3-pro-image-preview` since it's the only model supporting image output.
 
 ## Versioning Philosophy
 
