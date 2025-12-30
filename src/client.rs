@@ -189,11 +189,11 @@ impl Client {
     ///     .create()
     ///     .await?;
     ///
-    /// // Stateful conversation
+    /// // Stateful conversation (requires stored interaction)
     /// let response2 = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("What did I just say?")
-    ///     .with_previous_interaction(&response.id)
+    ///     .with_previous_interaction(response.id.as_ref().expect("stored interaction has id"))
     ///     .create()
     ///     .await?;
     /// # Ok(())
@@ -245,7 +245,7 @@ impl Client {
     /// };
     ///
     /// let response = client.create_interaction(request).await?;
-    /// println!("Interaction ID: {}", response.id);
+    /// println!("Interaction ID: {:?}", response.id);
     /// # Ok(())
     /// # }
     /// ```
@@ -259,7 +259,7 @@ impl Client {
         let response =
             genai_client::create_interaction(&self.http_client, &self.api_key, request).await?;
 
-        log::debug!("Interaction created: ID={}", response.id);
+        log::debug!("Interaction created: ID={:?}", response.id);
 
         Ok(response)
     }
@@ -310,7 +310,7 @@ impl Client {
     ///             }
     ///         }
     ///         StreamChunk::Complete(response) => {
-    ///             println!("\nDone! ID: {}", response.id);
+    ///             println!("\nDone! ID: {:?}", response.id);
     ///         }
     ///         _ => {} // Handle unknown future variants
     ///     }

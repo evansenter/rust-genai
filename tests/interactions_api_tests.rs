@@ -81,7 +81,7 @@ async fn test_simple_interaction() {
         .await
         .expect("Interaction failed");
 
-    assert!(!response.id.is_empty(), "Interaction ID is empty");
+    assert!(response.id.is_some(), "Interaction ID should be present");
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(!response.outputs.is_empty(), "Outputs are empty");
 
@@ -111,7 +111,7 @@ async fn test_stateful_conversation() {
 
         // Second interaction referencing the first
         let response2 = stateful_builder(&client)
-            .with_previous_interaction(&response1.id)
+            .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
             .with_text("What is my favorite color?")
             .create()
             .await
@@ -146,7 +146,7 @@ async fn test_get_interaction() {
 
     // Retrieve the interaction
     let retrieved = client
-        .get_interaction(&response.id)
+        .get_interaction(response.id.as_ref().expect("id should exist"))
         .await
         .expect("Get interaction failed");
 
@@ -172,12 +172,14 @@ async fn test_delete_interaction() {
 
     // Delete the interaction
     client
-        .delete_interaction(&response.id)
+        .delete_interaction(response.id.as_ref().expect("id should exist"))
         .await
         .expect("Delete interaction failed");
 
     // Verify it's deleted by trying to retrieve it
-    let get_result = client.get_interaction(&response.id).await;
+    let get_result = client
+        .get_interaction(response.id.as_ref().expect("id should exist"))
+        .await;
     assert!(
         get_result.is_err(),
         "Expected error when getting deleted interaction"
@@ -214,10 +216,7 @@ async fn test_streaming_interaction() {
 
         // If we got a complete event, verify it has a valid ID
         if let Some(response) = result.final_response {
-            assert!(
-                !response.id.is_empty(),
-                "Complete response should have an ID"
-            );
+            assert!(response.id.is_some(), "Complete response should have an ID");
         }
     })
     .await;
@@ -267,7 +266,7 @@ async fn test_streaming_deltas_are_incremental() {
                 }
                 Ok(StreamChunk::Complete(response)) => {
                     println!("\n--- Complete ---");
-                    println!("Interaction ID: {}", response.id);
+                    println!("Interaction ID: {:?}", response.id);
                     if let Some(final_text) = response.text() {
                         println!("Final text length: {}", final_text.len());
                     }
@@ -453,7 +452,7 @@ async fn test_manual_function_calling_with_result() {
         );
 
         let second_response = interaction_builder(&client)
-            .with_previous_interaction(&response.id)
+            .with_previous_interaction(response.id.as_ref().expect("id should exist"))
             .with_content(vec![function_result])
             .with_function(get_weather)
             .create()
@@ -518,7 +517,7 @@ async fn test_requires_action_status() {
             );
 
             let response2 = interaction_builder(&client)
-                .with_previous_interaction(&response.id)
+                .with_previous_interaction(response.id.as_ref().expect("id should exist"))
                 .with_content(vec![function_result])
                 .with_function(get_time)
                 .create()
@@ -684,7 +683,7 @@ async fn test_thought_signatures_in_multi_turn() {
         );
 
         let response2 = interaction_builder(&client)
-            .with_previous_interaction(&response1.id)
+            .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
             .with_content(vec![function_result])
             .with_function(get_weather)
             .create()
@@ -880,7 +879,7 @@ async fn test_system_instruction_persists() {
 
     // Turn 2: Continue conversation
     let response2 = interaction_builder(&client)
-        .with_previous_interaction(&response1.id)
+        .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
         .with_text("And what about Germany?")
         .create()
         .await
@@ -1012,10 +1011,10 @@ async fn test_store_true_interaction_retrievable() {
         .await
         .expect("Interaction failed");
 
-    println!("Created interaction with store=true: {}", response.id);
+    println!("Created interaction with store=true: {:?}", response.id);
 
     let retrieved = client
-        .get_interaction(&response.id)
+        .get_interaction(response.id.as_ref().expect("id should exist"))
         .await
         .expect("Should be able to retrieve stored interaction");
 
@@ -1039,8 +1038,10 @@ async fn test_store_false_interaction_not_retrievable() {
 
     match result {
         Ok(response) => {
-            if !response.id.is_empty() {
-                let get_result = client.get_interaction(&response.id).await;
+            if response.id.is_some() {
+                let get_result = client
+                    .get_interaction(response.id.as_ref().expect("id should exist"))
+                    .await;
                 assert!(
                     get_result.is_err(),
                     "Stored=false interaction should not be retrievable"
@@ -1090,7 +1091,7 @@ async fn test_long_conversation_chain() {
                 .unwrap_or_else(|e| panic!("Turn {} failed: {:?}", i + 1, e));
 
             println!("Turn {}: {:?}", i + 1, response.status);
-            previous_id = Some(response.id.clone());
+            previous_id = response.id.clone();
 
             // On the last turn, verify the model remembers context
             if i == messages.len() - 1 {

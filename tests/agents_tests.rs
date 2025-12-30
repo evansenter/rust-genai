@@ -50,7 +50,7 @@ async fn test_deep_research_agent() {
     match result {
         Ok(initial_response) => {
             println!("Initial status: {:?}", initial_response.status);
-            println!("Interaction ID: {}", initial_response.id);
+            println!("Interaction ID: {:?}", initial_response.id);
 
             // If already completed, check the response
             if initial_response.status == InteractionStatus::Completed {
@@ -67,7 +67,12 @@ async fn test_deep_research_agent() {
             }
 
             // Poll for completion using exponential backoff
-            match poll_until_complete(&client, &initial_response.id, BACKGROUND_TASK_TIMEOUT).await
+            match poll_until_complete(
+                &client,
+                initial_response.id.as_ref().expect("id should exist"),
+                BACKGROUND_TASK_TIMEOUT,
+            )
+            .await
             {
                 Ok(response) => {
                     println!("Deep research completed!");
@@ -146,7 +151,7 @@ async fn test_background_mode_polling() {
     match result {
         Ok(initial_response) => {
             println!("Initial status: {:?}", initial_response.status);
-            println!("Interaction ID: {}", initial_response.id);
+            println!("Interaction ID: {:?}", initial_response.id);
 
             // If already completed, we're done
             if initial_response.status == InteractionStatus::Completed {
@@ -158,7 +163,12 @@ async fn test_background_mode_polling() {
             }
 
             // Poll for completion using exponential backoff
-            match poll_until_complete(&client, &initial_response.id, BACKGROUND_TASK_TIMEOUT).await
+            match poll_until_complete(
+                &client,
+                initial_response.id.as_ref().expect("id should exist"),
+                BACKGROUND_TASK_TIMEOUT,
+            )
+            .await
             {
                 Ok(response) => {
                     println!("Task completed!");

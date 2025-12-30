@@ -378,7 +378,7 @@ pub async fn consume_stream(
                     }
                 }
                 StreamChunk::Complete(response) => {
-                    println!("\nStream complete: {}", response.id);
+                    println!("\nStream complete: {:?}", response.id);
                     result.final_response = Some(response);
                 }
                 _ => {} // Handle unknown variants
@@ -483,7 +483,7 @@ pub async fn consume_auto_function_stream(
                     }
                 }
                 AutoFunctionStreamChunk::Complete(response) => {
-                    println!("\n[Stream complete: {}]", response.id);
+                    println!("\n[Stream complete: {:?}]", response.id);
                     result.final_response = Some(response);
                 }
                 _ => {

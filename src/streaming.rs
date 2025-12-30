@@ -743,7 +743,7 @@ mod tests {
         // Create a realistic AutoFunctionResult with multiple executions
         let result = AutoFunctionResult {
             response: genai_client::InteractionResponse {
-                id: "interaction-abc123".to_string(),
+                id: Some("interaction-abc123".to_string()),
                 model: Some("gemini-3-flash-preview".to_string()),
                 agent: None,
                 input: vec![InteractionContent::Text {
@@ -822,7 +822,10 @@ mod tests {
             serde_json::from_str(&json_str).expect("Deserialization should succeed");
 
         // Verify response fields
-        assert_eq!(deserialized.response.id, "interaction-abc123");
+        assert_eq!(
+            deserialized.response.id.as_deref(),
+            Some("interaction-abc123")
+        );
         assert_eq!(
             deserialized.response.model,
             Some("gemini-3-flash-preview".to_string())
@@ -859,7 +862,7 @@ mod tests {
         // Create an AutoFunctionResult with reached_max_loops: true
         let result = AutoFunctionResult {
             response: genai_client::InteractionResponse {
-                id: "interaction-stuck".to_string(),
+                id: Some("interaction-stuck".to_string()),
                 model: Some("gemini-3-flash-preview".to_string()),
                 agent: None,
                 input: vec![InteractionContent::Text {
@@ -938,7 +941,7 @@ mod tests {
 
         // Create a MaxLoopsReached chunk
         let response = genai_client::InteractionResponse {
-            id: "interaction-max-loops".to_string(),
+            id: Some("interaction-max-loops".to_string()),
             model: Some("gemini-3-flash-preview".to_string()),
             agent: None,
             input: vec![],
@@ -975,7 +978,7 @@ mod tests {
 
         match deserialized {
             AutoFunctionStreamChunk::MaxLoopsReached(resp) => {
-                assert_eq!(resp.id, "interaction-max-loops");
+                assert_eq!(resp.id.as_deref(), Some("interaction-max-loops"));
                 assert_eq!(resp.function_calls().len(), 1);
                 assert_eq!(resp.function_calls()[0].name, "stuck_function");
             }
@@ -1005,7 +1008,7 @@ mod tests {
 
         // Simulate MaxLoopsReached being yielded
         let response = genai_client::InteractionResponse {
-            id: "max-loops-response".to_string(),
+            id: Some("max-loops-response".to_string()),
             model: Some("gemini-3-flash-preview".to_string()),
             agent: None,
             input: vec![],
@@ -1028,6 +1031,6 @@ mod tests {
             "Should have reached_max_loops: true"
         );
         assert_eq!(result.executions.len(), 1);
-        assert_eq!(result.response.id, "max-loops-response");
+        assert_eq!(result.response.id.as_deref(), Some("max-loops-response"));
     }
 }

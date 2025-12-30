@@ -52,12 +52,12 @@ async fn test_streaming_multi_turn_basic() {
         .expect("Turn 1 failed")
     };
 
-    println!("Turn 1 completed: {}", response1.id);
+    println!("Turn 1 completed: {:?}", response1.id);
     assert_eq!(response1.status, InteractionStatus::Completed);
 
     // Turn 2: Stream a question that requires context from Turn 1
     let stream = stateful_builder(&client)
-        .with_previous_interaction(&response1.id)
+        .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
         .with_text("What is my favorite programming language? Answer in one word.")
         .with_store(true)
         .create_stream();
@@ -145,7 +145,7 @@ async fn test_streaming_multi_turn_function_calling() {
 
     let response2 = {
         let client = client.clone();
-        let prev_id = response1.id.clone();
+        let prev_id = response1.id.clone().expect("id should exist");
         let get_weather = get_weather.clone();
         retry_on_transient(DEFAULT_MAX_RETRIES, || {
             let client = client.clone();
@@ -173,7 +173,7 @@ async fn test_streaming_multi_turn_function_calling() {
 
     // Turn 3: Stream a follow-up question about the weather context
     let stream = stateful_builder(&client)
-        .with_previous_interaction(&response2.id)
+        .with_previous_interaction(response2.id.as_ref().expect("id should exist"))
         .with_text("Should I bring an umbrella? Answer briefly.")
         .with_function(get_weather)
         .with_store(true)

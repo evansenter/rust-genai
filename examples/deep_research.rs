@@ -93,7 +93,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Ok(initial_response) => {
             println!("Research initiated!");
             println!("Initial status: {:?}", initial_response.status);
-            println!("Interaction ID: {}\n", initial_response.id);
+            println!("Interaction ID: {:?}\n", initial_response.id);
 
             // 4. If already completed (fast response), display results
             if initial_response.status == InteractionStatus::Completed {
@@ -115,7 +115,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 MAX_POLL_DURATION
             );
 
-            match poll_for_completion(&client, &initial_response.id).await {
+            match poll_for_completion(
+                &client,
+                initial_response.id.as_ref().expect("id should exist"),
+            )
+            .await
+            {
                 Ok(final_response) => {
                     println!("\nResearch completed!");
                     display_research_results(&final_response);
@@ -245,7 +250,7 @@ async fn poll_for_completion(
 /// Displays the research results from a completed interaction
 fn display_research_results(response: &rust_genai::InteractionResponse) {
     println!("Status: {:?}", response.status);
-    println!("Interaction ID: {}\n", response.id);
+    println!("Interaction ID: {:?}\n", response.id);
 
     if let Some(text) = response.text() {
         let display_text = truncate_for_display(text, DISPLAY_LIMIT);

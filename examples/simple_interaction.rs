@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     {
         Ok(response) => {
             println!("--- Interaction Response ---");
-            println!("Interaction ID: {}", response.id);
+            println!("Interaction ID: {:?}", response.id);
             println!("Status: {:?}", response.status);
 
             if !response.outputs.is_empty() {

@@ -248,7 +248,7 @@ mod tests {
     #[test]
     fn test_stream_chunk_complete_roundtrip() {
         let response = InteractionResponse {
-            id: "test-interaction-123".to_string(),
+            id: Some("test-interaction-123".to_string()),
             model: Some("gemini-3-flash-preview".to_string()),
             agent: None,
             input: vec![InteractionContent::Text {
@@ -284,7 +284,7 @@ mod tests {
 
         match deserialized {
             StreamChunk::Complete(response) => {
-                assert_eq!(response.id, "test-interaction-123");
+                assert_eq!(response.id.as_deref(), Some("test-interaction-123"));
                 assert_eq!(response.status, InteractionStatus::Completed);
                 assert_eq!(response.text(), Some("The answer is 4."));
             }

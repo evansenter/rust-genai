@@ -99,7 +99,7 @@ async fn test_google_search_multi_turn() {
     println!("\n--- Turn 2: Follow-up about search ---");
     let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
         stateful_builder(&client)
-            .with_previous_interaction(&response1.id)
+            .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
             .with_text("Based on the weather information you just found, should I bring an umbrella if I visit Tokyo today?")
             .with_store(true)
             .create()
@@ -220,7 +220,7 @@ async fn test_url_context_multi_turn() {
     println!("\n--- Turn 2: Follow-up about URL content ---");
     let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
         stateful_builder(&client)
-            .with_previous_interaction(&response1.id)
+            .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
             .with_text("What is the main purpose of that website you just fetched? Is it a real company or an example domain?")
             .create()
             .await
@@ -336,7 +336,7 @@ async fn test_code_execution_multi_turn() {
     println!("\n--- Turn 2: Multiply result by 2 ---");
     let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
         stateful_builder(&client)
-            .with_previous_interaction(&response1.id)
+            .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
             .with_text(
                 "Multiply the factorial result you just calculated by 2. What is the answer?",
             )

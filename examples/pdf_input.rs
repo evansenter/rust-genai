@@ -77,7 +77,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let follow_up = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_previous_interaction(&response.id)
+        .with_previous_interaction(
+            response
+                .id
+                .as_ref()
+                .expect("id should exist when store=true"),
+        )
         .with_text("What format is this document? Is it a valid PDF structure?")
         .with_store(true)
         .create()

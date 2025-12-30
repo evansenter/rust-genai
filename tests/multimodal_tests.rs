@@ -178,7 +178,7 @@ async fn test_image_with_follow_up_question() {
 
         // Second turn: ask follow-up about the same image
         let response2 = stateful_builder(&client)
-            .with_previous_interaction(&response1.id)
+            .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
             .with_text("Is that a warm or cool color?")
             .create()
             .await

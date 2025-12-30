@@ -42,7 +42,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     {
         Ok(response) => {
             println!("--- Interaction Response ---");
-            println!("Interaction ID: {}", response.id);
+            println!("Interaction ID: {:?}", response.id);
             println!("Status: {:?}", response.status);
 
             // 4. Check URL context metadata (retrieval status for each URL)

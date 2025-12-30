@@ -266,3 +266,125 @@ fn test_interaction_builder_with_max_function_call_loops() {
         .with_max_function_call_loops(1);
     assert_eq!(builder.max_function_call_loops, 1);
 }
+
+// --- Auto-Function store=false Validation Tests ---
+
+#[tokio::test]
+async fn test_auto_functions_rejects_store_false() {
+    let client = create_test_client();
+    let func = FunctionDeclaration::builder("test_func")
+        .description("Test function")
+        .build();
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Test")
+        .with_function(func)
+        .with_store(false)
+        .create_with_auto_functions()
+        .await;
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        matches!(err, crate::GenaiError::InvalidInput(_)),
+        "Expected InvalidInput error, got: {:?}",
+        err
+    );
+    assert!(
+        err.to_string().contains("stored interactions"),
+        "Error message should mention stored interactions: {}",
+        err
+    );
+}
+
+#[tokio::test]
+async fn test_auto_functions_stream_rejects_store_false() {
+    use futures_util::StreamExt;
+
+    let client = create_test_client();
+    let func = FunctionDeclaration::builder("test_func")
+        .description("Test function")
+        .build();
+
+    let mut stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Test")
+        .with_function(func)
+        .with_store(false)
+        .create_stream_with_auto_functions();
+
+    // The first item should be an error
+    let first = stream.next().await;
+    assert!(first.is_some(), "Stream should yield at least one item");
+
+    let err = first.unwrap().unwrap_err();
+    assert!(
+        matches!(err, crate::GenaiError::InvalidInput(_)),
+        "Expected InvalidInput error, got: {:?}",
+        err
+    );
+    assert!(
+        err.to_string().contains("stored interactions"),
+        "Error message should mention stored interactions: {}",
+        err
+    );
+}
+
+#[tokio::test]
+async fn test_auto_functions_allows_store_true() {
+    // This test verifies that store=true (explicit) doesn't trigger the validation error.
+    // The actual API call will fail (invalid key), but validation should pass.
+    let client = create_test_client();
+    let func = FunctionDeclaration::builder("test_func")
+        .description("Test function")
+        .build();
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Test")
+        .with_function(func)
+        .with_store(true) // Explicitly true
+        .create_with_auto_functions()
+        .await;
+
+    // Should fail with API error (invalid key), not InvalidInput validation error
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        !matches!(err, crate::GenaiError::InvalidInput(_)),
+        "Should not be an InvalidInput error (validation passed), got: {:?}",
+        err
+    );
+}
+
+#[tokio::test]
+async fn test_auto_functions_allows_store_default() {
+    // This test verifies that store=None (default) doesn't trigger the validation error.
+    // The actual API call will fail (invalid key), but validation should pass.
+    let client = create_test_client();
+    let func = FunctionDeclaration::builder("test_func")
+        .description("Test function")
+        .build();
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Test")
+        .with_function(func)
+        // No .with_store() call - uses default (None, which means true on server)
+        .create_with_auto_functions()
+        .await;
+
+    // Should fail with API error (invalid key), not InvalidInput validation error
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        !matches!(err, crate::GenaiError::InvalidInput(_)),
+        "Should not be an InvalidInput error (validation passed), got: {:?}",
+        err
+    );
+}

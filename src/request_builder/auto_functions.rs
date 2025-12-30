@@ -195,7 +195,18 @@ impl<'a> InteractionBuilder<'a> {
     /// - Neither model nor agent was specified
     /// - The API request fails
     /// - `max_function_call_loops` is set to 0 (invalid configuration)
+    /// - `store` is set to `false` (auto-function calling requires stored interactions)
     pub async fn create_with_auto_functions(self) -> Result<AutoFunctionResult, GenaiError> {
+        // Auto-function calling requires stored interactions to maintain conversation
+        // context across multiple function execution rounds via previous_interaction_id.
+        if self.store == Some(false) {
+            return Err(GenaiError::InvalidInput(
+                "Auto-function calling requires stored interactions to maintain conversation \
+                 context. Remove .with_store(false) or use manual function calling instead."
+                    .to_string(),
+            ));
+        }
+
         let client = self.client;
         let max_loops = self.max_function_call_loops;
         let tool_service = self.tool_service.clone();
@@ -257,6 +268,17 @@ impl<'a> InteractionBuilder<'a> {
             );
             let response = client.create_interaction(request.clone()).await?;
 
+            // When store != false (validated at function entry), the API should always
+            // return an interaction ID. Return an error if the API violates this contract,
+            // as continuing would silently lose conversation context.
+            if response.id.is_none() {
+                return Err(GenaiError::MalformedResponse(
+                    "Response missing interaction ID. Auto-function calling requires stored \
+                     interactions (store != false) to maintain conversation context."
+                        .to_string(),
+                ));
+            }
+
             // Extract function calls using convenience method
             let function_calls = response.function_calls();
 
@@ -312,7 +334,7 @@ impl<'a> InteractionBuilder<'a> {
 
             // Create new request with function results
             // The server maintains function call context via previous_interaction_id
-            request.previous_interaction_id = Some(response.id);
+            request.previous_interaction_id = response.id;
             request.input = InteractionInput::Content(function_results);
         }
 
@@ -410,9 +432,22 @@ impl<'a> InteractionBuilder<'a> {
     /// - The API request fails
     /// - A function call is missing its required `call_id` field
     /// - `max_function_call_loops` is set to 0 (invalid configuration)
+    /// - `store` is set to `false` (auto-function calling requires stored interactions)
     pub fn create_stream_with_auto_functions(
         self,
     ) -> BoxStream<'a, Result<AutoFunctionStreamChunk, GenaiError>> {
+        // Auto-function calling requires stored interactions to maintain conversation
+        // context across multiple function execution rounds via previous_interaction_id.
+        if self.store == Some(false) {
+            return Box::pin(futures_util::stream::once(async {
+                Err(GenaiError::InvalidInput(
+                    "Auto-function calling requires stored interactions to maintain conversation \
+                     context. Remove .with_store(false) or use manual function calling instead."
+                        .to_string(),
+                ))
+            }));
+        }
+
         let client = self.client;
         let max_loops = self.max_function_call_loops;
         let tool_service = self.tool_service.clone();
@@ -501,6 +536,17 @@ impl<'a> InteractionBuilder<'a> {
                         "Stream ended without Complete event".to_string()
                     )
                 })?;
+
+                // When store != false (validated at function entry), the API should always
+                // return an interaction ID. Return an error if the API violates this contract,
+                // as continuing would silently lose conversation context.
+                if response.id.is_none() {
+                    Err(GenaiError::MalformedResponse(
+                        "Response missing interaction ID. Auto-function calling requires stored \
+                         interactions (store != false) to maintain conversation context."
+                            .to_string(),
+                    ))?;
+                }
 
                 // Check for function calls from two possible sources:
                 // 1. response.function_calls(): Populated when the Complete event includes
@@ -593,7 +639,7 @@ impl<'a> InteractionBuilder<'a> {
                 last_response = Some(response.clone());
 
                 // Create new request with function results
-                request.previous_interaction_id = Some(response.id);
+                request.previous_interaction_id = response.id;
                 request.input = InteractionInput::Content(function_results_content);
             }
 
