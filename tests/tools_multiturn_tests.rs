@@ -13,7 +13,10 @@
 
 mod common;
 
-use common::{DEFAULT_MAX_RETRIES, get_client, retry_on_transient, stateful_builder};
+use common::{
+    DEFAULT_MAX_RETRIES, get_client, retry_on_transient, stateful_builder,
+    validate_response_semantically,
+};
 use rust_genai::InteractionStatus;
 
 /// Checks if an error is a known API limitation for long conversation chains.
@@ -112,18 +115,23 @@ async fn test_google_search_multi_turn() {
             println!("Turn 2 status: {:?}", response2.status);
             if let Some(text) = response2.text() {
                 println!("Turn 2 response: {}", text);
-                // Verify response references the previous weather context
-                let text_lower = text.to_lowercase();
+                // Verify structural response - model generated a non-empty response
+                // We don't assert on specific content as LLM outputs are non-deterministic
                 assert!(
-                    text_lower.contains("tokyo")
-                        || text_lower.contains("weather")
-                        || text_lower.contains("umbrella")
-                        || text_lower.contains("rain")
-                        || text_lower.contains("sun")
-                        || text_lower.contains("yes")
-                        || text_lower.contains("no"),
-                    "Turn 2 should reference weather context. Got: {}",
-                    text
+                    !text.is_empty(),
+                    "Turn 2 should have non-empty text response"
+                );
+
+                // Semantic validation: Check that the response uses weather context from Turn 1
+                let is_valid = validate_response_semantically(
+                    &client,
+                    "In Turn 1, Google Search was used to find weather information for Tokyo. Turn 2 asks 'Based on the weather information you just found, should I bring an umbrella if I visit Tokyo today?'",
+                    text,
+                    "Does this response reference or use the weather information from Turn 1 to answer about bringing an umbrella?"
+                ).await.expect("Semantic validation failed");
+                assert!(
+                    is_valid,
+                    "Turn 2 should use weather context from Turn 1's Google Search results"
                 );
             }
             assert_eq!(
@@ -232,17 +240,23 @@ async fn test_url_context_multi_turn() {
             println!("Turn 2 status: {:?}", response2.status);
             if let Some(text) = response2.text() {
                 println!("Turn 2 response: {}", text);
-                // Verify response references the example.com content
-                let text_lower = text.to_lowercase();
+                // Verify structural response - model generated a non-empty response
+                // We don't assert on specific content as LLM outputs are non-deterministic
                 assert!(
-                    text_lower.contains("example")
-                        || text_lower.contains("domain")
-                        || text_lower.contains("placeholder")
-                        || text_lower.contains("illustrative")
-                        || text_lower.contains("documentation")
-                        || text_lower.contains("reserved"),
-                    "Turn 2 should reference example.com content. Got: {}",
-                    text
+                    !text.is_empty(),
+                    "Turn 2 should have non-empty text response"
+                );
+
+                // Semantic validation: Check that the response uses URL content from Turn 1
+                let is_valid = validate_response_semantically(
+                    &client,
+                    "In Turn 1, URL Context was used to fetch content from https://example.com. Turn 2 asks 'What is the main purpose of that website you just fetched? Is it a real company or an example domain?'",
+                    text,
+                    "Does this response reference or use the URL content from Turn 1 to answer about the website's purpose?"
+                ).await.expect("Semantic validation failed");
+                assert!(
+                    is_valid,
+                    "Turn 2 should use URL context from Turn 1 to answer about the website's purpose"
                 );
             }
             assert_eq!(
@@ -352,20 +366,17 @@ async fn test_code_execution_multi_turn() {
             println!("Turn 2 status: {:?}", response2.status);
             if let Some(text) = response2.text() {
                 println!("Turn 2 response: {}", text);
-                // 5! = 120, 120 * 2 = 240
-                assert!(
-                    text.contains("240"),
-                    "Turn 2 should calculate 120 * 2 = 240. Got: {}",
-                    text
-                );
             }
-            // Also check code execution output
+            // Verify code execution results - the calculation should be correct
+            // Check the code execution output for the expected numerical result (5! * 2 = 240)
             let results = response2.code_execution_results();
-            for result in &results {
-                if result.output.contains("240") {
-                    println!("Verified: Code output contains 240");
-                }
-            }
+            let has_correct_result = results.iter().any(|r| r.output.contains("240"))
+                || response2.text().is_some_and(|t| t.contains("240"));
+            assert!(
+                has_correct_result,
+                "Turn 2 should calculate 120 * 2 = 240 in code execution output or text. Got: {:?}",
+                results
+            );
             assert_eq!(
                 response2.status,
                 InteractionStatus::Completed,

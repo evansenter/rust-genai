@@ -24,6 +24,7 @@ mod common;
 
 use common::{
     DEFAULT_MAX_RETRIES, consume_stream, get_client, retry_on_transient, stateful_builder,
+    validate_response_semantically,
 };
 use rust_genai::{FunctionDeclaration, InteractionStatus, ThinkingLevel, function_result_content};
 use serde_json::json;
@@ -201,15 +202,24 @@ async fn test_thinking_with_function_calling_multi_turn() {
         "Turn 2 should have text response about the weather"
     );
 
-    // Response should reference the weather conditions
-    let text2 = response2.text().unwrap().to_lowercase();
+    // Verify structural response - model generated a response based on the function result
+    // We don't assert on specific content as LLM outputs are non-deterministic
+    let text2 = response2.text().unwrap();
     assert!(
-        text2.contains("umbrella")
-            || text2.contains("rain")
-            || text2.contains("yes")
-            || text2.contains("18"),
-        "Turn 2 should reference weather conditions. Got: {}",
-        text2
+        !text2.is_empty(),
+        "Turn 2 should have non-empty text response"
+    );
+
+    // Semantic validation: Check that the response actually addresses the weather question
+    let is_valid = validate_response_semantically(
+        &client,
+        "User asked 'What's the weather in Tokyo? Should I bring an umbrella?' and received weather data showing 18°C, rainy conditions, 80% precipitation",
+        text2,
+        "Does this response address the weather conditions and whether an umbrella is needed?"
+    ).await.expect("Semantic validation failed");
+    assert!(
+        is_valid,
+        "Turn 2 response should meaningfully address the weather question based on the function result"
     );
 
     // =========================================================================
@@ -277,20 +287,31 @@ async fn test_thinking_with_function_calling_multi_turn() {
         println!("Turn 3 reasoning tokens: {}", reasoning_tokens);
     }
 
-    // Response should be contextually relevant (about indoor activities)
-    let text3 = response3.text().unwrap().to_lowercase();
+    // Verify structural response - model generated a response to the follow-up question
+    // We don't assert on specific content as LLM outputs are non-deterministic
+    let text3 = response3.text().unwrap();
     assert!(
-        text3.contains("indoor")
-            || text3.contains("inside")
-            || text3.contains("museum")
-            || text3.contains("shopping")
-            || text3.contains("restaurant")
-            || text3.contains("cafe")
-            || text3.contains("temple")
-            || text3.contains("activity")
-            || text3.contains("activities"),
-        "Turn 3 should recommend indoor activities. Got: {}",
-        text3
+        !text3.is_empty(),
+        "Turn 3 should have non-empty text response"
+    );
+
+    // Semantic validation: Check that the response provides indoor activity recommendations
+    let is_valid = validate_response_semantically(
+        &client,
+        "User asked for indoor activity recommendations in Tokyo, given rainy weather (18°C, 80% precipitation) from the previous conversation",
+        text3,
+        "Does this response suggest indoor activities appropriate for rainy weather?"
+    ).await.expect("Semantic validation failed");
+    assert!(
+        is_valid,
+        "Turn 3 response should suggest indoor activities based on the weather context from Turn 2"
+    );
+
+    // Verify response structure is complete
+    assert_eq!(
+        response3.status,
+        InteractionStatus::Completed,
+        "Turn 3 should complete successfully"
     );
 
     println!("\n✓ All three turns completed successfully with thinking + function calling");

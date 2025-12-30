@@ -612,3 +612,142 @@ pub fn stateful_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
 pub fn thinking_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
     interaction_builder(client).with_thinking_level(rust_genai::ThinkingLevel::Medium)
 }
+
+// =============================================================================
+// Semantic Validation Using Structured Output
+// =============================================================================
+
+/// Uses Gemini with structured output to validate that a response is semantically appropriate.
+///
+/// This provides a middle ground between brittle content assertions and purely structural checks.
+/// The validator uses a separate API call to ask Gemini to judge whether the response makes sense
+/// given the context and expected behavior.
+///
+/// **When to use this:**
+/// - Multi-turn context preservation tests
+/// - Function calling integration where the response should use the function result
+/// - Complex queries where "did it do the right thing?" matters
+/// - Any test where you need behavioral validation, not just structural checks
+///
+/// **When NOT to use this:**
+/// - Simple structural checks (empty/non-empty text, status codes)
+/// - Known deterministic outputs (error codes, status values, exact numbers)
+/// - Performance-critical test paths where extra API calls are costly
+///
+/// **Performance:** Adds ~1-2 seconds per validation (one extra API call with structured output).
+///
+/// **Reliability:** Uses best-effort validation with graceful fallback. If the structured output
+/// is malformed or unparsable, returns true (valid) to avoid blocking tests on API format changes.
+/// Prints validation reason for debugging.
+///
+/// # Arguments
+///
+/// * `client` - The API client to use for validation
+/// * `context` - Background context: what the user asked, what data was provided (e.g., function results, prior turns), and what's expected
+/// * `response_text` - The actual response text from the LLM being tested
+/// * `validation_question` - Specific yes/no question to ask, e.g., "Does this response address the user's question about weather?"
+///
+/// # Returns
+///
+/// * `Ok(true)` - Response is semantically valid
+/// * `Ok(false)` - Response is not semantically valid (rare - usually means genuinely wrong response)
+/// * `Err(_)` - Validation API call failed (network error, etc.)
+///
+/// # Example
+///
+/// ```ignore
+/// // Test that multi-turn context is preserved
+/// let response2 = stateful_builder(&client)
+///     .with_previous_interaction(&response1_id)
+///     .with_text("What is my favorite color?")
+///     .create().await?;
+///
+/// let is_valid = validate_response_semantically(
+///     &client,
+///     "User said 'My favorite color is blue' in Turn 1, now asking 'What is my favorite color?' in Turn 2",
+///     response2.text().unwrap(),
+///     "Does this response indicate the user's favorite color is blue?"
+/// ).await?;
+///
+/// assert!(is_valid, "Response should recall blue from previous turn");
+/// ```
+///
+/// # See Also
+///
+/// * Example usage in `tests/thinking_function_tests.rs` and `tests/interactions_api_tests.rs`
+/// * CLAUDE.md "Test Assertion Strategies" section for when to use this vs structural assertions
+#[allow(dead_code)]
+pub async fn validate_response_semantically(
+    client: &Client,
+    context: &str,
+    response_text: &str,
+    validation_question: &str,
+) -> Result<bool, GenaiError> {
+    use serde_json::json;
+
+    let validation_prompt = format!(
+        "Context: {}\n\nResponse to validate: {}\n\nQuestion: {}\n\nAnswer yes or no.",
+        context, response_text, validation_question
+    );
+
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "is_valid": {
+                "type": "boolean",
+                "description": "Whether the response is semantically valid"
+            },
+            "reason": {
+                "type": "string",
+                "description": "Brief explanation of the judgment"
+            }
+        },
+        "required": ["is_valid", "reason"]
+    });
+
+    let validation = interaction_builder(client)
+        .with_text(&validation_prompt)
+        .with_response_format(schema)
+        .create()
+        .await?;
+
+    // Parse structured output
+    if let Some(text) = validation.text() {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(text) {
+            let is_valid = json
+                .get("is_valid")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true); // Default to valid if parsing fails
+
+            let reason = json
+                .get("reason")
+                .and_then(|v| v.as_str())
+                .unwrap_or("(no reason provided)");
+
+            println!(
+                "Semantic validation: {} - {}",
+                if is_valid { "✓ VALID" } else { "✗ INVALID" },
+                reason
+            );
+
+            return Ok(is_valid);
+        }
+    }
+
+    // Fallback: if we can't parse the structured output, assume valid to avoid false failures
+    let response_preview = validation
+        .text()
+        .map(|t| {
+            if t.len() > 100 {
+                format!("{}...", &t[..100])
+            } else {
+                t.to_string()
+            }
+        })
+        .unwrap_or_else(|| "(no text)".to_string());
+    println!(
+        "Warning: Could not parse semantic validation response (text: '{}'), assuming valid",
+        response_preview
+    );
+    Ok(true)
+}

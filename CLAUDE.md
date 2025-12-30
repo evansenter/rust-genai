@@ -322,6 +322,46 @@ This requires a custom `Deserialize` implementation. See `InteractionContent` in
   - To add coverage for a new type: create an `arb_<type>()` strategy function, then add a `<type>_roundtrip` test
   - Use `#[cfg(feature = "strict-unknown")]` variants for strategies that include `Unknown` variants
 
+### Test Assertion Strategies
+
+Integration tests should use the appropriate assertion strategy based on what they're testing:
+
+**Structural Assertions** (default for most tests):
+- Verify API mechanics work (status codes, response structure, field presence)
+- Check non-empty responses, valid IDs, correct status
+- Fast execution, no extra API calls
+- Example: `assert!(!response.text().unwrap().is_empty())`
+
+**Semantic Validation** (for high-value behavioral tests):
+- Use `validate_response_semantically()` from `tests/common/mod.rs`
+- Validates responses are contextually appropriate using Gemini as a judge
+- Uses structured output for deterministic yes/no validation with explanation
+- Apply to critical tests where behavior matters: context preservation, function calling effectiveness, multi-turn coherence
+- Adds ~1-2 seconds per validation (extra API call)
+- Example:
+  ```rust
+  let is_valid = validate_response_semantically(
+      &client,
+      "User asked about weather in Tokyo",
+      response.text().unwrap(),
+      "Does this response provide weather information?"
+  ).await?;
+  assert!(is_valid, "Response should address weather question");
+  ```
+
+**DO NOT use brittle content assertions:**
+- ❌ Avoid `text.contains("specific word")` - LLM outputs vary
+- ❌ Avoid checking for exact phrases or specific numbers in generated text
+- ✅ Use structural checks for mechanics, semantic validation for behavior
+
+**When to use semantic validation:**
+- Multi-turn context preservation tests
+- Function calling integration tests where the function result should inform the response
+- Tests validating the model understood and addressed a complex question
+- Any test where "did it do the right thing?" matters more than "did it respond?"
+
+See `tests/thinking_function_tests.rs::test_thinking_with_function_calling_multi_turn` and `tests/interactions_api_tests.rs::test_stateful_conversation` for examples.
+
 ## CI/CD
 
 GitHub Actions (`.github/workflows/rust.yml`) runs 9 parallel jobs: check, test, test-strict-unknown, 4× test-integration (core, tools, functions, multimodal), fmt, clippy, doc, security. Integration tests are split into 4 matrix jobs for faster execution (~2.5 min vs ~4 min). Integration tests require same-repo origin (protects API key). CI runs on all PRs regardless of file type.

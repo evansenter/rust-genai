@@ -21,6 +21,7 @@ A Rust client library for interacting with Google's Generative AI (Gemini) API u
 - [Error Handling](#error-handling)
 - [Logging](#logging)
 - [Troubleshooting](#troubleshooting)
+- [Testing](#testing)
 - [License](#license)
 - [Contributing](#contributing)
 
@@ -922,6 +923,58 @@ match result {
 
 MIT License - see [LICENSE](LICENSE) for details.
 
+## Testing
+
+### Running Tests
+
+```bash
+# Run all tests (requires GEMINI_API_KEY)
+cargo test -- --include-ignored
+
+# Run specific test file
+cargo test --test interactions_api_tests -- --include-ignored
+
+# Run with output visible
+cargo test -- --include-ignored --nocapture
+```
+
+### Writing Integration Tests
+
+When writing integration tests for LLM interactions, use the appropriate assertion strategy:
+
+**Structural Assertions** (default):
+```rust
+// ✅ Good: Verify structure and mechanics
+assert!(response.has_text());
+assert!(!response.text().unwrap().is_empty());
+assert_eq!(response.status, InteractionStatus::Completed);
+```
+
+**Semantic Validation** (for behavioral tests):
+```rust
+// ✅ Good: Validate meaning using Gemini as a judge
+use common::validate_response_semantically;
+
+let is_valid = validate_response_semantically(
+    &client,
+    "User asked about weather in Tokyo",
+    response.text().unwrap(),
+    "Does this response provide weather information?"
+).await?;
+assert!(is_valid);
+```
+
+**Brittle Content Assertions** (avoid):
+```rust
+// ❌ Bad: LLM outputs vary, causes flaky tests
+assert!(text.contains("sunny"));  // Don't do this
+assert!(text.contains("umbrella") || text.contains("rain"));  // Still brittle
+```
+
+For more details, see the "Test Assertion Strategies" section in [CLAUDE.md](CLAUDE.md).
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+For development guidelines and testing patterns, see [CLAUDE.md](CLAUDE.md).
