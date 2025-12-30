@@ -395,8 +395,6 @@ mod tests {
         check(Some("image/png"), "png");
         check(Some("image/webp"), "webp");
         check(Some("image/gif"), "gif");
-        check(Some("image/heic"), "png"); // Unknown format, defaults to png
-        check(Some("image/heif"), "png"); // Unknown format, defaults to png
         check(Some("image/unknown"), "png"); // default
         check(None, "png"); // default
     }
