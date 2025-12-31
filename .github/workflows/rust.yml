@@ -145,7 +145,10 @@ jobs:
       - name: Run baseline benchmarks (PR only)
         if: github.event_name == 'pull_request'
         run: |
-          cargo bench -p rust-genai --bench serialization --bench multimodal --bench function_registry --bench response_extraction --bench tool_service -- --save-baseline main --noplot
+          # Run benchmarks that exist on main branch (new benchmarks won't have a baseline)
+          for bench in serialization multimodal function_registry response_extraction tool_service; do
+            cargo bench -p rust-genai --bench $bench -- --save-baseline main --noplot 2>/dev/null || echo "Benchmark $bench not found on main, skipping baseline"
+          done
       - name: Checkout PR branch
         if: github.event_name == 'pull_request'
         run: git checkout ${{ github.event.pull_request.head.sha }}
@@ -161,7 +164,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Comparing PR against main branch baseline." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          cargo bench -p rust-genai --bench serialization --bench multimodal --bench function_registry --bench response_extraction --bench tool_service -- --baseline main --noplot 2>&1 | tee benchmark-comparison.txt || true
+          # Compare against baseline (new benchmarks without baselines will show as new)
+          for bench in serialization multimodal function_registry response_extraction tool_service; do
+            echo "=== $bench ===" >> benchmark-comparison.txt
+            cargo bench -p rust-genai --bench $bench -- --baseline main --noplot 2>&1 | tee -a benchmark-comparison.txt || echo "No baseline for $bench" >> benchmark-comparison.txt
+          done
           echo '```' >> $GITHUB_STEP_SUMMARY
           cat benchmark-comparison.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
