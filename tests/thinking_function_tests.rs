@@ -311,15 +311,15 @@ async fn test_thinking_with_function_calling_multi_turn() {
                 .await
                 .expect("Turn 3 follow-up failed")
             };
-            println!("Turn 3 follow-up status: {:?}", response3_followup.status);
 
-            // Guard against infinite function call loops - the follow-up should complete
+            // Guard against infinite function call loops - fail early before any processing
             assert_ne!(
                 response3_followup.status,
                 InteractionStatus::RequiresAction,
                 "Turn 3 follow-up should not request another function call (would loop infinitely)"
             );
 
+            println!("Turn 3 follow-up status: {:?}", response3_followup.status);
             let text = response3_followup
                 .text()
                 .expect("Turn 3 follow-up should have text")
