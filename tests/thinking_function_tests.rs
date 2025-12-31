@@ -1,5 +1,6 @@
 //! Thinking mode + function calling tests
 //!
+//!
 //! Tests for combining thinking mode (ThinkingLevel) with function calling,
 //! including multi-turn conversations, parallel function calls, sequential
 //! chains, and streaming scenarios.
