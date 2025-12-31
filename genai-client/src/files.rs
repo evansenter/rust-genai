@@ -341,7 +341,22 @@ pub async fn upload_file(
     mime_type: &str,
     display_name: Option<&str>,
 ) -> Result<FileMetadata, GenaiError> {
+    // Validate file is not empty
+    if file_data.is_empty() {
+        return Err(GenaiError::InvalidInput(
+            "Cannot upload empty file".to_string(),
+        ));
+    }
+
+    // Validate file size doesn't exceed API limit (2 GB)
+    const MAX_FILE_SIZE: usize = 2_147_483_648; // 2 GB
     let file_size = file_data.len();
+    if file_size > MAX_FILE_SIZE {
+        return Err(GenaiError::InvalidInput(format!(
+            "File size {} bytes exceeds maximum allowed size of {} bytes (2 GB)",
+            file_size, MAX_FILE_SIZE
+        )));
+    }
 
     log::debug!(
         "Uploading file: size={} bytes, mime_type={}, display_name={:?}",
@@ -774,6 +789,10 @@ mod tests {
         };
         assert_eq!(file.size_bytes_as_u64(), Some(2147483648));
     }
+
+    // Note: Tests for upload_file validation (empty file, max size) are in
+    // tests/files_api_tests.rs as integration tests since they require mocking
+    // the HTTP client or hitting the real API.
 }
 
 /// Property-based tests for serialization roundtrips using proptest.

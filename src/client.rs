@@ -910,4 +910,42 @@ mod tests {
             err_string
         );
     }
+
+    #[tokio::test]
+    async fn test_upload_file_bytes_empty_file_error() {
+        let client = Client::new("test_key".to_string());
+
+        // Try to upload empty bytes
+        let result = client
+            .upload_file_bytes(Vec::new(), "text/plain", Some("empty.txt"))
+            .await;
+        assert!(result.is_err(), "Should fail for empty file");
+
+        let err = result.unwrap_err();
+        let err_string = err.to_string();
+        assert!(
+            err_string.contains("Cannot upload empty file"),
+            "Error should mention empty file: {}",
+            err_string
+        );
+    }
+
+    #[tokio::test]
+    async fn test_upload_file_bytes_validates_before_network() {
+        // This test verifies that validation happens before any network call
+        // by using an invalid API key - if we reach the network, we'd get auth error
+        let client = Client::new("invalid_key".to_string());
+
+        // Empty file should fail with validation error, not auth error
+        let result = client
+            .upload_file_bytes(Vec::new(), "text/plain", None)
+            .await;
+        assert!(result.is_err());
+        let err_string = result.unwrap_err().to_string();
+        assert!(
+            err_string.contains("Cannot upload empty file"),
+            "Should fail validation before hitting network: {}",
+            err_string
+        );
+    }
 }
