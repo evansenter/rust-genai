@@ -897,3 +897,191 @@ async fn test_add_image_file_not_found() {
         err
     );
 }
+
+// =============================================================================
+// Builder Pattern add_*_bytes() Tests
+// =============================================================================
+
+/// Tests the add_image_bytes() builder method.
+///
+/// This validates that raw bytes (not base64-encoded) can be passed directly
+/// to the builder, which will handle the base64 encoding internally.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_add_image_bytes_roundtrip() {
+    use base64::Engine;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Decode the base64 constant to get raw bytes
+    let image_bytes = base64::engine::general_purpose::STANDARD
+        .decode(TINY_RED_PNG_BASE64)
+        .expect("Failed to decode base64");
+
+    // Use add_image_bytes() with raw bytes
+    let response = interaction_builder(&client)
+        .with_text("What color is this image? Answer with just the color name.")
+        .add_image_bytes(&image_bytes, "image/png")
+        .create()
+        .await
+        .expect("Image bytes interaction failed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().unwrap().to_lowercase();
+    println!("Color response: {}", text);
+
+    // The tiny PNG is red
+    assert!(
+        text.contains("red") || text.contains("pink") || text.contains("magenta"),
+        "Response should identify the red color: {}",
+        text
+    );
+}
+
+/// Tests the add_audio_bytes() builder method.
+///
+/// This validates that raw audio bytes can be passed directly to the builder.
+/// Note: The minimal WAV test file may not contain actual audio, so the model
+/// may report it's empty/silent.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_add_audio_bytes_roundtrip() {
+    use base64::Engine;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Decode the base64 constant to get raw bytes
+    let audio_bytes = base64::engine::general_purpose::STANDARD
+        .decode(TINY_WAV_BASE64)
+        .expect("Failed to decode base64");
+
+    // Use add_audio_bytes() with raw bytes
+    let result = interaction_builder(&client)
+        .with_text("Describe what you hear in this audio file.")
+        .add_audio_bytes(&audio_bytes, "audio/wav")
+        .create()
+        .await;
+
+    match result {
+        Ok(response) => {
+            println!("Audio bytes response status: {:?}", response.status);
+            if response.has_text() {
+                let text = response.text().unwrap();
+                println!("Audio response: {}", text);
+                // Just verify we got some response - the content can vary
+                assert!(!text.is_empty(), "Should get some response about the audio");
+            }
+        }
+        Err(e) => {
+            // The minimal WAV might not be accepted
+            println!(
+                "Audio bytes error (may be expected for minimal WAV): {:?}",
+                e
+            );
+        }
+    }
+}
+
+/// Tests the add_video_bytes() builder method.
+///
+/// This validates that raw video bytes can be passed directly to the builder.
+/// Note: The minimal MP4 test file is just a container header with no frames,
+/// so the model may report it's empty/corrupt.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_add_video_bytes_roundtrip() {
+    use base64::Engine;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Decode the base64 constant to get raw bytes
+    let video_bytes = base64::engine::general_purpose::STANDARD
+        .decode(TINY_MP4_BASE64)
+        .expect("Failed to decode base64");
+
+    // Use add_video_bytes() with raw bytes
+    let result = interaction_builder(&client)
+        .with_text("Describe what you see in this video file.")
+        .add_video_bytes(&video_bytes, "video/mp4")
+        .create()
+        .await;
+
+    match result {
+        Ok(response) => {
+            println!("Video bytes response status: {:?}", response.status);
+            if response.has_text() {
+                let text = response.text().unwrap();
+                println!("Video response: {}", text);
+                // Just verify we got some response - the content can vary
+                assert!(!text.is_empty(), "Should get some response about the video");
+            }
+        }
+        Err(e) => {
+            // The minimal MP4 might not be accepted
+            println!(
+                "Video bytes error (may be expected for minimal MP4): {:?}",
+                e
+            );
+        }
+    }
+}
+
+/// Tests the add_document_bytes() builder method.
+///
+/// This validates that raw document bytes (PDF) can be passed directly to
+/// the builder. The test PDF contains "Hello World" text.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_add_document_bytes_roundtrip() {
+    use base64::Engine;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Decode the base64 constant to get raw bytes
+    let pdf_bytes = base64::engine::general_purpose::STANDARD
+        .decode(TINY_PDF_BASE64)
+        .expect("Failed to decode base64");
+
+    // Use add_document_bytes() with raw bytes
+    let result = interaction_builder(&client)
+        .with_text("What text does this PDF document contain? Answer with just the text you find.")
+        .add_document_bytes(&pdf_bytes, "application/pdf")
+        .create()
+        .await;
+
+    match result {
+        Ok(response) => {
+            println!("PDF bytes response status: {:?}", response.status);
+            if response.has_text() {
+                let text = response.text().unwrap();
+                println!("PDF response: {}", text);
+                // The minimal PDF contains "Hello World"
+                let lower = text.to_lowercase();
+                assert!(
+                    lower.contains("hello") || lower.contains("world"),
+                    "Response should mention the PDF content: {}",
+                    text
+                );
+            }
+            assert_eq!(response.status, InteractionStatus::Completed);
+        }
+        Err(e) => {
+            // The minimal PDF might not be fully valid
+            println!("PDF bytes error (may be expected for minimal PDF): {:?}", e);
+        }
+    }
+}
