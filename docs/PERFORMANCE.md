@@ -185,6 +185,7 @@ cargo +nightly bench --bench serialization -- --save-baseline main
 cargo +nightly bench --bench multimodal -- --save-baseline main
 cargo +nightly bench --bench function_registry -- --save-baseline main
 cargo +nightly bench --bench response_extraction -- --save-baseline main
+cargo +nightly bench --bench tool_service -- --save-baseline main
 ```
 
 ### Compare Against Baseline
