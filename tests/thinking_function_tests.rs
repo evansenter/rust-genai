@@ -268,28 +268,81 @@ async fn test_thinking_with_function_calling_multi_turn() {
         println!("Turn 3 text: {}", response3.text().unwrap());
     }
 
-    // Verify we got a response - thoughts may or may not be visible
-    if response3.has_thoughts() {
-        println!("✓ Thoughts visible in Turn 3");
+    // Handle the case where the model wants to call a function before responding.
+    // This is valid behavior - the model may want to re-check weather for indoor recommendations.
+    let (response3, text3) = if response3.status == InteractionStatus::RequiresAction {
+        println!("ℹ Turn 3 requested function call, providing result...");
+        let function_calls = response3.function_calls();
+        if !function_calls.is_empty() {
+            let call = &function_calls[0];
+            let function_result = function_result_content(
+                call.name,
+                call.id.expect("call_id should exist").to_string(),
+                json!({
+                    "temperature": "18°C",
+                    "conditions": "rainy",
+                    "precipitation": "80%",
+                    "humidity": "85%"
+                }),
+            );
+
+            // Make follow-up request with function result
+            let response3_followup = {
+                let client = client.clone();
+                let prev_id = response3.id.clone().expect("id should exist");
+                let get_weather = get_weather.clone();
+                let function_result = function_result.clone();
+                retry_on_transient(DEFAULT_MAX_RETRIES, || {
+                    let client = client.clone();
+                    let prev_id = prev_id.clone();
+                    let get_weather = get_weather.clone();
+                    let function_result = function_result.clone();
+                    async move {
+                        stateful_builder(&client)
+                            .with_previous_interaction(&prev_id)
+                            .with_content(vec![function_result])
+                            .with_function(get_weather)
+                            .with_thinking_level(ThinkingLevel::Medium)
+                            .with_store(true)
+                            .create()
+                            .await
+                    }
+                })
+                .await
+                .expect("Turn 3 follow-up failed")
+            };
+            println!("Turn 3 follow-up status: {:?}", response3_followup.status);
+            let text = response3_followup
+                .text()
+                .expect("Turn 3 follow-up should have text")
+                .to_string();
+            (response3_followup, text)
+        } else {
+            panic!("RequiresAction but no function calls");
+        }
     } else {
-        println!("ℹ Thoughts processed internally (not exposed in response)");
-    }
+        // Verify we got a response - thoughts may or may not be visible
+        if response3.has_thoughts() {
+            println!("✓ Thoughts visible in Turn 3");
+        } else {
+            println!("ℹ Thoughts processed internally (not exposed in response)");
+        }
 
-    assert!(
-        response3.has_text(),
-        "Turn 3 should have text response with recommendations"
-    );
+        assert!(
+            response3.has_text(),
+            "Turn 3 should have text response with recommendations"
+        );
 
-    // Log reasoning tokens if available (indicates thinking is engaged)
-    if let Some(ref usage) = response3.usage
-        && let Some(reasoning_tokens) = usage.total_reasoning_tokens
-    {
-        println!("Turn 3 reasoning tokens: {}", reasoning_tokens);
-    }
+        // Log reasoning tokens if available (indicates thinking is engaged)
+        if let Some(ref usage) = response3.usage
+            && let Some(reasoning_tokens) = usage.total_reasoning_tokens
+        {
+            println!("Turn 3 reasoning tokens: {}", reasoning_tokens);
+        }
 
-    // Verify structural response - model generated a response to the follow-up question
-    // We don't assert on specific content as LLM outputs are non-deterministic
-    let text3 = response3.text().unwrap();
+        let text = response3.text().unwrap().to_string();
+        (response3, text)
+    };
     assert!(
         !text3.is_empty(),
         "Turn 3 should have non-empty text response"
@@ -299,7 +352,7 @@ async fn test_thinking_with_function_calling_multi_turn() {
     let is_valid = validate_response_semantically(
         &client,
         "User asked for indoor activity recommendations in Tokyo, given rainy weather (18°C, 80% precipitation) from the previous conversation",
-        text3,
+        &text3,
         "Does this response suggest indoor activities appropriate for rainy weather?"
     ).await.expect("Semantic validation failed");
     assert!(
