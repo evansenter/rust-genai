@@ -125,52 +125,18 @@ jobs:
   benchmark:
     name: Benchmarks
     runs-on: ubuntu-latest
-    # Run on main pushes (save baseline) and all PRs
-    # Benchmarks add ~5 min to CI but provide valuable regression detection
+    # Only run on merge to main - benchmarks take ~40 min which is too slow for PR CI
+    # Results are saved as baseline for future comparisons
+    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: benchmarks
-
-      # For PRs, run comparison against main
-      - name: Checkout main for baseline (PR only)
-        if: github.event_name == 'pull_request'
-        run: |
-          git fetch origin main:main
-          git checkout main
-      - name: Run baseline benchmarks (PR only)
-        if: github.event_name == 'pull_request'
-        run: |
-          # Run benchmarks that exist on main branch (new benchmarks won't have a baseline)
-          for bench in serialization multimodal function_registry response_extraction tool_service; do
-            cargo bench -p rust-genai --bench $bench -- --save-baseline main --noplot 2>/dev/null || echo "Benchmark $bench not found on main, skipping baseline"
-          done
-      - name: Checkout PR branch
-        if: github.event_name == 'pull_request'
-        run: git checkout ${{ github.event.pull_request.head.sha }}
-
-      # Run benchmarks on current commit
       - name: Run benchmarks
         run: |
-          cargo bench -p rust-genai --bench serialization --bench multimodal --bench function_registry --bench response_extraction --bench tool_service -- --save-baseline pr --noplot
-      - name: Install critcmp (PR only)
-        if: github.event_name == 'pull_request'
-        run: cargo install critcmp --locked
-      - name: Compare against baseline (PR only)
-        if: github.event_name == 'pull_request'
-        run: |
-          echo "## Benchmark Comparison" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Comparing PR against main branch baseline." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          # Use critcmp to compare saved baselines (no re-running benchmarks)
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          critcmp main pr >> $GITHUB_STEP_SUMMARY 2>&1 || echo "Some benchmarks may be new (no baseline on main)" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          cargo bench -p rust-genai --bench serialization --bench multimodal --bench function_registry --bench response_extraction --bench tool_service -- --save-baseline main --noplot
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
