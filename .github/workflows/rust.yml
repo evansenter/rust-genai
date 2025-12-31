@@ -156,7 +156,10 @@ jobs:
       # Run benchmarks on current commit
       - name: Run benchmarks
         run: |
-          cargo bench -p rust-genai --bench serialization --bench multimodal --bench function_registry --bench response_extraction --bench tool_service -- --noplot
+          cargo bench -p rust-genai --bench serialization --bench multimodal --bench function_registry --bench response_extraction --bench tool_service -- --save-baseline pr --noplot
+      - name: Install critcmp (PR only)
+        if: github.event_name == 'pull_request'
+        run: cargo install critcmp --locked
       - name: Compare against baseline (PR only)
         if: github.event_name == 'pull_request'
         run: |
@@ -164,13 +167,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Comparing PR against main branch baseline." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          # Compare against baseline (new benchmarks without baselines will show as new)
-          for bench in serialization multimodal function_registry response_extraction tool_service; do
-            echo "=== $bench ===" >> benchmark-comparison.txt
-            cargo bench -p rust-genai --bench $bench -- --baseline main --noplot 2>&1 | tee -a benchmark-comparison.txt || echo "No baseline for $bench" >> benchmark-comparison.txt
-          done
+          # Use critcmp to compare saved baselines (no re-running benchmarks)
           echo '```' >> $GITHUB_STEP_SUMMARY
-          cat benchmark-comparison.txt >> $GITHUB_STEP_SUMMARY
+          critcmp main pr >> $GITHUB_STEP_SUMMARY 2>&1 || echo "Some benchmarks may be new (no baseline on main)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
