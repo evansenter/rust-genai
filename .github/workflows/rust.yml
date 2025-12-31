@@ -55,7 +55,9 @@ jobs:
           - group: tools
             tests: "tools_and_config_tests tools_multiturn_tests"
           - group: functions
-            tests: "advanced_function_calling_tests thinking_function_tests agents_tests"
+            tests: "advanced_function_calling_tests thinking_function_tests"
+          - group: agents
+            tests: "agents_tests"
           - group: multimodal
             tests: "multimodal_tests api_canary_tests temp_file_tests"
     steps:
