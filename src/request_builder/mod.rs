@@ -1138,7 +1138,29 @@ impl<'a> InteractionBuilder<'a> {
     /// This is useful for detecting stalled connections (e.g., model stops
     /// responding mid-stream), but does **not** limit the total time to
     /// complete the stream. For a total timeout, wrap the stream consumption
-    /// in `tokio::time::timeout()`.
+    /// in `tokio::time::timeout()`:
+    ///
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # use futures_util::StreamExt;
+    /// # use std::time::Duration;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Client::new("api_key".to_string());
+    /// let mut stream = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Write a story")
+    ///     .create_stream();
+    ///
+    /// // Total timeout for entire stream consumption
+    /// tokio::time::timeout(Duration::from_secs(60), async {
+    ///     while let Some(chunk) = stream.next().await {
+    ///         // process chunk...
+    ///     }
+    /// }).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///
