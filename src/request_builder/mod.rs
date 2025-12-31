@@ -6,7 +6,9 @@ use crate::GenaiError;
 use crate::client::Client;
 use crate::function_calling::ToolService;
 use base64::Engine;
+use log::debug;
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
@@ -73,6 +75,8 @@ pub struct InteractionBuilder<'a> {
     max_function_call_loops: usize,
     /// Tool service for dependency-injected functions
     tool_service: Option<Arc<dyn ToolService>>,
+    /// Optional timeout for the request
+    timeout: Option<Duration>,
 }
 
 impl std::fmt::Debug for InteractionBuilder<'_> {
@@ -91,6 +95,7 @@ impl std::fmt::Debug for InteractionBuilder<'_> {
             .field("system_instruction", &self.system_instruction)
             .field("max_function_call_loops", &self.max_function_call_loops)
             .field("tool_service", &self.tool_service.as_ref().map(|_| "..."))
+            .field("timeout", &self.timeout)
             .finish()
     }
 }
@@ -113,6 +118,7 @@ impl<'a> InteractionBuilder<'a> {
             system_instruction: None,
             max_function_call_loops: DEFAULT_MAX_FUNCTION_CALL_LOOPS,
             tool_service: None,
+            timeout: None,
         }
     }
 
@@ -1050,6 +1056,48 @@ impl<'a> InteractionBuilder<'a> {
         self
     }
 
+    /// Sets a timeout for the request.
+    ///
+    /// If the request takes longer than the specified duration, it will be
+    /// cancelled and return [`GenaiError::Timeout`].
+    ///
+    /// # Supported Methods
+    ///
+    /// - `create()`: Timeout applies to the entire request
+    /// - `create_stream()`: Timeout applies to each chunk (per-chunk timeout)
+    ///
+    /// **Note:** Timeout is **not** applied to `create_with_auto_functions()` or
+    /// `create_stream_with_auto_functions()` because these methods make multiple
+    /// API calls in a loop. For a total timeout on auto-function operations,
+    /// wrap the call in `tokio::time::timeout()`.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    /// use std::time::Duration;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What is the meaning of life?")
+    ///     .with_timeout(Duration::from_secs(30))
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`GenaiError::Timeout`]: crate::GenaiError::Timeout
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
     /// Creates the interaction and returns the response.
     ///
     /// # Errors
@@ -1058,10 +1106,21 @@ impl<'a> InteractionBuilder<'a> {
     /// - No input was provided
     /// - Neither model nor agent was specified
     /// - The API request fails
+    /// - The request times out (if `with_timeout()` was set)
     pub async fn create(self) -> Result<InteractionResponse, GenaiError> {
         let client = self.client;
+        let timeout = self.timeout;
         let request = self.build_request()?;
-        client.create_interaction(request).await
+
+        let future = client.create_interaction(request);
+
+        match timeout {
+            Some(duration) => tokio::time::timeout(duration, future).await.map_err(|_| {
+                debug!("Request timed out after {:?}", duration);
+                GenaiError::Timeout(duration)
+            })?,
+            None => future.await,
+        }
     }
 
     /// Creates a streaming interaction that yields chunks as they arrive.
@@ -1070,12 +1129,24 @@ impl<'a> InteractionBuilder<'a> {
     /// - `StreamChunk::Delta`: Incremental content (text or thought)
     /// - `StreamChunk::Complete`: The final complete interaction response
     ///
+    /// # Timeout Behavior
+    ///
+    /// If `with_timeout()` was set, the timeout applies **per-chunk**, not to
+    /// the total stream duration. Each `stream.next().await` call must complete
+    /// within the timeout, or a [`GenaiError::Timeout`] error is yielded.
+    ///
+    /// This is useful for detecting stalled connections (e.g., model stops
+    /// responding mid-stream), but does **not** limit the total time to
+    /// complete the stream. For a total timeout, wrap the stream consumption
+    /// in `tokio::time::timeout()`.
+    ///
     /// # Errors
     ///
     /// Returns errors if:
     /// - No input was provided
     /// - Neither model nor agent was specified
     /// - The API request fails
+    /// - A chunk doesn't arrive within the timeout (if set)
     ///
     /// # Examples
     ///
@@ -1107,15 +1178,38 @@ impl<'a> InteractionBuilder<'a> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// [`GenaiError::Timeout`]: crate::GenaiError::Timeout
     pub fn create_stream(self) -> BoxStream<'a, Result<StreamChunk, GenaiError>> {
         let client = self.client;
+        let timeout = self.timeout;
         Box::pin(async_stream::try_stream! {
             let mut request = self.build_request()?;
             request.stream = Some(true);
             let mut stream = client.create_interaction_stream(request);
 
-            while let Some(result) = stream.next().await {
-                yield result?;
+            loop {
+                let next_chunk = stream.next();
+                let result = match timeout {
+                    Some(duration) => {
+                        match tokio::time::timeout(duration, next_chunk).await {
+                            Ok(Some(result)) => Some(result),
+                            Ok(None) => None,
+                            Err(_) => {
+                                debug!("Stream chunk timed out after {:?}", duration);
+                                Err(GenaiError::Timeout(duration))?;
+                                unreachable!()
+                            }
+                        }
+                    }
+                    None => next_chunk.await,
+                };
+
+                match result {
+                    Some(Ok(chunk)) => yield chunk,
+                    Some(Err(e)) => Err(e)?,
+                    None => break,
+                }
             }
         })
     }

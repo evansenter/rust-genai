@@ -207,6 +207,16 @@ impl<'a> InteractionBuilder<'a> {
             ));
         }
 
+        // Warn if timeout is set - it's not applied to auto-function calling
+        // because this method makes multiple API calls in a loop.
+        if self.timeout.is_some() {
+            warn!(
+                "with_timeout() is not applied to create_with_auto_functions(). \
+                 The operation may run indefinitely. For a total timeout, wrap the call \
+                 in tokio::time::timeout()."
+            );
+        }
+
         let client = self.client;
         let max_loops = self.max_function_call_loops;
         let tool_service = self.tool_service.clone();
@@ -446,6 +456,16 @@ impl<'a> InteractionBuilder<'a> {
                         .to_string(),
                 ))
             }));
+        }
+
+        // Warn if timeout is set - it's not applied to auto-function calling
+        // because this method makes multiple API calls in a loop.
+        if self.timeout.is_some() {
+            warn!(
+                "with_timeout() is not applied to create_stream_with_auto_functions(). \
+                 The operation may run indefinitely. For a total timeout, wrap the call \
+                 in tokio::time::timeout()."
+            );
         }
 
         let client = self.client;

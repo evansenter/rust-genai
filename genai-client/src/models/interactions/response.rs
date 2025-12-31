@@ -1166,6 +1166,116 @@ impl InteractionResponse {
         summary.unknown_types = unknown_types_set.into_iter().collect();
         summary
     }
+
+    // =========================================================================
+    // Token Usage Helpers
+    // =========================================================================
+
+    /// Get the number of input (prompt) tokens used.
+    ///
+    /// Returns `None` if usage metadata is not available.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(tokens) = response.input_tokens() {
+    ///     println!("Input tokens: {}", tokens);
+    /// }
+    /// ```
+    pub fn input_tokens(&self) -> Option<i32> {
+        self.usage.as_ref().and_then(|u| u.total_input_tokens)
+    }
+
+    /// Get the number of output tokens generated.
+    ///
+    /// Returns `None` if usage metadata is not available.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(tokens) = response.output_tokens() {
+    ///     println!("Output tokens: {}", tokens);
+    /// }
+    /// ```
+    pub fn output_tokens(&self) -> Option<i32> {
+        self.usage.as_ref().and_then(|u| u.total_output_tokens)
+    }
+
+    /// Get the total number of tokens used (input + output).
+    ///
+    /// Returns `None` if usage metadata is not available.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(tokens) = response.total_tokens() {
+    ///     println!("Total tokens: {}", tokens);
+    /// }
+    /// ```
+    pub fn total_tokens(&self) -> Option<i32> {
+        self.usage.as_ref().and_then(|u| u.total_tokens)
+    }
+
+    /// Get the number of reasoning tokens used (for thinking models).
+    ///
+    /// Reasoning tokens are used when thinking mode is enabled
+    /// (e.g., via `with_thinking_level()` on supported models).
+    /// Returns `None` if usage metadata is not available or thinking wasn't used.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(tokens) = response.reasoning_tokens() {
+    ///     println!("Reasoning tokens: {}", tokens);
+    /// }
+    /// ```
+    pub fn reasoning_tokens(&self) -> Option<i32> {
+        self.usage.as_ref().and_then(|u| u.total_reasoning_tokens)
+    }
+
+    /// Get the number of cached tokens used (from context caching).
+    ///
+    /// Cached tokens reduce billing costs when reusing context.
+    /// Returns `None` if usage metadata is not available or caching wasn't used.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(tokens) = response.cached_tokens() {
+    ///     println!("Cached tokens: {} (reduces cost)", tokens);
+    /// }
+    /// ```
+    pub fn cached_tokens(&self) -> Option<i32> {
+        self.usage.as_ref().and_then(|u| u.total_cached_tokens)
+    }
+
+    /// Get the number of tool use tokens consumed.
+    ///
+    /// Tool use tokens represent overhead from function calling.
+    /// Returns `None` if usage metadata is not available or tools weren't used.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(tokens) = response.tool_use_tokens() {
+    ///     println!("Tool use overhead: {} tokens", tokens);
+    /// }
+    /// ```
+    pub fn tool_use_tokens(&self) -> Option<i32> {
+        self.usage.as_ref().and_then(|u| u.total_tool_use_tokens)
+    }
 }
 
 /// Summary of content types present in an interaction response.
