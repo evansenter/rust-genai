@@ -68,6 +68,10 @@ harness = false
 name = "response_extraction"
 harness = false
 
+[[bench]]
+name = "tool_service"
+harness = false
+
 [features]
 ## Strict mode for unknown content types.
 ##

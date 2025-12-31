@@ -125,17 +125,101 @@ jobs:
   benchmark:
     name: Benchmarks
     runs-on: ubuntu-latest
-    # Only run on main branch pushes to avoid slowing down PR feedback
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Run on main pushes (save baseline) and all PRs
+    # Benchmarks add ~5 min to CI but provide valuable regression detection
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: benchmarks
+
+      # For PRs, run comparison against main
+      - name: Checkout main for baseline (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin main:main
+          git checkout main
+      - name: Run baseline benchmarks (PR only)
+        if: github.event_name == 'pull_request'
+        run: cargo bench --workspace -- --save-baseline main --noplot
+      - name: Checkout PR branch
+        if: github.event_name == 'pull_request'
+        run: git checkout ${{ github.head_ref }}
+
+      # Run benchmarks on current commit
       - name: Run benchmarks
         run: cargo bench --workspace -- --noplot
+      - name: Compare against baseline (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "## Benchmark Comparison" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Comparing PR against main branch baseline." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cargo bench --workspace -- --baseline main --noplot 2>&1 | tee benchmark-comparison.txt || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat benchmark-comparison.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
           path: target/criterion
           retention-days: 30
+
+  build-metrics:
+    name: Build Metrics
+    runs-on: ubuntu-latest
+    # Only run on PRs that change code (not docs-only changes)
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Clean build time
+        run: |
+          echo "## Build Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cargo clean
+          start=$(date +%s)
+          cargo build --release
+          end=$(date +%s)
+          duration=$((end - start))
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Clean release build | ${duration}s |" >> $GITHUB_STEP_SUMMARY
+      - name: Build examples
+        run: |
+          start=$(date +%s)
+          cargo build --release --examples
+          end=$(date +%s)
+          duration=$((end - start))
+          echo "| Examples build | ${duration}s |" >> $GITHUB_STEP_SUMMARY
+      - name: Binary sizes
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Example Binary Sizes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Example | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|------|" >> $GITHUB_STEP_SUMMARY
+          for f in target/release/examples/simple_interaction target/release/examples/auto_function_calling target/release/examples/streaming; do
+            if [ -f "$f" ]; then
+              size=$(ls -lh "$f" | awk '{print $5}')
+              name=$(basename "$f")
+              echo "| $name | $size |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+      - name: Check size limits
+        run: |
+          # Fail if any example exceeds 10MB
+          for f in target/release/examples/*; do
+            if [ -f "$f" ] && [ ! "$(basename "$f")" = "*.d" ]; then
+              size=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f")
+              if [ "$size" -gt 10485760 ]; then
+                echo "::error::Binary $(basename $f) exceeds 10MB limit: $size bytes"
+                exit 1
+              fi
+            fi
+          done
