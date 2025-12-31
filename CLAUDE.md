@@ -85,6 +85,7 @@ cargo +nightly bench --bench serialization      # JSON serialization performance
 cargo +nightly bench --bench multimodal         # File loading and encoding
 cargo +nightly bench --bench function_registry  # Function discovery and lookup
 cargo +nightly bench --bench response_extraction # Response parsing helpers
+cargo +nightly bench --bench tool_service       # ToolService patterns and auto-functions
 ```
 
 ## Architecture
