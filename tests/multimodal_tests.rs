@@ -18,10 +18,12 @@
 
 mod common;
 
+use base64::Engine;
 use common::{
     SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TEST_TIMEOUT, TINY_BLUE_PNG_BASE64,
     TINY_MP4_BASE64, TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, consume_stream,
-    get_client, interaction_builder, stateful_builder, with_timeout,
+    get_client, interaction_builder, stateful_builder, validate_response_semantically,
+    with_timeout,
 };
 use rust_genai::{
     InteractionInput, InteractionStatus, audio_data_content, audio_uri_content,
@@ -906,11 +908,10 @@ async fn test_add_image_file_not_found() {
 ///
 /// This validates that raw bytes (not base64-encoded) can be passed directly
 /// to the builder, which will handle the base64 encoding internally.
+/// Uses semantic validation to verify the model correctly interprets the image.
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_add_image_bytes_roundtrip() {
-    use base64::Engine;
-
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -932,13 +933,22 @@ async fn test_add_image_bytes_roundtrip() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Color response: {}", text);
 
-    // The tiny PNG is red
+    // Use semantic validation instead of brittle content checks
+    let is_valid = validate_response_semantically(
+        &client,
+        "User asked about the color of a 1x1 red PNG image",
+        text,
+        "Does this response describe a red, pink, magenta, or similar warm color?",
+    )
+    .await
+    .expect("Semantic validation failed");
+
     assert!(
-        text.contains("red") || text.contains("pink") || text.contains("magenta"),
-        "Response should identify the red color: {}",
+        is_valid,
+        "Response should identify a red/warm color: {}",
         text
     );
 }
@@ -951,8 +961,6 @@ async fn test_add_image_bytes_roundtrip() {
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_add_audio_bytes_roundtrip() {
-    use base64::Engine;
-
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -998,8 +1006,6 @@ async fn test_add_audio_bytes_roundtrip() {
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_add_video_bytes_roundtrip() {
-    use base64::Engine;
-
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -1041,11 +1047,10 @@ async fn test_add_video_bytes_roundtrip() {
 ///
 /// This validates that raw document bytes (PDF) can be passed directly to
 /// the builder. The test PDF contains "Hello World" text.
+/// Uses semantic validation to verify the model correctly interprets the document.
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_add_document_bytes_roundtrip() {
-    use base64::Engine;
-
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -1066,18 +1071,27 @@ async fn test_add_document_bytes_roundtrip() {
     match result {
         Ok(response) => {
             println!("PDF bytes response status: {:?}", response.status);
-            if response.has_text() {
-                let text = response.text().unwrap();
-                println!("PDF response: {}", text);
-                // The minimal PDF contains "Hello World"
-                let lower = text.to_lowercase();
-                assert!(
-                    lower.contains("hello") || lower.contains("world"),
-                    "Response should mention the PDF content: {}",
-                    text
-                );
-            }
             assert_eq!(response.status, InteractionStatus::Completed);
+            assert!(response.has_text(), "Should have text response");
+
+            let text = response.text().unwrap();
+            println!("PDF response: {}", text);
+
+            // Use semantic validation instead of brittle content checks
+            let is_valid = validate_response_semantically(
+                &client,
+                "User asked about text in a PDF that contains 'Hello World'",
+                text,
+                "Does this response mention 'Hello', 'World', or indicate these words were found in the document?",
+            )
+            .await
+            .expect("Semantic validation failed");
+
+            assert!(
+                is_valid,
+                "Response should mention the PDF content: {}",
+                text
+            );
         }
         Err(e) => {
             // The minimal PDF might not be fully valid
