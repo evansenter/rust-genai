@@ -18,10 +18,12 @@
 
 mod common;
 
+use base64::Engine;
 use common::{
     SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TEST_TIMEOUT, TINY_BLUE_PNG_BASE64,
     TINY_MP4_BASE64, TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, consume_stream,
-    get_client, interaction_builder, stateful_builder, with_timeout,
+    get_client, interaction_builder, stateful_builder, validate_response_semantically,
+    with_timeout,
 };
 use rust_genai::{
     InteractionInput, InteractionStatus, audio_data_content, audio_uri_content,
@@ -896,4 +898,219 @@ async fn test_add_image_file_not_found() {
         "Error should mention file not found: {}",
         err
     );
+}
+
+// =============================================================================
+// Builder Pattern add_*_bytes() Tests
+// =============================================================================
+
+/// Tests the add_image_bytes() builder method.
+///
+/// This validates that raw bytes (not base64-encoded) can be passed directly
+/// to the builder, which will handle the base64 encoding internally.
+/// Uses semantic validation to verify the model correctly interprets the image.
+///
+/// Note: This test uses `.expect()` (strict assertion) because the PNG fixture
+/// is a complete, well-formed image that the API should always accept.
+/// Compare to audio/video tests which use lenient `match result` because those
+/// minimal fixtures may be rejected by the API.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_add_image_bytes_roundtrip() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Decode the base64 constant to get raw bytes
+    let image_bytes = base64::engine::general_purpose::STANDARD
+        .decode(TINY_RED_PNG_BASE64)
+        .expect("Failed to decode base64");
+
+    // Use add_image_bytes() with raw bytes
+    // The tiny PNG is well-formed and should always be processable
+    let response = interaction_builder(&client)
+        .with_text("What color is this image? Answer with just the color name.")
+        .add_image_bytes(&image_bytes, "image/png")
+        .create()
+        .await
+        .expect("Image bytes interaction failed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().unwrap();
+    println!("Color response: {}", text);
+
+    // Use semantic validation instead of brittle content checks
+    let is_valid = validate_response_semantically(
+        &client,
+        "User asked about the color of a 1x1 red PNG image",
+        text,
+        "Does this response describe a red, pink, magenta, or similar warm color?",
+    )
+    .await
+    .expect("Semantic validation failed");
+
+    assert!(
+        is_valid,
+        "Response should identify a red/warm color: {}",
+        text
+    );
+}
+
+/// Tests the add_audio_bytes() builder method.
+///
+/// This validates that raw audio bytes can be passed directly to the builder.
+/// Note: The minimal WAV test file may not contain actual audio, so the model
+/// may report it's empty/silent.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_add_audio_bytes_roundtrip() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Decode the base64 constant to get raw bytes
+    let audio_bytes = base64::engine::general_purpose::STANDARD
+        .decode(TINY_WAV_BASE64)
+        .expect("Failed to decode base64");
+
+    // Use add_audio_bytes() with raw bytes
+    let result = interaction_builder(&client)
+        .with_text("Describe what you hear in this audio file.")
+        .add_audio_bytes(&audio_bytes, "audio/wav")
+        .create()
+        .await;
+
+    match result {
+        Ok(response) => {
+            println!("Audio bytes response status: {:?}", response.status);
+            if response.has_text() {
+                let text = response.text().unwrap();
+                println!("Audio response: {}", text);
+                // Just verify we got some response - the content can vary
+                assert!(!text.is_empty(), "Should get some response about the audio");
+            }
+        }
+        Err(e) => {
+            // The minimal WAV might not be accepted
+            println!(
+                "Audio bytes error (may be expected for minimal WAV): {:?}",
+                e
+            );
+        }
+    }
+}
+
+/// Tests the add_video_bytes() builder method.
+///
+/// This validates that raw video bytes can be passed directly to the builder.
+/// Note: The minimal MP4 test file is just a container header with no frames,
+/// so the model may report it's empty/corrupt.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_add_video_bytes_roundtrip() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Decode the base64 constant to get raw bytes
+    let video_bytes = base64::engine::general_purpose::STANDARD
+        .decode(TINY_MP4_BASE64)
+        .expect("Failed to decode base64");
+
+    // Use add_video_bytes() with raw bytes
+    let result = interaction_builder(&client)
+        .with_text("Describe what you see in this video file.")
+        .add_video_bytes(&video_bytes, "video/mp4")
+        .create()
+        .await;
+
+    match result {
+        Ok(response) => {
+            println!("Video bytes response status: {:?}", response.status);
+            if response.has_text() {
+                let text = response.text().unwrap();
+                println!("Video response: {}", text);
+                // Just verify we got some response - the content can vary
+                assert!(!text.is_empty(), "Should get some response about the video");
+            }
+        }
+        Err(e) => {
+            // The minimal MP4 might not be accepted
+            println!(
+                "Video bytes error (may be expected for minimal MP4): {:?}",
+                e
+            );
+        }
+    }
+}
+
+/// Tests the add_document_bytes() builder method.
+///
+/// This validates that raw document bytes (PDF) can be passed directly to
+/// the builder. The test PDF contains "Hello World" text.
+/// Uses semantic validation to verify the model correctly interprets the document.
+///
+/// Note: Like audio/video tests, this uses lenient error handling because the
+/// minimal PDF fixture or the semantic validation call might fail.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_add_document_bytes_roundtrip() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Decode the base64 constant to get raw bytes
+    let pdf_bytes = base64::engine::general_purpose::STANDARD
+        .decode(TINY_PDF_BASE64)
+        .expect("Failed to decode base64");
+
+    // Use add_document_bytes() with raw bytes
+    let result = interaction_builder(&client)
+        .with_text("What text does this PDF document contain? Answer with just the text you find.")
+        .add_document_bytes(&pdf_bytes, "application/pdf")
+        .create()
+        .await;
+
+    match result {
+        Ok(response) => {
+            println!("PDF bytes response status: {:?}", response.status);
+            assert_eq!(response.status, InteractionStatus::Completed);
+            assert!(response.has_text(), "Should have text response");
+
+            let text = response.text().unwrap();
+            println!("PDF response: {}", text);
+
+            // Use semantic validation instead of brittle content checks
+            // Handle validation failure gracefully since it makes an additional API call
+            match validate_response_semantically(
+                &client,
+                "User asked about text in a PDF that contains 'Hello World'",
+                text,
+                "Does this response mention 'Hello', 'World', or indicate these words were found in the document?",
+            )
+            .await
+            {
+                Ok(is_valid) => {
+                    assert!(
+                        is_valid,
+                        "Response should mention the PDF content: {}",
+                        text
+                    );
+                }
+                Err(e) => {
+                    println!("Semantic validation error (non-fatal): {:?}", e);
+                }
+            }
+        }
+        Err(e) => {
+            // The minimal PDF might not be fully valid
+            println!("PDF bytes error (may be expected for minimal PDF): {:?}", e);
+        }
+    }
 }
