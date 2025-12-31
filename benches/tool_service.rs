@@ -444,7 +444,7 @@ fn bench_stream_chunk_serialization(c: &mut Criterion) {
 }
 
 criterion_group!(
-    benches,
+    tool_service_benches,
     bench_tool_service_tools,
     bench_build_service_function_map,
     bench_service_map_lookup,
@@ -454,4 +454,4 @@ criterion_group!(
     bench_execution_result_creation,
     bench_stream_chunk_serialization
 );
-criterion_main!(benches);
+criterion_main!(tool_service_benches);
