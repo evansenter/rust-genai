@@ -909,6 +909,11 @@ async fn test_add_image_file_not_found() {
 /// This validates that raw bytes (not base64-encoded) can be passed directly
 /// to the builder, which will handle the base64 encoding internally.
 /// Uses semantic validation to verify the model correctly interprets the image.
+///
+/// Note: This test uses `.expect()` (strict assertion) because the PNG fixture
+/// is a complete, well-formed image that the API should always accept.
+/// Compare to audio/video tests which use lenient `match result` because those
+/// minimal fixtures may be rejected by the API.
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_add_image_bytes_roundtrip() {
@@ -923,6 +928,7 @@ async fn test_add_image_bytes_roundtrip() {
         .expect("Failed to decode base64");
 
     // Use add_image_bytes() with raw bytes
+    // The tiny PNG is well-formed and should always be processable
     let response = interaction_builder(&client)
         .with_text("What color is this image? Answer with just the color name.")
         .add_image_bytes(&image_bytes, "image/png")
@@ -1048,6 +1054,9 @@ async fn test_add_video_bytes_roundtrip() {
 /// This validates that raw document bytes (PDF) can be passed directly to
 /// the builder. The test PDF contains "Hello World" text.
 /// Uses semantic validation to verify the model correctly interprets the document.
+///
+/// Note: Like audio/video tests, this uses lenient error handling because the
+/// minimal PDF fixture or the semantic validation call might fail.
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_add_document_bytes_roundtrip() {
@@ -1078,20 +1087,26 @@ async fn test_add_document_bytes_roundtrip() {
             println!("PDF response: {}", text);
 
             // Use semantic validation instead of brittle content checks
-            let is_valid = validate_response_semantically(
+            // Handle validation failure gracefully since it makes an additional API call
+            match validate_response_semantically(
                 &client,
                 "User asked about text in a PDF that contains 'Hello World'",
                 text,
                 "Does this response mention 'Hello', 'World', or indicate these words were found in the document?",
             )
             .await
-            .expect("Semantic validation failed");
-
-            assert!(
-                is_valid,
-                "Response should mention the PDF content: {}",
-                text
-            );
+            {
+                Ok(is_valid) => {
+                    assert!(
+                        is_valid,
+                        "Response should mention the PDF content: {}",
+                        text
+                    );
+                }
+                Err(e) => {
+                    println!("Semantic validation error (non-fatal): {:?}", e);
+                }
+            }
         }
         Err(e) => {
             // The minimal PDF might not be fully valid
