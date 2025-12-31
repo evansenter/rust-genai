@@ -24,6 +24,7 @@ mod common;
 
 use common::{
     DEFAULT_MAX_RETRIES, consume_stream, get_client, retry_on_transient, stateful_builder,
+    validate_response_semantically,
 };
 use rust_genai::{FunctionDeclaration, InteractionStatus, ThinkingLevel, function_result_content};
 use serde_json::json;
@@ -201,21 +202,33 @@ async fn test_thinking_with_function_calling_multi_turn() {
         "Turn 2 should have text response about the weather"
     );
 
-    // Response should reference the weather conditions
-    let text2 = response2.text().unwrap().to_lowercase();
+    // Verify structural response - model generated a response based on the function result
+    let text2 = response2.text().unwrap();
     assert!(
-        text2.contains("umbrella")
-            || text2.contains("rain")
-            || text2.contains("yes")
-            || text2.contains("18"),
-        "Turn 2 should reference weather conditions. Got: {}",
-        text2
+        !text2.is_empty(),
+        "Turn 2 should have non-empty text response"
+    );
+
+    // Semantic validation: Check that the response addresses the weather question
+    let is_valid = validate_response_semantically(
+        &client,
+        "User asked 'What's the weather in Tokyo? Should I bring an umbrella?' and received weather data showing 18°C, rainy conditions, 80% precipitation",
+        text2,
+        "Does this response address the weather conditions and whether an umbrella is needed?",
+    )
+    .await
+    .expect("Semantic validation failed");
+    assert!(
+        is_valid,
+        "Turn 2 response should meaningfully address the weather question"
     );
 
     // =========================================================================
     // Turn 3: Follow-up question - model reasons with full context
+    // The model may respond directly OR make another function call first.
+    // We handle both cases to avoid flakiness.
     // =========================================================================
-    let response3 = {
+    let mut response3 = {
         let client = client.clone();
         let prev_id = response2.id.clone().expect("id should exist");
         let get_weather = get_weather.clone();
@@ -244,6 +257,56 @@ async fn test_thinking_with_function_calling_multi_turn() {
     println!("Turn 3 has_thoughts: {}", response3.has_thoughts());
     println!("Turn 3 has_text: {}", response3.has_text());
 
+    // Handle the case where the model wants to call a function before responding.
+    // This is LLM variability - sometimes it calls get_weather again even though
+    // we already provided weather data. We handle this gracefully.
+    if response3.status == InteractionStatus::RequiresAction {
+        println!("ℹ Turn 3 requested function call, providing result...");
+        let function_calls = response3.function_calls();
+        if !function_calls.is_empty() {
+            let call = &function_calls[0];
+            println!("  Function: {} (call_id: {:?})", call.name, call.id);
+
+            // Provide a consistent weather result
+            let function_result = function_result_content(
+                call.name,
+                call.id.expect("call_id should exist").to_string(),
+                json!({
+                    "temperature": "18°C",
+                    "conditions": "rainy",
+                    "precipitation": "80%",
+                    "humidity": "85%"
+                }),
+            );
+
+            response3 = {
+                let client = client.clone();
+                let prev_id = response3.id.clone().expect("id should exist");
+                let get_weather = get_weather.clone();
+                retry_on_transient(DEFAULT_MAX_RETRIES, || {
+                    let client = client.clone();
+                    let prev_id = prev_id.clone();
+                    let get_weather = get_weather.clone();
+                    let function_result = function_result.clone();
+                    async move {
+                        stateful_builder(&client)
+                            .with_previous_interaction(&prev_id)
+                            .with_content(vec![function_result])
+                            .with_function(get_weather)
+                            .with_thinking_level(ThinkingLevel::Medium)
+                            .with_store(true)
+                            .create()
+                            .await
+                    }
+                })
+                .await
+                .expect("Turn 3 follow-up failed")
+            };
+            println!("Turn 3 follow-up status: {:?}", response3.status);
+            println!("Turn 3 follow-up has_text: {}", response3.has_text());
+        }
+    }
+
     if response3.has_thoughts() {
         for (i, thought) in response3.thoughts().enumerate() {
             println!(
@@ -265,11 +328,6 @@ async fn test_thinking_with_function_calling_multi_turn() {
         println!("ℹ Thoughts processed internally (not exposed in response)");
     }
 
-    assert!(
-        response3.has_text(),
-        "Turn 3 should have text response with recommendations"
-    );
-
     // Log reasoning tokens if available (indicates thinking is engaged)
     if let Some(ref usage) = response3.usage
         && let Some(reasoning_tokens) = usage.total_reasoning_tokens
@@ -277,20 +335,30 @@ async fn test_thinking_with_function_calling_multi_turn() {
         println!("Turn 3 reasoning tokens: {}", reasoning_tokens);
     }
 
-    // Response should be contextually relevant (about indoor activities)
-    let text3 = response3.text().unwrap().to_lowercase();
+    // Verify structural response - model should now have text
     assert!(
-        text3.contains("indoor")
-            || text3.contains("inside")
-            || text3.contains("museum")
-            || text3.contains("shopping")
-            || text3.contains("restaurant")
-            || text3.contains("cafe")
-            || text3.contains("temple")
-            || text3.contains("activity")
-            || text3.contains("activities"),
-        "Turn 3 should recommend indoor activities. Got: {}",
-        text3
+        response3.has_text(),
+        "Turn 3 should have text response after handling any function calls"
+    );
+
+    let text3 = response3.text().unwrap();
+    assert!(
+        !text3.is_empty(),
+        "Turn 3 should have non-empty text response"
+    );
+
+    // Semantic validation: Check that the response provides indoor activity recommendations
+    let is_valid = validate_response_semantically(
+        &client,
+        "User asked for indoor activity recommendations in Tokyo, given rainy weather (18°C, 80% precipitation) from the previous conversation",
+        text3,
+        "Does this response suggest indoor activities appropriate for rainy weather?",
+    )
+    .await
+    .expect("Semantic validation failed");
+    assert!(
+        is_valid,
+        "Turn 3 response should suggest indoor activities based on the weather context"
     );
 
     println!("\n✓ All three turns completed successfully with thinking + function calling");
