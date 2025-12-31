@@ -64,6 +64,9 @@ pub use genai_client::{
     UrlContextResultInfo, UrlMetadataEntry, UrlRetrievalStatus, UsageMetadata, WebSource,
 };
 
+// Re-export Files API types for convenient access
+pub use genai_client::{FileError, FileMetadata, FileState, ListFilesResponse, VideoMetadata};
+
 // Re-export error type from genai_client
 pub use genai_client::GenaiError;
 
@@ -83,9 +86,9 @@ pub use genai_client::GenaiError;
 pub mod interactions_api;
 pub use interactions_api::{
     audio_data_content, audio_uri_content, document_data_content, document_uri_content,
-    function_call_content, function_call_content_with_signature, function_result_content,
-    image_data_content, image_uri_content, text_content, thought_content, video_data_content,
-    video_uri_content,
+    file_uri_content, function_call_content, function_call_content_with_signature,
+    function_result_content, image_data_content, image_uri_content, text_content, thought_content,
+    video_data_content, video_uri_content,
 };
 
 // Multimodal file loading utilities

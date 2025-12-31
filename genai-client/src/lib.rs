@@ -22,6 +22,7 @@
 pub(crate) mod common;
 pub(crate) mod error_helpers;
 pub mod errors;
+pub mod files;
 pub mod interactions;
 pub mod models;
 pub(crate) mod sse_parser;
@@ -64,6 +65,12 @@ pub use models::interactions::WebSource;
 
 // Re-export GenaiError from the errors module
 pub use errors::GenaiError;
+
+// Re-export Files API types and functions
+pub use files::{
+    FileError, FileMetadata, FileState, ListFilesResponse, VideoMetadata, delete_file, get_file,
+    list_files, upload_file,
+};
 
 // Re-export Interactions API functions from the interactions module
 pub use interactions::create_interaction;

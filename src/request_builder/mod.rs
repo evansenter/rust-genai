@@ -454,6 +454,75 @@ impl<'a> InteractionBuilder<'a> {
         self
     }
 
+    /// Adds a file from the Files API to the content.
+    ///
+    /// Use this to include files uploaded via `client.upload_file()`. The file
+    /// is referenced by its URI, which is more efficient than sending the file
+    /// data inline for large files or files used across multiple interactions.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// // Upload a file once
+    /// let file = client.upload_file("video.mp4").await?;
+    ///
+    /// // Use in interaction
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Describe this video")
+    ///     .with_file(&file)
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_file(mut self, file: &genai_client::FileMetadata) -> Self {
+        let content = crate::interactions_api::file_uri_content(file);
+        self.add_content_item(content);
+        self
+    }
+
+    /// Adds a file from the Files API using just the URI and MIME type.
+    ///
+    /// Use this when you have the file URI and MIME type but not the full
+    /// `FileMetadata` struct. The content type is inferred from the MIME type.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Describe this video")
+    ///     .with_file_uri(
+    ///         "https://generativelanguage.googleapis.com/v1beta/files/abc123",
+    ///         "video/mp4"
+    ///     )
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_file_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        let content =
+            crate::interactions_api::content_from_uri_and_mime(uri.into(), mime_type.into());
+        self.add_content_item(content);
+        self
+    }
+
     /// Internal helper to add a content item, converting input type if needed.
     ///
     /// - If input is `None`: creates a new `Content` variant with the item

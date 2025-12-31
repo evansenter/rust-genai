@@ -38,9 +38,24 @@
 //!    # }
 //!    ```
 //!
-//! 2. **Files API** (coming soon): For files that need to be referenced across
-//!    multiple interactions, the Files API allows uploading once and referencing
-//!    by URI. See issue #93 for tracking.
+//! 2. **Files API**: For files that need to be referenced across multiple
+//!    interactions, the Files API allows uploading once and referencing by URI:
+//!
+//!    ```no_run
+//!    # use rust_genai::Client;
+//!    # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//!    # let client = Client::new("key".to_string());
+//!    let file = client.upload_file("large-video.mp4").await?;
+//!    let response = client
+//!        .interaction()
+//!        .with_model("gemini-3-flash-preview")
+//!        .with_text("Describe this video")
+//!        .with_file(&file)
+//!        .create()
+//!        .await?;
+//!    # Ok(())
+//!    # }
+//!    ```
 //!
 //! # Example
 //!
