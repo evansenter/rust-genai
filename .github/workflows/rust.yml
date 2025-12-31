@@ -144,14 +144,16 @@ jobs:
           git checkout main
       - name: Run baseline benchmarks (PR only)
         if: github.event_name == 'pull_request'
-        run: cargo bench -p rust-genai --benches -- --save-baseline main --noplot
+        run: |
+          cargo bench -p rust-genai --bench serialization --bench multimodal --bench function_registry --bench response_extraction --bench tool_service -- --save-baseline main --noplot
       - name: Checkout PR branch
         if: github.event_name == 'pull_request'
         run: git checkout ${{ github.event.pull_request.head.sha }}
 
       # Run benchmarks on current commit
       - name: Run benchmarks
-        run: cargo bench -p rust-genai --benches -- --noplot
+        run: |
+          cargo bench -p rust-genai --bench serialization --bench multimodal --bench function_registry --bench response_extraction --bench tool_service -- --noplot
       - name: Compare against baseline (PR only)
         if: github.event_name == 'pull_request'
         run: |
@@ -159,7 +161,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Comparing PR against main branch baseline." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          cargo bench -p rust-genai --benches -- --baseline main --noplot 2>&1 | tee benchmark-comparison.txt || true
+          cargo bench -p rust-genai --bench serialization --bench multimodal --bench function_registry --bench response_extraction --bench tool_service -- --baseline main --noplot 2>&1 | tee benchmark-comparison.txt || true
           echo '```' >> $GITHUB_STEP_SUMMARY
           cat benchmark-comparison.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
