@@ -14,6 +14,15 @@
 //! - Storage capacity: 20 GB per project
 //! - File retention: 48 hours
 //!
+//! # Implementation Notes
+//!
+//! The current implementation uses Google's resumable upload protocol but completes
+//! the upload in a single request. True resumable uploads (where you can retry from
+//! an offset after network failure) are not implemented. For most use cases under
+//! the 2 GB limit, this single-request approach works reliably. If you need to
+//! upload very large files in unreliable network conditions, consider implementing
+//! chunked upload logic with the resumable upload URI.
+//!
 //! # Example
 //!
 //! ```ignore
@@ -109,6 +118,30 @@ impl FileMetadata {
     /// Returns true if file processing failed.
     pub fn is_failed(&self) -> bool {
         matches!(self.state, Some(FileState::Failed))
+    }
+
+    /// Parses the size_bytes field as a u64, if present and valid.
+    ///
+    /// The API returns file sizes as strings in the JSON response.
+    /// This helper parses that string into a numeric type for convenience.
+    ///
+    /// # Returns
+    ///
+    /// - `Some(size)` if size_bytes is present and can be parsed as u64
+    /// - `None` if size_bytes is absent or cannot be parsed
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use genai_client::FileMetadata;
+    /// # let file: FileMetadata = serde_json::from_str(r#"{"name":"files/abc","mimeType":"video/mp4","uri":"","sizeBytes":"1234567"}"#).unwrap();
+    /// if let Some(size) = file.size_bytes_as_u64() {
+    ///     println!("File size: {} bytes", size);
+    /// }
+    /// ```
+    #[must_use]
+    pub fn size_bytes_as_u64(&self) -> Option<u64> {
+        self.size_bytes.as_ref().and_then(|s| s.parse().ok())
     }
 }
 
@@ -673,6 +706,73 @@ mod tests {
             message: None,
         };
         assert_eq!(error.to_string(), "unknown error");
+    }
+
+    #[test]
+    fn test_size_bytes_as_u64() {
+        // Valid size_bytes parses correctly
+        let file = FileMetadata {
+            name: "files/test".to_string(),
+            display_name: None,
+            mime_type: "video/mp4".to_string(),
+            size_bytes: Some("1234567890".to_string()),
+            create_time: None,
+            expiration_time: None,
+            sha256_hash: None,
+            uri: "".to_string(),
+            state: None,
+            error: None,
+            video_metadata: None,
+        };
+        assert_eq!(file.size_bytes_as_u64(), Some(1234567890));
+
+        // None size_bytes returns None
+        let file = FileMetadata {
+            name: "files/test".to_string(),
+            display_name: None,
+            mime_type: "video/mp4".to_string(),
+            size_bytes: None,
+            create_time: None,
+            expiration_time: None,
+            sha256_hash: None,
+            uri: "".to_string(),
+            state: None,
+            error: None,
+            video_metadata: None,
+        };
+        assert_eq!(file.size_bytes_as_u64(), None);
+
+        // Invalid size_bytes (non-numeric) returns None
+        let file = FileMetadata {
+            name: "files/test".to_string(),
+            display_name: None,
+            mime_type: "video/mp4".to_string(),
+            size_bytes: Some("not a number".to_string()),
+            create_time: None,
+            expiration_time: None,
+            sha256_hash: None,
+            uri: "".to_string(),
+            state: None,
+            error: None,
+            video_metadata: None,
+        };
+        assert_eq!(file.size_bytes_as_u64(), None);
+
+        // Large file size (2GB+) parses correctly
+        let file = FileMetadata {
+            name: "files/test".to_string(),
+            display_name: None,
+            mime_type: "video/mp4".to_string(),
+            size_bytes: Some("2147483648".to_string()), // 2GB
+            create_time: None,
+            expiration_time: None,
+            sha256_hash: None,
+            uri: "".to_string(),
+            state: None,
+            error: None,
+            video_metadata: None,
+        };
+        assert_eq!(file.size_bytes_as_u64(), Some(2147483648));
     }
 }
 
