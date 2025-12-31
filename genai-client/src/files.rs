@@ -850,9 +850,9 @@ mod proptest_tests {
             prop::option::of("[0-9]+"),  // size_bytes
             prop::option::of("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"), // create_time
             prop::option::of("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"), // expiration_time
-            prop::option::of("sha256:[a-f0-9]{64}"), // sha256_hash
-            "https?://[a-z]+\\.[a-z]+/[a-z]+",       // uri
-            prop::option::of(arb_file_state()),      // state is Option<FileState>
+            prop::option::of("[a-f0-9]{64}"), // sha256_hash (API returns raw hash, no prefix)
+            "https?://[a-z]+\\.[a-z]+/[a-z]+", // uri
+            prop::option::of(arb_file_state()), // state is Option<FileState>
             prop::option::of(arb_file_error()),
             prop::option::of(arb_video_metadata()),
         )
