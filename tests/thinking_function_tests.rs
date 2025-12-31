@@ -348,7 +348,7 @@ async fn test_thinking_with_function_calling_multi_turn() {
             println!("Turn 3 reasoning tokens: {}", reasoning_tokens);
         }
 
-        let text = response3.text().unwrap().to_string();
+        let text = response3.text().expect("Turn 3 should have text").to_string();
         (response3, text)
     };
     assert!(
