@@ -400,6 +400,86 @@ pub fn document_uri_content(
     }
 }
 
+/// Creates file content from a Files API URI.
+///
+/// Use this to reference files uploaded via the Files API. The content type
+/// is inferred from the file's MIME type (image, audio, video, or document).
+///
+/// # Arguments
+///
+/// * `file` - The uploaded file metadata from the Files API
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_genai::Client;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let client = Client::new("api-key".to_string());
+///
+/// let file = client.upload_file("video.mp4").await?;
+/// let content = rust_genai::file_uri_content(&file);
+///
+/// let response = client.interaction()
+///     .with_model("gemini-3-flash-preview")
+///     .with_content(vec![
+///         rust_genai::text_content("Describe this video"),
+///         content,
+///     ])
+///     .create()
+///     .await?;
+/// # Ok(())
+/// # }
+/// ```
+pub fn file_uri_content(file: &genai_client::FileMetadata) -> InteractionContent {
+    content_from_uri_and_mime(file.uri.clone(), file.mime_type.clone())
+}
+
+/// Creates content from a URI and MIME type.
+///
+/// This is the shared implementation used by [`file_uri_content`] and
+/// [`crate::InteractionBuilder::with_file_uri`]. The content type is inferred
+/// from the MIME type:
+///
+/// - `image/*` → [`InteractionContent::Image`]
+/// - `audio/*` → [`InteractionContent::Audio`]
+/// - `video/*` → [`InteractionContent::Video`]
+/// - Other MIME types (including `application/*`, `text/*`) → [`InteractionContent::Document`]
+///
+/// # Arguments
+///
+/// * `uri` - The file URI (typically from the Files API)
+/// * `mime_type` - The MIME type of the file
+pub fn content_from_uri_and_mime(uri: String, mime_type: String) -> InteractionContent {
+    // Choose the appropriate content type based on MIME type prefix
+    if mime_type.starts_with("image/") {
+        InteractionContent::Image {
+            data: None,
+            uri: Some(uri),
+            mime_type: Some(mime_type),
+        }
+    } else if mime_type.starts_with("audio/") {
+        InteractionContent::Audio {
+            data: None,
+            uri: Some(uri),
+            mime_type: Some(mime_type),
+        }
+    } else if mime_type.starts_with("video/") {
+        InteractionContent::Video {
+            data: None,
+            uri: Some(uri),
+            mime_type: Some(mime_type),
+        }
+    } else {
+        // Default to document for PDFs, text files, and other types
+        InteractionContent::Document {
+            data: None,
+            uri: Some(uri),
+            mime_type: Some(mime_type),
+        }
+    }
+}
+
 // ============================================================================
 // MODEL OUTPUT CONSTRUCTORS
 // ============================================================================
@@ -969,6 +1049,83 @@ mod tests {
                 assert_eq!(c, None);
             }
             _ => panic!("Expected UrlContextResult variant"),
+        }
+    }
+
+    #[test]
+    fn test_content_from_uri_and_mime_image() {
+        let content =
+            content_from_uri_and_mime("files/abc123".to_string(), "image/png".to_string());
+        match content {
+            InteractionContent::Image { uri, mime_type, .. } => {
+                assert_eq!(uri, Some("files/abc123".to_string()));
+                assert_eq!(mime_type, Some("image/png".to_string()));
+            }
+            _ => panic!("Expected Image variant for image/* MIME type"),
+        }
+    }
+
+    #[test]
+    fn test_content_from_uri_and_mime_audio() {
+        let content =
+            content_from_uri_and_mime("files/audio456".to_string(), "audio/mp3".to_string());
+        match content {
+            InteractionContent::Audio { uri, mime_type, .. } => {
+                assert_eq!(uri, Some("files/audio456".to_string()));
+                assert_eq!(mime_type, Some("audio/mp3".to_string()));
+            }
+            _ => panic!("Expected Audio variant for audio/* MIME type"),
+        }
+    }
+
+    #[test]
+    fn test_content_from_uri_and_mime_video() {
+        let content =
+            content_from_uri_and_mime("files/video789".to_string(), "video/mp4".to_string());
+        match content {
+            InteractionContent::Video { uri, mime_type, .. } => {
+                assert_eq!(uri, Some("files/video789".to_string()));
+                assert_eq!(mime_type, Some("video/mp4".to_string()));
+            }
+            _ => panic!("Expected Video variant for video/* MIME type"),
+        }
+    }
+
+    #[test]
+    fn test_content_from_uri_and_mime_document_pdf() {
+        let content =
+            content_from_uri_and_mime("files/doc123".to_string(), "application/pdf".to_string());
+        match content {
+            InteractionContent::Document { uri, mime_type, .. } => {
+                assert_eq!(uri, Some("files/doc123".to_string()));
+                assert_eq!(mime_type, Some("application/pdf".to_string()));
+            }
+            _ => panic!("Expected Document variant for application/pdf"),
+        }
+    }
+
+    #[test]
+    fn test_content_from_uri_and_mime_text_routes_to_document() {
+        // text/* MIME types should route to Document variant
+        let content =
+            content_from_uri_and_mime("files/text123".to_string(), "text/plain".to_string());
+        match content {
+            InteractionContent::Document { uri, mime_type, .. } => {
+                assert_eq!(uri, Some("files/text123".to_string()));
+                assert_eq!(mime_type, Some("text/plain".to_string()));
+            }
+            _ => panic!("Expected Document variant for text/plain"),
+        }
+
+        // text/markdown should also route to Document
+        let content =
+            content_from_uri_and_mime("files/md456".to_string(), "text/markdown".to_string());
+        match content {
+            InteractionContent::Document { uri, mime_type, .. } => {
+                assert_eq!(uri, Some("files/md456".to_string()));
+                assert_eq!(mime_type, Some("text/markdown".to_string()));
+            }
+            _ => panic!("Expected Document variant for text/markdown"),
         }
     }
 }

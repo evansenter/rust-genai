@@ -1011,3 +1011,87 @@ fn test_add_methods_order_preserves_sequence() {
         _ => panic!("Expected InteractionInput::Content variant"),
     }
 }
+
+/// Test with_file_uri creates correct content variants based on MIME type.
+#[test]
+fn test_with_file_uri_creates_correct_content_type() {
+    let client = Client::new("test-api-key".to_string());
+
+    // Test image MIME type
+    let builder = client
+        .interaction()
+        .with_model(DEFAULT_MODEL)
+        .with_file_uri("https://example.com/image.png", "image/png");
+
+    let request = builder.build_request().expect("Should build valid request");
+
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 1);
+            assert!(matches!(
+                &items[0],
+                InteractionContent::Image { uri, mime_type, .. }
+                if uri.as_deref() == Some("https://example.com/image.png")
+                    && mime_type.as_deref() == Some("image/png")
+            ));
+        }
+        _ => panic!("Expected InteractionInput::Content variant"),
+    }
+
+    // Test video MIME type
+    let builder = client
+        .interaction()
+        .with_model(DEFAULT_MODEL)
+        .with_file_uri("https://example.com/video.mp4", "video/mp4");
+
+    let request = builder.build_request().unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert!(matches!(
+                &items[0],
+                InteractionContent::Video { uri, mime_type, .. }
+                if uri.as_deref() == Some("https://example.com/video.mp4")
+                    && mime_type.as_deref() == Some("video/mp4")
+            ));
+        }
+        _ => panic!("Expected Video variant"),
+    }
+
+    // Test document MIME type (application/pdf)
+    let builder = client
+        .interaction()
+        .with_model(DEFAULT_MODEL)
+        .with_file_uri("https://example.com/doc.pdf", "application/pdf");
+
+    let request = builder.build_request().unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert!(matches!(
+                &items[0],
+                InteractionContent::Document { uri, mime_type, .. }
+                if uri.as_deref() == Some("https://example.com/doc.pdf")
+                    && mime_type.as_deref() == Some("application/pdf")
+            ));
+        }
+        _ => panic!("Expected Document variant"),
+    }
+
+    // Test text/* routes to Document
+    let builder = client
+        .interaction()
+        .with_model(DEFAULT_MODEL)
+        .with_file_uri("https://example.com/file.txt", "text/plain");
+
+    let request = builder.build_request().unwrap();
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert!(matches!(
+                &items[0],
+                InteractionContent::Document { uri, mime_type, .. }
+                if uri.as_deref() == Some("https://example.com/file.txt")
+                    && mime_type.as_deref() == Some("text/plain")
+            ));
+        }
+        _ => panic!("Expected Document variant for text/plain"),
+    }
+}

@@ -391,6 +391,398 @@ impl Client {
 
         Ok(())
     }
+
+    // --- Files API methods ---
+
+    /// Uploads a file from a path to the Files API.
+    ///
+    /// Files are stored for 48 hours and can be referenced in interactions by their URI.
+    /// This is more efficient than inline base64 encoding for large files or files
+    /// that will be used across multiple interactions.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the file to upload
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The file cannot be read
+    /// - The MIME type cannot be determined
+    /// - The upload fails
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// // Upload a video file
+    /// let file = client.upload_file("video.mp4").await?;
+    /// println!("Uploaded: {} -> {}", file.name, file.uri);
+    ///
+    /// // Use in interaction
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_file(&file)
+    ///     .with_text("Describe this video")
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn upload_file(
+        &self,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<genai_client::FileMetadata, GenaiError> {
+        let path = path.as_ref();
+
+        // Read file contents
+        let file_data = tokio::fs::read(path).await.map_err(|e| {
+            log::warn!("Failed to read file '{}': {}", path.display(), e);
+            GenaiError::InvalidInput(format!("Failed to read file '{}': {}", path.display(), e))
+        })?;
+
+        // Detect MIME type from extension
+        let mime_type = crate::multimodal::detect_mime_type(path).ok_or_else(|| {
+            log::warn!(
+                "Could not determine MIME type for '{}' - unknown extension",
+                path.display()
+            );
+            GenaiError::InvalidInput(format!(
+                "Could not determine MIME type for '{}'. Please use upload_file_with_mime() to specify explicitly.",
+                path.display()
+            ))
+        })?;
+
+        // Use filename as display name
+        let display_name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_string());
+
+        log::debug!(
+            "Uploading file: path={}, size={} bytes, mime_type={}",
+            path.display(),
+            file_data.len(),
+            mime_type
+        );
+
+        genai_client::upload_file(
+            &self.http_client,
+            &self.api_key,
+            file_data,
+            mime_type,
+            display_name.as_deref(),
+        )
+        .await
+    }
+
+    /// Uploads a file with an explicit MIME type.
+    ///
+    /// Use this when automatic MIME type detection isn't suitable.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the file to upload
+    /// * `mime_type` - MIME type of the file (e.g., "video/mp4")
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let file = client.upload_file_with_mime("data.bin", "application/octet-stream").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn upload_file_with_mime(
+        &self,
+        path: impl AsRef<std::path::Path>,
+        mime_type: &str,
+    ) -> Result<genai_client::FileMetadata, GenaiError> {
+        let path = path.as_ref();
+
+        let file_data = tokio::fs::read(path).await.map_err(|e| {
+            log::warn!("Failed to read file '{}': {}", path.display(), e);
+            GenaiError::InvalidInput(format!("Failed to read file '{}': {}", path.display(), e))
+        })?;
+
+        let display_name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_string());
+
+        log::debug!(
+            "Uploading file: path={}, size={} bytes, mime_type={}",
+            path.display(),
+            file_data.len(),
+            mime_type
+        );
+
+        genai_client::upload_file(
+            &self.http_client,
+            &self.api_key,
+            file_data,
+            mime_type,
+            display_name.as_deref(),
+        )
+        .await
+    }
+
+    /// Uploads file bytes directly with a specified MIME type.
+    ///
+    /// Use this when you already have file contents in memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - File contents as bytes
+    /// * `mime_type` - MIME type of the file
+    /// * `display_name` - Optional display name for the file
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// // Upload bytes from memory
+    /// let video_bytes = std::fs::read("video.mp4")?;
+    /// let file = client.upload_file_bytes(video_bytes, "video/mp4", Some("my-video")).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn upload_file_bytes(
+        &self,
+        data: Vec<u8>,
+        mime_type: &str,
+        display_name: Option<&str>,
+    ) -> Result<genai_client::FileMetadata, GenaiError> {
+        log::debug!(
+            "Uploading file bytes: size={} bytes, mime_type={}, display_name={:?}",
+            data.len(),
+            mime_type,
+            display_name
+        );
+
+        genai_client::upload_file(
+            &self.http_client,
+            &self.api_key,
+            data,
+            mime_type,
+            display_name,
+        )
+        .await
+    }
+
+    /// Gets metadata for an uploaded file.
+    ///
+    /// Use this to check the processing status of a recently uploaded file.
+    ///
+    /// # Arguments
+    ///
+    /// * `file_name` - The resource name of the file (e.g., "files/abc123")
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let file = client.get_file("files/abc123").await?;
+    /// if file.is_active() {
+    ///     println!("File is ready to use");
+    /// } else if file.is_processing() {
+    ///     println!("File is still processing...");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_file(
+        &self,
+        file_name: &str,
+    ) -> Result<genai_client::FileMetadata, GenaiError> {
+        genai_client::get_file(&self.http_client, &self.api_key, file_name).await
+    }
+
+    /// Lists all uploaded files.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client.list_files(None, None).await?;
+    /// for file in response.files {
+    ///     println!("{}: {} ({})", file.name, file.display_name.as_deref().unwrap_or(""), file.mime_type);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn list_files(
+        &self,
+        page_size: Option<u32>,
+        page_token: Option<&str>,
+    ) -> Result<genai_client::ListFilesResponse, GenaiError> {
+        genai_client::list_files(&self.http_client, &self.api_key, page_size, page_token).await
+    }
+
+    /// Deletes an uploaded file.
+    ///
+    /// # Arguments
+    ///
+    /// * `file_name` - The resource name of the file to delete (e.g., "files/abc123")
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// // Upload, use, then delete
+    /// let file = client.upload_file("video.mp4").await?;
+    /// // ... use in interactions ...
+    /// client.delete_file(&file.name).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn delete_file(&self, file_name: &str) -> Result<(), GenaiError> {
+        genai_client::delete_file(&self.http_client, &self.api_key, file_name).await
+    }
+
+    /// Waits for a file to finish processing.
+    ///
+    /// Some files (especially videos) require processing before they can be used.
+    /// This method polls the file status until it becomes active or fails.
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - The file metadata to wait for
+    /// * `poll_interval` - How often to check the status
+    /// * `timeout` - Maximum time to wait
+    ///
+    /// # Returns
+    ///
+    /// Returns the updated file metadata when processing completes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The file processing fails
+    /// - The timeout is exceeded
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    /// use std::time::Duration;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let file = client.upload_file("large_video.mp4").await?;
+    ///
+    /// // Wait for processing to complete
+    /// let ready_file = client.wait_for_file_ready(
+    ///     &file,
+    ///     Duration::from_secs(2),
+    ///     Duration::from_secs(120)
+    /// ).await?;
+    ///
+    /// println!("File ready: {}", ready_file.uri);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn wait_for_file_ready(
+        &self,
+        file: &genai_client::FileMetadata,
+        poll_interval: std::time::Duration,
+        timeout: std::time::Duration,
+    ) -> Result<genai_client::FileMetadata, GenaiError> {
+        use std::time::Instant;
+
+        let start = Instant::now();
+
+        loop {
+            let current = self.get_file(&file.name).await?;
+
+            if current.is_active() {
+                return Ok(current);
+            }
+
+            if current.is_failed() {
+                let error_code = current.error.as_ref().and_then(|e| e.code);
+                let error_msg = current
+                    .error
+                    .as_ref()
+                    .and_then(|e| e.message.as_deref())
+                    .unwrap_or("File processing failed without details");
+
+                log::error!(
+                    "File '{}' processing failed: code={:?}, message={}",
+                    file.name,
+                    error_code,
+                    error_msg
+                );
+
+                // Use Api error since this is a server-side processing failure
+                return Err(GenaiError::Api {
+                    status_code: error_code.map_or(500, |c| c as u16),
+                    message: format!("File processing failed: {}", error_msg),
+                    request_id: None,
+                });
+            }
+
+            // Log unknown states per Evergreen logging strategy
+            if let Some(state) = &current.state {
+                if state.is_unknown() {
+                    log::warn!(
+                        "File '{}' is in unknown state {:?}, continuing to poll. \
+                         This may indicate API evolution - consider updating rust-genai.",
+                        file.name,
+                        state
+                    );
+                }
+            }
+
+            if start.elapsed() > timeout {
+                // Use Internal error since this is an operational issue, not invalid input
+                let state_info = current
+                    .state
+                    .as_ref()
+                    .map(|s| format!("{:?}", s))
+                    .unwrap_or_else(|| "unknown".to_string());
+                return Err(GenaiError::Internal(format!(
+                    "Timeout waiting for file '{}' to be ready (waited {:?}, last state: {}). \
+                     The file may still be processing - try again with a longer timeout.",
+                    file.name,
+                    start.elapsed(),
+                    state_info
+                )));
+            }
+
+            log::debug!(
+                "File '{}' still processing, waiting {:?}...",
+                file.name,
+                poll_interval
+            );
+            tokio::time::sleep(poll_interval).await;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -472,6 +864,88 @@ mod tests {
             debug_output.contains("[REDACTED]"),
             "Builder debug output should contain [REDACTED]: {}",
             debug_output
+        );
+    }
+
+    #[tokio::test]
+    async fn test_upload_file_unknown_extension_error() {
+        let client = Client::new("test_key".to_string());
+
+        // Create a temp file with an unknown extension
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("data.xyz");
+        std::fs::write(&file_path, b"test data").unwrap();
+
+        // upload_file should fail with InvalidInput for unknown MIME type
+        let result = client.upload_file(&file_path).await;
+        assert!(result.is_err(), "Should fail for unknown extension");
+
+        let err = result.unwrap_err();
+        let err_string = err.to_string();
+        assert!(
+            err_string.contains("Could not determine MIME type"),
+            "Error should mention MIME type issue: {}",
+            err_string
+        );
+        assert!(
+            err_string.contains("data.xyz"),
+            "Error should include filename: {}",
+            err_string
+        );
+    }
+
+    #[tokio::test]
+    async fn test_upload_file_nonexistent_file_error() {
+        let client = Client::new("test_key".to_string());
+
+        // Try to upload a file that doesn't exist
+        let result = client.upload_file("/nonexistent/path/to/file.txt").await;
+        assert!(result.is_err(), "Should fail for nonexistent file");
+
+        let err = result.unwrap_err();
+        let err_string = err.to_string();
+        assert!(
+            err_string.contains("Failed to read file"),
+            "Error should mention file read failure: {}",
+            err_string
+        );
+    }
+
+    #[tokio::test]
+    async fn test_upload_file_bytes_empty_file_error() {
+        let client = Client::new("test_key".to_string());
+
+        // Try to upload empty bytes
+        let result = client
+            .upload_file_bytes(Vec::new(), "text/plain", Some("empty.txt"))
+            .await;
+        assert!(result.is_err(), "Should fail for empty file");
+
+        let err = result.unwrap_err();
+        let err_string = err.to_string();
+        assert!(
+            err_string.contains("Cannot upload empty file"),
+            "Error should mention empty file: {}",
+            err_string
+        );
+    }
+
+    #[tokio::test]
+    async fn test_upload_file_bytes_validates_before_network() {
+        // This test verifies that validation happens before any network call
+        // by using an invalid API key - if we reach the network, we'd get auth error
+        let client = Client::new("invalid_key".to_string());
+
+        // Empty file should fail with validation error, not auth error
+        let result = client
+            .upload_file_bytes(Vec::new(), "text/plain", None)
+            .await;
+        assert!(result.is_err());
+        let err_string = result.unwrap_err().to_string();
+        assert!(
+            err_string.contains("Cannot upload empty file"),
+            "Should fail validation before hitting network: {}",
+            err_string
         );
     }
 }
