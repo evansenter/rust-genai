@@ -83,7 +83,7 @@ cargo run --example image_generation
 
 1. **Public API** (`src/lib.rs`, `src/client.rs`, `src/request_builder.rs`): User-facing `Client`, `InteractionBuilder`, error conversion
 2. **Internal Logic** (`src/function_calling.rs`, `src/interactions_api.rs`, `src/multimodal.rs`): Function registry, content builders, file loading helpers
-3. **HTTP Client** (`genai-client/`): Raw API requests, JSON models (`models/interactions.rs`, `models/shared.rs`), SSE streaming
+3. **HTTP Client** (`genai-client/`): Raw API requests, JSON models (`models/interactions/`, `models/shared.rs`), SSE streaming
 4. **Macros** (`rust-genai-macros/`): `#[tool]` macro with `inventory` registration
 
 ### Key Patterns
