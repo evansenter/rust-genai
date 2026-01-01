@@ -27,10 +27,5 @@ strict-unknown = []
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
-criterion = { workspace = true }
 futures-util = { workspace = true }
 proptest = "1.9"
-
-[[bench]]
-name = "content_serialization"
-harness = false
