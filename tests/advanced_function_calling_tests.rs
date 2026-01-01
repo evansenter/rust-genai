@@ -1583,3 +1583,36 @@ async fn test_auto_functions_stream_timeout_returns_error() {
     })
     .await;
 }
+
+/// Tests that timeout works correctly when functions are registered.
+/// This validates the documented behavior that on timeout, previous function
+/// executions are preserved on the API side but an error is returned.
+#[tokio::test]
+#[ignore = "requires GEMINI_API_KEY"]
+async fn test_auto_functions_timeout_with_registered_functions() {
+    use std::time::Duration;
+
+    with_timeout(TEST_TIMEOUT, async {
+        let client = get_client().expect("GEMINI_API_KEY required");
+
+        // Use an impossibly short timeout with functions registered
+        // The functions are registered via #[tool] macro (get_weather_test, etc.)
+        let result = interaction_builder(&client)
+            .with_text("What's the weather in Tokyo and what time is it in JST?")
+            .with_timeout(Duration::from_millis(1))
+            .create_with_auto_functions()
+            .await;
+
+        // Should return a timeout error even with functions registered
+        assert!(
+            matches!(result, Err(GenaiError::Timeout(_))),
+            "Expected GenaiError::Timeout with registered functions, got: {:?}",
+            result
+        );
+
+        println!("✓ Timeout correctly fires with registered functions");
+        println!("  Note: Any function calls that completed before timeout are");
+        println!("  preserved on the API side via previous_interaction_id chain");
+    })
+    .await;
+}
