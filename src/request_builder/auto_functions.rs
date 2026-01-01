@@ -208,6 +208,7 @@ impl<'a> InteractionBuilder<'a> {
         }
 
         let client = self.client;
+        let has_timeout = self.timeout.is_some();
         let max_loops = self.max_function_call_loops;
         let tool_service = self.tool_service.clone();
         let mut request = self.build_request()?;
@@ -258,6 +259,16 @@ impl<'a> InteractionBuilder<'a> {
 
         // Track the last response for returning partial results if max loops is reached
         let mut last_response: Option<InteractionResponse> = None;
+
+        // Warn if timeout is set - it's not applied to auto-function calling
+        // because this method makes multiple API calls in a loop.
+        if has_timeout {
+            warn!(
+                "with_timeout() is not applied to create_with_auto_functions(). \
+                 The operation may run indefinitely. For a total timeout, wrap the call \
+                 in tokio::time::timeout()."
+            );
+        }
 
         // Main auto-function loop (configurable iterations to prevent infinite loops)
         for loop_count in 0..max_loops {
@@ -451,6 +462,7 @@ impl<'a> InteractionBuilder<'a> {
         let client = self.client;
         let max_loops = self.max_function_call_loops;
         let tool_service = self.tool_service.clone();
+        let has_timeout = self.timeout.is_some();
 
         Box::pin(async_stream::try_stream! {
             let mut request = self.build_request()?;
@@ -500,6 +512,16 @@ impl<'a> InteractionBuilder<'a> {
 
             // Track the last response for returning partial results if max loops is reached
             let mut last_response: Option<InteractionResponse> = None;
+
+            // Warn if timeout is set - it's not applied to auto-function calling
+            // because this method makes multiple API calls in a loop.
+            if has_timeout {
+                warn!(
+                    "with_timeout() is not applied to create_stream_with_auto_functions(). \
+                     The operation may run indefinitely. For a total timeout, wrap the call \
+                     in tokio::time::timeout()."
+                );
+            }
 
             // Main auto-function streaming loop
             for loop_count in 0..max_loops {

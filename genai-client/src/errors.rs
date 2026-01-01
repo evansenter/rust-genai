@@ -52,6 +52,13 @@ pub enum GenaiError {
     /// the API response itself.
     #[error("Malformed API response: {0}")]
     MalformedResponse(String),
+    /// Request timed out after the specified duration.
+    ///
+    /// This error is returned when a request exceeds the timeout configured
+    /// via `with_timeout()`. The duration indicates how long the request
+    /// was allowed to run before being cancelled.
+    #[error("Request timed out after {0:?}")]
+    Timeout(std::time::Duration),
 }
 
 #[cfg(test)]
@@ -198,5 +205,21 @@ mod tests {
         let display = format!("{}", error);
         assert!(display.contains("Malformed API response"));
         assert!(display.contains("Complete event"));
+    }
+
+    #[test]
+    fn test_genai_error_timeout_display() {
+        let error = GenaiError::Timeout(std::time::Duration::from_secs(30));
+        let display = format!("{}", error);
+        assert!(display.contains("Request timed out"));
+        assert!(display.contains("30s"));
+    }
+
+    #[test]
+    fn test_genai_error_timeout_debug() {
+        let error = GenaiError::Timeout(std::time::Duration::from_millis(500));
+        let debug = format!("{:?}", error);
+        assert!(debug.contains("Timeout"));
+        assert!(debug.contains("500ms"));
     }
 }
