@@ -162,7 +162,7 @@ async fn test_streaming_multi_turn_function_calling() {
     // The model should reference the weather conditions from Turn 1 (rainy, 18°C)
     let is_valid = validate_response_semantically(
         &client,
-        "Turn 1 established weather in Tokyo: rainy, 18°C, high humidity. User asked 'Should I bring an umbrella?' in Turn 2.",
+        "Turn 1 established weather in Paris: rainy, 18°C, high humidity. User asked 'Should I bring an umbrella?' in Turn 3.",
         &result.collected_text,
         "Does this response address whether to bring an umbrella based on the rainy weather?",
     )

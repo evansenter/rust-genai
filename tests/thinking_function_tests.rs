@@ -489,7 +489,7 @@ async fn test_thinking_with_parallel_function_calls() {
     let text2 = response2.text().unwrap();
     let is_valid = validate_response_semantically(
         &client,
-        "User asked about current conditions in Paris. Two functions returned: weather (22°C, cloudy) and time (14:30).",
+        "User asked about current conditions in Tokyo. Two functions returned: weather (22°C, cloudy) and time (14:30 JST).",
         text2,
         "Does this response incorporate the weather or time information from the function results?",
     )
