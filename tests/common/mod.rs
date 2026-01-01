@@ -107,6 +107,67 @@ where
     Err(last_error.expect("Should have an error if we exhausted retries"))
 }
 
+/// Macro to reduce boilerplate when using `retry_on_transient`.
+///
+/// The `retry_on_transient` function requires double-cloning: once for the outer
+/// closure capture, and again inside the closure for the `async move` block.
+/// This macro eliminates that boilerplate by handling the cloning automatically.
+///
+/// # Usage
+///
+/// ```ignore
+/// // Clone client and prev_id for retry, then execute the async block
+/// let response = retry_request!([client, prev_id] => {
+///     stateful_builder(&client)
+///         .with_previous_interaction(&prev_id)
+///         .create()
+///         .await
+/// }).expect("Request failed");
+/// ```
+///
+/// This expands to:
+///
+/// ```ignore
+/// let response = {
+///     let client = client.clone();
+///     let prev_id = prev_id.clone();
+///     retry_on_transient(DEFAULT_MAX_RETRIES, || {
+///         let client = client.clone();
+///         let prev_id = prev_id.clone();
+///         async move {
+///             stateful_builder(&client)
+///                 .with_previous_interaction(&prev_id)
+///                 .create()
+///                 .await
+///         }
+///     }).await
+/// }.expect("Request failed");
+/// ```
+///
+/// # Arguments
+///
+/// * Variables in brackets `[a, b, c]` - Variables to clone for each retry attempt
+/// * Expression after `=>` - The async operation to execute (should include `.await`)
+///
+/// # Returns
+///
+/// The result of `retry_on_transient(...).await` - typically `Result<T, GenaiError>`.
+/// Chain with `.expect()` or `?` as needed.
+/// See documentation above.
+///
+/// **Usage**: Import with `use crate::retry_request;` in test files, or just
+/// use directly after `mod common;` since `#[macro_export]` places it at crate root.
+#[macro_export]
+macro_rules! retry_request {
+    ([$($var:ident),* $(,)?] => $body:expr) => {{
+        $(let $var = $var.clone();)*
+        $crate::common::retry_on_transient($crate::common::DEFAULT_MAX_RETRIES, || {
+            $(let $var = $var.clone();)*
+            async move { $body }
+        }).await
+    }};
+}
+
 /// Creates a client from the GEMINI_API_KEY environment variable.
 /// Returns None if the API key is not set.
 #[allow(dead_code)]

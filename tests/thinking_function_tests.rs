@@ -22,10 +22,7 @@
 
 mod common;
 
-use common::{
-    DEFAULT_MAX_RETRIES, consume_stream, get_client, retry_on_transient, stateful_builder,
-    validate_response_semantically,
-};
+use common::{consume_stream, get_client, stateful_builder, validate_response_semantically};
 use rust_genai::{FunctionDeclaration, InteractionStatus, ThinkingLevel, function_result_content};
 use serde_json::json;
 
@@ -72,25 +69,16 @@ async fn test_thinking_with_function_calling_multi_turn() {
     // =========================================================================
     // Turn 1: Enable thinking + trigger function call
     // =========================================================================
-    let response1 = {
-        let client = client.clone();
-        let get_weather = get_weather.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let get_weather = get_weather.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_text("What's the weather in Tokyo? Should I bring an umbrella?")
-                    .with_function(get_weather)
-                    .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 1 failed")
-    };
+    let response1 = retry_request!([client, get_weather] => {
+        stateful_builder(&client)
+            .with_text("What's the weather in Tokyo? Should I bring an umbrella?")
+            .with_function(get_weather)
+            .with_thinking_level(ThinkingLevel::Medium)
+            .with_store(true)
+            .create()
+            .await
+    })
+    .expect("Turn 1 failed");
 
     println!("Turn 1 status: {:?}", response1.status);
 
@@ -146,30 +134,18 @@ async fn test_thinking_with_function_calling_multi_turn() {
         }),
     );
 
-    let response2 = {
-        let client = client.clone();
-        let prev_id = response1.id.clone().expect("id should exist");
-        let get_weather = get_weather.clone();
-        let function_result = function_result.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            let get_weather = get_weather.clone();
-            let function_result = function_result.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
-                    .with_content(vec![function_result])
-                    .with_function(get_weather)
-                    .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 2 failed")
-    };
+    let prev_id = response1.id.clone().expect("id should exist");
+    let response2 = retry_request!([client, prev_id, get_weather, function_result] => {
+        stateful_builder(&client)
+            .with_previous_interaction(&prev_id)
+            .with_content(vec![function_result])
+            .with_function(get_weather)
+            .with_thinking_level(ThinkingLevel::Medium)
+            .with_store(true)
+            .create()
+            .await
+    })
+    .expect("Turn 2 failed");
 
     println!("Turn 2 status: {:?}", response2.status);
     println!("Turn 2 has_thoughts: {}", response2.has_thoughts());
@@ -225,30 +201,20 @@ async fn test_thinking_with_function_calling_multi_turn() {
     // =========================================================================
     // Turn 3: Follow-up question - model reasons with full context
     // =========================================================================
-    let response3 = {
-        let client = client.clone();
-        let prev_id = response2.id.clone().expect("id should exist");
-        let get_weather = get_weather.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            let get_weather = get_weather.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
-                    .with_text(
-                        "Given this weather, what indoor activities would you recommend in Tokyo?",
-                    )
-                    .with_function(get_weather)
-                    .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 3 failed")
-    };
+    let prev_id = response2.id.clone().expect("id should exist");
+    let response3 = retry_request!([client, prev_id, get_weather] => {
+        stateful_builder(&client)
+            .with_previous_interaction(&prev_id)
+            .with_text(
+                "Given this weather, what indoor activities would you recommend in Tokyo?",
+            )
+            .with_function(get_weather)
+            .with_thinking_level(ThinkingLevel::Medium)
+            .with_store(true)
+            .create()
+            .await
+    })
+    .expect("Turn 3 failed");
 
     println!("Turn 3 status: {:?}", response3.status);
     println!("Turn 3 has_thoughts: {}", response3.has_thoughts());
@@ -287,30 +253,18 @@ async fn test_thinking_with_function_calling_multi_turn() {
             );
 
             // Make follow-up request with function result
-            let response3_followup = {
-                let client = client.clone();
-                let prev_id = response3.id.clone().expect("id should exist");
-                let get_weather = get_weather.clone();
-                let function_result = function_result.clone();
-                retry_on_transient(DEFAULT_MAX_RETRIES, || {
-                    let client = client.clone();
-                    let prev_id = prev_id.clone();
-                    let get_weather = get_weather.clone();
-                    let function_result = function_result.clone();
-                    async move {
-                        stateful_builder(&client)
-                            .with_previous_interaction(&prev_id)
-                            .with_content(vec![function_result])
-                            .with_function(get_weather)
-                            .with_thinking_level(ThinkingLevel::Medium)
-                            .with_store(true)
-                            .create()
-                            .await
-                    }
-                })
-                .await
-                .expect("Turn 3 follow-up failed")
-            };
+            let prev_id = response3.id.clone().expect("id should exist");
+            let response3_followup = retry_request!([client, prev_id, get_weather, function_result] => {
+                stateful_builder(&client)
+                    .with_previous_interaction(&prev_id)
+                    .with_content(vec![function_result])
+                    .with_function(get_weather)
+                    .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store(true)
+                    .create()
+                    .await
+            })
+            .expect("Turn 3 follow-up failed");
 
             // Guard against infinite function call loops - fail early before any processing
             assert_ne!(
@@ -420,30 +374,19 @@ async fn test_thinking_with_parallel_function_calls() {
     // =========================================================================
     // Turn 1: Enable thinking + trigger parallel function calls
     // =========================================================================
-    let response1 = {
-        let client = client.clone();
-        let get_weather = get_weather.clone();
-        let get_time = get_time.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let get_weather = get_weather.clone();
-            let get_time = get_time.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_text(
-                        "What's the weather in Tokyo and what time is it there? \
-                         I need both pieces of information.",
-                    )
-                    .with_functions(vec![get_weather, get_time])
-                    .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 1 failed")
-    };
+    let response1 = retry_request!([client, get_weather, get_time] => {
+        stateful_builder(&client)
+            .with_text(
+                "What's the weather in Tokyo and what time is it there? \
+                 I need both pieces of information.",
+            )
+            .with_functions(vec![get_weather, get_time])
+            .with_thinking_level(ThinkingLevel::Medium)
+            .with_store(true)
+            .create()
+            .await
+    })
+    .expect("Turn 1 failed");
 
     println!("Turn 1 status: {:?}", response1.status);
 
@@ -508,32 +451,18 @@ async fn test_thinking_with_parallel_function_calls() {
         ));
     }
 
-    let response2 = {
-        let client = client.clone();
-        let prev_id = response1.id.clone().expect("id should exist");
-        let get_weather = get_weather.clone();
-        let get_time = get_time.clone();
-        let results = results.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            let get_weather = get_weather.clone();
-            let get_time = get_time.clone();
-            let results = results.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
-                    .with_content(results)
-                    .with_functions(vec![get_weather, get_time])
-                    .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 2 failed")
-    };
+    let prev_id = response1.id.clone().expect("id should exist");
+    let response2 = retry_request!([client, prev_id, get_weather, get_time, results] => {
+        stateful_builder(&client)
+            .with_previous_interaction(&prev_id)
+            .with_content(results)
+            .with_functions(vec![get_weather, get_time])
+            .with_thinking_level(ThinkingLevel::Medium)
+            .with_store(true)
+            .create()
+            .await
+    })
+    .expect("Turn 2 failed");
 
     println!("Turn 2 status: {:?}", response2.status);
     println!("Turn 2 has_thoughts: {}", response2.has_thoughts());
@@ -652,29 +581,21 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
     // =========================================================================
     println!("=== Step 1: Initial request ===");
 
-    let response1 = {
-        let client = client.clone();
-        let functions = all_functions.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let functions = functions.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_text(
-                        "I'm planning a trip to Tokyo. I need to know the current weather, \
-                         current local time, the forecast for the next few days, and what \
-                         activities you'd recommend. Please gather all this information.",
-                    )
-                    .with_functions(functions)
-                    .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Step 1 failed")
-    };
+    let functions = all_functions.clone();
+    let response1 = retry_request!([client, functions] => {
+        stateful_builder(&client)
+            .with_text(
+                "I'm planning a trip to Tokyo. I need to know the current weather, \
+                 current local time, the forecast for the next few days, and what \
+                 activities you'd recommend. Please gather all this information.",
+            )
+            .with_functions(functions)
+            .with_thinking_level(ThinkingLevel::Medium)
+            .with_store(true)
+            .create()
+            .await
+    })
+    .expect("Step 1 failed");
 
     println!("Step 1 status: {:?}", response1.status);
 
@@ -739,30 +660,20 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
         ));
     }
 
-    let response2 = {
-        let client = client.clone();
-        let prev_id = response1.id.clone().expect("id should exist");
-        let functions = all_functions.clone();
-        let results = results1.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            let functions = functions.clone();
-            let results = results.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
-                    .with_content(results)
-                    .with_functions(functions)
-                    .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Step 2 failed")
-    };
+    let prev_id = response1.id.clone().expect("id should exist");
+    let functions = all_functions.clone();
+    let results = results1.clone();
+    let response2 = retry_request!([client, prev_id, functions, results] => {
+        stateful_builder(&client)
+            .with_previous_interaction(&prev_id)
+            .with_content(results)
+            .with_functions(functions)
+            .with_thinking_level(ThinkingLevel::Medium)
+            .with_store(true)
+            .create()
+            .await
+    })
+    .expect("Step 2 failed");
 
     println!("Step 2 status: {:?}", response2.status);
     println!("Step 2 has_thoughts: {}", response2.has_thoughts());
@@ -821,30 +732,20 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
             ));
         }
 
-        let response3 = {
-            let client = client.clone();
-            let prev_id = response2.id.clone().expect("id should exist");
-            let functions = all_functions.clone();
-            let results = results2.clone();
-            retry_on_transient(DEFAULT_MAX_RETRIES, || {
-                let client = client.clone();
-                let prev_id = prev_id.clone();
-                let functions = functions.clone();
-                let results = results.clone();
-                async move {
-                    stateful_builder(&client)
-                        .with_previous_interaction(&prev_id)
-                        .with_content(results)
-                        .with_functions(functions)
-                        .with_thinking_level(ThinkingLevel::Medium)
-                        .with_store(true)
-                        .create()
-                        .await
-                }
-            })
-            .await
-            .expect("Step 3 failed")
-        };
+        let prev_id = response2.id.clone().expect("id should exist");
+        let functions = all_functions.clone();
+        let results = results2.clone();
+        let response3 = retry_request!([client, prev_id, functions, results] => {
+            stateful_builder(&client)
+                .with_previous_interaction(&prev_id)
+                .with_content(results)
+                .with_functions(functions)
+                .with_thinking_level(ThinkingLevel::Medium)
+                .with_store(true)
+                .create()
+                .await
+        })
+        .expect("Step 3 failed");
 
         println!("Step 3 status: {:?}", response3.status);
         println!("Step 3 has_thoughts: {}", response3.has_thoughts());
@@ -930,25 +831,17 @@ async fn test_thinking_levels_with_function_calling() {
         println!("\n=== Testing ThinkingLevel::{} ===", level_name);
 
         // Turn 1: Trigger function call with this thinking level
-        let response1 = {
-            let client = client.clone();
-            let get_weather = get_weather.clone();
-            retry_on_transient(DEFAULT_MAX_RETRIES, || {
-                let client = client.clone();
-                let get_weather = get_weather.clone();
-                async move {
-                    stateful_builder(&client)
-                        .with_text("What's the weather in Paris?")
-                        .with_function(get_weather)
-                        .with_thinking_level(level)
-                        .with_store(true)
-                        .create()
-                        .await
-                }
-            })
-            .await
-            .unwrap_or_else(|e| panic!("Turn 1 failed for ThinkingLevel::{}: {}", level_name, e))
-        };
+        let get_weather_fn = get_weather.clone();
+        let response1 = retry_request!([client, get_weather_fn] => {
+            stateful_builder(&client)
+                .with_text("What's the weather in Paris?")
+                .with_function(get_weather_fn)
+                .with_thinking_level(level)
+                .with_store(true)
+                .create()
+                .await
+        })
+        .unwrap_or_else(|e| panic!("Turn 1 failed for ThinkingLevel::{}: {}", level_name, e));
 
         println!(
             "  Turn 1 status: {:?}, has_thoughts: {}",
@@ -979,29 +872,19 @@ async fn test_thinking_levels_with_function_calling() {
             }),
         );
 
-        let response2 = {
-            let client = client.clone();
-            let prev_id = response1.id.clone().expect("id should exist");
-            let get_weather = get_weather.clone();
-            let function_result = function_result.clone();
-            retry_on_transient(DEFAULT_MAX_RETRIES, || {
-                let client = client.clone();
-                let prev_id = prev_id.clone();
-                let get_weather = get_weather.clone();
-                let function_result = function_result.clone();
-                async move {
-                    stateful_builder(&client)
-                        .with_previous_interaction(&prev_id)
-                        .with_content(vec![function_result])
-                        .with_function(get_weather)
-                        .with_thinking_level(level)
-                        .create()
-                        .await
-                }
-            })
-            .await
-            .unwrap_or_else(|e| panic!("Turn 2 failed for ThinkingLevel::{}: {}", level_name, e))
-        };
+        let prev_id = response1.id.clone().expect("id should exist");
+        let get_weather_fn = get_weather.clone();
+        let fn_result = function_result.clone();
+        let response2 = retry_request!([client, prev_id, get_weather_fn, fn_result] => {
+            stateful_builder(&client)
+                .with_previous_interaction(&prev_id)
+                .with_content(vec![fn_result])
+                .with_function(get_weather_fn)
+                .with_thinking_level(level)
+                .create()
+                .await
+        })
+        .unwrap_or_else(|e| panic!("Turn 2 failed for ThinkingLevel::{}: {}", level_name, e));
 
         println!(
             "  Turn 2 status: {:?}, has_thoughts: {}, has_text: {}",
@@ -1062,25 +945,17 @@ async fn test_function_calling_without_thinking() {
     // =========================================================================
     println!("=== Turn 1: Request without thinking ===");
 
-    let response1 = {
-        let client = client.clone();
-        let get_weather = get_weather.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let get_weather = get_weather.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_text("What's the weather in Tokyo?")
-                    .with_function(get_weather)
-                    // Note: NO with_thinking_level() call
-                    .with_store(true)
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 1 failed")
-    };
+    let get_weather_fn = get_weather.clone();
+    let response1 = retry_request!([client, get_weather_fn] => {
+        stateful_builder(&client)
+            .with_text("What's the weather in Tokyo?")
+            .with_function(get_weather_fn)
+            // Note: NO with_thinking_level() call
+            .with_store(true)
+            .create()
+            .await
+    })
+    .expect("Turn 1 failed");
 
     println!("Turn 1 status: {:?}", response1.status);
     println!("Turn 1 has_thoughts: {}", response1.has_thoughts());
@@ -1128,29 +1003,19 @@ async fn test_function_calling_without_thinking() {
         }),
     );
 
-    let response2 = {
-        let client = client.clone();
-        let prev_id = response1.id.clone().expect("id should exist");
-        let get_weather = get_weather.clone();
-        let function_result = function_result.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            let get_weather = get_weather.clone();
-            let function_result = function_result.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
-                    .with_content(vec![function_result])
-                    .with_function(get_weather)
-                    // Note: NO with_thinking_level() call
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 2 failed")
-    };
+    let prev_id = response1.id.clone().expect("id should exist");
+    let get_weather_fn = get_weather.clone();
+    let fn_result = function_result.clone();
+    let response2 = retry_request!([client, prev_id, get_weather_fn, fn_result] => {
+        stateful_builder(&client)
+            .with_previous_interaction(&prev_id)
+            .with_content(vec![fn_result])
+            .with_function(get_weather_fn)
+            // Note: NO with_thinking_level() call
+            .create()
+            .await
+    })
+    .expect("Turn 2 failed");
 
     println!("Turn 2 status: {:?}", response2.status);
     println!("Turn 2 has_thoughts: {}", response2.has_thoughts());

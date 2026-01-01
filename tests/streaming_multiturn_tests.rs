@@ -13,9 +13,7 @@
 
 mod common;
 
-use common::{
-    DEFAULT_MAX_RETRIES, consume_stream, get_client, retry_on_transient, stateful_builder,
-};
+use common::{consume_stream, get_client, stateful_builder};
 use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 
@@ -34,23 +32,16 @@ async fn test_streaming_multi_turn_basic() {
     };
 
     // Turn 1: Establish a fact (non-streaming)
-    let response1 = {
-        let client = client.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_text(
-                        "My favorite programming language is Python. Please acknowledge this.",
-                    )
-                    .with_store(true)
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 1 failed")
-    };
+    let response1 = retry_request!([client] => {
+        stateful_builder(&client)
+            .with_text(
+                "My favorite programming language is Python. Please acknowledge this.",
+            )
+            .with_store(true)
+            .create()
+            .await
+    })
+    .expect("Turn 1 failed");
 
     println!("Turn 1 completed: {:?}", response1.id);
     assert_eq!(response1.status, InteractionStatus::Completed);
@@ -106,24 +97,15 @@ async fn test_streaming_multi_turn_function_calling() {
         .build();
 
     // Turn 1: Trigger function call
-    let response1 = {
-        let client = client.clone();
-        let get_weather = get_weather.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let get_weather = get_weather.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_text("What's the weather in Paris?")
-                    .with_function(get_weather)
-                    .with_store(true)
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 1 failed")
-    };
+    let response1 = retry_request!([client, get_weather] => {
+        stateful_builder(&client)
+            .with_text("What's the weather in Paris?")
+            .with_function(get_weather)
+            .with_store(true)
+            .create()
+            .await
+    })
+    .expect("Turn 1 failed");
 
     println!("Turn 1 status: {:?}", response1.status);
 
@@ -137,34 +119,23 @@ async fn test_streaming_multi_turn_function_calling() {
     println!("Function call: {} with args: {:?}", call.name, call.args);
 
     // Turn 2: Provide function result
-    let result = function_result_content(
+    let function_result = function_result_content(
         "get_weather",
         call.id.expect("Function call should have ID").to_string(),
         json!({"temperature": "18°C", "conditions": "rainy", "humidity": "85%"}),
     );
 
-    let response2 = {
-        let client = client.clone();
-        let prev_id = response1.id.clone().expect("id should exist");
-        let get_weather = get_weather.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            let result = result.clone();
-            let get_weather = get_weather.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
-                    .with_content(vec![result])
-                    .with_function(get_weather)
-                    .with_store(true)
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 2 failed")
-    };
+    let prev_id = response1.id.clone().expect("id should exist");
+    let response2 = retry_request!([client, prev_id, function_result, get_weather] => {
+        stateful_builder(&client)
+            .with_previous_interaction(&prev_id)
+            .with_content(vec![function_result])
+            .with_function(get_weather)
+            .with_store(true)
+            .create()
+            .await
+    })
+    .expect("Turn 2 failed");
 
     println!("Turn 2 status: {:?}", response2.status);
     if response2.has_text() {
