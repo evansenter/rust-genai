@@ -502,7 +502,7 @@ impl<'a> InteractionBuilder<'a> {
     ///     while let Some(chunk) = stream.next().await {
     ///         // process chunk...
     ///     }
-    /// }).await??;
+    /// }).await?;
     /// # Ok(())
     /// # }
     /// ```
