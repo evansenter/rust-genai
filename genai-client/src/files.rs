@@ -49,6 +49,7 @@
 //! # }
 //! ```
 
+use crate::common::API_KEY_HEADER;
 use crate::error_helpers::{check_response, deserialize_with_context};
 use crate::errors::GenaiError;
 use reqwest::Client as ReqwestClient;
@@ -372,8 +373,6 @@ pub async fn upload_file(
     );
 
     // Step 1: Start the resumable upload
-    let start_url = format!("{UPLOAD_URL}?key={api_key}");
-
     let metadata = if let Some(name) = display_name {
         serde_json::json!({ "file": { "displayName": name } })
     } else {
@@ -381,7 +380,8 @@ pub async fn upload_file(
     };
 
     let start_response = http_client
-        .post(&start_url)
+        .post(UPLOAD_URL)
+        .header(API_KEY_HEADER, api_key)
         .header("X-Goog-Upload-Protocol", "resumable")
         .header("X-Goog-Upload-Command", "start")
         .header("X-Goog-Upload-Header-Content-Length", file_size.to_string())
@@ -745,8 +745,6 @@ pub async fn upload_file_chunked_with_chunk_size(
     );
 
     // Step 1: Start the resumable upload session
-    let start_url = format!("{UPLOAD_URL}?key={api_key}");
-
     let metadata_json = if let Some(name) = display_name {
         serde_json::json!({ "file": { "displayName": name } })
     } else {
@@ -754,7 +752,8 @@ pub async fn upload_file_chunked_with_chunk_size(
     };
 
     let start_response = http_client
-        .post(&start_url)
+        .post(UPLOAD_URL)
+        .header(API_KEY_HEADER, api_key)
         .header("X-Goog-Upload-Protocol", "resumable")
         .header("X-Goog-Upload-Command", "start")
         .header("X-Goog-Upload-Header-Content-Length", file_size.to_string())
@@ -837,9 +836,13 @@ pub async fn get_file(
 ) -> Result<FileMetadata, GenaiError> {
     log::debug!("Getting file metadata: {}", file_name);
 
-    let url = format!("{BASE_URL}/{API_VERSION}/{file_name}?key={api_key}");
+    let url = format!("{BASE_URL}/{API_VERSION}/{file_name}");
 
-    let response = http_client.get(&url).send().await?;
+    let response = http_client
+        .get(&url)
+        .header(API_KEY_HEADER, api_key)
+        .send()
+        .await?;
     let response = check_response(response).await?;
     let response_text = response.text().await.map_err(GenaiError::Http)?;
     let file: FileMetadata = deserialize_with_context(&response_text, "FileMetadata")?;
@@ -873,16 +876,24 @@ pub async fn list_files(
         page_token
     );
 
-    let mut url = format!("{BASE_URL}/{API_VERSION}/files?key={api_key}");
+    let mut url = format!("{BASE_URL}/{API_VERSION}/files");
 
+    // Add query parameters
+    let mut has_params = false;
     if let Some(size) = page_size {
-        url.push_str(&format!("&pageSize={size}"));
+        url.push_str(&format!("?pageSize={size}"));
+        has_params = true;
     }
     if let Some(token) = page_token {
-        url.push_str(&format!("&pageToken={token}"));
+        let separator = if has_params { "&" } else { "?" };
+        url.push_str(&format!("{separator}pageToken={token}"));
     }
 
-    let response = http_client.get(&url).send().await?;
+    let response = http_client
+        .get(&url)
+        .header(API_KEY_HEADER, api_key)
+        .send()
+        .await?;
     let response = check_response(response).await?;
     let response_text = response.text().await.map_err(GenaiError::Http)?;
     let list_response: ListFilesResponse =
@@ -911,9 +922,13 @@ pub async fn delete_file(
 ) -> Result<(), GenaiError> {
     log::debug!("Deleting file: {}", file_name);
 
-    let url = format!("{BASE_URL}/{API_VERSION}/{file_name}?key={api_key}");
+    let url = format!("{BASE_URL}/{API_VERSION}/{file_name}");
 
-    let response = http_client.delete(&url).send().await?;
+    let response = http_client
+        .delete(&url)
+        .header(API_KEY_HEADER, api_key)
+        .send()
+        .await?;
     check_response(response).await?;
 
     log::debug!("File deleted successfully");

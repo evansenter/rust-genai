@@ -1,4 +1,4 @@
-use crate::common::{Endpoint, construct_endpoint_url};
+use crate::common::{API_KEY_HEADER, Endpoint, construct_endpoint_url};
 use crate::error_helpers::{check_response, deserialize_with_context};
 use crate::errors::GenaiError;
 use crate::models::interactions::{
@@ -27,9 +27,14 @@ pub async fn create_interaction(
     request: CreateInteractionRequest,
 ) -> Result<InteractionResponse, GenaiError> {
     let endpoint = Endpoint::CreateInteraction { stream: false };
-    let url = construct_endpoint_url(endpoint, api_key);
+    let url = construct_endpoint_url(endpoint);
 
-    let response = http_client.post(&url).json(&request).send().await?;
+    let response = http_client
+        .post(&url)
+        .header(API_KEY_HEADER, api_key)
+        .json(&request)
+        .send()
+        .await?;
     let response = check_response(response).await?;
     let response_text = response.text().await.map_err(GenaiError::Http)?;
     let interaction_response: InteractionResponse =
@@ -67,11 +72,12 @@ pub fn create_interaction_stream<'a>(
     request: CreateInteractionRequest,
 ) -> impl Stream<Item = Result<StreamChunk, GenaiError>> + Send + 'a {
     let endpoint = Endpoint::CreateInteraction { stream: true };
-    let url = construct_endpoint_url(endpoint, api_key);
+    let url = construct_endpoint_url(endpoint);
 
     try_stream! {
         let response = http_client
             .post(&url)
+            .header(API_KEY_HEADER, api_key)
             .json(&request)
             .send()
             .await?;
@@ -154,9 +160,13 @@ pub async fn get_interaction(
     interaction_id: &str,
 ) -> Result<InteractionResponse, GenaiError> {
     let endpoint = Endpoint::GetInteraction { id: interaction_id };
-    let url = construct_endpoint_url(endpoint, api_key);
+    let url = construct_endpoint_url(endpoint);
 
-    let response = http_client.get(&url).send().await?;
+    let response = http_client
+        .get(&url)
+        .header(API_KEY_HEADER, api_key)
+        .send()
+        .await?;
     let response = check_response(response).await?;
     let response_text = response.text().await.map_err(GenaiError::Http)?;
     let interaction_response: InteractionResponse =
@@ -181,9 +191,13 @@ pub async fn delete_interaction(
     interaction_id: &str,
 ) -> Result<(), GenaiError> {
     let endpoint = Endpoint::DeleteInteraction { id: interaction_id };
-    let url = construct_endpoint_url(endpoint, api_key);
+    let url = construct_endpoint_url(endpoint);
 
-    let response = http_client.delete(&url).send().await?;
+    let response = http_client
+        .delete(&url)
+        .header(API_KEY_HEADER, api_key)
+        .send()
+        .await?;
     check_response(response).await?;
     Ok(())
 }
@@ -196,18 +210,21 @@ mod tests {
     #[test]
     fn test_endpoint_url_construction() {
         // Test that we can construct proper URLs for each endpoint
+        // API key is now passed via header, not in URL
         let endpoint_create = Endpoint::CreateInteraction { stream: false };
-        let url = construct_endpoint_url(endpoint_create, "test_key");
+        let url = construct_endpoint_url(endpoint_create);
         assert!(url.contains("/v1beta/interactions"));
-        assert!(url.contains("key=test_key"));
+        assert!(!url.contains("key=")); // API key should not be in URL
 
         let endpoint_get = Endpoint::GetInteraction { id: "test_id_123" };
-        let url = construct_endpoint_url(endpoint_get, "test_key");
+        let url = construct_endpoint_url(endpoint_get);
         assert!(url.contains("/v1beta/interactions/test_id_123"));
+        assert!(!url.contains("key=")); // API key should not be in URL
 
         let endpoint_delete = Endpoint::DeleteInteraction { id: "test_id_456" };
-        let url = construct_endpoint_url(endpoint_delete, "test_key");
+        let url = construct_endpoint_url(endpoint_delete);
         assert!(url.contains("/v1beta/interactions/test_id_456"));
+        assert!(!url.contains("key=")); // API key should not be in URL
     }
 
     #[test]

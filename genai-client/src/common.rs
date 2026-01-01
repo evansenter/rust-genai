@@ -20,6 +20,14 @@ impl ApiVersion {
 // --- URL Construction ---
 const BASE_URL_PREFIX: &str = "https://generativelanguage.googleapis.com";
 
+/// Header name for API key authentication.
+///
+/// Using header-based authentication is more secure than query parameters because:
+/// - API keys don't appear in server logs, proxy logs, or browser history
+/// - Keys are not leaked in error messages containing URLs
+/// - Matches Google Cloud API best practices
+pub const API_KEY_HEADER: &str = "X-Goog-Api-Key";
+
 /// Represents different API endpoints for the Interactions API
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(clippy::enum_variant_names)] // "Interaction" suffix is intentional for API clarity
@@ -57,18 +65,21 @@ impl Endpoint<'_> {
     }
 }
 
-/// Constructs a URL for a specific endpoint
+/// Constructs a URL for a specific endpoint.
+///
+/// Note: API key authentication is handled via the `X-Goog-Api-Key` header,
+/// not as a query parameter. Use [`API_KEY_HEADER`] when making requests.
 #[must_use]
-pub fn construct_endpoint_url(endpoint: Endpoint, api_key: &str) -> String {
+pub fn construct_endpoint_url(endpoint: Endpoint) -> String {
     let version = ApiVersion::V1Beta; // Default version for new function
     let path = endpoint.to_path(version);
     let sse_param = if endpoint.requires_sse() {
-        "&alt=sse"
+        "?alt=sse"
     } else {
         ""
     };
 
-    format!("{BASE_URL_PREFIX}{path}?key={api_key}{sse_param}")
+    format!("{BASE_URL_PREFIX}{path}{sse_param}")
 }
 
 #[cfg(test)]
@@ -86,25 +97,27 @@ mod tests {
     #[test]
     fn test_endpoint_create_interaction_non_streaming() {
         let endpoint = Endpoint::CreateInteraction { stream: false };
-        let url = construct_endpoint_url(endpoint, "my-key");
+        let url = construct_endpoint_url(endpoint);
 
         assert_eq!(
             url,
-            "https://generativelanguage.googleapis.com/v1beta/interactions?key=my-key"
+            "https://generativelanguage.googleapis.com/v1beta/interactions"
         );
-        assert!(!url.contains("&alt=sse"));
+        assert!(!url.contains("alt=sse"));
+        assert!(!url.contains("key=")); // API key should not be in URL
     }
 
     #[test]
     fn test_endpoint_create_interaction_streaming() {
         let endpoint = Endpoint::CreateInteraction { stream: true };
-        let url = construct_endpoint_url(endpoint, "my-key");
+        let url = construct_endpoint_url(endpoint);
 
         assert_eq!(
             url,
-            "https://generativelanguage.googleapis.com/v1beta/interactions?key=my-key&alt=sse"
+            "https://generativelanguage.googleapis.com/v1beta/interactions?alt=sse"
         );
-        assert!(url.contains("&alt=sse"));
+        assert!(url.contains("alt=sse"));
+        assert!(!url.contains("key=")); // API key should not be in URL
     }
 
     #[test]
@@ -112,14 +125,15 @@ mod tests {
         let endpoint = Endpoint::GetInteraction {
             id: "interaction-123",
         };
-        let url = construct_endpoint_url(endpoint, "api-key");
+        let url = construct_endpoint_url(endpoint);
 
         assert_eq!(
             url,
-            "https://generativelanguage.googleapis.com/v1beta/interactions/interaction-123?key=api-key"
+            "https://generativelanguage.googleapis.com/v1beta/interactions/interaction-123"
         );
         assert!(url.contains("/interactions/interaction-123"));
-        assert!(!url.contains("&alt=sse"));
+        assert!(!url.contains("alt=sse"));
+        assert!(!url.contains("key=")); // API key should not be in URL
     }
 
     #[test]
@@ -127,14 +141,20 @@ mod tests {
         let endpoint = Endpoint::DeleteInteraction {
             id: "interaction-456",
         };
-        let url = construct_endpoint_url(endpoint, "api-key");
+        let url = construct_endpoint_url(endpoint);
 
         assert_eq!(
             url,
-            "https://generativelanguage.googleapis.com/v1beta/interactions/interaction-456?key=api-key"
+            "https://generativelanguage.googleapis.com/v1beta/interactions/interaction-456"
         );
         assert!(url.contains("/interactions/interaction-456"));
-        assert!(!url.contains("&alt=sse"));
+        assert!(!url.contains("alt=sse"));
+        assert!(!url.contains("key=")); // API key should not be in URL
+    }
+
+    #[test]
+    fn test_api_key_header_constant() {
+        assert_eq!(API_KEY_HEADER, "X-Goog-Api-Key");
     }
 
     #[test]
