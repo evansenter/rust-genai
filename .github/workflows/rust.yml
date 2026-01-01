@@ -124,28 +124,6 @@ jobs:
       - name: Run security audit
         run: cargo audit
 
-  benchmark:
-    name: Benchmarks
-    runs-on: ubuntu-latest
-    # Only run on merge to main - benchmarks take ~40 min which is too slow for PR CI
-    # Results are saved as baseline for future comparisons
-    if: github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: benchmarks
-      - name: Run benchmarks
-        run: |
-          cargo bench -p rust-genai --bench serialization --bench multimodal --bench function_registry --bench response_extraction --bench tool_service -- --save-baseline main --noplot
-      - name: Upload benchmark results
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-results
-          path: target/criterion
-          retention-days: 30
-
   build-metrics:
     name: Build Metrics
     runs-on: ubuntu-latest
