@@ -146,14 +146,14 @@ where
 ///
 /// # Arguments
 ///
-/// * Variables in brackets `[a, b, c]` - Variables to clone for each retry attempt
+/// * Variables in brackets `[a, b, c]` - Variables to clone for each retry attempt.
+///   All non-Copy variables captured in the async block must be listed here.
 /// * Expression after `=>` - The async operation to execute (should include `.await`)
 ///
 /// # Returns
 ///
 /// The result of `retry_on_transient(...).await` - typically `Result<T, GenaiError>`.
 /// Chain with `.expect()` or `?` as needed.
-/// See documentation above.
 ///
 /// **Usage**: Import with `use crate::retry_request;` in test files, or just
 /// use directly after `mod common;` since `#[macro_export]` places it at crate root.
