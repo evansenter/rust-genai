@@ -434,14 +434,26 @@ pub async fn upload_file(
 /// This struct represents an active upload session with Google's resumable upload protocol.
 /// It can be used to resume an interrupted upload from the last successfully uploaded offset.
 ///
+/// # Session Expiration
+///
+/// Upload sessions expire after approximately **1 week** of inactivity. If you attempt to
+/// resume an expired session, `query_offset()` or `resume()` will return an error.
+/// For long-running uploads, start a new session rather than relying on old handles.
+///
+/// # Thread Safety
+///
+/// While this struct is `Clone`, **concurrent calls to `resume()` on cloned handles are
+/// not supported** and may result in upload failures. Use a single handle per upload
+/// session, or coordinate access externally.
+///
 /// # Example
 ///
 /// ```ignore
-/// use genai_client::files::{ResumableUpload, upload_file_streaming};
+/// use genai_client::files::{ResumableUpload, upload_file_chunked};
 /// use std::time::Duration;
 ///
 /// // Start a streaming upload
-/// let (file, upload) = upload_file_streaming(
+/// let (file, upload) = upload_file_chunked(
 ///     &http_client,
 ///     "api-key",
 ///     "large_video.mp4",
@@ -487,7 +499,10 @@ impl ResumableUpload {
     ///
     /// # Errors
     ///
-    /// Returns an error if the query fails or the upload session has expired.
+    /// Returns an error if:
+    /// - The query request fails
+    /// - The upload session has expired (sessions expire after ~1 week)
+    /// - The server response is missing the expected offset header
     pub async fn query_offset(&self, http_client: &ReqwestClient) -> Result<u64, GenaiError> {
         let response = http_client
             .post(&self.upload_url)
@@ -504,7 +519,16 @@ impl ResumableUpload {
             .get("x-goog-upload-size-received")
             .and_then(|v| v.to_str().ok())
             .and_then(|s| s.parse().ok())
-            .unwrap_or(0);
+            .ok_or_else(|| {
+                log::warn!(
+                    "Missing or invalid x-goog-upload-size-received header in query response"
+                );
+                GenaiError::InvalidInput(
+                    "Upload session query failed: missing offset header. \
+                     The session may have expired (sessions expire after ~1 week)."
+                        .to_string(),
+                )
+            })?;
 
         log::debug!("Query offset: {} bytes uploaded", offset);
 
@@ -577,14 +601,14 @@ impl ResumableUpload {
     }
 }
 
-/// Default chunk size for streaming uploads (8 MB).
+/// Default chunk size for chunked uploads (8 MB).
 ///
 /// This balances memory usage with network efficiency. Smaller chunks use less
 /// memory but may have higher overhead; larger chunks are more efficient but
 /// require more memory for buffering.
 pub const DEFAULT_CHUNK_SIZE: usize = 8 * 1024 * 1024; // 8 MB
 
-/// Uploads a file to the Files API using streaming to minimize memory usage.
+/// Uploads a file to the Files API using chunked transfer to minimize memory usage.
 ///
 /// Unlike `upload_file`, this function streams the file from disk in chunks,
 /// never loading the entire file into memory. This is ideal for large files
@@ -620,13 +644,13 @@ pub const DEFAULT_CHUNK_SIZE: usize = 8 * 1024 * 1024; // 8 MB
 /// # Example
 ///
 /// ```ignore
-/// use genai_client::files::upload_file_streaming;
+/// use genai_client::files::upload_file_chunked;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let http_client = reqwest::Client::new();
 ///
 /// // Upload a large video file without loading it all into memory
-/// let (file, _upload_handle) = upload_file_streaming(
+/// let (file, _upload_handle) = upload_file_chunked(
 ///     &http_client,
 ///     "api-key",
 ///     "large_video.mp4",
@@ -638,14 +662,14 @@ pub const DEFAULT_CHUNK_SIZE: usize = 8 * 1024 * 1024; // 8 MB
 /// # Ok(())
 /// # }
 /// ```
-pub async fn upload_file_streaming(
+pub async fn upload_file_chunked(
     http_client: &ReqwestClient,
     api_key: &str,
     path: impl AsRef<Path>,
     mime_type: &str,
     display_name: Option<&str>,
 ) -> Result<(FileMetadata, ResumableUpload), GenaiError> {
-    upload_file_streaming_with_chunk_size(
+    upload_file_chunked_with_chunk_size(
         http_client,
         api_key,
         path,
@@ -656,11 +680,11 @@ pub async fn upload_file_streaming(
     .await
 }
 
-/// Uploads a file using streaming with a custom chunk size.
+/// Uploads a file using chunked transfer with a custom chunk size.
 ///
-/// This is the same as `upload_file_streaming` but allows specifying the chunk
-/// size for streaming. Larger chunks are more efficient for fast networks,
-/// while smaller chunks use less memory.
+/// This is the same as `upload_file_chunked` but allows specifying the chunk
+/// size. Larger chunks are more efficient for fast networks, while smaller
+/// chunks use less memory.
 ///
 /// # Arguments
 ///
@@ -674,7 +698,7 @@ pub async fn upload_file_streaming(
 /// # Errors
 ///
 /// Returns an error if the file cannot be read or the upload fails.
-pub async fn upload_file_streaming_with_chunk_size(
+pub async fn upload_file_chunked_with_chunk_size(
     http_client: &ReqwestClient,
     api_key: &str,
     path: impl AsRef<Path>,
@@ -767,9 +791,8 @@ pub async fn upload_file_streaming_with_chunk_size(
         GenaiError::InvalidInput(format!("Failed to open file '{}': {}", path.display(), e))
     })?;
 
-    // Wrap the file in a BufReader for efficient reading, then create a stream
-    let reader = tokio::io::BufReader::with_capacity(chunk_size, file);
-    let stream = ReaderStream::with_capacity(reader, chunk_size);
+    // Create a stream directly from the file - ReaderStream already buffers internally
+    let stream = ReaderStream::with_capacity(file, chunk_size);
     let body = reqwest::Body::wrap_stream(stream);
 
     // Step 3: Upload the file bytes using streaming

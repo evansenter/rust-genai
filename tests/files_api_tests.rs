@@ -399,7 +399,7 @@ async fn test_get_nonexistent_file_returns_error() {
 /// the streaming mechanism works correctly across multiple chunks.
 #[tokio::test]
 #[ignore] // Requires API key
-async fn test_upload_file_streaming() {
+async fn test_upload_file_chunked() {
     let client = get_client();
 
     // Create a temporary file larger than the default chunk size (8MB)
@@ -413,7 +413,7 @@ async fn test_upload_file_streaming() {
 
     // Upload using streaming
     let (file, resumable_upload) = client
-        .upload_file_streaming_with_mime(&file_path, "text/plain")
+        .upload_file_chunked_with_mime(&file_path, "text/plain")
         .await
         .expect("Streaming upload failed");
 
@@ -460,7 +460,7 @@ async fn test_upload_file_streaming() {
 /// Tests streaming upload with automatic MIME type detection.
 #[tokio::test]
 #[ignore] // Requires API key
-async fn test_upload_file_streaming_auto_mime() {
+async fn test_upload_file_chunked_auto_mime() {
     let client = get_client();
 
     // Create a temporary file with a known extension
@@ -473,7 +473,7 @@ async fn test_upload_file_streaming_auto_mime() {
 
     // Upload using streaming with auto MIME detection
     let (file, _) = client
-        .upload_file_streaming(&file_path)
+        .upload_file_chunked(&file_path)
         .await
         .expect("Streaming upload failed");
 
@@ -491,7 +491,7 @@ async fn test_upload_file_streaming_auto_mime() {
 /// Tests streaming upload with a custom chunk size.
 #[tokio::test]
 #[ignore] // Requires API key
-async fn test_upload_file_streaming_custom_chunk_size() {
+async fn test_upload_file_chunked_custom_chunk_size() {
     let client = get_client();
 
     // Create a temporary file
@@ -505,7 +505,7 @@ async fn test_upload_file_streaming_custom_chunk_size() {
     // Upload with a custom chunk size (1MB)
     let chunk_size = 1024 * 1024; // 1MB
     let (file, resumable_upload) = client
-        .upload_file_streaming_with_options(&file_path, "text/plain", chunk_size)
+        .upload_file_chunked_with_options(&file_path, "text/plain", chunk_size)
         .await
         .expect("Streaming upload with custom chunk size failed");
 
@@ -520,7 +520,7 @@ async fn test_upload_file_streaming_custom_chunk_size() {
 /// Tests streaming upload validates empty files.
 #[tokio::test]
 #[ignore] // Requires API key
-async fn test_upload_file_streaming_empty_file_error() {
+async fn test_upload_file_chunked_empty_file_error() {
     let client = get_client();
 
     // Create an empty temporary file
@@ -530,7 +530,7 @@ async fn test_upload_file_streaming_empty_file_error() {
 
     // Streaming upload should fail for empty files
     let result = client
-        .upload_file_streaming_with_mime(&file_path, "text/plain")
+        .upload_file_chunked_with_mime(&file_path, "text/plain")
         .await;
 
     assert!(result.is_err(), "Should fail for empty file");
@@ -545,12 +545,12 @@ async fn test_upload_file_streaming_empty_file_error() {
 /// Tests streaming upload with nonexistent file returns appropriate error.
 #[tokio::test]
 #[ignore] // Requires API key
-async fn test_upload_file_streaming_nonexistent_file_error() {
+async fn test_upload_file_chunked_nonexistent_file_error() {
     let client = get_client();
 
     // Try to stream a file that doesn't exist
     let result = client
-        .upload_file_streaming_with_mime("/nonexistent/path/to/file.txt", "text/plain")
+        .upload_file_chunked_with_mime("/nonexistent/path/to/file.txt", "text/plain")
         .await;
 
     assert!(result.is_err(), "Should fail for nonexistent file");
@@ -577,7 +577,7 @@ async fn test_streaming_upload_in_interaction() {
 
     // Upload using streaming
     let (file, _) = client
-        .upload_file_streaming_with_mime(&file_path, "text/plain")
+        .upload_file_chunked_with_mime(&file_path, "text/plain")
         .await
         .expect("Streaming upload failed");
 

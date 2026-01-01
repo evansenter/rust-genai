@@ -664,7 +664,7 @@ impl Client {
         genai_client::delete_file(&self.http_client, &self.api_key, file_name).await
     }
 
-    /// Uploads a file using streaming to minimize memory usage.
+    /// Uploads a file using chunked transfer to minimize memory usage.
     ///
     /// Unlike `upload_file`, this method streams the file from disk in chunks,
     /// never loading the entire file into memory. This is ideal for large files
@@ -701,7 +701,7 @@ impl Client {
     /// let client = Client::new("api-key".to_string());
     ///
     /// // Upload a large video file without loading it all into memory
-    /// let (file, _upload_handle) = client.upload_file_streaming("large_video.mp4").await?;
+    /// let (file, _upload_handle) = client.upload_file_chunked("large_video.mp4").await?;
     /// println!("Uploaded: {} -> {}", file.name, file.uri);
     ///
     /// // Use in interaction
@@ -714,7 +714,7 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn upload_file_streaming(
+    pub async fn upload_file_chunked(
         &self,
         path: impl AsRef<std::path::Path>,
     ) -> Result<(genai_client::FileMetadata, genai_client::ResumableUpload), GenaiError> {
@@ -727,7 +727,7 @@ impl Client {
                 path.display()
             );
             GenaiError::InvalidInput(format!(
-                "Could not determine MIME type for '{}'. Please use upload_file_streaming_with_mime() to specify explicitly.",
+                "Could not determine MIME type for '{}'. Please use upload_file_chunked_with_mime() to specify explicitly.",
                 path.display()
             ))
         })?;
@@ -739,12 +739,12 @@ impl Client {
             .map(|s| s.to_string());
 
         log::debug!(
-            "Streaming upload: path={}, mime_type={}",
+            "Chunked upload: path={}, mime_type={}",
             path.display(),
             mime_type
         );
 
-        genai_client::upload_file_streaming(
+        genai_client::upload_file_chunked(
             &self.http_client,
             &self.api_key,
             path,
@@ -754,7 +754,7 @@ impl Client {
         .await
     }
 
-    /// Uploads a file using streaming with an explicit MIME type.
+    /// Uploads a file using chunked transfer with an explicit MIME type.
     ///
     /// Use this when automatic MIME type detection isn't suitable.
     ///
@@ -771,14 +771,14 @@ impl Client {
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
     ///
-    /// let (file, _) = client.upload_file_streaming_with_mime(
+    /// let (file, _) = client.upload_file_chunked_with_mime(
     ///     "data.bin",
     ///     "application/octet-stream"
     /// ).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn upload_file_streaming_with_mime(
+    pub async fn upload_file_chunked_with_mime(
         &self,
         path: impl AsRef<std::path::Path>,
         mime_type: &str,
@@ -791,12 +791,12 @@ impl Client {
             .map(|s| s.to_string());
 
         log::debug!(
-            "Streaming upload: path={}, mime_type={}",
+            "Chunked upload: path={}, mime_type={}",
             path.display(),
             mime_type
         );
 
-        genai_client::upload_file_streaming(
+        genai_client::upload_file_chunked(
             &self.http_client,
             &self.api_key,
             path,
@@ -806,9 +806,9 @@ impl Client {
         .await
     }
 
-    /// Uploads a file using streaming with a custom chunk size.
+    /// Uploads a file using chunked transfer with a custom chunk size.
     ///
-    /// This is the same as `upload_file_streaming_with_mime` but allows
+    /// This is the same as `upload_file_chunked_with_mime` but allows
     /// specifying the chunk size for streaming. Larger chunks are more
     /// efficient for fast networks, while smaller chunks use less memory.
     ///
@@ -828,7 +828,7 @@ impl Client {
     ///
     /// // Use 16MB chunks for faster upload on a fast network
     /// let chunk_size = 16 * 1024 * 1024;
-    /// let (file, _) = client.upload_file_streaming_with_options(
+    /// let (file, _) = client.upload_file_chunked_with_options(
     ///     "large_video.mp4",
     ///     "video/mp4",
     ///     chunk_size
@@ -836,7 +836,7 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn upload_file_streaming_with_options(
+    pub async fn upload_file_chunked_with_options(
         &self,
         path: impl AsRef<std::path::Path>,
         mime_type: &str,
@@ -850,13 +850,13 @@ impl Client {
             .map(|s| s.to_string());
 
         log::debug!(
-            "Streaming upload: path={}, mime_type={}, chunk_size={}",
+            "Chunked upload: path={}, mime_type={}, chunk_size={}",
             path.display(),
             mime_type,
             chunk_size
         );
 
-        genai_client::upload_file_streaming_with_chunk_size(
+        genai_client::upload_file_chunked_with_chunk_size(
             &self.http_client,
             &self.api_key,
             path,

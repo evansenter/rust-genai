@@ -69,8 +69,8 @@ pub use errors::GenaiError;
 // Re-export Files API types and functions
 pub use files::{
     DEFAULT_CHUNK_SIZE, FileError, FileMetadata, FileState, ListFilesResponse, ResumableUpload,
-    VideoMetadata, delete_file, get_file, list_files, upload_file, upload_file_streaming,
-    upload_file_streaming_with_chunk_size,
+    VideoMetadata, delete_file, get_file, list_files, upload_file, upload_file_chunked,
+    upload_file_chunked_with_chunk_size,
 };
 
 // Re-export Interactions API functions from the interactions module
