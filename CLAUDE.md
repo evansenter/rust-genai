@@ -195,6 +195,48 @@ See `examples/image_generation.rs` for complete example.
 
 **Not re-exported** (model-generated): Built-in tool outputs accessed via response methods like `response.google_search_results()`, `response.code_execution_results()`
 
+### Files API
+
+The Files API allows uploading large files (up to 2GB) that can be referenced across multiple interactions. Files are stored for 48 hours.
+
+**Standard upload** (loads entire file into memory):
+```rust
+let file = client.upload_file("video.mp4").await?;
+// Use in interaction
+client.interaction().with_file(&file).with_text("Describe this").create().await?;
+// Clean up
+client.delete_file(&file.name).await?;
+```
+
+**Streaming upload** (memory-efficient for large files 500MB-2GB):
+```rust
+// Uses ~8MB memory regardless of file size
+let (file, resumable) = client.upload_file_streaming("large_video.mp4").await?;
+
+// With custom chunk size
+let (file, resumable) = client.upload_file_streaming_with_options(
+    "large_video.mp4",
+    "video/mp4",
+    16 * 1024 * 1024  // 16MB chunks
+).await?;
+```
+
+**When to use streaming:**
+- Large files (500MB-2GB) to avoid memory pressure
+- Memory-constrained environments (containers, edge devices)
+- Batch processing multiple large files
+
+**Memory characteristics:**
+- Standard: Requires `file_size` bytes of RAM
+- Streaming: Uses fixed ~`chunk_size` bytes (default 8MB)
+
+**ResumableUpload handle** returned from streaming methods:
+- `file_size()`: Total file size
+- `mime_type()`: File MIME type
+- `upload_url()`: Resumable upload URL
+- `query_offset()`: Query server for bytes uploaded (for resume logic)
+- `resume()`: Resume upload from offset with a reader
+
 ## Core Design Philosophy: Evergreen-Inspired Soft-Typing
 
 This library follows the [Evergreen spec](https://github.com/google-deepmind/evergreen-spec) philosophy for graceful API evolution. The core principle: **unknown data should be preserved, not rejected**.
