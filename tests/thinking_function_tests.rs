@@ -254,17 +254,18 @@ async fn test_thinking_with_function_calling_multi_turn() {
 
             // Make follow-up request with function result
             let prev_id = response3.id.clone().expect("id should exist");
-            let response3_followup = retry_request!([client, prev_id, get_weather, function_result] => {
-                stateful_builder(&client)
-                    .with_previous_interaction(&prev_id)
-                    .with_content(vec![function_result])
-                    .with_function(get_weather)
-                    .with_thinking_level(ThinkingLevel::Medium)
-                    .with_store(true)
-                    .create()
-                    .await
-            })
-            .expect("Turn 3 follow-up failed");
+            let response3_followup =
+                retry_request!([client, prev_id, get_weather, function_result] => {
+                    stateful_builder(&client)
+                        .with_previous_interaction(&prev_id)
+                        .with_content(vec![function_result])
+                        .with_function(get_weather)
+                        .with_thinking_level(ThinkingLevel::Medium)
+                        .with_store(true)
+                        .create()
+                        .await
+                })
+                .expect("Turn 3 follow-up failed");
 
             // Guard against infinite function call loops - fail early before any processing
             assert_ne!(
