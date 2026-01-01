@@ -13,7 +13,7 @@
 
 mod common;
 
-use common::{DEFAULT_MAX_RETRIES, get_client, retry_on_transient, stateful_builder};
+use common::{get_client, stateful_builder};
 use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 
@@ -273,7 +273,7 @@ async fn test_conversation_function_then_text() {
 async fn test_conversation_branch() {
     // Test starting a new conversation from a mid-point
     //
-    // NOTE: This test uses retry_on_transient to handle intermittent Spanner UTF-8
+    // NOTE: This test uses retry_request! to handle intermittent Spanner UTF-8
     // errors from the Google backend. See issue #60 for details.
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
@@ -282,75 +282,44 @@ async fn test_conversation_branch() {
 
     // Build initial context
     // Each call is wrapped with retry logic to handle transient Spanner errors
-    let response1 = {
-        let client = client.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_text("My favorite color is red.")
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 1 failed")
-    };
+    let response1 = retry_request!([client] => {
+        stateful_builder(&client)
+            .with_text("My favorite color is red.")
+            .create()
+            .await
+    })
+    .expect("Turn 1 failed");
 
-    let response2 = {
-        let client = client.clone();
-        let prev_id = response1.id.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(prev_id.as_ref().expect("id should exist"))
-                    .with_text("My favorite number is 7.")
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 2 failed")
-    };
+    let prev_id = response1.id.clone().expect("id should exist");
+    let response2 = retry_request!([client, prev_id] => {
+        stateful_builder(&client)
+            .with_previous_interaction(&prev_id)
+            .with_text("My favorite number is 7.")
+            .create()
+            .await
+    })
+    .expect("Turn 2 failed");
 
-    let response3 = {
-        let client = client.clone();
-        let prev_id = response2.id.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(prev_id.as_ref().expect("id should exist"))
-                    .with_text("My favorite animal is a cat.")
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Turn 3 failed")
-    };
+    let prev_id = response2.id.clone().expect("id should exist");
+    let response3 = retry_request!([client, prev_id] => {
+        stateful_builder(&client)
+            .with_previous_interaction(&prev_id)
+            .with_text("My favorite animal is a cat.")
+            .create()
+            .await
+    })
+    .expect("Turn 3 failed");
 
     // Branch from turn 2 (before the cat fact)
-    let branch_response = {
-        let client = client.clone();
-        let prev_id = response2.id.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(prev_id.as_ref().expect("id should exist")) // Branch from turn 2
-                    .with_text("What do you know about my favorites so far?")
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Branch failed")
-    };
+    let prev_id = response2.id.clone().expect("id should exist");
+    let branch_response = retry_request!([client, prev_id] => {
+        stateful_builder(&client)
+            .with_previous_interaction(&prev_id) // Branch from turn 2
+            .with_text("What do you know about my favorites so far?")
+            .create()
+            .await
+    })
+    .expect("Branch failed");
 
     assert!(branch_response.has_text(), "Should have text response");
 
@@ -374,23 +343,15 @@ async fn test_conversation_branch() {
     );
 
     // Continue from turn 3 to verify it still works
-    let continue_response = {
-        let client = client.clone();
-        let prev_id = response3.id.clone();
-        retry_on_transient(DEFAULT_MAX_RETRIES, || {
-            let client = client.clone();
-            let prev_id = prev_id.clone();
-            async move {
-                stateful_builder(&client)
-                    .with_previous_interaction(prev_id.as_ref().expect("id should exist"))
-                    .with_text("And what's my favorite animal?")
-                    .create()
-                    .await
-            }
-        })
-        .await
-        .expect("Continue failed")
-    };
+    let prev_id = response3.id.clone().expect("id should exist");
+    let continue_response = retry_request!([client, prev_id] => {
+        stateful_builder(&client)
+            .with_previous_interaction(&prev_id)
+            .with_text("And what's my favorite animal?")
+            .create()
+            .await
+    })
+    .expect("Continue failed");
 
     let continue_text = continue_response.text().unwrap().to_lowercase();
     println!("Continue response (from turn 3): {}", continue_text);
