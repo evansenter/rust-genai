@@ -188,12 +188,52 @@ impl<'a> InteractionBuilder<'a> {
     /// # }
     /// ```
     ///
+    /// # Timeout Behavior
+    ///
+    /// If [`with_timeout()`](InteractionBuilder::with_timeout) was set, the timeout applies
+    /// **per-API-call**, not to the total operation or function execution time. Each round
+    /// of model interaction must complete within the timeout, but:
+    ///
+    /// - Function execution time is **not** counted against the timeout
+    /// - Multiple API calls may occur (one per function-calling round)
+    /// - For a total timeout, wrap the call in `tokio::time::timeout()`
+    ///
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # use std::time::Duration;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Client::new("key".to_string());
+    /// // Per-API-call timeout (30s per model round)
+    /// let result = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What's the weather?")
+    ///     .with_timeout(Duration::from_secs(30))
+    ///     .create_with_auto_functions()
+    ///     .await?;
+    ///
+    /// // Total timeout (60s for entire operation including functions)
+    /// let result = tokio::time::timeout(
+    ///     Duration::from_secs(60),
+    ///     client.interaction()
+    ///         .with_model("gemini-3-flash-preview")
+    ///         .with_text("What's the weather?")
+    ///         .create_with_auto_functions()
+    /// ).await??;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     ///
     /// Returns an error if:
     /// - No input was provided
     /// - Neither model nor agent was specified
     /// - The API request fails
+    /// - An API call times out (if `with_timeout()` was set). Note: on timeout, any
+    ///   function calls that completed in previous iterations are preserved on the API
+    ///   side via the interaction chain, but this method returns an error rather than
+    ///   a partial `AutoFunctionResult`. Use `previous_interaction_id` to continue.
     /// - `max_function_call_loops` is set to 0 (invalid configuration)
     /// - `store` is set to `false` (auto-function calling requires stored interactions)
     pub async fn create_with_auto_functions(self) -> Result<AutoFunctionResult, GenaiError> {
@@ -208,7 +248,7 @@ impl<'a> InteractionBuilder<'a> {
         }
 
         let client = self.client;
-        let has_timeout = self.timeout.is_some();
+        let timeout = self.timeout;
         let max_loops = self.max_function_call_loops;
         let tool_service = self.tool_service.clone();
         let mut request = self.build_request()?;
@@ -260,16 +300,6 @@ impl<'a> InteractionBuilder<'a> {
         // Track the last response for returning partial results if max loops is reached
         let mut last_response: Option<InteractionResponse> = None;
 
-        // Warn if timeout is set - it's not applied to auto-function calling
-        // because this method makes multiple API calls in a loop.
-        if has_timeout {
-            warn!(
-                "with_timeout() is not applied to create_with_auto_functions(). \
-                 The operation may run indefinitely. For a total timeout, wrap the call \
-                 in tokio::time::timeout()."
-            );
-        }
-
         // Main auto-function loop (configurable iterations to prevent infinite loops)
         for loop_count in 0..max_loops {
             debug!(
@@ -277,7 +307,18 @@ impl<'a> InteractionBuilder<'a> {
                 loop_count + 1,
                 max_loops
             );
-            let response = client.create_interaction(request.clone()).await?;
+
+            // Apply per-API-call timeout if set (function execution time not included)
+            let response = match timeout {
+                Some(duration) => {
+                    let future = client.create_interaction(request.clone());
+                    tokio::time::timeout(duration, future).await.map_err(|_| {
+                        warn!("Auto-function API call timed out after {:?}", duration);
+                        GenaiError::Timeout(duration)
+                    })??
+                }
+                None => client.create_interaction(request.clone()).await?,
+            };
 
             // When store != false (validated at function entry), the API should always
             // return an interaction ID. Return an error if the API violates this contract,
@@ -435,12 +476,50 @@ impl<'a> InteractionBuilder<'a> {
     /// The `AutoFunctionResultAccumulator` handles `MaxLoopsReached` automatically
     /// and returns an `AutoFunctionResult` with `reached_max_loops: true`.
     ///
+    /// # Timeout Behavior
+    ///
+    /// If [`with_timeout()`](InteractionBuilder::with_timeout) was set, the timeout applies
+    /// **per-chunk**, not to the total stream or function execution time. Each chunk must
+    /// arrive within the timeout (detecting stalled connections), but:
+    ///
+    /// - Function execution time is **not** counted against the timeout
+    /// - Multiple streaming rounds may occur (one per function-calling round)
+    /// - For a total timeout, wrap the stream consumption in `tokio::time::timeout()`
+    ///
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # use futures_util::StreamExt;
+    /// # use std::time::Duration;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Client::new("key".to_string());
+    /// // Per-chunk timeout (30s between chunks)
+    /// let mut stream = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What's the weather?")
+    ///     .with_timeout(Duration::from_secs(30))
+    ///     .create_stream_with_auto_functions();
+    ///
+    /// // Total timeout (120s for entire stream + function execution)
+    /// tokio::time::timeout(Duration::from_secs(120), async {
+    ///     while let Some(chunk) = stream.next().await {
+    ///         // process chunk...
+    ///     }
+    /// }).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     ///
     /// Returns errors if:
     /// - No input was provided
     /// - Neither model nor agent was specified
     /// - The API request fails
+    /// - A chunk doesn't arrive within the timeout (if set). Note: on timeout, any
+    ///   function calls that completed in previous iterations are preserved on the API
+    ///   side via the interaction chain, but the stream yields an error rather than
+    ///   a partial result. Use `previous_interaction_id` to continue.
     /// - A function call is missing its required `call_id` field
     /// - `max_function_call_loops` is set to 0 (invalid configuration)
     /// - `store` is set to `false` (auto-function calling requires stored interactions)
@@ -462,7 +541,7 @@ impl<'a> InteractionBuilder<'a> {
         let client = self.client;
         let max_loops = self.max_function_call_loops;
         let tool_service = self.tool_service.clone();
-        let has_timeout = self.timeout.is_some();
+        let timeout = self.timeout;
 
         Box::pin(async_stream::try_stream! {
             let mut request = self.build_request()?;
@@ -513,16 +592,6 @@ impl<'a> InteractionBuilder<'a> {
             // Track the last response for returning partial results if max loops is reached
             let mut last_response: Option<InteractionResponse> = None;
 
-            // Warn if timeout is set - it's not applied to auto-function calling
-            // because this method makes multiple API calls in a loop.
-            if has_timeout {
-                warn!(
-                    "with_timeout() is not applied to create_stream_with_auto_functions(). \
-                     The operation may run indefinitely. For a total timeout, wrap the call \
-                     in tokio::time::timeout()."
-                );
-            }
-
             // Main auto-function streaming loop
             for loop_count in 0..max_loops {
                 debug!("Auto-function streaming loop iteration {}/{}", loop_count + 1, max_loops);
@@ -535,7 +604,25 @@ impl<'a> InteractionBuilder<'a> {
                 // Accumulate function calls from deltas (streaming API may not include them in Complete)
                 let mut accumulated_calls: Vec<(Option<String>, String, serde_json::Value)> = Vec::new();
 
-                while let Some(result) = stream.next().await {
+                // Apply per-chunk timeout if set (function execution time not included)
+                loop {
+                    let next_chunk = stream.next();
+                    let result = match timeout {
+                        Some(duration) => {
+                            match tokio::time::timeout(duration, next_chunk).await {
+                                Ok(Some(result)) => Some(result),
+                                Ok(None) => None,
+                                Err(_) => {
+                                    warn!("Auto-function stream chunk timed out after {:?}", duration);
+                                    Err(GenaiError::Timeout(duration))?;
+                                    unreachable!()
+                                }
+                            }
+                        }
+                        None => next_chunk.await,
+                    };
+
+                    let Some(result) = result else { break };
                     match result? {
                         StreamChunk::Delta(delta) => {
                             // Check for function calls in delta

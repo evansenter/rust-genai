@@ -1061,15 +1061,18 @@ impl<'a> InteractionBuilder<'a> {
     /// If the request takes longer than the specified duration, it will be
     /// cancelled and return [`GenaiError::Timeout`].
     ///
-    /// # Supported Methods
+    /// # Behavior by Method
     ///
-    /// - `create()`: Timeout applies to the entire request
-    /// - `create_stream()`: Timeout applies to each chunk (per-chunk timeout)
+    /// | Method | Timeout Applies To |
+    /// |--------|-------------------|
+    /// | `create()` | Entire request |
+    /// | `create_stream()` | Per-chunk (inter-chunk timeout) |
+    /// | `create_with_auto_functions()` | Per-API-call (each round) |
+    /// | `create_stream_with_auto_functions()` | Per-chunk (each streaming round) |
     ///
-    /// **Note:** Timeout is **not** applied to `create_with_auto_functions()` or
-    /// `create_stream_with_auto_functions()` because these methods make multiple
-    /// API calls in a loop. For a total timeout on auto-function operations,
-    /// wrap the call in `tokio::time::timeout()`.
+    /// For auto-function methods, function execution time is **not** counted against
+    /// the timeout. For a total timeout including function execution, wrap the call
+    /// in `tokio::time::timeout()`.
     ///
     /// # Example
     ///
