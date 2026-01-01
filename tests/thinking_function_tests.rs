@@ -485,22 +485,19 @@ async fn test_thinking_with_parallel_function_calls() {
         "Turn 2 should have text response combining weather and time info"
     );
 
-    // Response should reference both weather and time
-    let text2 = response2.text().unwrap().to_lowercase();
-    let has_weather_ref = text2.contains("weather")
-        || text2.contains("temperature")
-        || text2.contains("22")
-        || text2.contains("cloud");
-    let has_time_ref = text2.contains("time") || text2.contains("14:30") || text2.contains("2:30");
+    // Use semantic validation instead of brittle keyword matching
+    let text2 = response2.text().unwrap();
+    let is_valid = validate_response_semantically(
+        &client,
+        "User asked about current conditions in Paris. Two functions returned: weather (22°C, cloudy) and time (14:30).",
+        text2,
+        "Does this response incorporate the weather or time information from the function results?",
+    )
+    .await
+    .expect("Semantic validation failed");
 
-    println!(
-        "References weather: {}, References time: {}",
-        has_weather_ref, has_time_ref
-    );
-
-    // At minimum, should reference at least one of the function results
     assert!(
-        has_weather_ref || has_time_ref,
+        is_valid,
         "Turn 2 should reference function results. Got: {}",
         text2
     );
@@ -769,13 +766,18 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
             let text = response3.text().unwrap();
             println!("Step 3 text preview: {}...", &text[..text.len().min(200)]);
 
-            // Verify the response integrates information from the chain
-            let text_lower = text.to_lowercase();
+            // Use semantic validation instead of brittle keyword matching
+            let is_valid = validate_response_semantically(
+                &client,
+                "User asked about Tokyo trip planning. Functions returned: weather (24°C, partly cloudy), time (10:30 AM JST), forecast (sunny tomorrow, rainy in 3 days), and activities (temples, parks, ramen, sushi).",
+                text,
+                "Does this response incorporate the gathered trip planning information?",
+            )
+            .await
+            .expect("Semantic validation failed");
+
             assert!(
-                text_lower.contains("tokyo")
-                    || text_lower.contains("weather")
-                    || text_lower.contains("temperature")
-                    || text_lower.contains("activit"),
+                is_valid,
                 "Final response should reference gathered information"
             );
         }
@@ -1223,13 +1225,18 @@ async fn test_streaming_with_thinking_and_function_calling() {
         "Turn 2 should stream text content"
     );
 
-    // Verify context was maintained - response should reference weather
-    let text_lower = result2.collected_text.to_lowercase();
+    // Use semantic validation instead of brittle keyword matching
+    let is_valid = validate_response_semantically(
+        &client,
+        "User asked about Tokyo weather and whether to bring an umbrella. Function returned: rainy, 18°C, 85% precipitation, 90% humidity.",
+        &result2.collected_text,
+        "Does this response address the umbrella question based on the rainy weather data?",
+    )
+    .await
+    .expect("Semantic validation failed");
+
     assert!(
-        text_lower.contains("umbrella")
-            || text_lower.contains("rain")
-            || text_lower.contains("yes")
-            || text_lower.contains("18"),
+        is_valid,
         "Streaming response should reference weather context. Got: {}",
         result2.collected_text
     );

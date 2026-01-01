@@ -10,7 +10,13 @@ mod response;
 mod streaming;
 
 #[cfg(test)]
-mod tests;
+mod content_tests;
+#[cfg(test)]
+mod request_tests;
+#[cfg(test)]
+mod response_tests;
+#[cfg(test)]
+mod streaming_tests;
 
 #[cfg(test)]
 mod proptest_tests;

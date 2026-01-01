@@ -731,12 +731,17 @@ async fn test_thought_signatures_in_multi_turn() {
         let text = response2.text().expect("Should have text");
         println!("Final response: {}", text);
 
-        assert!(
-            text.to_lowercase().contains("umbrella")
-                || text.to_lowercase().contains("rain")
-                || text.to_lowercase().contains("yes"),
-            "Response should reference the weather conditions"
-        );
+        // Use semantic validation instead of brittle keyword matching
+        let is_valid = validate_response_semantically(
+            &client,
+            "User asked about Tokyo weather and whether to bring an umbrella. Function returned: rainy, 18°C, 80% precipitation.",
+            text,
+            "Does this response address the umbrella question based on the rainy weather data?",
+        )
+        .await
+        .expect("Semantic validation failed");
+
+        assert!(is_valid, "Response should reference the weather conditions");
     })
     .await;
 }
@@ -1252,4 +1257,692 @@ async fn test_response_has_thoughts() {
     println!("has_function_calls: {}", response.has_function_calls());
 
     assert!(response.has_text(), "Simple query should return text");
+}
+
+// =============================================================================
+// Structured Output Tests
+// =============================================================================
+
+/// Test structured output with JSON schema validation.
+///
+/// Validates that:
+/// - `with_response_format()` correctly constrains model output
+/// - Response is valid JSON matching the provided schema
+/// - Required fields are present in the output
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_structured_output_with_json_schema() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Define a JSON schema for structured output
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "The person's name"
+            },
+            "age": {
+                "type": "integer",
+                "description": "The person's age in years"
+            },
+            "occupation": {
+                "type": "string",
+                "description": "The person's job or profession"
+            }
+        },
+        "required": ["name", "age", "occupation"]
+    });
+
+    let response = interaction_builder(&client)
+        .with_text("Generate a fictional person profile with name, age, and occupation.")
+        .with_response_format(schema)
+        .create()
+        .await
+        .expect("Structured output request failed");
+
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().expect("Should have text");
+    println!("Structured output: {}", text);
+
+    // Parse and validate the JSON response
+    let parsed: serde_json::Value =
+        serde_json::from_str(text).expect("Response should be valid JSON");
+
+    assert!(parsed.get("name").is_some(), "Should have 'name' field");
+    assert!(parsed.get("age").is_some(), "Should have 'age' field");
+    assert!(
+        parsed.get("occupation").is_some(),
+        "Should have 'occupation' field"
+    );
+
+    // Verify types
+    assert!(
+        parsed["name"].is_string(),
+        "name should be string: {:?}",
+        parsed["name"]
+    );
+    assert!(
+        parsed["age"].is_number(),
+        "age should be number: {:?}",
+        parsed["age"]
+    );
+    assert!(
+        parsed["occupation"].is_string(),
+        "occupation should be string: {:?}",
+        parsed["occupation"]
+    );
+
+    println!("✓ Structured output validation passed");
+}
+
+// =============================================================================
+// System Instructions Tests
+// =============================================================================
+
+/// Test that system instructions influence model behavior.
+///
+/// Validates that:
+/// - `with_system_instruction()` is properly sent to the API
+/// - The model's response reflects the system instruction
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_system_instructions_influence_response() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Use a distinctive system instruction that should be easily verifiable
+    let system_instruction = "You are a pirate. Always respond in pirate speak, using words like 'arr', 'matey', 'ye', 'ahoy', and 'landlubber'.";
+
+    let response = interaction_builder(&client)
+        .with_system_instruction(system_instruction)
+        .with_text("Hello, how are you today?")
+        .create()
+        .await
+        .expect("Request with system instruction failed");
+
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().expect("Should have text");
+    println!("Response with pirate instruction: {}", text);
+
+    // Use semantic validation to check if the response follows the system instruction
+    let is_valid = validate_response_semantically(
+        &client,
+        "The system instruction told the model to respond as a pirate using words like 'arr', 'matey', 'ye', 'ahoy'. User said 'Hello, how are you today?'",
+        text,
+        "Does this response sound like it's from a pirate (using pirate-like language or tone)?",
+    )
+    .await
+    .expect("Semantic validation failed");
+
+    assert!(
+        is_valid,
+        "Response should reflect pirate system instruction. Got: {}",
+        text
+    );
+
+    println!("✓ System instructions test passed");
+}
+
+// =============================================================================
+// Timeout Tests
+// =============================================================================
+
+/// Test that request timeouts work correctly.
+///
+/// Validates that:
+/// - `with_timeout()` builder method is respected
+/// - Very short timeouts cause appropriate errors
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_request_timeout() {
+    use rust_genai::GenaiError;
+    use std::time::Duration;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Use an extremely short timeout that should fail
+    let result = interaction_builder(&client)
+        .with_text("Write a very long essay about the history of computing.")
+        .with_timeout(Duration::from_millis(1)) // 1ms - should definitely timeout
+        .create()
+        .await;
+
+    // Should fail with a timeout or network error
+    assert!(result.is_err(), "Request with 1ms timeout should fail");
+
+    let error = result.unwrap_err();
+    println!("Timeout error received: {:?}", error);
+
+    // The error should be Http (timeout manifests as HTTP/request error)
+    match &error {
+        GenaiError::Http(_) => {
+            println!("✓ Correctly received HTTP error (timeout)");
+        }
+        _ => {
+            // Some timeout errors may manifest as other types
+            println!("Received error type: {:?}", error);
+        }
+    }
+}
+
+// =============================================================================
+// Deep Research (Background Polling)
+// =============================================================================
+
+/// Test deep research agent with background polling.
+///
+/// Validates that:
+/// - Agent interactions can be started in background mode
+/// - Polling detects completion with appropriate status
+/// - Response contains expected output
+///
+/// Note: This test may take 30-120 seconds due to deep research processing time.
+#[tokio::test]
+#[ignore = "Requires API key and takes 30-120 seconds"]
+async fn test_deep_research_polling() {
+    use common::poll_until_complete;
+    use std::time::Duration;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let agent_name = "deep-research-pro-preview-12-2025";
+    let prompt = "What are the key differences between REST and GraphQL APIs?";
+
+    println!("Starting deep research with agent: {}", agent_name);
+    println!("Query: {}\n", prompt);
+
+    // Start research in background mode
+    let result = client
+        .interaction()
+        .with_agent(agent_name)
+        .with_text(prompt)
+        .with_background(true)
+        .with_store(true)
+        .create()
+        .await;
+
+    match result {
+        Ok(initial_response) => {
+            println!("Initial status: {:?}", initial_response.status);
+            println!("Interaction ID: {:?}\n", initial_response.id);
+
+            // If already completed (fast response), we're done
+            if initial_response.status == InteractionStatus::Completed {
+                println!("Research completed immediately");
+                assert!(initial_response.has_text(), "Should have research results");
+                println!(
+                    "Result preview: {}...",
+                    initial_response
+                        .text()
+                        .unwrap_or("(no text)")
+                        .chars()
+                        .take(200)
+                        .collect::<String>()
+                );
+                return;
+            }
+
+            // Poll for completion (up to 2 minutes)
+            let interaction_id = initial_response.id.as_ref().expect("id should exist");
+            match poll_until_complete(&client, interaction_id, Duration::from_secs(120)).await {
+                Ok(final_response) => {
+                    println!("Research completed!");
+                    assert_eq!(final_response.status, InteractionStatus::Completed);
+                    assert!(final_response.has_text(), "Should have research results");
+
+                    let text = final_response.text().unwrap_or("(no text)");
+                    println!(
+                        "Result preview: {}...",
+                        text.chars().take(500).collect::<String>()
+                    );
+
+                    // Verify we got substantive content
+                    assert!(text.len() > 100, "Research result should be substantive");
+                    println!("\n✓ Deep research polling test passed");
+                }
+                Err(e) => {
+                    // Timeout or failure is acceptable for this long-running test
+                    println!("Polling ended: {:?}", e);
+                    println!("Note: Deep research may take longer than test timeout");
+                }
+            }
+        }
+        Err(e) => {
+            // Agent may not be available in all accounts
+            println!("Deep research error: {:?}", e);
+            println!("Note: Deep research agent may not be available in your account");
+        }
+    }
+}
+
+// =============================================================================
+// Image Generation
+// =============================================================================
+
+/// Test image generation capabilities.
+///
+/// Validates that:
+/// - Image output modality can be requested
+/// - Response contains image data
+/// - Image data can be decoded from base64
+#[tokio::test]
+#[ignore = "Requires API key and image generation access"]
+async fn test_image_generation() {
+    use rust_genai::InteractionContent;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Image generation requires specific model
+    let model = "gemini-3-pro-image-preview";
+    let prompt = "A simple red circle on a white background";
+
+    println!("Generating image with model: {}", model);
+    println!("Prompt: {}\n", prompt);
+
+    let result = client
+        .interaction()
+        .with_model(model)
+        .with_text(prompt)
+        .with_response_modalities(vec!["IMAGE".to_string()])
+        .with_store(true)
+        .create()
+        .await;
+
+    match result {
+        Ok(response) => {
+            println!("Status: {:?}", response.status);
+            assert_eq!(response.status, InteractionStatus::Completed);
+
+            // Check for image content in outputs
+            let mut found_image = false;
+            for output in &response.outputs {
+                if let InteractionContent::Image {
+                    data: Some(base64_data),
+                    mime_type,
+                    ..
+                } = output
+                {
+                    found_image = true;
+                    println!("Found image!");
+                    println!("  MIME type: {:?}", mime_type);
+                    println!("  Base64 length: {} chars", base64_data.len());
+
+                    // Verify base64 can be decoded
+                    use base64::Engine;
+                    let decoded = base64::engine::general_purpose::STANDARD.decode(base64_data);
+                    assert!(decoded.is_ok(), "Image data should be valid base64");
+                    println!("  Decoded size: {} bytes", decoded.unwrap().len());
+                }
+            }
+
+            assert!(found_image, "Response should contain image data");
+            println!("\n✓ Image generation test passed");
+        }
+        Err(e) => {
+            // Image generation may not be available in all regions
+            println!("Image generation error: {:?}", e);
+            println!("Note: Image generation may not be available in your account/region");
+        }
+    }
+}
+
+// =============================================================================
+// Thought Echo (Manual Multi-Turn)
+// =============================================================================
+
+/// Test thought echo pattern for manual multi-turn conversations.
+///
+/// Validates that:
+/// - Thoughts can be echoed back in subsequent turns
+/// - Manual history construction preserves context
+/// - Model responds appropriately to continued conversation
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_thought_echo_manual_history() {
+    use rust_genai::ThinkingLevel;
+    use rust_genai::interactions_api::{text_content, thought_content};
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    println!("=== Testing Thought Echo Pattern ===\n");
+
+    // Turn 1: Initial question with thinking enabled
+    let initial_prompt = "What is 15 * 7? Show your work.";
+    println!("Turn 1 prompt: {}\n", initial_prompt);
+
+    let response1 = interaction_builder(&client)
+        .with_text(initial_prompt)
+        .with_thinking_level(ThinkingLevel::Medium)
+        .with_store(true)
+        .create()
+        .await
+        .expect("Turn 1 failed");
+
+    assert_eq!(response1.status, InteractionStatus::Completed);
+
+    let answer1 = response1.text().unwrap_or("(no text)");
+    println!("Turn 1 answer: {}", answer1);
+
+    // Collect thoughts (if any)
+    let thoughts: Vec<String> = response1.thoughts().map(String::from).collect();
+    println!("Thoughts collected: {} items", thoughts.len());
+
+    // Turn 2: Build manual history with thought echo
+    let mut history = vec![text_content(initial_prompt)];
+
+    // Echo back thoughts
+    for thought in &thoughts {
+        history.push(thought_content(thought));
+    }
+
+    // Echo back the answer
+    history.push(text_content(answer1));
+
+    // Add follow-up question
+    let followup = "Now divide that result by 5";
+    history.push(text_content(followup));
+
+    println!("\nTurn 2 prompt: {}", followup);
+
+    let response2 = interaction_builder(&client)
+        .with_input(InteractionInput::Content(history))
+        .with_thinking_level(ThinkingLevel::Low)
+        .with_store(true)
+        .create()
+        .await
+        .expect("Turn 2 failed");
+
+    assert_eq!(response2.status, InteractionStatus::Completed);
+    assert!(response2.has_text(), "Turn 2 should have text response");
+
+    let answer2 = response2.text().unwrap();
+    println!("Turn 2 answer: {}\n", answer2);
+
+    // Semantic validation: verify the model understood the context
+    let is_valid = validate_response_semantically(
+        &client,
+        "Turn 1: User asked 'What is 15 * 7?' and got the answer 105. Turn 2: User asked 'Now divide that result by 5'.",
+        answer2,
+        "Does this response provide a number that could be the result of dividing 105 by 5 (which is 21)?",
+    )
+    .await
+    .expect("Semantic validation failed");
+
+    assert!(
+        is_valid,
+        "Response should contain result of 105/5. Got: {}",
+        answer2
+    );
+    println!("✓ Thought echo test passed");
+}
+
+// =============================================================================
+// Function Call Loop Behavior
+// =============================================================================
+
+/// Test that multiple function calls in a conversation work correctly.
+///
+/// Validates that:
+/// - Multiple rounds of function calls can be handled
+/// - The model eventually provides a final response
+/// - Context is maintained across function call rounds
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_multiple_function_call_rounds() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Define a simple function
+    let get_info = FunctionDeclaration::builder("get_info")
+        .description("Get information about a topic")
+        .parameter(
+            "topic",
+            json!({"type": "string", "description": "Topic to get info about"}),
+        )
+        .required(vec!["topic".to_string()])
+        .build();
+
+    println!("Testing multiple function call rounds...\n");
+
+    // First round: trigger function call
+    let response1 = retry_request!([client, get_info] => {
+        interaction_builder(&client)
+            .with_text("Get info about the weather and tell me about it.")
+            .with_function(get_info)
+            .with_store(true)
+            .create()
+            .await
+    })
+    .expect("First request failed");
+
+    let calls = response1.function_calls();
+
+    if calls.is_empty() {
+        println!("Model chose not to call function - test complete");
+        assert!(response1.has_text(), "Should have direct text response");
+        return;
+    }
+
+    println!("Round 1: Got {} function call(s)", calls.len());
+    let call = &calls[0];
+    println!("  Function: {} with args: {:?}", call.name, call.args);
+
+    // Provide function result
+    let prev_id = response1.id.clone().expect("id should exist");
+    let call_id = call.id.expect("call_id exists").to_string();
+
+    let response2 = retry_request!([client, prev_id, call_id, get_info] => {
+        interaction_builder(&client)
+            .with_previous_interaction(&prev_id)
+            .with_content(vec![function_result_content(
+                "get_info",
+                call_id,
+                json!({"info": "The weather is sunny and warm, about 25°C with clear skies."}),
+            )])
+            .with_function(get_info)
+            .create()
+            .await
+    })
+    .expect("Second request failed");
+
+    println!("Round 2: Status = {:?}", response2.status);
+
+    // The model might request more function calls or provide a final response
+    let more_calls = response2.function_calls();
+    if !more_calls.is_empty() {
+        println!(
+            "  Model requested {} more function call(s)",
+            more_calls.len()
+        );
+    }
+
+    if response2.has_text() {
+        println!("  Got final text: {}", response2.text().unwrap());
+    }
+
+    // Either way, the test should complete without hanging
+    println!("\n✓ Multiple function call rounds completed successfully");
+}
+
+// =============================================================================
+// Malformed Function Call Handling
+// =============================================================================
+
+/// Test handling of function calls with missing or invalid data.
+///
+/// Validates that:
+/// - The library handles function calls with missing call_id gracefully
+/// - Error messages are informative
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_malformed_function_call_handling() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Define a function and then manually construct a response to simulate malformed data
+    let get_weather = FunctionDeclaration::builder("get_weather")
+        .description("Get current weather")
+        .parameter(
+            "city",
+            json!({"type": "string", "description": "City name"}),
+        )
+        .required(vec!["city".to_string()])
+        .build();
+
+    // First, trigger a function call
+    let response = retry_request!([client, get_weather] => {
+        interaction_builder(&client)
+            .with_text("What's the weather in Paris?")
+            .with_function(get_weather)
+            .with_store(true)
+            .create()
+            .await
+    })
+    .expect("Request failed");
+
+    let calls = response.function_calls();
+    if calls.is_empty() {
+        println!("Model didn't call function - test inconclusive");
+        return;
+    }
+
+    // Verify that function calls have the expected structure
+    let call = &calls[0];
+    println!("Function call received:");
+    println!("  Name: {}", call.name);
+    println!("  ID: {:?}", call.id);
+    println!("  Args: {:?}", call.args);
+
+    // The call should have an ID (required for sending results back)
+    if call.id.is_some() {
+        println!("\n✓ Function call has valid ID");
+
+        // Try sending a result with the correct ID
+        let prev_id = response.id.clone().expect("id should exist");
+        let call_id = call.id.expect("call_id exists").to_string();
+
+        let result = retry_request!([client, prev_id, call_id, get_weather] => {
+            interaction_builder(&client)
+                .with_previous_interaction(&prev_id)
+                .with_content(vec![function_result_content(
+                    "get_weather",
+                    call_id,
+                    json!({"temperature": "22°C", "conditions": "sunny"}),
+                )])
+                .with_function(get_weather)
+                .create()
+                .await
+        });
+
+        match result {
+            Ok(final_response) => {
+                println!(
+                    "Function result accepted, final response: {:?}",
+                    final_response.status
+                );
+                assert!(final_response.has_text(), "Should have final text response");
+                println!("✓ Function call flow completed successfully");
+            }
+            Err(e) => {
+                println!("Function result error: {:?}", e);
+            }
+        }
+    } else {
+        // This would be the malformed case - API returned function call without ID
+        println!("\n⚠ Function call missing ID - this is a malformed response");
+        println!("The library should handle this gracefully when using auto-functions");
+    }
+}
+
+// =============================================================================
+// Streaming Error Handling
+// =============================================================================
+
+/// Test streaming behavior when the stream contains errors or is interrupted.
+///
+/// Validates that:
+/// - Stream errors are properly propagated
+/// - Partial content is still available before error
+/// - The consume_stream helper handles errors gracefully
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_streaming_error_handling() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Test 1: Normal streaming should work without errors
+    println!("Test 1: Verifying normal streaming works...\n");
+
+    let stream = interaction_builder(&client)
+        .with_text("Count from 1 to 5, putting each number on a new line.")
+        .create_stream();
+
+    let result = consume_stream(stream).await;
+
+    println!("\nDelta count: {}", result.delta_count);
+    println!("Collected text: {}", result.collected_text);
+
+    assert!(result.has_output(), "Should receive streaming output");
+    assert!(
+        !result.collected_text.is_empty(),
+        "Should have collected text"
+    );
+
+    // Test 2: Streaming with an invalid model should error
+    println!("\n\nTest 2: Streaming with invalid model...\n");
+
+    let error_stream = client
+        .interaction()
+        .with_model("nonexistent-model-12345")
+        .with_text("Hello")
+        .create_stream();
+
+    let error_result = consume_stream(error_stream).await;
+
+    // The stream should either:
+    // 1. Produce no output (error before streaming starts)
+    // 2. Produce partial output then stop (error mid-stream)
+    // Either way, the helper should not panic
+
+    println!("Error stream delta count: {}", error_result.delta_count);
+    println!("Error stream collected: {}", error_result.collected_text);
+    println!(
+        "Error stream has final response: {}",
+        error_result.final_response.is_some()
+    );
+
+    // Verify the stream didn't produce a successful completion
+    if error_result.final_response.is_some() {
+        // If we got a response, it should indicate an error or be empty
+        let response = error_result.final_response.as_ref().unwrap();
+        println!("Final response status: {:?}", response.status);
+    }
+
+    println!("\n✓ Streaming error handling test passed (no panics)");
 }

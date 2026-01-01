@@ -13,7 +13,7 @@
 
 mod common;
 
-use common::{consume_stream, get_client, stateful_builder};
+use common::{consume_stream, get_client, stateful_builder, validate_response_semantically};
 use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 
@@ -158,16 +158,19 @@ async fn test_streaming_multi_turn_function_calling() {
     // Verify streaming worked
     assert!(result.has_output(), "Should receive streaming chunks");
 
-    // Verify context was maintained - response should reference weather conditions.
-    // Allow flexible matching due to LLM response variability - any reference to
-    // the weather conditions indicates the multi-turn context was preserved.
-    let text_lower = result.collected_text.to_lowercase();
+    // Verify context was maintained using semantic validation
+    // The model should reference the weather conditions from Turn 1 (rainy, 18°C)
+    let is_valid = validate_response_semantically(
+        &client,
+        "Turn 1 established weather in Tokyo: rainy, 18°C, high humidity. User asked 'Should I bring an umbrella?' in Turn 2.",
+        &result.collected_text,
+        "Does this response address whether to bring an umbrella based on the rainy weather?",
+    )
+    .await
+    .expect("Semantic validation failed");
+
     assert!(
-        text_lower.contains("yes")
-            || text_lower.contains("umbrella")
-            || text_lower.contains("rain")
-            || text_lower.contains("18")
-            || text_lower.contains("humid"),
+        is_valid,
         "Streaming response should reference weather context. Got: {}",
         result.collected_text
     );
