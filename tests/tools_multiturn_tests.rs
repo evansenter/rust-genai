@@ -13,10 +13,7 @@
 
 mod common;
 
-use common::{
-    DEFAULT_MAX_RETRIES, get_client, retry_on_transient, stateful_builder,
-    validate_response_semantically,
-};
+use common::{get_client, stateful_builder, validate_response_semantically};
 use rust_genai::InteractionStatus;
 
 /// Checks if an error is a known API limitation for long conversation chains.
@@ -100,15 +97,15 @@ async fn test_google_search_multi_turn() {
 
     // Turn 2: Ask follow-up referencing the search results
     println!("\n--- Turn 2: Follow-up about search ---");
-    let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
+    let prev_id = response1.id.clone().expect("id should exist");
+    let result2 = retry_request!([client, prev_id] => {
         stateful_builder(&client)
-            .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
+            .with_previous_interaction(&prev_id)
             .with_text("Based on the weather information you just found, should I bring an umbrella if I visit Tokyo today?")
             .with_store(true)
             .create()
             .await
-    })
-    .await;
+    });
 
     match result2 {
         Ok(response2) => {
@@ -226,14 +223,14 @@ async fn test_url_context_multi_turn() {
 
     // Turn 2: Ask follow-up about the fetched content
     println!("\n--- Turn 2: Follow-up about URL content ---");
-    let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
+    let prev_id = response1.id.clone().expect("id should exist");
+    let result2 = retry_request!([client, prev_id] => {
         stateful_builder(&client)
-            .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
+            .with_previous_interaction(&prev_id)
             .with_text("What is the main purpose of that website you just fetched? Is it a real company or an example domain?")
             .create()
             .await
-    })
-    .await;
+    });
 
     match result2 {
         Ok(response2) => {
@@ -302,15 +299,14 @@ async fn test_code_execution_multi_turn() {
 
     // Turn 1: Calculate factorial of 5
     println!("\n--- Turn 1: Calculate factorial ---");
-    let result1 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
+    let result1 = retry_request!([client] => {
         stateful_builder(&client)
             .with_text("Calculate the factorial of 5 using code execution. Return just the number.")
             .with_code_execution()
             .with_store(true)
             .create()
             .await
-    })
-    .await;
+    });
 
     let response1 = match result1 {
         Ok(response) => {
@@ -348,9 +344,10 @@ async fn test_code_execution_multi_turn() {
 
     // Turn 2: Multiply the result by 2
     println!("\n--- Turn 2: Multiply result by 2 ---");
-    let result2 = retry_on_transient(DEFAULT_MAX_RETRIES, || async {
+    let prev_id = response1.id.clone().expect("id should exist");
+    let result2 = retry_request!([client, prev_id] => {
         stateful_builder(&client)
-            .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
+            .with_previous_interaction(&prev_id)
             .with_text(
                 "Multiply the factorial result you just calculated by 2. What is the answer?",
             )
@@ -358,8 +355,7 @@ async fn test_code_execution_multi_turn() {
             .with_store(true)
             .create()
             .await
-    })
-    .await;
+    });
 
     match result2 {
         Ok(response2) => {
