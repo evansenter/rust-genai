@@ -65,7 +65,10 @@ pub use genai_client::{
 };
 
 // Re-export Files API types for convenient access
-pub use genai_client::{FileError, FileMetadata, FileState, ListFilesResponse, VideoMetadata};
+pub use genai_client::{
+    DEFAULT_CHUNK_SIZE, FileError, FileMetadata, FileState, ListFilesResponse, ResumableUpload,
+    VideoMetadata,
+};
 
 // Re-export error type from genai_client
 pub use genai_client::GenaiError;

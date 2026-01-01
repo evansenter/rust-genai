@@ -195,6 +195,48 @@ See `examples/image_generation.rs` for complete example.
 
 **Not re-exported** (model-generated): Built-in tool outputs accessed via response methods like `response.google_search_results()`, `response.code_execution_results()`
 
+### Files API
+
+The Files API allows uploading large files (up to 2GB) that can be referenced across multiple interactions. Files are stored for 48 hours.
+
+**Standard upload** (loads entire file into memory):
+```rust
+let file = client.upload_file("video.mp4").await?;
+// Use in interaction
+client.interaction().with_file(&file).with_text("Describe this").create().await?;
+// Clean up
+client.delete_file(&file.name).await?;
+```
+
+**Chunked upload** (memory-efficient for large files 500MB-2GB):
+```rust
+// Uses ~8MB memory regardless of file size
+let (file, resumable) = client.upload_file_chunked("large_video.mp4").await?;
+
+// With custom chunk size
+let (file, resumable) = client.upload_file_chunked_with_options(
+    "large_video.mp4",
+    "video/mp4",
+    16 * 1024 * 1024  // 16MB chunks
+).await?;
+```
+
+**When to use chunked:**
+- Large files (500MB-2GB) to avoid memory pressure
+- Memory-constrained environments (containers, edge devices)
+- Batch processing multiple large files
+
+**Memory characteristics:**
+- Standard: Requires `file_size` bytes of RAM
+- Chunked: Uses fixed ~`chunk_size` bytes (default 8MB)
+
+**ResumableUpload handle** returned from chunked methods:
+- `file_size()`: Total file size
+- `mime_type()`: File MIME type
+- `upload_url()`: Resumable upload URL
+- `query_offset()`: Query server for bytes uploaded (for resume logic)
+- `resume()`: Resume upload from offset with a reader
+
 ## Core Design Philosophy: Evergreen-Inspired Soft-Typing
 
 This library follows the [Evergreen spec](https://github.com/google-deepmind/evergreen-spec) philosophy for graceful API evolution. The core principle: **unknown data should be preserved, not rejected**.
@@ -359,6 +401,39 @@ GitHub Actions (`.github/workflows/rust.yml`) runs 9 parallel jobs: check, test,
 ## Project Conventions
 
 - **Model name**: Always use `gemini-3-flash-preview` throughout the project (tests, examples, documentation). Exception: Image generation requires `gemini-3-pro-image-preview` since it's the only model supporting image output.
+
+### Naming Conventions
+
+**Suffix patterns for method names:**
+
+| Suffix | Meaning | Example |
+|--------|---------|---------|
+| `*_stream()` | Returns a `Stream<Item>` for async iteration | `create_stream()` returns `Stream<StreamChunk>` |
+| `*_chunked()` | Uses chunked/streaming internally, returns single result | `upload_file_chunked()` returns `(FileMetadata, ResumableUpload)` |
+| `*_with_auto_functions()` | Automatically executes functions in a loop | `create_stream_with_auto_functions()` |
+
+The distinction matters: `*_stream()` methods return async iterators that yield multiple items, while `*_chunked()` methods use chunked I/O internally but return a single final result.
+
+### #[must_use] Annotation
+
+Use `#[must_use]` liberally to prevent users from silently dropping values with side effects:
+
+```rust
+// Good - prevents ignoring important return values
+#[must_use]
+pub fn upload_url(&self) -> &str { ... }
+
+#[must_use]
+pub fn is_active(&self) -> bool { ... }
+```
+
+Apply `#[must_use]` to:
+- Getters that return important state
+- Methods returning handles needed for further operations (e.g., `ResumableUpload`)
+- Boolean status checks
+- Any function where ignoring the result is likely a bug
+
+The attribute generates a compiler warning if the return value is unused, catching bugs early.
 
 ## Versioning Philosophy
 

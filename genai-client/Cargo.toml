@@ -13,6 +13,7 @@ bytes = { workspace = true }
 futures-util = { workspace = true }
 log = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { version = "0.7", features = ["io"] }
 
 [features]
 ## Strict mode for unknown content types.

@@ -388,3 +388,221 @@ async fn test_get_nonexistent_file_returns_error() {
         err_string
     );
 }
+
+// =============================================================================
+// Streaming Upload Tests
+// =============================================================================
+
+/// Tests streaming upload with a moderately sized file.
+///
+/// This test creates a file larger than the default chunk size to verify
+/// the streaming mechanism works correctly across multiple chunks.
+#[tokio::test]
+#[ignore] // Requires API key
+async fn test_upload_file_chunked() {
+    let client = get_client();
+
+    // Create a temporary file larger than the default chunk size (8MB)
+    // Use 9MB to ensure at least 2 chunks are streamed
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file_path = temp_dir.path().join("large_test.txt");
+
+    // Generate 9MB of data
+    let data: Vec<u8> = (0..9 * 1024 * 1024).map(|i| (i % 256) as u8).collect();
+    std::fs::write(&file_path, &data).unwrap();
+
+    // Upload using streaming
+    let (file, resumable_upload) = client
+        .upload_file_chunked_with_mime(&file_path, "text/plain")
+        .await
+        .expect("Streaming upload failed");
+
+    // Verify file metadata
+    assert!(
+        file.name.starts_with("files/"),
+        "File name should start with 'files/'"
+    );
+    assert_eq!(file.mime_type, "text/plain");
+    assert!(
+        file.display_name.as_deref() == Some("large_test.txt"),
+        "Display name should be the filename"
+    );
+    assert!(!file.uri.is_empty(), "URI should not be empty");
+
+    // Verify file size if reported
+    if let Some(size) = file.size_bytes_as_u64() {
+        assert_eq!(
+            size,
+            data.len() as u64,
+            "File size should match uploaded data"
+        );
+    }
+
+    // Verify ResumableUpload metadata
+    assert_eq!(
+        resumable_upload.file_size(),
+        data.len() as u64,
+        "ResumableUpload should track file size"
+    );
+    assert_eq!(resumable_upload.mime_type(), "text/plain");
+    assert!(
+        !resumable_upload.upload_url().is_empty(),
+        "Upload URL should not be empty"
+    );
+
+    // Clean up
+    client
+        .delete_file(&file.name)
+        .await
+        .expect("Failed to delete file");
+}
+
+/// Tests streaming upload with automatic MIME type detection.
+#[tokio::test]
+#[ignore] // Requires API key
+async fn test_upload_file_chunked_auto_mime() {
+    let client = get_client();
+
+    // Create a temporary file with a known extension
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file_path = temp_dir.path().join("test.mp4");
+
+    // Write some fake video data (just bytes, won't actually play)
+    let data = vec![0u8; 1024]; // 1KB fake video
+    std::fs::write(&file_path, &data).unwrap();
+
+    // Upload using streaming with auto MIME detection
+    let (file, _) = client
+        .upload_file_chunked(&file_path)
+        .await
+        .expect("Streaming upload failed");
+
+    // Verify MIME type was detected correctly
+    assert_eq!(
+        file.mime_type, "video/mp4",
+        "MIME type should be auto-detected from extension"
+    );
+    assert_eq!(file.display_name.as_deref(), Some("test.mp4"));
+
+    // Clean up
+    client.delete_file(&file.name).await.unwrap();
+}
+
+/// Tests streaming upload with a custom chunk size.
+#[tokio::test]
+#[ignore] // Requires API key
+async fn test_upload_file_chunked_custom_chunk_size() {
+    let client = get_client();
+
+    // Create a temporary file
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file_path = temp_dir.path().join("chunk_test.txt");
+
+    // Generate 5MB of data
+    let data: Vec<u8> = (0..5 * 1024 * 1024).map(|i| (i % 256) as u8).collect();
+    std::fs::write(&file_path, &data).unwrap();
+
+    // Upload with a custom chunk size (1MB)
+    let chunk_size = 1024 * 1024; // 1MB
+    let (file, resumable_upload) = client
+        .upload_file_chunked_with_options(&file_path, "text/plain", chunk_size)
+        .await
+        .expect("Streaming upload with custom chunk size failed");
+
+    // Verify upload succeeded
+    assert!(file.name.starts_with("files/"));
+    assert_eq!(resumable_upload.file_size(), data.len() as u64);
+
+    // Clean up
+    client.delete_file(&file.name).await.unwrap();
+}
+
+/// Tests streaming upload validates empty files.
+#[tokio::test]
+#[ignore] // Requires API key
+async fn test_upload_file_chunked_empty_file_error() {
+    let client = get_client();
+
+    // Create an empty temporary file
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file_path = temp_dir.path().join("empty.txt");
+    std::fs::write(&file_path, b"").unwrap();
+
+    // Streaming upload should fail for empty files
+    let result = client
+        .upload_file_chunked_with_mime(&file_path, "text/plain")
+        .await;
+
+    assert!(result.is_err(), "Should fail for empty file");
+    let err_string = result.unwrap_err().to_string();
+    assert!(
+        err_string.contains("empty"),
+        "Error should mention empty file: {}",
+        err_string
+    );
+}
+
+/// Tests streaming upload with nonexistent file returns appropriate error.
+#[tokio::test]
+#[ignore] // Requires API key
+async fn test_upload_file_chunked_nonexistent_file_error() {
+    let client = get_client();
+
+    // Try to stream a file that doesn't exist
+    let result = client
+        .upload_file_chunked_with_mime("/nonexistent/path/to/file.txt", "text/plain")
+        .await;
+
+    assert!(result.is_err(), "Should fail for nonexistent file");
+    let err_string = result.unwrap_err().to_string();
+    assert!(
+        err_string.contains("Failed to access") || err_string.contains("No such file"),
+        "Error should indicate file access failure: {}",
+        err_string
+    );
+}
+
+/// Tests that streamed file can be used in an interaction.
+#[tokio::test]
+#[ignore] // Requires API key
+async fn test_streaming_upload_in_interaction() {
+    let client = get_client();
+
+    // Create a text file with content
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file_path = temp_dir.path().join("interact.txt");
+    let content =
+        "The quick brown fox jumps over the lazy dog. This file was uploaded via streaming.";
+    std::fs::write(&file_path, content).unwrap();
+
+    // Upload using streaming
+    let (file, _) = client
+        .upload_file_chunked_with_mime(&file_path, "text/plain")
+        .await
+        .expect("Streaming upload failed");
+
+    // Wait for file to be ready
+    let ready_file = client
+        .wait_for_file_ready(&file, Duration::from_secs(1), Duration::from_secs(30))
+        .await
+        .expect("File should become ready");
+
+    assert!(ready_file.is_active(), "File should be active");
+
+    // Use in interaction
+    let response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_file(&ready_file)
+        .with_text("What does the file say about a fox?")
+        .create()
+        .await
+        .expect("Interaction should succeed");
+
+    // Verify we got a response
+    let text = response.text().expect("Response should have text");
+    assert!(!text.is_empty(), "Response should not be empty");
+
+    // Clean up
+    client.delete_file(&file.name).await.unwrap();
+}

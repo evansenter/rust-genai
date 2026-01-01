@@ -53,6 +53,9 @@ use crate::error_helpers::{check_response, deserialize_with_context};
 use crate::errors::GenaiError;
 use reqwest::Client as ReqwestClient;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
+use tokio::io::AsyncRead;
+use tokio_util::io::ReaderStream;
 
 /// Represents an uploaded file in the Files API.
 ///
@@ -424,6 +427,396 @@ pub async fn upload_file(
     );
 
     Ok(file_response.file)
+}
+
+/// Handle to a resumable upload session.
+///
+/// This struct represents an active upload session with Google's resumable upload protocol.
+/// It can be used to resume an interrupted upload from the last successfully uploaded offset.
+///
+/// # Session Expiration
+///
+/// Upload sessions expire after approximately **1 week** of inactivity. If you attempt to
+/// resume an expired session, `query_offset()` or `resume()` will return an error.
+/// For long-running uploads, start a new session rather than relying on old handles.
+///
+/// # Thread Safety
+///
+/// While this struct is `Clone`, **concurrent calls to `resume()` on cloned handles are
+/// not supported** and may result in upload failures. Use a single handle per upload
+/// session, or coordinate access externally.
+///
+/// # Example
+///
+/// ```ignore
+/// use genai_client::files::{ResumableUpload, upload_file_chunked};
+/// use std::time::Duration;
+///
+/// // Start a streaming upload
+/// let (file, upload) = upload_file_chunked(
+///     &http_client,
+///     "api-key",
+///     "large_video.mp4",
+///     "video/mp4",
+///     Some("my-video"),
+/// ).await?;
+///
+/// // If the upload was interrupted, you could resume it using upload.resume()
+/// ```
+#[derive(Clone, Debug)]
+pub struct ResumableUpload {
+    /// The resumable upload URL returned by the API
+    upload_url: String,
+    /// Total file size in bytes
+    file_size: u64,
+    /// MIME type of the file
+    mime_type: String,
+}
+
+impl ResumableUpload {
+    /// Returns the upload URL for this session.
+    #[must_use]
+    pub fn upload_url(&self) -> &str {
+        &self.upload_url
+    }
+
+    /// Returns the total file size.
+    #[must_use]
+    pub fn file_size(&self) -> u64 {
+        self.file_size
+    }
+
+    /// Returns the MIME type.
+    #[must_use]
+    pub fn mime_type(&self) -> &str {
+        &self.mime_type
+    }
+
+    /// Queries the current upload offset from the server.
+    ///
+    /// This is useful for resuming an interrupted upload. The returned offset
+    /// indicates how many bytes have been successfully uploaded.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The query request fails
+    /// - The upload session has expired (sessions expire after ~1 week)
+    /// - The server response is missing the expected offset header
+    pub async fn query_offset(&self, http_client: &ReqwestClient) -> Result<u64, GenaiError> {
+        let response = http_client
+            .post(&self.upload_url)
+            .header("X-Goog-Upload-Command", "query")
+            .header("Content-Length", "0")
+            .send()
+            .await?;
+
+        let response = check_response(response).await?;
+
+        // Extract the current offset from the response headers
+        let offset = response
+            .headers()
+            .get("x-goog-upload-size-received")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| {
+                log::warn!(
+                    "Missing or invalid x-goog-upload-size-received header in query response"
+                );
+                GenaiError::InvalidInput(
+                    "Upload session query failed: missing offset header. \
+                     The session may have expired (sessions expire after ~1 week)."
+                        .to_string(),
+                )
+            })?;
+
+        log::debug!("Query offset: {} bytes uploaded", offset);
+
+        Ok(offset)
+    }
+
+    /// Resumes an upload from the specified offset.
+    ///
+    /// This reads the file from the given offset and uploads the remaining bytes.
+    /// The `reader` must be positioned at the offset (e.g., by seeking or skipping).
+    ///
+    /// # Arguments
+    ///
+    /// * `http_client` - The HTTP client to use
+    /// * `reader` - An async reader positioned at the resume offset
+    /// * `offset` - The byte offset to resume from
+    /// * `chunk_size` - Size of chunks to stream (default: 8MB)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the upload fails or the response cannot be parsed.
+    pub async fn resume<R: AsyncRead + Unpin + Send + Sync + 'static>(
+        &self,
+        http_client: &ReqwestClient,
+        reader: R,
+        offset: u64,
+        chunk_size: Option<usize>,
+    ) -> Result<FileMetadata, GenaiError> {
+        let remaining_size = self.file_size.saturating_sub(offset);
+
+        if remaining_size == 0 {
+            return Err(GenaiError::InvalidInput(
+                "Upload already complete (offset equals file size)".to_string(),
+            ));
+        }
+
+        log::debug!(
+            "Resuming upload from offset {} ({} bytes remaining)",
+            offset,
+            remaining_size
+        );
+
+        // Create a streaming body from the reader
+        let chunk_size = chunk_size.unwrap_or(DEFAULT_CHUNK_SIZE);
+        let stream = ReaderStream::with_capacity(reader, chunk_size);
+        let body = reqwest::Body::wrap_stream(stream);
+
+        // Resume the upload
+        let upload_response = http_client
+            .post(&self.upload_url)
+            .header("X-Goog-Upload-Offset", offset.to_string())
+            .header("X-Goog-Upload-Command", "upload, finalize")
+            .header("Content-Length", remaining_size.to_string())
+            .body(body)
+            .send()
+            .await?;
+
+        let upload_response = check_response(upload_response).await?;
+        let response_text = upload_response.text().await.map_err(GenaiError::Http)?;
+        let file_response: FileUploadResponse =
+            deserialize_with_context(&response_text, "FileUploadResponse")?;
+
+        log::debug!(
+            "Upload resumed successfully: name={}, uri={}",
+            file_response.file.name,
+            file_response.file.uri
+        );
+
+        Ok(file_response.file)
+    }
+}
+
+/// Default chunk size for chunked uploads (8 MB).
+///
+/// This balances memory usage with network efficiency. Smaller chunks use less
+/// memory but may have higher overhead; larger chunks are more efficient but
+/// require more memory for buffering.
+pub const DEFAULT_CHUNK_SIZE: usize = 8 * 1024 * 1024; // 8 MB
+
+/// Uploads a file to the Files API using chunked transfer to minimize memory usage.
+///
+/// Unlike `upload_file`, this function streams the file from disk in chunks,
+/// never loading the entire file into memory. This is ideal for large files
+/// (500MB-2GB) or memory-constrained environments.
+///
+/// # Arguments
+///
+/// * `http_client` - The HTTP client to use
+/// * `api_key` - API key for authentication
+/// * `path` - Path to the file to upload
+/// * `mime_type` - MIME type of the file
+/// * `display_name` - Optional display name for the file
+///
+/// # Returns
+///
+/// Returns a tuple of:
+/// - `FileMetadata`: The uploaded file's metadata
+/// - `ResumableUpload`: A handle that can be used to resume if the upload is interrupted
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The file cannot be opened or read
+/// - The upload initiation fails
+/// - The upload itself fails
+///
+/// # Memory Usage
+///
+/// This function uses approximately `chunk_size` (default 8MB) of memory for
+/// buffering, regardless of the file size. A 2GB file uses the same memory
+/// as a 10MB file.
+///
+/// # Example
+///
+/// ```ignore
+/// use genai_client::files::upload_file_chunked;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let http_client = reqwest::Client::new();
+///
+/// // Upload a large video file without loading it all into memory
+/// let (file, _upload_handle) = upload_file_chunked(
+///     &http_client,
+///     "api-key",
+///     "large_video.mp4",
+///     "video/mp4",
+///     Some("my-video"),
+/// ).await?;
+///
+/// println!("Uploaded: {}", file.uri);
+/// # Ok(())
+/// # }
+/// ```
+pub async fn upload_file_chunked(
+    http_client: &ReqwestClient,
+    api_key: &str,
+    path: impl AsRef<Path>,
+    mime_type: &str,
+    display_name: Option<&str>,
+) -> Result<(FileMetadata, ResumableUpload), GenaiError> {
+    upload_file_chunked_with_chunk_size(
+        http_client,
+        api_key,
+        path,
+        mime_type,
+        display_name,
+        DEFAULT_CHUNK_SIZE,
+    )
+    .await
+}
+
+/// Uploads a file using chunked transfer with a custom chunk size.
+///
+/// This is the same as `upload_file_chunked` but allows specifying the chunk
+/// size. Larger chunks are more efficient for fast networks, while smaller
+/// chunks use less memory.
+///
+/// # Arguments
+///
+/// * `http_client` - The HTTP client to use
+/// * `api_key` - API key for authentication
+/// * `path` - Path to the file to upload
+/// * `mime_type` - MIME type of the file
+/// * `display_name` - Optional display name for the file
+/// * `chunk_size` - Size of chunks to stream in bytes
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read or the upload fails.
+pub async fn upload_file_chunked_with_chunk_size(
+    http_client: &ReqwestClient,
+    api_key: &str,
+    path: impl AsRef<Path>,
+    mime_type: &str,
+    display_name: Option<&str>,
+    chunk_size: usize,
+) -> Result<(FileMetadata, ResumableUpload), GenaiError> {
+    let path = path.as_ref();
+
+    // Get file metadata to check size
+    let metadata = tokio::fs::metadata(path).await.map_err(|e| {
+        log::warn!(
+            "Failed to get file metadata for '{}': {}",
+            path.display(),
+            e
+        );
+        GenaiError::InvalidInput(format!("Failed to access file '{}': {}", path.display(), e))
+    })?;
+
+    let file_size = metadata.len();
+
+    // Validate file is not empty
+    if file_size == 0 {
+        return Err(GenaiError::InvalidInput(
+            "Cannot upload empty file".to_string(),
+        ));
+    }
+
+    // Validate file size doesn't exceed API limit (2 GB)
+    const MAX_FILE_SIZE: u64 = 2_147_483_648; // 2 GB
+    if file_size > MAX_FILE_SIZE {
+        return Err(GenaiError::InvalidInput(format!(
+            "File size {} bytes exceeds maximum allowed size of {} bytes (2 GB)",
+            file_size, MAX_FILE_SIZE
+        )));
+    }
+
+    log::debug!(
+        "Streaming upload: path={}, size={} bytes, mime_type={}, chunk_size={} bytes",
+        path.display(),
+        file_size,
+        mime_type,
+        chunk_size
+    );
+
+    // Step 1: Start the resumable upload session
+    let start_url = format!("{UPLOAD_URL}?key={api_key}");
+
+    let metadata_json = if let Some(name) = display_name {
+        serde_json::json!({ "file": { "displayName": name } })
+    } else {
+        serde_json::json!({ "file": {} })
+    };
+
+    let start_response = http_client
+        .post(&start_url)
+        .header("X-Goog-Upload-Protocol", "resumable")
+        .header("X-Goog-Upload-Command", "start")
+        .header("X-Goog-Upload-Header-Content-Length", file_size.to_string())
+        .header("X-Goog-Upload-Header-Content-Type", mime_type)
+        .header("Content-Type", "application/json")
+        .json(&metadata_json)
+        .send()
+        .await?;
+
+    let start_response = check_response(start_response).await?;
+
+    // Extract the upload URL from the response headers
+    let upload_url = start_response
+        .headers()
+        .get("x-goog-upload-url")
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| {
+            GenaiError::InvalidInput("Missing upload URL in response headers".to_string())
+        })?
+        .to_string();
+
+    log::debug!("Got upload URL, streaming file data...");
+
+    // Create the resumable upload handle
+    let resumable_upload = ResumableUpload {
+        upload_url: upload_url.clone(),
+        file_size,
+        mime_type: mime_type.to_string(),
+    };
+
+    // Step 2: Open the file and create a streaming body
+    let file = tokio::fs::File::open(path).await.map_err(|e| {
+        log::warn!("Failed to open file '{}': {}", path.display(), e);
+        GenaiError::InvalidInput(format!("Failed to open file '{}': {}", path.display(), e))
+    })?;
+
+    // Create a stream directly from the file - ReaderStream already buffers internally
+    let stream = ReaderStream::with_capacity(file, chunk_size);
+    let body = reqwest::Body::wrap_stream(stream);
+
+    // Step 3: Upload the file bytes using streaming
+    let upload_response = http_client
+        .post(&upload_url)
+        .header("X-Goog-Upload-Offset", "0")
+        .header("X-Goog-Upload-Command", "upload, finalize")
+        .header("Content-Length", file_size.to_string())
+        .body(body)
+        .send()
+        .await?;
+
+    let upload_response = check_response(upload_response).await?;
+    let response_text = upload_response.text().await.map_err(GenaiError::Http)?;
+    let file_response: FileUploadResponse =
+        deserialize_with_context(&response_text, "FileUploadResponse")?;
+
+    log::debug!(
+        "File streamed successfully: name={}, uri={}",
+        file_response.file.name,
+        file_response.file.uri
+    );
+
+    Ok((file_response.file, resumable_upload))
 }
 
 /// Gets metadata for a specific file.

@@ -664,6 +664,209 @@ impl Client {
         genai_client::delete_file(&self.http_client, &self.api_key, file_name).await
     }
 
+    /// Uploads a file using chunked transfer to minimize memory usage.
+    ///
+    /// Unlike `upload_file`, this method streams the file from disk in chunks,
+    /// never loading the entire file into memory. This is ideal for large files
+    /// (500MB-2GB) or memory-constrained environments.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the file to upload
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple of:
+    /// - `FileMetadata`: The uploaded file's metadata
+    /// - `ResumableUpload`: A handle that can be used to resume if the upload is interrupted
+    ///
+    /// # Memory Usage
+    ///
+    /// This method uses approximately 8MB of memory for buffering, regardless of
+    /// the file size. A 2GB file uses the same memory as a 10MB file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The file cannot be read
+    /// - The MIME type cannot be determined
+    /// - The upload fails
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// // Upload a large video file without loading it all into memory
+    /// let (file, _upload_handle) = client.upload_file_chunked("large_video.mp4").await?;
+    /// println!("Uploaded: {} -> {}", file.name, file.uri);
+    ///
+    /// // Use in interaction
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_file(&file)
+    ///     .with_text("Describe this video")
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn upload_file_chunked(
+        &self,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<(genai_client::FileMetadata, genai_client::ResumableUpload), GenaiError> {
+        let path = path.as_ref();
+
+        // Detect MIME type from extension
+        let mime_type = crate::multimodal::detect_mime_type(path).ok_or_else(|| {
+            log::warn!(
+                "Could not determine MIME type for '{}' - unknown extension",
+                path.display()
+            );
+            GenaiError::InvalidInput(format!(
+                "Could not determine MIME type for '{}'. Please use upload_file_chunked_with_mime() to specify explicitly.",
+                path.display()
+            ))
+        })?;
+
+        // Use filename as display name
+        let display_name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_string());
+
+        log::debug!(
+            "Chunked upload: path={}, mime_type={}",
+            path.display(),
+            mime_type
+        );
+
+        genai_client::upload_file_chunked(
+            &self.http_client,
+            &self.api_key,
+            path,
+            mime_type,
+            display_name.as_deref(),
+        )
+        .await
+    }
+
+    /// Uploads a file using chunked transfer with an explicit MIME type.
+    ///
+    /// Use this when automatic MIME type detection isn't suitable.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the file to upload
+    /// * `mime_type` - MIME type of the file (e.g., "video/mp4")
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let (file, _) = client.upload_file_chunked_with_mime(
+    ///     "data.bin",
+    ///     "application/octet-stream"
+    /// ).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn upload_file_chunked_with_mime(
+        &self,
+        path: impl AsRef<std::path::Path>,
+        mime_type: &str,
+    ) -> Result<(genai_client::FileMetadata, genai_client::ResumableUpload), GenaiError> {
+        let path = path.as_ref();
+
+        let display_name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_string());
+
+        log::debug!(
+            "Chunked upload: path={}, mime_type={}",
+            path.display(),
+            mime_type
+        );
+
+        genai_client::upload_file_chunked(
+            &self.http_client,
+            &self.api_key,
+            path,
+            mime_type,
+            display_name.as_deref(),
+        )
+        .await
+    }
+
+    /// Uploads a file using chunked transfer with a custom chunk size.
+    ///
+    /// This is the same as `upload_file_chunked_with_mime` but allows
+    /// specifying the chunk size for streaming. Larger chunks are more
+    /// efficient for fast networks, while smaller chunks use less memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the file to upload
+    /// * `mime_type` - MIME type of the file
+    /// * `chunk_size` - Size of chunks to stream in bytes (default: 8MB)
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// // Use 16MB chunks for faster upload on a fast network
+    /// let chunk_size = 16 * 1024 * 1024;
+    /// let (file, _) = client.upload_file_chunked_with_options(
+    ///     "large_video.mp4",
+    ///     "video/mp4",
+    ///     chunk_size
+    /// ).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn upload_file_chunked_with_options(
+        &self,
+        path: impl AsRef<std::path::Path>,
+        mime_type: &str,
+        chunk_size: usize,
+    ) -> Result<(genai_client::FileMetadata, genai_client::ResumableUpload), GenaiError> {
+        let path = path.as_ref();
+
+        let display_name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_string());
+
+        log::debug!(
+            "Chunked upload: path={}, mime_type={}, chunk_size={}",
+            path.display(),
+            mime_type,
+            chunk_size
+        );
+
+        genai_client::upload_file_chunked_with_chunk_size(
+            &self.http_client,
+            &self.api_key,
+            path,
+            mime_type,
+            display_name.as_deref(),
+            chunk_size,
+        )
+        .await
+    }
+
     /// Waits for a file to finish processing.
     ///
     /// Some files (especially videos) require processing before they can be used.
