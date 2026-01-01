@@ -394,6 +394,7 @@ impl InteractionResponse {
     ///     println!("Response: {}", text);
     /// }
     /// ```
+    #[must_use]
     pub fn text(&self) -> Option<&str> {
         self.outputs.iter().find_map(|content| {
             if let InteractionContent::Text { text: Some(t) } = content {
@@ -416,6 +417,7 @@ impl InteractionResponse {
     /// let full_text = response.all_text();
     /// println!("Complete response: {}", full_text);
     /// ```
+    #[must_use]
     pub fn all_text(&self) -> String {
         self.outputs
             .iter()
@@ -452,6 +454,7 @@ impl InteractionResponse {
     ///     }
     /// }
     /// ```
+    #[must_use]
     pub fn function_calls(&self) -> Vec<FunctionCallInfo<'_>> {
         self.outputs
             .iter()
@@ -533,6 +536,7 @@ impl InteractionResponse {
     ///         result.name, result.call_id, result.result);
     /// }
     /// ```
+    #[must_use]
     pub fn function_results(&self) -> Vec<FunctionResultInfo<'_>> {
         self.outputs
             .iter()
@@ -635,6 +639,7 @@ impl InteractionResponse {
     ///     println!("Unknown type '{}': {}", content_type, data);
     /// }
     /// ```
+    #[must_use]
     pub fn unknown_content(&self) -> Vec<(&str, &serde_json::Value)> {
         self.outputs
             .iter()
@@ -687,6 +692,7 @@ impl InteractionResponse {
     ///     }
     /// }
     /// ```
+    #[must_use]
     pub fn google_search_metadata(&self) -> Option<&GroundingMetadata> {
         self.grounding_metadata.as_ref()
     }
@@ -729,6 +735,7 @@ impl InteractionResponse {
     ///     }
     /// }
     /// ```
+    #[must_use]
     pub fn url_context_metadata(&self) -> Option<&UrlContextMetadata> {
         self.url_context_metadata.as_ref()
     }
@@ -759,6 +766,7 @@ impl InteractionResponse {
     ///     println!("Model wants to run {} code (id: {}):\n{}", call.language, call.id, call.code);
     /// }
     /// ```
+    #[must_use]
     pub fn code_execution_call(&self) -> Option<CodeExecutionCallInfo<'_>> {
         self.outputs.iter().find_map(|content| {
             if let InteractionContent::CodeExecutionCall { id, language, code } = content {
@@ -790,6 +798,7 @@ impl InteractionResponse {
     ///     }
     /// }
     /// ```
+    #[must_use]
     pub fn code_execution_calls(&self) -> Vec<CodeExecutionCallInfo<'_>> {
         self.outputs
             .iter()
@@ -833,6 +842,7 @@ impl InteractionResponse {
     ///     }
     /// }
     /// ```
+    #[must_use]
     pub fn code_execution_results(&self) -> Vec<CodeExecutionResultInfo<'_>> {
         self.outputs
             .iter()
@@ -869,6 +879,7 @@ impl InteractionResponse {
     ///     println!("Result: {}", output);
     /// }
     /// ```
+    #[must_use]
     pub fn successful_code_output(&self) -> Option<&str> {
         self.outputs.iter().find_map(|content| {
             if let InteractionContent::CodeExecutionResult {
@@ -924,6 +935,7 @@ impl InteractionResponse {
     ///     println!("Model searched for: {}", query);
     /// }
     /// ```
+    #[must_use]
     pub fn google_search_call(&self) -> Option<&str> {
         self.outputs.iter().find_map(|content| {
             if let InteractionContent::GoogleSearchCall { query } = content {
@@ -947,6 +959,7 @@ impl InteractionResponse {
     ///     println!("Searched for: {}", query);
     /// }
     /// ```
+    #[must_use]
     pub fn google_search_calls(&self) -> Vec<&str> {
         self.outputs
             .iter()
@@ -971,6 +984,7 @@ impl InteractionResponse {
     /// Extract Google Search results from outputs
     ///
     /// Returns a vector of references to the search result JSON data.
+    #[must_use]
     pub fn google_search_results(&self) -> Vec<&serde_json::Value> {
         self.outputs
             .iter()
@@ -1022,6 +1036,7 @@ impl InteractionResponse {
     ///     println!("Model fetched: {}", url);
     /// }
     /// ```
+    #[must_use]
     pub fn url_context_call(&self) -> Option<&str> {
         self.outputs.iter().find_map(|content| {
             if let InteractionContent::UrlContextCall { url } = content {
@@ -1045,6 +1060,7 @@ impl InteractionResponse {
     ///     println!("Fetched: {}", url);
     /// }
     /// ```
+    #[must_use]
     pub fn url_context_calls(&self) -> Vec<&str> {
         self.outputs
             .iter()
@@ -1083,6 +1099,7 @@ impl InteractionResponse {
     ///     }
     /// }
     /// ```
+    #[must_use]
     pub fn url_context_results(&self) -> Vec<UrlContextResultInfo<'_>> {
         self.outputs
             .iter()
@@ -1120,6 +1137,7 @@ impl InteractionResponse {
     ///         summary.unknown_count, summary.unknown_types);
     /// }
     /// ```
+    #[must_use]
     pub fn content_summary(&self) -> ContentSummary {
         let mut summary = ContentSummary::default();
         let mut unknown_types_set = BTreeSet::new();
@@ -1184,6 +1202,7 @@ impl InteractionResponse {
     ///     println!("Input tokens: {}", tokens);
     /// }
     /// ```
+    #[must_use]
     pub fn input_tokens(&self) -> Option<i32> {
         self.usage.as_ref().and_then(|u| u.total_input_tokens)
     }
@@ -1201,6 +1220,7 @@ impl InteractionResponse {
     ///     println!("Output tokens: {}", tokens);
     /// }
     /// ```
+    #[must_use]
     pub fn output_tokens(&self) -> Option<i32> {
         self.usage.as_ref().and_then(|u| u.total_output_tokens)
     }
@@ -1218,6 +1238,7 @@ impl InteractionResponse {
     ///     println!("Total tokens: {}", tokens);
     /// }
     /// ```
+    #[must_use]
     pub fn total_tokens(&self) -> Option<i32> {
         self.usage.as_ref().and_then(|u| u.total_tokens)
     }
@@ -1237,6 +1258,7 @@ impl InteractionResponse {
     ///     println!("Reasoning tokens: {}", tokens);
     /// }
     /// ```
+    #[must_use]
     pub fn reasoning_tokens(&self) -> Option<i32> {
         self.usage.as_ref().and_then(|u| u.total_reasoning_tokens)
     }
@@ -1255,6 +1277,7 @@ impl InteractionResponse {
     ///     println!("Cached tokens: {} (reduces cost)", tokens);
     /// }
     /// ```
+    #[must_use]
     pub fn cached_tokens(&self) -> Option<i32> {
         self.usage.as_ref().and_then(|u| u.total_cached_tokens)
     }
@@ -1273,6 +1296,7 @@ impl InteractionResponse {
     ///     println!("Tool use overhead: {} tokens", tokens);
     /// }
     /// ```
+    #[must_use]
     pub fn tool_use_tokens(&self) -> Option<i32> {
         self.usage.as_ref().and_then(|u| u.total_tool_use_tokens)
     }
@@ -1413,5 +1437,77 @@ impl fmt::Display for ContentSummary {
         } else {
             write!(f, "{}", parts.join(", "))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn minimal_response(usage: Option<UsageMetadata>) -> InteractionResponse {
+        InteractionResponse {
+            id: None,
+            model: None,
+            agent: None,
+            input: vec![],
+            outputs: vec![],
+            status: InteractionStatus::Completed,
+            usage,
+            tools: None,
+            grounding_metadata: None,
+            url_context_metadata: None,
+            previous_interaction_id: None,
+        }
+    }
+
+    #[test]
+    fn test_token_helpers_with_usage() {
+        let response = minimal_response(Some(UsageMetadata {
+            total_input_tokens: Some(100),
+            total_output_tokens: Some(50),
+            total_tokens: Some(150),
+            total_cached_tokens: Some(25),
+            total_reasoning_tokens: Some(10),
+            total_tool_use_tokens: Some(5),
+        }));
+
+        assert_eq!(response.input_tokens(), Some(100));
+        assert_eq!(response.output_tokens(), Some(50));
+        assert_eq!(response.total_tokens(), Some(150));
+        assert_eq!(response.cached_tokens(), Some(25));
+        assert_eq!(response.reasoning_tokens(), Some(10));
+        assert_eq!(response.tool_use_tokens(), Some(5));
+    }
+
+    #[test]
+    fn test_token_helpers_without_usage() {
+        let response = minimal_response(None);
+
+        assert_eq!(response.input_tokens(), None);
+        assert_eq!(response.output_tokens(), None);
+        assert_eq!(response.total_tokens(), None);
+        assert_eq!(response.cached_tokens(), None);
+        assert_eq!(response.reasoning_tokens(), None);
+        assert_eq!(response.tool_use_tokens(), None);
+    }
+
+    #[test]
+    fn test_token_helpers_with_partial_usage() {
+        // Test case where only some token counts are available
+        let response = minimal_response(Some(UsageMetadata {
+            total_input_tokens: Some(100),
+            total_output_tokens: Some(50),
+            total_tokens: Some(150),
+            total_cached_tokens: None,
+            total_reasoning_tokens: None,
+            total_tool_use_tokens: None,
+        }));
+
+        assert_eq!(response.input_tokens(), Some(100));
+        assert_eq!(response.output_tokens(), Some(50));
+        assert_eq!(response.total_tokens(), Some(150));
+        assert_eq!(response.cached_tokens(), None);
+        assert_eq!(response.reasoning_tokens(), None);
+        assert_eq!(response.tool_use_tokens(), None);
     }
 }

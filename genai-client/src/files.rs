@@ -106,16 +106,19 @@ pub struct FileMetadata {
 
 impl FileMetadata {
     /// Returns true if the file is still being processed.
+    #[must_use]
     pub fn is_processing(&self) -> bool {
         matches!(self.state, Some(FileState::Processing))
     }
 
     /// Returns true if the file is ready to use.
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self.state, Some(FileState::Active))
     }
 
     /// Returns true if file processing failed.
+    #[must_use]
     pub fn is_failed(&self) -> bool {
         matches!(self.state, Some(FileState::Failed))
     }

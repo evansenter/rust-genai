@@ -80,6 +80,16 @@ for exec in &result.executions {
 
 ### Added
 
+- **Request timeout and token usage helpers** (#228):
+  - New `with_timeout(Duration)` on `InteractionBuilder` for per-request timeouts
+  - For `create()`: Overall request timeout
+  - For `create_stream()`: Per-chunk timeout to detect stalled connections
+  - New `GenaiError::Timeout(Duration)` variant returned when requests exceed timeout
+  - Token usage helper methods on `InteractionResponse`:
+    - `input_tokens()`, `output_tokens()`, `total_tokens()`
+    - `reasoning_tokens()`, `cached_tokens()`, `tool_use_tokens()`
+  - Warning logged when timeout used with auto-function methods (not yet supported)
+
 - **ToolService trait for dependency injection** (#197):
   - New `ToolService` trait enables tools to access shared state (DB connections, API clients, config)
   - Use `with_tool_service(Arc<dyn ToolService>)` on `InteractionBuilder` to provide tools

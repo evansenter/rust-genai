@@ -606,6 +606,7 @@ impl InteractionContent {
     ///
     /// Returns `Some` only for `Text` variants with non-empty text.
     /// Returns `None` for all other variants including `Thought`.
+    #[must_use]
     pub fn text(&self) -> Option<&str> {
         match self {
             Self::Text { text: Some(t) } if !t.is_empty() => Some(t),
@@ -617,6 +618,7 @@ impl InteractionContent {
     ///
     /// Returns `Some` only for `Thought` variants with non-empty text.
     /// Returns `None` for all other variants including `Text`.
+    #[must_use]
     pub fn thought(&self) -> Option<&str> {
         match self {
             Self::Thought { text: Some(t) } if !t.is_empty() => Some(t),
@@ -625,21 +627,25 @@ impl InteractionContent {
     }
 
     /// Check if this is a Text content type.
+    #[must_use]
     pub const fn is_text(&self) -> bool {
         matches!(self, Self::Text { .. })
     }
 
     /// Check if this is a Thought content type.
+    #[must_use]
     pub const fn is_thought(&self) -> bool {
         matches!(self, Self::Thought { .. })
     }
 
     /// Check if this is a ThoughtSignature content type.
+    #[must_use]
     pub const fn is_thought_signature(&self) -> bool {
         matches!(self, Self::ThoughtSignature { .. })
     }
 
     /// Check if this is a FunctionCall content type.
+    #[must_use]
     pub const fn is_function_call(&self) -> bool {
         matches!(self, Self::FunctionCall { .. })
     }
@@ -654,31 +660,37 @@ impl InteractionContent {
     }
 
     /// Check if this is a CodeExecutionCall content type.
+    #[must_use]
     pub const fn is_code_execution_call(&self) -> bool {
         matches!(self, Self::CodeExecutionCall { .. })
     }
 
     /// Check if this is a CodeExecutionResult content type.
+    #[must_use]
     pub const fn is_code_execution_result(&self) -> bool {
         matches!(self, Self::CodeExecutionResult { .. })
     }
 
     /// Check if this is a GoogleSearchCall content type.
+    #[must_use]
     pub const fn is_google_search_call(&self) -> bool {
         matches!(self, Self::GoogleSearchCall { .. })
     }
 
     /// Check if this is a GoogleSearchResult content type.
+    #[must_use]
     pub const fn is_google_search_result(&self) -> bool {
         matches!(self, Self::GoogleSearchResult { .. })
     }
 
     /// Check if this is a UrlContextCall content type.
+    #[must_use]
     pub const fn is_url_context_call(&self) -> bool {
         matches!(self, Self::UrlContextCall { .. })
     }
 
     /// Check if this is a UrlContextResult content type.
+    #[must_use]
     pub const fn is_url_context_result(&self) -> bool {
         matches!(self, Self::UrlContextResult { .. })
     }
