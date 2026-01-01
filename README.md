@@ -77,6 +77,8 @@ Note: `async-trait` and `inventory` are already included as dependencies of `rus
 > - `audio_input.rs` - Audio input handling
 > - `video_input.rs` - Video input handling
 > - `pdf_input.rs` - PDF document processing
+> - `text_input.rs` - Text document input (TXT, Markdown, JSON, CSV)
+> - `files_api.rs` - File upload and management via Files API
 > - `image_generation.rs` - Image generation
 > - `deep_research.rs` - Long-running research tasks
 > - `thought_echo.rs` - Thought continuation across turns

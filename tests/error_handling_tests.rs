@@ -494,3 +494,76 @@ fn test_interaction_builder_missing_content() {
         err
     );
 }
+
+// =============================================================================
+// API Error Integration Tests
+// =============================================================================
+
+/// Test that invalid API keys return appropriate 401/403 errors.
+///
+/// This test intentionally uses an invalid API key to verify that:
+/// - The library correctly propagates authentication errors
+/// - Error messages indicate the authentication failure
+/// - Status codes are captured correctly (400/401/403)
+#[tokio::test]
+async fn test_invalid_api_key_returns_auth_error() {
+    // Create client with intentionally invalid API key
+    let client = rust_genai::Client::builder("invalid-api-key-12345".to_string()).build();
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Hello")
+        .create()
+        .await;
+
+    // Should fail with an API error
+    assert!(result.is_err(), "Request with invalid API key should fail");
+
+    let error = result.unwrap_err();
+    println!("Error received: {:?}", error);
+
+    // Verify it's an API error with auth-related status code
+    match &error {
+        GenaiError::Api {
+            status_code,
+            message,
+            ..
+        } => {
+            // Google API returns 400 for invalid API key format
+            // or 401/403 for invalid but properly formatted keys
+            assert!(
+                *status_code == 400 || *status_code == 401 || *status_code == 403,
+                "Expected auth error (400/401/403), got {}: {}",
+                status_code,
+                message
+            );
+            println!(
+                "✓ Correctly received {} error for invalid API key",
+                status_code
+            );
+        }
+        _ => panic!(
+            "Expected GenaiError::Api for auth failure, got: {:?}",
+            error
+        ),
+    }
+}
+
+/// Test that malformed API keys are rejected appropriately.
+#[tokio::test]
+async fn test_malformed_api_key() {
+    // Create client with empty API key
+    let client = rust_genai::Client::builder("".to_string()).build();
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Hello")
+        .create()
+        .await;
+
+    // Should fail
+    assert!(result.is_err(), "Request with empty API key should fail");
+    println!("Empty key error: {:?}", result.unwrap_err());
+}
