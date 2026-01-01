@@ -230,7 +230,10 @@ impl<'a> InteractionBuilder<'a> {
     /// - No input was provided
     /// - Neither model nor agent was specified
     /// - The API request fails
-    /// - An API call times out (if `with_timeout()` was set)
+    /// - An API call times out (if `with_timeout()` was set). Note: on timeout, any
+    ///   function calls that completed in previous iterations are preserved on the API
+    ///   side via the interaction chain, but this method returns an error rather than
+    ///   a partial `AutoFunctionResult`. Use `previous_interaction_id` to continue.
     /// - `max_function_call_loops` is set to 0 (invalid configuration)
     /// - `store` is set to `false` (auto-function calling requires stored interactions)
     pub async fn create_with_auto_functions(self) -> Result<AutoFunctionResult, GenaiError> {
@@ -310,7 +313,7 @@ impl<'a> InteractionBuilder<'a> {
                 Some(duration) => {
                     let future = client.create_interaction(request.clone());
                     tokio::time::timeout(duration, future).await.map_err(|_| {
-                        debug!("Auto-function API call timed out after {:?}", duration);
+                        warn!("Auto-function API call timed out after {:?}", duration);
                         GenaiError::Timeout(duration)
                     })??
                 }
@@ -513,7 +516,10 @@ impl<'a> InteractionBuilder<'a> {
     /// - No input was provided
     /// - Neither model nor agent was specified
     /// - The API request fails
-    /// - A chunk doesn't arrive within the timeout (if set)
+    /// - A chunk doesn't arrive within the timeout (if set). Note: on timeout, any
+    ///   function calls that completed in previous iterations are preserved on the API
+    ///   side via the interaction chain, but the stream yields an error rather than
+    ///   a partial result. Use `previous_interaction_id` to continue.
     /// - A function call is missing its required `call_id` field
     /// - `max_function_call_loops` is set to 0 (invalid configuration)
     /// - `store` is set to `false` (auto-function calling requires stored interactions)
@@ -607,7 +613,7 @@ impl<'a> InteractionBuilder<'a> {
                                 Ok(Some(result)) => Some(result),
                                 Ok(None) => None,
                                 Err(_) => {
-                                    debug!("Auto-function stream chunk timed out after {:?}", duration);
+                                    warn!("Auto-function stream chunk timed out after {:?}", duration);
                                     Err(GenaiError::Timeout(duration))?;
                                     unreachable!()
                                 }

@@ -17,7 +17,7 @@ use common::{
     EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_auto_function_stream, consume_stream, get_client,
     interaction_builder, stateful_builder, validate_response_semantically, with_timeout,
 };
-use rust_genai::{CallableFunction, FunctionDeclaration, function_result_content};
+use rust_genai::{CallableFunction, FunctionDeclaration, GenaiError, function_result_content};
 use rust_genai_macros::tool;
 use serde_json::json;
 
@@ -1511,6 +1511,75 @@ async fn test_tool_service_streaming_with_multiple_functions() {
             text.contains("8") || text.contains("28"),
             "Response should contain calculation results"
         );
+    })
+    .await;
+}
+
+// =============================================================================
+// Timeout Behavior Tests
+// =============================================================================
+
+/// Tests that `create_with_auto_functions` returns a timeout error when given
+/// an impossibly short timeout.
+#[tokio::test]
+#[ignore = "requires GEMINI_API_KEY"]
+async fn test_auto_functions_timeout_returns_error() {
+    use std::time::Duration;
+
+    with_timeout(TEST_TIMEOUT, async {
+        let client = get_client().expect("GEMINI_API_KEY required");
+
+        // Use an impossibly short timeout - 1ms is far too short for any API call
+        let result = interaction_builder(&client)
+            .with_text("What is 2 + 2?")
+            .with_timeout(Duration::from_millis(1))
+            .create_with_auto_functions()
+            .await;
+
+        // Should return a timeout error
+        assert!(
+            matches!(result, Err(GenaiError::Timeout(_))),
+            "Expected GenaiError::Timeout, got: {:?}",
+            result
+        );
+
+        println!("✓ create_with_auto_functions correctly returns timeout error");
+    })
+    .await;
+}
+
+/// Tests that `create_stream_with_auto_functions` returns a timeout error when given
+/// an impossibly short timeout.
+#[tokio::test]
+#[ignore = "requires GEMINI_API_KEY"]
+async fn test_auto_functions_stream_timeout_returns_error() {
+    use futures_util::StreamExt;
+    use std::time::Duration;
+
+    with_timeout(TEST_TIMEOUT, async {
+        let client = get_client().expect("GEMINI_API_KEY required");
+
+        // Use an impossibly short timeout - 1ms is far too short for any API call
+        let mut stream = interaction_builder(&client)
+            .with_text("What is 2 + 2?")
+            .with_timeout(Duration::from_millis(1))
+            .create_stream_with_auto_functions();
+
+        // Consume the stream - should get a timeout error
+        let mut got_timeout = false;
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(_) => continue,
+                Err(GenaiError::Timeout(_)) => {
+                    got_timeout = true;
+                    break;
+                }
+                Err(e) => panic!("Expected GenaiError::Timeout, got: {:?}", e),
+            }
+        }
+
+        assert!(got_timeout, "Stream should have yielded a timeout error");
+        println!("✓ create_stream_with_auto_functions correctly returns timeout error");
     })
     .await;
 }
