@@ -54,6 +54,7 @@ pub use models::interactions::InteractionContent;
 pub use models::interactions::InteractionInput;
 pub use models::interactions::InteractionResponse;
 pub use models::interactions::InteractionStatus;
+pub use models::interactions::OwnedFunctionCallInfo;
 pub use models::interactions::StreamChunk;
 pub use models::interactions::ThinkingLevel;
 pub use models::interactions::UrlContextMetadata;
