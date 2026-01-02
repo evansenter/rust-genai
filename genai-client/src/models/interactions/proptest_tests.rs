@@ -10,7 +10,9 @@ use super::metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
     WebSource,
 };
-use super::response::{InteractionResponse, InteractionStatus, UsageMetadata};
+use super::response::{
+    InteractionResponse, InteractionStatus, OwnedFunctionCallInfo, UsageMetadata,
+};
 use super::streaming::StreamChunk;
 use crate::models::shared::{FunctionParameters, Tool};
 
@@ -161,6 +163,27 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
                     total_reasoning_tokens,
                     total_tool_use_tokens,
                 }
+            },
+        )
+}
+
+// =============================================================================
+// OwnedFunctionCallInfo Strategy
+// =============================================================================
+
+fn arb_owned_function_call_info() -> impl Strategy<Value = OwnedFunctionCallInfo> {
+    (
+        proptest::option::of(arb_identifier()),
+        arb_identifier(),
+        arb_json_value(),
+        proptest::option::of(arb_text()),
+    )
+        .prop_map(
+            |(id, name, args, thought_signature)| OwnedFunctionCallInfo {
+                id,
+                name,
+                args,
+                thought_signature,
             },
         )
 }
@@ -485,6 +508,14 @@ proptest! {
         let json = serde_json::to_string(&usage).expect("Serialization should succeed");
         let restored: UsageMetadata = serde_json::from_str(&json).expect("Deserialization should succeed");
         prop_assert_eq!(usage, restored);
+    }
+
+    /// Test that OwnedFunctionCallInfo roundtrips correctly through JSON.
+    #[test]
+    fn owned_function_call_info_roundtrip(info in arb_owned_function_call_info()) {
+        let json = serde_json::to_string(&info).expect("Serialization should succeed");
+        let restored: OwnedFunctionCallInfo = serde_json::from_str(&json).expect("Deserialization should succeed");
+        prop_assert_eq!(info, restored);
     }
 
     /// Test that InteractionStatus roundtrips correctly through JSON.

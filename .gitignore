@@ -1,4 +1,4 @@
 /target
 .claude/
 .DS_Store
-.parallel-context.md
+.parallel-context.md.worktrees/
