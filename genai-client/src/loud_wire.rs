@@ -19,7 +19,6 @@
 //! Base64-encoded media content is truncated to keep output readable.
 
 use colored::Colorize;
-use regex::Regex;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -45,26 +44,46 @@ pub fn next_request_id() -> usize {
     REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
-/// Truncate base64-encoded data fields in JSON to keep output readable.
-///
-/// Finds patterns like `"data": "base64..."` and truncates the value to
-/// the first 100 characters followed by "...".
-///
-/// Note: Only matches the `"data"` field name, which is the standard field
-/// used by the Gemini API for base64-encoded content. Other field names
-/// containing base64 data will not be truncated.
-#[must_use]
-pub fn truncate_base64(json: &str) -> String {
-    // Match "data" fields with long base64-like values
-    // Pattern: "data" : "AAAA..." where value is >100 chars of base64 alphabet
-    static REGEX: OnceLock<Regex> = OnceLock::new();
-    // SAFETY: This is a compile-time constant regex that is valid and cannot fail.
-    let re = REGEX.get_or_init(|| {
-        Regex::new(r#"("data"\s*:\s*")([A-Za-z0-9+/=]{100})([A-Za-z0-9+/=]+)""#)
-            .expect("Invalid regex")
-    });
+/// Fields that should have their values truncated if too long.
+/// These typically contain base64-encoded binary data.
+const TRUNCATE_FIELDS: &[&str] = &["data", "signature"];
 
-    re.replace_all(json, r#"$1$2...""#).into_owned()
+/// Maximum length before truncation (keep first 100 chars).
+const TRUNCATE_THRESHOLD: usize = 100;
+
+/// Truncate long base64-encoded fields in a JSON value.
+///
+/// Walks the JSON tree and truncates `"data"` and `"signature"` fields
+/// that contain strings longer than 100 characters. Text content and
+/// other fields are preserved in full.
+fn truncate_long_fields(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (key, val) in map.iter_mut() {
+                if TRUNCATE_FIELDS.contains(&key.as_str()) {
+                    if let serde_json::Value::String(s) = val {
+                        if s.len() > TRUNCATE_THRESHOLD {
+                            *s = format!("{}...", &s[..TRUNCATE_THRESHOLD]);
+                        }
+                    }
+                } else {
+                    truncate_long_fields(val);
+                }
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for item in arr.iter_mut() {
+                truncate_long_fields(item);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Colorize and format JSON for terminal output.
+/// Returns lines ready to print, or None if colorization fails.
+fn colorize_json(value: &serde_json::Value) -> Option<String> {
+    colored_json::to_colored_json_auto(value).ok()
 }
 
 /// Format the current timestamp for log output.
@@ -146,21 +165,20 @@ pub fn log_request(request_id: usize, method: &str, url: &str, body: Option<&str
     eprintln!("{prefix} {direction} {method} {url}");
 
     if let Some(body) = body {
-        // Pretty-print and truncate base64
-        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(body) {
-            if let Ok(pretty) = serde_json::to_string_pretty(&parsed) {
-                let truncated = truncate_base64(&pretty);
-                eprintln!("{prefix} {}:", "Body".green());
-                for line in truncated.lines() {
+        if let Ok(mut parsed) = serde_json::from_str::<serde_json::Value>(body) {
+            truncate_long_fields(&mut parsed);
+            eprintln!("{prefix} {}:", "Body".green());
+            if let Some(colored) = colorize_json(&parsed) {
+                for line in colored.lines() {
                     eprintln!("{prefix} {line}");
                 }
-            } else {
-                // JSON parsed but pretty-print failed - use compact form
-                let truncated = truncate_base64(body);
-                eprintln!("{prefix} {}: {truncated}", "Body".green());
+            } else if let Ok(pretty) = serde_json::to_string_pretty(&parsed) {
+                for line in pretty.lines() {
+                    eprintln!("{prefix} {line}");
+                }
             }
         } else {
-            // Not valid JSON, print as-is (truncated)
+            // Not valid JSON, print as-is (truncated for safety)
             let truncated = if body.len() > 500 {
                 format!("{}...", &body[..500])
             } else {
@@ -196,21 +214,20 @@ pub fn log_response_body(request_id: usize, body: &str) {
 
     let prefix = prefix(request_id);
 
-    // Pretty-print and truncate base64
-    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(body) {
-        if let Ok(pretty) = serde_json::to_string_pretty(&parsed) {
-            let truncated = truncate_base64(&pretty);
-            eprintln!("{prefix} {}:", "Response".red());
-            for line in truncated.lines() {
+    if let Ok(mut parsed) = serde_json::from_str::<serde_json::Value>(body) {
+        truncate_long_fields(&mut parsed);
+        eprintln!("{prefix} {}:", "Response".red());
+        if let Some(colored) = colorize_json(&parsed) {
+            for line in colored.lines() {
                 eprintln!("{prefix} {line}");
             }
-        } else {
-            // JSON parsed but pretty-print failed - use compact form
-            let truncated = truncate_base64(body);
-            eprintln!("{prefix} {}: {truncated}", "Response".red());
+        } else if let Ok(pretty) = serde_json::to_string_pretty(&parsed) {
+            for line in pretty.lines() {
+                eprintln!("{prefix} {line}");
+            }
         }
     } else {
-        // Not valid JSON, print as-is (truncated)
+        // Not valid JSON, print as-is (truncated for safety)
         let truncated = if body.len() > 1000 {
             format!("{}...", &body[..1000])
         } else {
@@ -229,18 +246,17 @@ pub fn log_sse_chunk(request_id: usize, raw_json: &str) {
     let prefix = prefix(request_id);
     let label = "SSE".blue().bold();
 
-    // Pretty-print and truncate base64
-    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(raw_json) {
-        if let Ok(pretty) = serde_json::to_string_pretty(&parsed) {
-            let truncated = truncate_base64(&pretty);
-            eprintln!("{prefix} {label}:");
-            for line in truncated.lines() {
+    if let Ok(mut parsed) = serde_json::from_str::<serde_json::Value>(raw_json) {
+        truncate_long_fields(&mut parsed);
+        eprintln!("{prefix} {label}:");
+        if let Some(colored) = colorize_json(&parsed) {
+            for line in colored.lines() {
                 eprintln!("{prefix} {line}");
             }
-        } else {
-            // JSON parsed but pretty-print failed - use compact form
-            let truncated = truncate_base64(raw_json);
-            eprintln!("{prefix} {label}: {truncated}");
+        } else if let Ok(pretty) = serde_json::to_string_pretty(&parsed) {
+            for line in pretty.lines() {
+                eprintln!("{prefix} {line}");
+            }
         }
     } else {
         eprintln!("{prefix} {label}: {raw_json}");
@@ -283,42 +299,60 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_truncate_base64_short_data() {
-        let json = r#"{"data": "short"}"#;
-        let result = truncate_base64(json);
-        assert_eq!(result, json, "Short data should not be truncated");
+    fn test_truncate_short_data() {
+        let mut value = serde_json::json!({"data": "short"});
+        truncate_long_fields(&mut value);
+        assert_eq!(value["data"], "short", "Short data should not be truncated");
     }
 
     #[test]
-    fn test_truncate_base64_long_data() {
-        // Create a string with >100 chars of base64-like content
+    fn test_truncate_long_data() {
         let long_base64 = "A".repeat(200);
-        let json = format!(r#"{{"data": "{long_base64}"}}"#);
-        let result = truncate_base64(&json);
+        let mut value = serde_json::json!({"data": long_base64});
+        truncate_long_fields(&mut value);
 
-        assert!(result.contains("..."), "Long data should be truncated");
-        assert!(
-            result.len() < json.len(),
-            "Result should be shorter than input"
-        );
-        // Should keep first 100 chars
-        assert!(
-            result.contains(&"A".repeat(100)),
-            "Should preserve first 100 chars"
-        );
+        let result = value["data"].as_str().unwrap();
+        assert!(result.ends_with("..."), "Long data should be truncated");
+        assert_eq!(result.len(), 103, "Should be 100 chars + '...'");
+        assert!(result.starts_with(&"A".repeat(100)), "Should preserve first 100 chars");
     }
 
     #[test]
-    fn test_truncate_base64_preserves_structure() {
-        let long_base64 = "B".repeat(150);
-        let json = format!(
-            r#"{{"model": "gemini", "content": {{"data": "{long_base64}"}}, "other": "value"}}"#
-        );
-        let result = truncate_base64(&json);
+    fn test_truncate_signature_field() {
+        let long_sig = "B".repeat(200);
+        let mut value = serde_json::json!({"signature": long_sig});
+        truncate_long_fields(&mut value);
 
-        assert!(result.contains(r#""model": "gemini""#));
-        assert!(result.contains(r#""other": "value""#));
-        assert!(result.contains("..."));
+        let result = value["signature"].as_str().unwrap();
+        assert!(result.ends_with("..."), "Long signature should be truncated");
+    }
+
+    #[test]
+    fn test_truncate_preserves_text() {
+        let long_text = "Hello world! ".repeat(50);
+        let mut value = serde_json::json!({
+            "text": long_text.clone(),
+            "data": "A".repeat(200)
+        });
+        truncate_long_fields(&mut value);
+
+        assert_eq!(value["text"], long_text, "Text field should not be truncated");
+        assert!(value["data"].as_str().unwrap().ends_with("..."), "Data should be truncated");
+    }
+
+    #[test]
+    fn test_truncate_nested_structure() {
+        let long_base64 = "C".repeat(150);
+        let mut value = serde_json::json!({
+            "model": "gemini",
+            "content": {"data": long_base64},
+            "other": "value"
+        });
+        truncate_long_fields(&mut value);
+
+        assert_eq!(value["model"], "gemini");
+        assert_eq!(value["other"], "value");
+        assert!(value["content"]["data"].as_str().unwrap().ends_with("..."));
     }
 
     #[test]

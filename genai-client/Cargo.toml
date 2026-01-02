@@ -15,6 +15,7 @@ log = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { version = "0.7", features = ["io"] }
 colored = "3"
+colored_json = "5"
 regex = "1"
 
 [features]
