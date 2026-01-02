@@ -31,7 +31,9 @@ static ENABLED: OnceLock<bool> = OnceLock::new();
 
 /// Check if LOUD_WIRE debugging is enabled.
 ///
-/// The result is cached after first check for performance.
+/// The result is cached after first check for performance. This means
+/// `LOUD_WIRE` must be set before the first API call is made - setting
+/// it after the first call will have no effect.
 #[must_use]
 pub fn is_enabled() -> bool {
     *ENABLED.get_or_init(|| std::env::var("LOUD_WIRE").is_ok())
@@ -47,11 +49,16 @@ pub fn next_request_id() -> usize {
 ///
 /// Finds patterns like `"data": "base64..."` and truncates the value to
 /// the first 100 characters followed by "...".
+///
+/// Note: Only matches the `"data"` field name, which is the standard field
+/// used by the Gemini API for base64-encoded content. Other field names
+/// containing base64 data will not be truncated.
 #[must_use]
 pub fn truncate_base64(json: &str) -> String {
     // Match "data" fields with long base64-like values
     // Pattern: "data" : "AAAA..." where value is >100 chars of base64 alphabet
     static REGEX: OnceLock<Regex> = OnceLock::new();
+    // SAFETY: This is a compile-time constant regex that is valid and cannot fail.
     let re = REGEX.get_or_init(|| {
         Regex::new(r#"("data"\s*:\s*")([A-Za-z0-9+/=]{100})([A-Za-z0-9+/=]+)""#)
             .expect("Invalid regex")

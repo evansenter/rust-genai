@@ -374,6 +374,9 @@ pub async fn upload_file(
     );
 
     // LOUD_WIRE: Log upload start
+    // Note: This function receives raw bytes, not a file path, so we can only use
+    // the display_name if provided. For file path context, use the chunked upload
+    // variants which preserve and log the original file path.
     let request_id = loud_wire::next_request_id();
     loud_wire::log_upload_start(
         request_id,
