@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_text(prompt)
         .with_thinking_level(ThinkingLevel::Medium)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -109,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_model("gemini-3-flash-preview")
             .with_text(complex_prompt)
             .with_thinking_level(level)
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await?;
 

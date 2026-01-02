@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_model(model_name)
         .with_text(prompt)
         .with_url_context() // Enable URL context fetching
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await
     {

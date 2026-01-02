@@ -20,7 +20,7 @@ use crate::function_calling::{CallableFunction, FunctionRegistry, get_global_fun
 use crate::interactions_api::function_result_content;
 use crate::streaming::{AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionResult};
 
-use super::InteractionBuilder;
+use super::{CanAutoFunction, InteractionBuilder};
 
 /// Default maximum iterations for auto function calling.
 pub(crate) const DEFAULT_MAX_FUNCTION_CALL_LOOPS: usize = 5;
@@ -105,7 +105,7 @@ async fn execute_function(
     }
 }
 
-impl<'a> InteractionBuilder<'a> {
+impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     /// Creates interaction with automatic function call handling.
     ///
     /// This method implements the auto-function execution loop:
@@ -129,6 +129,13 @@ impl<'a> InteractionBuilder<'a> {
     /// turns, which allows the server to manage thought signatures automatically.
     ///
     /// See <https://ai.google.dev/gemini-api/docs/thought-signatures> for more details.
+    ///
+    /// # Availability
+    ///
+    /// This method is available on [`super::FirstTurn`] and [`super::Chained`] builders.
+    /// It is NOT available on [`super::StoreDisabled`] builders because auto-function
+    /// calling requires stored interactions to maintain conversation context across
+    /// multiple function execution rounds via `previous_interaction_id`.
     ///
     /// # Example
     /// ```no_run
@@ -235,17 +242,9 @@ impl<'a> InteractionBuilder<'a> {
     ///   side via the interaction chain, but this method returns an error rather than
     ///   a partial `AutoFunctionResult`. Use `previous_interaction_id` to continue.
     /// - `max_function_call_loops` is set to 0 (invalid configuration)
-    /// - `store` is set to `false` (auto-function calling requires stored interactions)
     pub async fn create_with_auto_functions(self) -> Result<AutoFunctionResult, GenaiError> {
-        // Auto-function calling requires stored interactions to maintain conversation
-        // context across multiple function execution rounds via previous_interaction_id.
-        if self.store == Some(false) {
-            return Err(GenaiError::InvalidInput(
-                "Auto-function calling requires stored interactions to maintain conversation \
-                 context. Remove .with_store(false) or use manual function calling instead."
-                    .to_string(),
-            ));
-        }
+        // Note: The `CanAutoFunction` trait bound ensures at compile-time that this method
+        // is not available on `StoreDisabled` builders. No runtime check needed.
 
         let client = self.client;
         let timeout = self.timeout;
@@ -522,21 +521,11 @@ impl<'a> InteractionBuilder<'a> {
     ///   a partial result. Use `previous_interaction_id` to continue.
     /// - A function call is missing its required `call_id` field
     /// - `max_function_call_loops` is set to 0 (invalid configuration)
-    /// - `store` is set to `false` (auto-function calling requires stored interactions)
     pub fn create_stream_with_auto_functions(
         self,
     ) -> BoxStream<'a, Result<AutoFunctionStreamChunk, GenaiError>> {
-        // Auto-function calling requires stored interactions to maintain conversation
-        // context across multiple function execution rounds via previous_interaction_id.
-        if self.store == Some(false) {
-            return Box::pin(futures_util::stream::once(async {
-                Err(GenaiError::InvalidInput(
-                    "Auto-function calling requires stored interactions to maintain conversation \
-                     context. Remove .with_store(false) or use manual function calling instead."
-                        .to_string(),
-                ))
-            }));
-        }
+        // Note: The `CanAutoFunction` trait bound ensures at compile-time that this method
+        // is not available on `StoreDisabled` builders. No runtime check needed.
 
         let client = self.client;
         let max_loops = self.max_function_call_loops;

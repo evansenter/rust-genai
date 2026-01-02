@@ -68,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model(model)
         .with_text(prompt)
         .with_image_output() // New convenience method!
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await;
 
@@ -116,7 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model(model)
         .with_text(prompt)
         .with_image_output() // New convenience method!
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await;
 

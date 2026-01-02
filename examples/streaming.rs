@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(prompt)
-        .with_store(true)
+        .with_store_enabled()
         .create_stream();
 
     let mut delta_count = 0;

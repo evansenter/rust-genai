@@ -101,7 +101,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
              Use simple language suitable for a 10-year-old.",
         )
         .with_text("What is multiplication?")
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 

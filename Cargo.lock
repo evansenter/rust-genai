@@ -294,7 +294,7 @@ dependencies = [
 
 [[package]]
 name = "genai-client"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-stream",
  "bytes",
@@ -1091,7 +1091,7 @@ dependencies = [
 
 [[package]]
 name = "rust-genai"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -1114,7 +1114,7 @@ dependencies = [
 
 [[package]]
 name = "rust-genai-macros"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "proc-macro2",
  "quote",

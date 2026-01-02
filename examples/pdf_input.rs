@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_text("What text content does this PDF document contain?")
         .add_document_data(SAMPLE_PDF_BASE64, "application/pdf")
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -84,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .expect("id should exist when store=true"),
         )
         .with_text("What format is this document? Is it a valid PDF structure?")
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 

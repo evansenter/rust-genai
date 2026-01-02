@@ -74,7 +74,7 @@ async fn test_thinking_with_function_calling_multi_turn() {
             .with_text("What's the weather in Tokyo? Should I bring an umbrella?")
             .with_function(get_weather)
             .with_thinking_level(ThinkingLevel::Medium)
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     })
@@ -141,7 +141,7 @@ async fn test_thinking_with_function_calling_multi_turn() {
             .with_content(vec![function_result])
             .with_function(get_weather)
             .with_thinking_level(ThinkingLevel::Medium)
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     })
@@ -210,7 +210,7 @@ async fn test_thinking_with_function_calling_multi_turn() {
             )
             .with_function(get_weather)
             .with_thinking_level(ThinkingLevel::Medium)
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     })
@@ -261,7 +261,7 @@ async fn test_thinking_with_function_calling_multi_turn() {
                         .with_content(vec![function_result])
                         .with_function(get_weather)
                         .with_thinking_level(ThinkingLevel::Medium)
-                        .with_store(true)
+                        .with_store_enabled()
                         .create()
                         .await
                 })
@@ -383,7 +383,7 @@ async fn test_thinking_with_parallel_function_calls() {
             )
             .with_functions(vec![get_weather, get_time])
             .with_thinking_level(ThinkingLevel::Medium)
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     })
@@ -459,7 +459,7 @@ async fn test_thinking_with_parallel_function_calls() {
             .with_content(results)
             .with_functions(vec![get_weather, get_time])
             .with_thinking_level(ThinkingLevel::Medium)
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     })
@@ -589,7 +589,7 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
             )
             .with_functions(functions)
             .with_thinking_level(ThinkingLevel::Medium)
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     })
@@ -667,7 +667,7 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
             .with_content(results)
             .with_functions(functions)
             .with_thinking_level(ThinkingLevel::Medium)
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     })
@@ -739,7 +739,7 @@ async fn test_thinking_with_sequential_parallel_function_chain() {
                 .with_content(results)
                 .with_functions(functions)
                 .with_thinking_level(ThinkingLevel::Medium)
-                .with_store(true)
+                .with_store_enabled()
                 .create()
                 .await
         })
@@ -840,7 +840,7 @@ async fn test_thinking_levels_with_function_calling() {
                 .with_text("What's the weather in Paris?")
                 .with_function(get_weather_fn)
                 .with_thinking_level(level)
-                .with_store(true)
+                .with_store_enabled()
                 .create()
                 .await
         })
@@ -954,7 +954,7 @@ async fn test_function_calling_without_thinking() {
             .with_text("What's the weather in Tokyo?")
             .with_function(get_weather_fn)
             // Note: NO with_thinking_level() call
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     })
@@ -1111,7 +1111,7 @@ async fn test_streaming_with_thinking_and_function_calling() {
         .with_text("What's the weather in Tokyo? I need to know if I should bring an umbrella.")
         .with_function(get_weather.clone())
         .with_thinking_level(ThinkingLevel::Medium)
-        .with_store(true)
+        .with_store_enabled()
         .create_stream();
 
     let result = consume_stream(stream).await;
@@ -1198,7 +1198,7 @@ async fn test_streaming_with_thinking_and_function_calling() {
         .with_content(vec![function_result])
         .with_function(get_weather)
         .with_thinking_level(ThinkingLevel::Medium)
-        .with_store(true)
+        .with_store_enabled()
         .create_stream();
 
     let result2 = consume_stream(stream2).await;

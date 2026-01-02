@@ -7,6 +7,7 @@ use crate::client::Client;
 use crate::function_calling::ToolService;
 use base64::Engine;
 use log::debug;
+use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -16,9 +17,82 @@ use genai_client::{
     InteractionInput, InteractionResponse, StreamChunk, ThinkingLevel, Tool as InternalTool,
 };
 
+// ============================================================================
+// Typestate Markers for Builder State
+// ============================================================================
+//
+// These marker types enforce at compile time which builder methods are valid
+// based on the current configuration.
+//
+// State transitions:
+// - FirstTurn (initial) -> Chained (via with_previous_interaction)
+// - FirstTurn (initial) -> StoreDisabled (via with_store_disabled)
+//
+// Constraints enforced:
+// - Chained: can't disable store, can't set system_instruction
+// - StoreDisabled: can't chain to previous, can't enable background
+//
+// Inheritance behavior with `previousInteractionId`:
+// - `systemInstruction`: IS inherited (only valid on first turn)
+// - `tools`: NOT inherited (must be sent on every turn)
+// - conversation history: IS inherited
+
+/// Marker type for the initial builder state.
+///
+/// All methods are available including:
+/// - `with_system_instruction()` - set system instructions
+/// - `with_previous_interaction()` - chain to previous (transitions to [`Chained`])
+/// - `with_store_disabled()` - disable storage (transitions to [`StoreDisabled`])
+/// - `with_background(true)` - enable background execution
+#[derive(Debug, Clone, Copy)]
+pub struct FirstTurn;
+
+/// Marker type for a builder chained via `with_previous_interaction()`.
+///
+/// Unavailable methods:
+/// - `with_system_instruction()` - system instructions are inherited
+/// - `with_store_disabled()` - chained interactions require storage
+#[derive(Debug, Clone, Copy)]
+pub struct Chained;
+
+/// Marker type for a builder with storage explicitly disabled via `with_store_disabled()`.
+///
+/// Unavailable methods:
+/// - `with_previous_interaction()` - requires storage for chain context
+/// - `with_background(true)` - background execution requires storage
+/// - `create_with_auto_functions()` - auto-function calling requires storage
+/// - `create_stream_with_auto_functions()` - auto-function calling requires storage
+#[derive(Debug, Clone, Copy)]
+pub struct StoreDisabled;
+
+/// Marker trait for builder states that support auto-function calling.
+///
+/// This trait is implemented by [`FirstTurn`] and [`Chained`] states.
+/// It is NOT implemented by [`StoreDisabled`] because auto-function calling
+/// requires stored interactions to maintain conversation context across
+/// multiple function execution rounds via `previous_interaction_id`.
+///
+/// This allows compile-time enforcement that `create_with_auto_functions()`
+/// and `create_stream_with_auto_functions()` cannot be called on a builder
+/// with storage disabled.
+pub trait CanAutoFunction {}
+impl CanAutoFunction for FirstTurn {}
+impl CanAutoFunction for Chained {}
+
 /// Builder for creating interactions with the Gemini Interactions API.
 ///
 /// Provides a fluent interface for constructing interaction requests with models or agents.
+///
+/// # Type Parameter
+///
+/// The `State` parameter tracks whether this builder has been chained to a previous
+/// interaction. This enables compile-time enforcement of API constraints:
+///
+/// - [`FirstTurn`]: Initial state. All methods available including `with_system_instruction()`
+///   and `with_store(false)`.
+/// - [`Chained`]: After calling `with_previous_interaction()`. The `with_system_instruction()`
+///   method is not available (system instructions are inherited), and `with_store(false)` is
+///   not available (chained interactions require storage).
 ///
 /// # Examples
 ///
@@ -58,7 +132,7 @@ use genai_client::{
 /// # Ok(())
 /// # }
 /// ```
-pub struct InteractionBuilder<'a> {
+pub struct InteractionBuilder<'a, State = FirstTurn> {
     client: &'a Client,
     model: Option<String>,
     agent: Option<String>,
@@ -77,9 +151,11 @@ pub struct InteractionBuilder<'a> {
     tool_service: Option<Arc<dyn ToolService>>,
     /// Optional timeout for the request
     timeout: Option<Duration>,
+    /// Phantom data for the state type parameter
+    _state: PhantomData<State>,
 }
 
-impl std::fmt::Debug for InteractionBuilder<'_> {
+impl<State> std::fmt::Debug for InteractionBuilder<'_, State> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InteractionBuilder")
             .field("model", &self.model)
@@ -100,7 +176,11 @@ impl std::fmt::Debug for InteractionBuilder<'_> {
     }
 }
 
-impl<'a> InteractionBuilder<'a> {
+// ============================================================================
+// Methods available only on FirstTurn (initial state)
+// ============================================================================
+
+impl<'a> InteractionBuilder<'a, FirstTurn> {
     /// Creates a new interaction builder.
     pub(crate) fn new(client: &'a Client) -> Self {
         Self {
@@ -119,9 +199,130 @@ impl<'a> InteractionBuilder<'a> {
             max_function_call_loops: DEFAULT_MAX_FUNCTION_CALL_LOOPS,
             tool_service: None,
             timeout: None,
+            _state: PhantomData,
         }
     }
 
+    /// References a previous interaction for stateful conversations.
+    ///
+    /// The interaction will have access to the context from the previous interaction.
+    ///
+    /// # State Transition
+    ///
+    /// This method transitions the builder from [`FirstTurn`] to [`Chained`] state.
+    /// After calling this method:
+    /// - `with_system_instruction()` is no longer available (system instructions are inherited)
+    /// - `with_store(false)` is no longer available (chained interactions require storage)
+    pub fn with_previous_interaction(
+        self,
+        id: impl Into<String>,
+    ) -> InteractionBuilder<'a, Chained> {
+        InteractionBuilder {
+            client: self.client,
+            model: self.model,
+            agent: self.agent,
+            input: self.input,
+            previous_interaction_id: Some(id.into()),
+            tools: self.tools,
+            response_modalities: self.response_modalities,
+            response_format: self.response_format,
+            generation_config: self.generation_config,
+            background: self.background,
+            store: self.store,
+            system_instruction: self.system_instruction,
+            max_function_call_loops: self.max_function_call_loops,
+            tool_service: self.tool_service,
+            timeout: self.timeout,
+            _state: PhantomData,
+        }
+    }
+
+    /// Sets a system instruction for the model.
+    ///
+    /// # Availability
+    ///
+    /// This method is only available on [`FirstTurn`] builders. After calling
+    /// `with_previous_interaction()`, system instructions are inherited from the
+    /// previous interaction and cannot be changed.
+    pub fn with_system_instruction(mut self, instruction: impl Into<String>) -> Self {
+        self.system_instruction = Some(InteractionInput::Text(instruction.into()));
+        self
+    }
+
+    /// Explicitly disables storage for this interaction.
+    ///
+    /// When `store` is `false`, the interaction will not be stored and cannot be
+    /// referenced by future interactions via `previousInteractionId`.
+    ///
+    /// # State Transition
+    ///
+    /// This method transitions the builder from [`FirstTurn`] to [`StoreDisabled`] state.
+    /// After calling this method:
+    /// - `with_previous_interaction()` is no longer available (requires storage)
+    /// - `with_background(true)` is no longer available (requires storage)
+    pub fn with_store_disabled(self) -> InteractionBuilder<'a, StoreDisabled> {
+        InteractionBuilder {
+            client: self.client,
+            model: self.model,
+            agent: self.agent,
+            input: self.input,
+            previous_interaction_id: None, // Explicitly None
+            tools: self.tools,
+            response_modalities: self.response_modalities,
+            response_format: self.response_format,
+            generation_config: self.generation_config,
+            background: None, // Reset - can't be true with store disabled
+            store: Some(false),
+            system_instruction: self.system_instruction,
+            max_function_call_loops: self.max_function_call_loops,
+            tool_service: self.tool_service,
+            timeout: self.timeout,
+            _state: PhantomData,
+        }
+    }
+
+    /// Enables background execution for this interaction.
+    ///
+    /// Background execution allows long-running operations to continue after
+    /// the initial API response. Only supported for agents.
+    ///
+    /// # Availability
+    ///
+    /// This method is available on [`FirstTurn`] and [`Chained`] builders.
+    /// It is NOT available after calling `with_store_disabled()` because
+    /// background execution requires storage.
+    pub fn with_background(mut self, background: bool) -> Self {
+        self.background = Some(background);
+        self
+    }
+}
+
+// ============================================================================
+// Methods available on Chained builders
+// ============================================================================
+
+impl<'a> InteractionBuilder<'a, Chained> {
+    /// Enables background execution for this interaction.
+    ///
+    /// Background execution allows long-running operations to continue after
+    /// the initial API response. Only supported for agents.
+    ///
+    /// # Availability
+    ///
+    /// This method is available on [`FirstTurn`] and [`Chained`] builders.
+    /// It is NOT available after calling `with_store_disabled()` because
+    /// background execution requires storage.
+    pub fn with_background(mut self, background: bool) -> Self {
+        self.background = Some(background);
+        self
+    }
+}
+
+// ============================================================================
+// Methods available on all builder states
+// ============================================================================
+
+impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// Sets the model to use for this interaction (e.g., "gemini-3-flash-preview").
     ///
     /// Note: Mutually exclusive with `with_agent()`.
@@ -559,14 +760,6 @@ impl<'a> InteractionBuilder<'a> {
         self.tools.get_or_insert_with(Vec::new).push(tool);
     }
 
-    /// References a previous interaction for stateful conversations.
-    ///
-    /// The interaction will have access to the context from the previous interaction.
-    pub fn with_previous_interaction(mut self, id: impl Into<String>) -> Self {
-        self.previous_interaction_id = Some(id.into());
-        self
-    }
-
     /// Adds tools for function calling.
     pub fn with_tools(mut self, tools: Vec<InternalTool>) -> Self {
         self.tools = Some(tools);
@@ -976,50 +1169,22 @@ impl<'a> InteractionBuilder<'a> {
         self
     }
 
-    /// Enables background execution mode (agents only).
-    pub fn with_background(mut self, background: bool) -> Self {
-        self.background = Some(background);
-        self
-    }
-
-    /// Controls whether interaction data is persisted (default: true).
+    /// Explicitly enables storage for this interaction.
     ///
-    /// When `false`, the API does not store the interaction, and the response will
-    /// not include an `id` field (`response.id` will be `None`). This means you cannot:
-    /// - Retrieve the interaction later with `get_interaction()`
-    /// - Use it with `with_previous_interaction()` in follow-up requests
-    /// - Use auto-function calling (`create_with_auto_functions()`)
+    /// Storage is enabled by default, so this method is typically only needed
+    /// to be explicit about intent or to re-enable after conditional logic.
     ///
-    /// Use `store=false` for one-off requests where you don't need conversation history
-    /// or when you want to avoid storing data for privacy/compliance reasons.
+    /// When storage is enabled:
+    /// - The response will include an `id` field
+    /// - The interaction can be retrieved later with `get_interaction()`
+    /// - The interaction can be referenced via `with_previous_interaction()` in follow-up requests
+    /// - Auto-function calling (`create_with_auto_functions()`) will work
     ///
-    /// # Example
+    /// # See Also
     ///
-    /// ```no_run
-    /// # use rust_genai::Client;
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let client = Client::new("key".to_string());
-    /// // One-off request, no history needed
-    /// let response = client.interaction()
-    ///     .with_model("gemini-3-flash-preview")
-    ///     .with_text("Translate 'hello' to Spanish")
-    ///     .with_store(false)  // Response won't have an ID
-    ///     .create()
-    ///     .await?;
-    ///
-    /// assert!(response.id.is_none());
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn with_store(mut self, store: bool) -> Self {
-        self.store = Some(store);
-        self
-    }
-
-    /// Sets a system instruction for the model.
-    pub fn with_system_instruction(mut self, instruction: impl Into<String>) -> Self {
-        self.system_instruction = Some(InteractionInput::Text(instruction.into()));
+    /// Use `with_store_disabled()` (only available on [`FirstTurn`] builders) to disable storage.
+    pub fn with_store_enabled(mut self) -> Self {
+        self.store = Some(true);
         self
     }
 

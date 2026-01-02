@@ -22,7 +22,7 @@ utoipa = "5.4"
 
 [package]
 name = "rust-genai"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
@@ -67,8 +67,16 @@ name = "rag_system"
 path = "examples/real_world/rag_system/main.rs"
 
 [[example]]
-name = "multi_turn_agent"
-path = "examples/real_world/multi_turn_agent/main.rs"
+name = "multi_turn_agent_auto"
+path = "examples/real_world/multi_turn_agent_auto/main.rs"
+
+[[example]]
+name = "multi_turn_agent_manual"
+path = "examples/real_world/multi_turn_agent_manual/main.rs"
+
+[[example]]
+name = "stateless_multi_turn_agent_manual"
+path = "examples/real_world/stateless_multi_turn_agent_manual/main.rs"
 
 [[example]]
 name = "code_assistant"

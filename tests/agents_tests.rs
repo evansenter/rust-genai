@@ -43,7 +43,7 @@ async fn test_deep_research_agent() {
         .with_agent("deep-research-pro-preview-12-2025")
         .with_text("What are the main differences between Rust and Go programming languages?")
         .with_background(true) // Required for agent interactions
-        .with_store(true) // Required to retrieve results by interaction ID
+        .with_store_enabled() // Required to retrieve results by interaction ID
         .create()
         .await;
 
@@ -140,7 +140,7 @@ async fn test_background_mode_polling() {
         .with_agent("deep-research-pro-preview-12-2025")
         .with_text("Briefly explain what machine learning is.")
         .with_background(true)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await;
 

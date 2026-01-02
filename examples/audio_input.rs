@@ -128,7 +128,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
        .with_model("gemini-3-flash-preview")
        .with_text("Summarize this audio recording.")
        .add_audio_data(&base64_audio, "audio/mp3")
-       .with_store(true)  // Enable conversation storage
+       .with_store_enabled()  // Enable conversation storage
        .create()
        .await?;
 

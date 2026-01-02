@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_text(initial_prompt)
         .with_thinking_level(ThinkingLevel::Medium)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -99,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_input(InteractionInput::Content(history))
         .with_thinking_level(ThinkingLevel::Medium)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -128,7 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_text("What is 17 * 23?")
         .with_thinking_level(ThinkingLevel::Low)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -146,7 +146,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .expect("id should exist when store=true"),
         )
         .with_thinking_level(ThinkingLevel::Low)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 

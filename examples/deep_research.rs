@@ -85,7 +85,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_agent(agent_name)
         .with_text(prompt)
         .with_background(true) // Required for agent interactions
-        .with_store(true) // Required to retrieve results by interaction ID
+        .with_store_enabled() // Required to retrieve results by interaction ID
         .create()
         .await;
 

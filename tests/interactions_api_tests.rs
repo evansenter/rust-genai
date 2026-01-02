@@ -1070,7 +1070,7 @@ async fn test_store_false_interaction_not_retrievable() {
     // With store=false, API may return incomplete response
     let result = interaction_builder(&client)
         .with_text("Hello")
-        .with_store(false)
+        .with_store_disabled()
         .create()
         .await;
 
@@ -1117,16 +1117,23 @@ async fn test_long_conversation_chain() {
         let mut previous_id: Option<String> = None;
 
         for (i, message) in messages.iter().enumerate() {
-            let mut builder = stateful_builder(&client).with_text(*message);
-
-            if let Some(ref prev_id) = previous_id {
-                builder = builder.with_previous_interaction(prev_id);
+            // Handle typestate transition cleanly
+            let response = match &previous_id {
+                None => {
+                    stateful_builder(&client)
+                        .with_text(*message)
+                        .create()
+                        .await
+                }
+                Some(prev_id) => {
+                    stateful_builder(&client)
+                        .with_text(*message)
+                        .with_previous_interaction(prev_id)
+                        .create()
+                        .await
+                }
             }
-
-            let response = builder
-                .create()
-                .await
-                .unwrap_or_else(|e| panic!("Turn {} failed: {:?}", i + 1, e));
+            .unwrap_or_else(|e| panic!("Turn {} failed: {:?}", i + 1, e));
 
             println!("Turn {}: {:?}", i + 1, response.status);
             previous_id = response.id.clone();
@@ -1471,7 +1478,7 @@ async fn test_deep_research_polling() {
         .with_agent(agent_name)
         .with_text(prompt)
         .with_background(true)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await;
 
@@ -1561,7 +1568,7 @@ async fn test_image_generation() {
         .with_model(model)
         .with_text(prompt)
         .with_response_modalities(vec!["IMAGE".to_string()])
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await;
 
@@ -1633,7 +1640,7 @@ async fn test_thought_echo_manual_history() {
     let response1 = interaction_builder(&client)
         .with_text(initial_prompt)
         .with_thinking_level(ThinkingLevel::Medium)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await
         .expect("Turn 1 failed");
@@ -1667,7 +1674,7 @@ async fn test_thought_echo_manual_history() {
     let response2 = interaction_builder(&client)
         .with_input(InteractionInput::Content(history))
         .with_thinking_level(ThinkingLevel::Low)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await
         .expect("Turn 2 failed");
@@ -1731,7 +1738,7 @@ async fn test_multiple_function_call_rounds() {
         interaction_builder(&client)
             .with_text("Get info about the weather and tell me about it.")
             .with_function(get_info)
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     })
@@ -1818,7 +1825,7 @@ async fn test_malformed_function_call_handling() {
         interaction_builder(&client)
             .with_text("What's the weather in Paris?")
             .with_function(get_weather)
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     })

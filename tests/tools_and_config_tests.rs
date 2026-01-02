@@ -265,7 +265,7 @@ async fn test_code_execution_complex() {
             "Using Python, calculate the sum of the first 100 prime numbers. Execute the code to get the answer.",
         )
         .with_tools(vec![Tool::CodeExecution])
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await;
 
@@ -409,7 +409,7 @@ async fn test_url_context() {
             "Fetch and summarize the main content from https://example.com using URL context.",
         )
         .with_url_context() // Use convenience method
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await;
 
@@ -931,7 +931,7 @@ async fn test_response_modalities_image() {
         .with_model("gemini-3-pro-image-preview")
         .with_text("Generate a simple image of a red circle on a white background.")
         .with_response_modalities(vec!["IMAGE".to_string()])
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await;
 

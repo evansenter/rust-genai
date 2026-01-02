@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .interaction()
         .with_model(model_name)
         .with_text(prompt)
-        .with_store(true) // Store for potential follow-up
+        .with_store_enabled() // Store for potential follow-up
         .create()
         .await
     {

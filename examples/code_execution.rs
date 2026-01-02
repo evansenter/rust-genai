@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_model(model_name)
         .with_text(prompt)
         .with_code_execution() // Enable Python code execution
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await
     {

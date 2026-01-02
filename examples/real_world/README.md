@@ -7,7 +7,8 @@ This directory contains comprehensive example applications demonstrating practic
 | Example | Description | Key Features |
 |---------|-------------|--------------|
 | [RAG System](./rag_system/) | Document Q&A with retrieval | Context injection, source attribution |
-| [Multi-Turn Agent](./multi_turn_agent/) | Customer support bot | Stateful conversations, function calling |
+| [Multi-Turn Agent (Auto)](./multi_turn_agent_auto/) | Customer support bot | `create_with_auto_functions()`, stateful conversations |
+| [Multi-Turn Agent (Manual)](./multi_turn_agent_manual/) | Customer support bot | Manual function loop, full control |
 | [Code Assistant](./code_assistant/) | Code analysis tool | Structured output, multi-task analysis |
 | [Data Analysis](./data_analysis/) | CSV analysis with NL queries | Function calling, data operations |
 | [Web Scraper Agent](./web_scraper_agent/) | Web research assistant | Google Search grounding, streaming |
@@ -25,7 +26,8 @@ Run any example with:
 
 ```bash
 cargo run --example rag_system
-cargo run --example multi_turn_agent
+cargo run --example multi_turn_agent_auto
+cargo run --example multi_turn_agent_manual
 cargo run --example code_assistant
 cargo run --example data_analysis
 cargo run --example web_scraper_agent
@@ -80,16 +82,28 @@ let response = client.interaction()
     .create().await?;
 ```
 
-### Multi-Turn Agent
+### Multi-Turn Agent (Auto Functions)
 
-Stateful customer support bot:
+Stateful customer support bot with automatic function execution:
 
 ```rust
-// Chain conversations with previous interaction
-let response = client.interaction()
+// Auto handles function calling loop
+let result = client.interaction()
     .with_previous_interaction(&last_id)
     .with_functions(tools)
     .create_with_auto_functions().await?;
+```
+
+### Multi-Turn Agent (Manual Functions)
+
+Same bot with manual control over function execution:
+
+```rust
+// Manual function calling loop
+let response = client.interaction()
+    .with_previous_interaction(&last_id)
+    .with_content(function_results)
+    .create().await?;
 ```
 
 ### Code Assistant

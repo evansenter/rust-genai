@@ -117,6 +117,19 @@ cargo run --example image_generation
 
 **ToolService Pattern**: Use `Arc<RwLock<T>>` for interior mutability. Same service instance reused across requests via `service.clone()` (clones the Arc, not the service). See `examples/tool_service.rs`.
 
+**Multi-Turn Inheritance Rules** (with `previousInteractionId`):
+| Field | Inherited? | Notes |
+|-------|------------|-------|
+| `systemInstruction` | ✅ Yes | Only send on first turn |
+| `tools` | ❌ No | Must resend on every new user message turn |
+| Conversation history | ✅ Yes | Automatically included |
+
+**Function Result Returns**: When returning function results to the model (after executing a tool), you do NOT need to resend `tools`. The model remembers available tools from the interaction that triggered the function call. Only new user message turns require tools to be included.
+
+**Debugging Multi-Turn**: Use `LOUD_WIRE=1` to see exactly what's being sent on each request. This shows tools, systemInstruction, and previousInteractionId for each turn, making it easy to verify correct behavior.
+
+**For comprehensive multi-turn and function calling patterns**: See `docs/MULTI_TURN_FUNCTION_CALLING.md` - covers stateful vs stateless, auto vs manual execution, thought signatures, and design patterns.
+
 **Streaming**: Uses `async-stream` generators and `futures-util::Stream`
 
 ### Error Types

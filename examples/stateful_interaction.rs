@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .interaction()
         .with_model(model_name)
         .with_text(first_prompt)
-        .with_store(true) // Important: Store for stateful conversation
+        .with_store_enabled() // Important: Store for stateful conversation
         .create()
         .await?;
     let interaction_id = first_response
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_model(model_name)
         .with_text(second_prompt)
         .with_previous_interaction(&interaction_id) // Reference first interaction
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -81,7 +81,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_model(model_name)
         .with_text(third_prompt)
         .with_previous_interaction(second_response.id.as_ref().expect("id should exist")) // Reference second interaction
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 

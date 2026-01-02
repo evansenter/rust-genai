@@ -41,7 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_text("What color is this image? Describe it.")
         .add_image_data(TINY_RED_PNG_BASE64, "image/png")
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -77,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_content(comparison_contents)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -99,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .expect("id should exist when store=true"),
         )
         .with_text("Which of those colors is warmer?")
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
