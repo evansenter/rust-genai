@@ -142,8 +142,8 @@ fn day_of_year_to_month_day(day_of_year: u32, leap: bool) -> (u32, u32) {
     (12, 31) // Fallback
 }
 
-/// Log prefix with timestamp and request ID.
-fn prefix(request_id: usize) -> String {
+/// Log prefix with timestamp and request ID (for outgoing requests).
+fn request_prefix(request_id: usize) -> String {
     let ts = timestamp().dimmed();
     format!(
         "{} {} {}",
@@ -153,13 +153,24 @@ fn prefix(request_id: usize) -> String {
     )
 }
 
+/// Log prefix with timestamp and response ID (for incoming responses).
+fn response_prefix(request_id: usize) -> String {
+    let ts = timestamp().dimmed();
+    format!(
+        "{} {} {}",
+        "[LOUD_WIRE]".bold(),
+        ts,
+        format!("[RES#{}]", request_id).cyan()
+    )
+}
+
 /// Log an outgoing HTTP request.
 pub fn log_request(request_id: usize, method: &str, url: &str, body: Option<&str>) {
     if !is_enabled() {
         return;
     }
 
-    let prefix = prefix(request_id);
+    let prefix = request_prefix(request_id);
     let direction = ">>>".green().bold();
 
     eprintln!("{prefix} {direction} {method} {url}");
@@ -195,7 +206,7 @@ pub fn log_response_status(request_id: usize, status: u16) {
         return;
     }
 
-    let prefix = prefix(request_id);
+    let prefix = response_prefix(request_id);
     let direction = "<<<".red().bold();
     let status_text = if status < 300 {
         format!("{status} OK").green()
@@ -212,7 +223,7 @@ pub fn log_response_body(request_id: usize, body: &str) {
         return;
     }
 
-    let prefix = prefix(request_id);
+    let prefix = response_prefix(request_id);
 
     if let Ok(mut parsed) = serde_json::from_str::<serde_json::Value>(body) {
         truncate_long_fields(&mut parsed);
@@ -243,7 +254,7 @@ pub fn log_sse_chunk(request_id: usize, raw_json: &str) {
         return;
     }
 
-    let prefix = prefix(request_id);
+    let prefix = response_prefix(request_id);
     let label = "SSE".blue().bold();
 
     if let Ok(mut parsed) = serde_json::from_str::<serde_json::Value>(raw_json) {
@@ -269,7 +280,7 @@ pub fn log_upload_start(request_id: usize, file_name: &str, mime_type: &str, siz
         return;
     }
 
-    let prefix = prefix(request_id);
+    let prefix = request_prefix(request_id);
     let direction = ">>>".green().bold();
     let size_mb = size as f64 / 1_048_576.0;
 
@@ -285,7 +296,7 @@ pub fn log_upload_complete(request_id: usize, file_uri: &str) {
         return;
     }
 
-    let prefix = prefix(request_id);
+    let prefix = response_prefix(request_id);
     let direction = "<<<".red().bold();
 
     eprintln!(
