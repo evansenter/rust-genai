@@ -331,8 +331,8 @@ LOUD_WIRE=1 cargo run --example simple_interaction
   "input": "Hello",
   ...
 }
-[LOUD_WIRE] 2026-01-02T10:30:46Z [REQ#1] <<< 200 OK
-[LOUD_WIRE] 2026-01-02T10:30:46Z [REQ#1] SSE:
+[LOUD_WIRE] 2026-01-02T10:30:46Z [RES#1] <<< 200 OK
+[LOUD_WIRE] 2026-01-02T10:30:46Z [RES#1] SSE:
 {
   "delta": {
     "text": "Hello"
@@ -340,6 +340,6 @@ LOUD_WIRE=1 cargo run --example simple_interaction
 }
 ```
 
-- Request IDs (`[REQ#N]`) correlate requests with their responses and SSE chunks
+- Request IDs (`[REQ#N]`) and response IDs (`[RES#N]`) correlate requests with their responses
 - Base64 `"data"` fields are truncated: `"data": "AAAA..."`
 - File uploads show progress: `>>> UPLOAD "video.mp4" (video/mp4, 150.25 MB)`
