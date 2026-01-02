@@ -24,13 +24,29 @@ use genai_client::{
 // These marker types enforce at compile time which builder methods are valid
 // based on the current configuration.
 //
-// State transitions:
-// - FirstTurn (initial) -> Chained (via with_previous_interaction)
-// - FirstTurn (initial) -> StoreDisabled (via with_store_disabled)
+// State Transition Diagram:
 //
-// Constraints enforced:
-// - Chained: can't disable store, can't set system_instruction
-// - StoreDisabled: can't chain to previous, can't enable background
+//                  ┌─────────────────────────────────────┐
+//                  │             FirstTurn               │
+//                  │    (all methods available)          │
+//                  │    • with_system_instruction()      │
+//                  │    • with_store_disabled()          │
+//                  │    • with_previous_interaction()    │
+//                  │    • with_background(true)          │
+//                  └──────────────┬──────────────────────┘
+//                                 │
+//            ┌────────────────────┴────────────────────┐
+//            │                                         │
+//            ▼                                         ▼
+//   ┌─────────────────────┐               ┌─────────────────────┐
+//   │       Chained       │               │    StoreDisabled    │
+//   │ (via prev_interact) │               │ (via store_disabled)│
+//   ├─────────────────────┤               ├─────────────────────┤
+//   │ ✗ system_instruction│               │ ✗ prev_interaction  │
+//   │ ✗ store_disabled    │               │ ✗ background(true)  │
+//   │ ✓ background(true)  │               │ ✗ auto_functions()  │
+//   │ ✓ auto_functions()  │               │ ✓ system_instruction│
+//   └─────────────────────┘               └─────────────────────┘
 //
 // Inheritance behavior with `previousInteractionId`:
 // - `systemInstruction`: IS inherited (only valid on first turn)
@@ -89,9 +105,9 @@ impl CanAutoFunction for Chained {}
 /// interaction. This enables compile-time enforcement of API constraints:
 ///
 /// - [`FirstTurn`]: Initial state. All methods available including `with_system_instruction()`
-///   and `with_store(false)`.
+///   and `with_store_disabled()`.
 /// - [`Chained`]: After calling `with_previous_interaction()`. The `with_system_instruction()`
-///   method is not available (system instructions are inherited), and `with_store(false)` is
+///   method is not available (system instructions are inherited), and `with_store_disabled()` is
 ///   not available (chained interactions require storage).
 ///
 /// # Examples
@@ -212,7 +228,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
     /// This method transitions the builder from [`FirstTurn`] to [`Chained`] state.
     /// After calling this method:
     /// - `with_system_instruction()` is no longer available (system instructions are inherited)
-    /// - `with_store(false)` is no longer available (chained interactions require storage)
+    /// - `with_store_disabled()` is no longer available (chained interactions require storage)
     pub fn with_previous_interaction(
         self,
         id: impl Into<String>,
