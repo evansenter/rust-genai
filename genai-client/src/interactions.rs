@@ -1,6 +1,7 @@
 use crate::common::{API_KEY_HEADER, Endpoint, construct_endpoint_url};
 use crate::error_helpers::{check_response, deserialize_with_context};
 use crate::errors::GenaiError;
+use crate::loud_wire;
 use crate::models::interactions::{
     CreateInteractionRequest, InteractionResponse, InteractionStreamEvent, StreamChunk,
 };
@@ -29,14 +30,33 @@ pub async fn create_interaction(
     let endpoint = Endpoint::CreateInteraction { stream: false };
     let url = construct_endpoint_url(endpoint);
 
+    // LOUD_WIRE: Log outgoing request
+    let request_id = loud_wire::next_request_id();
+    let request_body = match serde_json::to_string(&request) {
+        Ok(body) => Some(body),
+        Err(e) => {
+            log::warn!("LOUD_WIRE: Failed to serialize request body: {}", e);
+            None
+        }
+    };
+    loud_wire::log_request(request_id, "POST", &url, request_body.as_deref());
+
     let response = http_client
         .post(&url)
         .header(API_KEY_HEADER, api_key)
         .json(&request)
         .send()
         .await?;
+
+    // LOUD_WIRE: Log response status
+    loud_wire::log_response_status(request_id, response.status().as_u16());
+
     let response = check_response(response).await?;
     let response_text = response.text().await.map_err(GenaiError::Http)?;
+
+    // LOUD_WIRE: Log response body
+    loud_wire::log_response_body(request_id, &response_text);
+
     let interaction_response: InteractionResponse =
         deserialize_with_context(&response_text, "InteractionResponse from create")?;
 
@@ -74,6 +94,17 @@ pub fn create_interaction_stream<'a>(
     let endpoint = Endpoint::CreateInteraction { stream: true };
     let url = construct_endpoint_url(endpoint);
 
+    // LOUD_WIRE: Log outgoing request (before try_stream! to capture request_id)
+    let request_id = loud_wire::next_request_id();
+    let request_body = match serde_json::to_string(&request) {
+        Ok(body) => Some(body),
+        Err(e) => {
+            log::warn!("LOUD_WIRE: Failed to serialize request body: {}", e);
+            None
+        }
+    };
+    loud_wire::log_request(request_id, "POST (stream)", &url, request_body.as_deref());
+
     try_stream! {
         let response = http_client
             .post(&url)
@@ -81,9 +112,13 @@ pub fn create_interaction_stream<'a>(
             .json(&request)
             .send()
             .await?;
+
+        // LOUD_WIRE: Log response status
+        loud_wire::log_response_status(request_id, response.status().as_u16());
+
         let response = check_response(response).await?;
         let byte_stream = response.bytes_stream();
-        let parsed_stream = parse_sse_stream::<InteractionStreamEvent>(byte_stream);
+        let parsed_stream = parse_sse_stream::<InteractionStreamEvent>(byte_stream, request_id);
         futures_util::pin_mut!(parsed_stream);
 
         while let Some(result) = parsed_stream.next().await {
@@ -162,13 +197,25 @@ pub async fn get_interaction(
     let endpoint = Endpoint::GetInteraction { id: interaction_id };
     let url = construct_endpoint_url(endpoint);
 
+    // LOUD_WIRE: Log outgoing request
+    let request_id = loud_wire::next_request_id();
+    loud_wire::log_request(request_id, "GET", &url, None);
+
     let response = http_client
         .get(&url)
         .header(API_KEY_HEADER, api_key)
         .send()
         .await?;
+
+    // LOUD_WIRE: Log response status
+    loud_wire::log_response_status(request_id, response.status().as_u16());
+
     let response = check_response(response).await?;
     let response_text = response.text().await.map_err(GenaiError::Http)?;
+
+    // LOUD_WIRE: Log response body
+    loud_wire::log_response_body(request_id, &response_text);
+
     let interaction_response: InteractionResponse =
         deserialize_with_context(&response_text, "InteractionResponse from get")?;
 
@@ -193,11 +240,19 @@ pub async fn delete_interaction(
     let endpoint = Endpoint::DeleteInteraction { id: interaction_id };
     let url = construct_endpoint_url(endpoint);
 
+    // LOUD_WIRE: Log outgoing request
+    let request_id = loud_wire::next_request_id();
+    loud_wire::log_request(request_id, "DELETE", &url, None);
+
     let response = http_client
         .delete(&url)
         .header(API_KEY_HEADER, api_key)
         .send()
         .await?;
+
+    // LOUD_WIRE: Log response status
+    loud_wire::log_response_status(request_id, response.status().as_u16());
+
     check_response(response).await?;
     Ok(())
 }

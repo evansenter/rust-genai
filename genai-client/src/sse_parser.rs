@@ -4,6 +4,7 @@
 /// SSE format consists of lines starting with "data: " followed by JSON payloads.
 use crate::error_helpers::format_json_parse_error;
 use crate::errors::GenaiError;
+use crate::loud_wire;
 use async_stream::try_stream;
 use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
@@ -26,6 +27,7 @@ use std::str;
 /// # Arguments
 ///
 /// * `byte_stream` - An async stream of byte chunks from the HTTP response
+/// * `request_id` - Request ID for LOUD_WIRE correlation
 ///
 /// # Returns
 ///
@@ -35,7 +37,7 @@ use std::str;
 ///
 /// ```ignore
 /// let byte_stream = response.bytes_stream();
-/// let parsed_stream = parse_sse_stream::<MyResponseType>(byte_stream);
+/// let parsed_stream = parse_sse_stream::<MyResponseType>(byte_stream, request_id);
 ///
 /// while let Some(result) = parsed_stream.next().await {
 ///     let response = result?;
@@ -44,6 +46,7 @@ use std::str;
 /// ```
 pub fn parse_sse_stream<T>(
     byte_stream: impl Stream<Item = Result<Bytes, reqwest::Error>> + Send,
+    request_id: usize,
 ) -> impl Stream<Item = Result<T, GenaiError>> + Send
 where
     T: DeserializeOwned + Send,
@@ -69,6 +72,10 @@ where
                     // Skip empty data lines and [DONE] markers (used by some SSE endpoints)
                     if !json_data.is_empty() && json_data != "[DONE]" {
                         debug!("SSE raw data: {}", json_data);
+
+                        // LOUD_WIRE: Log SSE chunk
+                        loud_wire::log_sse_chunk(request_id, json_data);
+
                         let parsed: T = serde_json::from_str(json_data).map_err(|e| {
                             let context_msg = format_json_parse_error(json_data, e);
                             GenaiError::Parse(context_msg)
@@ -98,7 +105,7 @@ mod tests {
         let data = b"data: {\"text\":\"Hello\"}\n\n".to_vec();
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
 
-        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream, 0);
         pin_mut!(parsed_stream);
 
         let result = parsed_stream.next().await;
@@ -114,7 +121,7 @@ mod tests {
         let data = b"data: {\"text\":\"First\"}\n\ndata: {\"text\":\"Second\"}\n\n".to_vec();
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
 
-        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream, 0);
         pin_mut!(parsed_stream);
 
         let first = parsed_stream.next().await.unwrap().unwrap();
@@ -131,7 +138,7 @@ mod tests {
         let chunk2 = b"xt\":\"Hello\"}\n\n".to_vec();
         let byte_stream = stream::iter(vec![Ok(Bytes::from(chunk1)), Ok(Bytes::from(chunk2))]);
 
-        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream, 0);
         pin_mut!(parsed_stream);
 
         let message = parsed_stream.next().await.unwrap().unwrap();
@@ -144,7 +151,7 @@ mod tests {
         let data = b": comment\ndata: {\"text\":\"Hello\"}\n\nevent: test\n\n".to_vec();
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
 
-        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream, 0);
         pin_mut!(parsed_stream);
 
         let message = parsed_stream.next().await.unwrap().unwrap();
@@ -160,7 +167,7 @@ mod tests {
         let data = b"data: \ndata: {\"text\":\"Hello\"}\n\n".to_vec();
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
 
-        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream, 0);
         pin_mut!(parsed_stream);
 
         let message = parsed_stream.next().await.unwrap().unwrap();
@@ -173,7 +180,7 @@ mod tests {
         let data = b"data: {invalid json}\n\n".to_vec();
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
 
-        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream, 0);
         pin_mut!(parsed_stream);
 
         let result = parsed_stream.next().await.unwrap();
@@ -189,7 +196,7 @@ mod tests {
         let data = format!("data: {{\"text\":\"{}\"}}\n\n", large_text);
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
 
-        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream, 0);
         pin_mut!(parsed_stream);
 
         let result = parsed_stream.next().await;
@@ -207,7 +214,7 @@ mod tests {
         }
 
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
-        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream, 0);
         pin_mut!(parsed_stream);
 
         let mut count = 0;
@@ -231,7 +238,7 @@ mod tests {
             .collect();
 
         let byte_stream = stream::iter(chunks);
-        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream, 0);
         pin_mut!(parsed_stream);
 
         let message = parsed_stream.next().await.unwrap().unwrap();
@@ -244,7 +251,7 @@ mod tests {
         let data = b"data: {\"text\":\"First\"}\n\ndata: {\"text\":\"Second\"}\r\n\r\ndata: {\"text\":\"Third\"}\n\n".to_vec();
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
 
-        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream, 0);
         pin_mut!(parsed_stream);
 
         let first = parsed_stream.next().await.unwrap().unwrap();
@@ -263,7 +270,7 @@ mod tests {
         let data = b"data: {\"text\":\"Hello \\u4e16\\u754c \\ud83c\\udf0d\"}\n\n".to_vec();
         let byte_stream = stream::iter(vec![Ok(Bytes::from(data))]);
 
-        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream);
+        let parsed_stream = parse_sse_stream::<TestMessage>(byte_stream, 0);
         pin_mut!(parsed_stream);
 
         let message = parsed_stream.next().await.unwrap().unwrap();
