@@ -8,6 +8,7 @@ This guide covers everything you need to know about multi-turn conversations and
 - [Stateful vs Stateless](#stateful-vs-stateless)
 - [Function Declaration Approaches](#function-declaration-approaches)
 - [Auto vs Manual Function Calling](#auto-vs-manual-function-calling)
+- [Parallel and Compositional Function Calling](#parallel-and-compositional-function-calling)
 - [API Inheritance Behavior](#api-inheritance-behavior)
 - [Thought Signatures](#thought-signatures)
 - [Design Patterns](#design-patterns)
@@ -53,9 +54,10 @@ let response = client.interaction()
 **Characteristics:**
 - Server maintains conversation history
 - Use `previous_interaction_id` to chain turns
-- System instruction is inherited (only send on first turn)
-- Tools are NOT inherited (must resend each turn)
+- System instruction is inherited - only send on first turn (observed behavior, not explicitly documented by Google)
+- Tools are NOT inherited - must resend on new user message turns, but not on function result turns (observed behavior, not explicitly documented by Google)
 - Enables `create_with_auto_functions()` for automatic function execution
+- Enables `with_background(true)` for async/agent execution (see `examples/deep_research.rs`)
 
 ### Stateless Mode (`store: false`)
 
@@ -93,6 +95,7 @@ let response = client.interaction()
 - Must manually build and send conversation history
 - Cannot use `previous_interaction_id`
 - `create_with_auto_functions()` is blocked at compile time
+- `with_background(true)` is blocked (requires storage to retrieve results)
 - Must use manual function calling with `create()`
 
 ### When to Use Each
@@ -105,6 +108,7 @@ let response = client.interaction()
 | Conversation filtering/modification | | ✅ |
 | Testing and debugging | | ✅ |
 | Automatic function execution | ✅ | |
+| Background/async execution | ✅ | |
 
 ## Function Declaration Approaches
 
@@ -174,7 +178,7 @@ let result = client.interaction()
 - Tools need runtime configuration
 - Tools need per-request context (user ID, auth tokens)
 
-**Pattern:** Use `Arc<RwLock<T>>` for interior mutability. Clone the Arc, not the service.
+**Pattern:** Use `Arc<RwLock<T>>` for interior mutability. Clone the Arc, not the service—cloning an `Arc` just increments a reference count (cheap), and all clones share the same underlying state.
 
 ### 3. `FunctionDeclaration` Builder (Manual)
 
@@ -283,6 +287,72 @@ for _ in 0..MAX_ITERATIONS {
 - Works with both stateful and stateless modes
 - Required for `store: false`
 
+## Parallel and Compositional Function Calling
+
+The Gemini API supports advanced function calling patterns:
+
+### Parallel Function Calls
+
+The model can request multiple independent functions in a single response:
+
+```rust
+// Model might return multiple function calls at once
+let calls = response.function_calls();
+// calls = [get_weather("Tokyo"), get_weather("London"), get_time("UTC")]
+
+// Execute all in parallel
+let results: Vec<_> = futures::future::join_all(
+    calls.iter().map(|call| execute_function(call))
+).await;
+
+// Send all results back together
+let result_contents: Vec<_> = calls.iter().zip(results.iter())
+    .map(|(call, result)| function_result_content(
+        call.name,
+        call.id.unwrap(),
+        result.clone(),
+    ))
+    .collect();
+
+// Function result turn - no need to resend tools
+response = client.interaction()
+    .with_previous_interaction(&response.id.unwrap())
+    .with_content(result_contents)
+    .create()
+    .await?;
+```
+
+**When parallel calls occur:**
+- Functions are independent (no data dependencies)
+- Model determines parallelism automatically based on the request
+- Results can be provided in any order
+
+### Compositional (Sequential) Function Calls
+
+The model can chain functions where output of one becomes input to another:
+
+```rust
+// User: "Get the weather in my current location"
+// Step 1: Model calls get_current_location()
+// Step 2: After receiving location, model calls get_weather(location)
+
+// This happens automatically across turns - the model orchestrates the chain
+// You just need to execute each function call and return results
+```
+
+**Key behaviors:**
+- Model manages the chain logic internally
+- Each step is a separate function call turn
+- Results from earlier steps inform later function selection
+
+### Thought Signatures with Parallel Calls
+
+Per the API documentation:
+- **Parallel calls**: Only the first function call in a parallel batch has a thought signature
+- **Sequential calls**: Each step in a sequence has its own thought signature
+
+See `tests/thinking_function_tests.rs` for examples of these patterns.
+
 ## API Inheritance Behavior
 
 When using `previous_interaction_id` (stateful mode), some settings are inherited:
@@ -291,8 +361,10 @@ When using `previous_interaction_id` (stateful mode), some settings are inherite
 |---------|-----------|-------------|
 | System instruction | ✅ Yes | Only send on first turn |
 | Conversation history | ✅ Yes | Model remembers context |
-| Tools/Functions | ❌ No | Must resend each turn that needs function calling |
+| Tools/Functions | ❌ No | Must resend on new user message turns (not function result turns) |
 | Model | ❌ No | Must specify each request |
+
+> **Note:** The inheritance behavior for system instructions and tools is based on observed behavior through testing. Google's API documentation does not explicitly document what settings are inherited via `previousInteractionId`.
 
 This leads to the recommended pattern:
 
