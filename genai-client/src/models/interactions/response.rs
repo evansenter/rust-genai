@@ -203,6 +203,69 @@ pub struct FunctionCallInfo<'a> {
     pub thought_signature: Option<&'a str>,
 }
 
+impl FunctionCallInfo<'_> {
+    /// Convert to an owned version that doesn't borrow from the response.
+    ///
+    /// Use this when you need to store function call data beyond the lifetime
+    /// of the response, such as for event emission, trajectory recording,
+    /// or passing to async tasks.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// // Store function calls for later processing
+    /// let owned_calls: Vec<_> = response.function_calls()
+    ///     .into_iter()
+    ///     .map(|call| call.to_owned())
+    ///     .collect();
+    /// ```
+    #[must_use]
+    pub fn to_owned(&self) -> OwnedFunctionCallInfo {
+        OwnedFunctionCallInfo {
+            id: self.id.map(String::from),
+            name: self.name.to_string(),
+            args: self.args.clone(),
+            thought_signature: self.thought_signature.map(String::from),
+        }
+    }
+}
+
+/// Owned version of [`FunctionCallInfo`] for storing beyond response lifetime.
+///
+/// This type owns all its data, making it suitable for:
+/// - Event emission with function call metadata
+/// - Trajectory/replay recording
+/// - Passing to async tasks or storing in collections
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::InteractionResponse;
+/// # let response: InteractionResponse = todo!();
+/// let owned_calls: Vec<_> = response.function_calls()
+///     .into_iter()
+///     .map(|call| call.to_owned())
+///     .collect();
+///
+/// // owned_calls can now outlive `response`
+/// for call in owned_calls {
+///     println!("Function: {} with args: {}", call.name, call.args);
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OwnedFunctionCallInfo {
+    /// Unique identifier for this function call (used when sending results back)
+    pub id: Option<String>,
+    /// Name of the function to call
+    pub name: String,
+    /// Arguments to pass to the function
+    pub args: serde_json::Value,
+    /// Thought signature for Gemini 3 reasoning continuity
+    pub thought_signature: Option<String>,
+}
+
 /// Information about a function result in the response.
 ///
 /// Returned by [`InteractionResponse::function_results()`] for convenient access

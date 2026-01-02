@@ -1724,3 +1724,188 @@ fn test_interaction_response_roundtrip_without_id() {
     assert_eq!(restored.model, original.model);
     assert_eq!(restored.status, original.status);
 }
+
+// --- OwnedFunctionCallInfo Tests ---
+
+#[test]
+fn test_function_call_info_to_owned() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::FunctionCall {
+            id: Some("call_123".to_string()),
+            name: "get_weather".to_string(),
+            args: serde_json::json!({"city": "Tokyo", "units": "celsius"}),
+            thought_signature: Some("sig_abc".to_string()),
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    let calls = response.function_calls();
+    assert_eq!(calls.len(), 1);
+
+    // Convert to owned
+    let owned = calls[0].to_owned();
+
+    // Verify all fields are correctly converted
+    assert_eq!(owned.id, Some("call_123".to_string()));
+    assert_eq!(owned.name, "get_weather");
+    assert_eq!(owned.args["city"], "Tokyo");
+    assert_eq!(owned.args["units"], "celsius");
+    assert_eq!(owned.thought_signature, Some("sig_abc".to_string()));
+}
+
+#[test]
+fn test_function_call_info_to_owned_none_fields() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::FunctionCall {
+            id: None,
+            name: "simple_function".to_string(),
+            args: serde_json::json!({}),
+            thought_signature: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    let calls = response.function_calls();
+    let owned = calls[0].to_owned();
+
+    assert_eq!(owned.id, None);
+    assert_eq!(owned.name, "simple_function");
+    assert_eq!(owned.args, serde_json::json!({}));
+    assert_eq!(owned.thought_signature, None);
+}
+
+#[test]
+fn test_owned_function_call_info_outlives_response() {
+    // Demonstrate the main use case: owned call can outlive the response
+    let owned_calls: Vec<OwnedFunctionCallInfo> = {
+        let response = InteractionResponse {
+            id: Some("test_id".to_string()),
+            model: Some("gemini-3-flash-preview".to_string()),
+            agent: None,
+            input: vec![],
+            outputs: vec![
+                InteractionContent::FunctionCall {
+                    id: Some("call_1".to_string()),
+                    name: "func_a".to_string(),
+                    args: serde_json::json!({"x": 1}),
+                    thought_signature: None,
+                },
+                InteractionContent::FunctionCall {
+                    id: Some("call_2".to_string()),
+                    name: "func_b".to_string(),
+                    args: serde_json::json!({"y": 2}),
+                    thought_signature: None,
+                },
+            ],
+            status: InteractionStatus::RequiresAction,
+            usage: None,
+            tools: None,
+            previous_interaction_id: None,
+            grounding_metadata: None,
+            url_context_metadata: None,
+        };
+
+        // Convert to owned before response goes out of scope
+        response
+            .function_calls()
+            .into_iter()
+            .map(|call| call.to_owned())
+            .collect()
+    }; // response is dropped here
+
+    // owned_calls is still valid and usable
+    assert_eq!(owned_calls.len(), 2);
+    assert_eq!(owned_calls[0].name, "func_a");
+    assert_eq!(owned_calls[0].args["x"], 1);
+    assert_eq!(owned_calls[1].name, "func_b");
+    assert_eq!(owned_calls[1].args["y"], 2);
+}
+
+#[test]
+fn test_owned_function_call_info_serialization_roundtrip() {
+    let owned = OwnedFunctionCallInfo {
+        id: Some("call_xyz".to_string()),
+        name: "my_function".to_string(),
+        args: serde_json::json!({"key": "value", "number": 42}),
+        thought_signature: Some("thought_sig".to_string()),
+    };
+
+    // Serialize to JSON
+    let json = serde_json::to_string(&owned).expect("Serialization should succeed");
+
+    // Verify JSON contains expected data
+    assert!(json.contains("call_xyz"));
+    assert!(json.contains("my_function"));
+    assert!(json.contains("thought_sig"));
+
+    // Deserialize back
+    let restored: OwnedFunctionCallInfo =
+        serde_json::from_str(&json).expect("Deserialization should succeed");
+
+    assert_eq!(restored.id, owned.id);
+    assert_eq!(restored.name, owned.name);
+    assert_eq!(restored.args, owned.args);
+    assert_eq!(restored.thought_signature, owned.thought_signature);
+}
+
+#[test]
+fn test_owned_function_call_info_clone() {
+    let owned = OwnedFunctionCallInfo {
+        id: Some("call_id".to_string()),
+        name: "cloneable".to_string(),
+        args: serde_json::json!({"data": [1, 2, 3]}),
+        thought_signature: None,
+    };
+
+    let cloned = owned.clone();
+
+    assert_eq!(cloned.id, owned.id);
+    assert_eq!(cloned.name, owned.name);
+    assert_eq!(cloned.args, owned.args);
+    assert_eq!(cloned.thought_signature, owned.thought_signature);
+}
+
+#[test]
+fn test_owned_function_call_info_equality() {
+    let owned1 = OwnedFunctionCallInfo {
+        id: Some("same_id".to_string()),
+        name: "same_name".to_string(),
+        args: serde_json::json!({"same": true}),
+        thought_signature: Some("same_sig".to_string()),
+    };
+
+    let owned2 = OwnedFunctionCallInfo {
+        id: Some("same_id".to_string()),
+        name: "same_name".to_string(),
+        args: serde_json::json!({"same": true}),
+        thought_signature: Some("same_sig".to_string()),
+    };
+
+    let different = OwnedFunctionCallInfo {
+        id: Some("different_id".to_string()),
+        name: "same_name".to_string(),
+        args: serde_json::json!({"same": true}),
+        thought_signature: Some("same_sig".to_string()),
+    };
+
+    assert_eq!(owned1, owned2);
+    assert_ne!(owned1, different);
+}
