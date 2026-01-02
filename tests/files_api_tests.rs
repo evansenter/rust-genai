@@ -390,10 +390,10 @@ async fn test_get_nonexistent_file_returns_error() {
 }
 
 // =============================================================================
-// Streaming Upload Tests
+// Chunked Upload Tests
 // =============================================================================
 
-/// Tests streaming upload with a moderately sized file.
+/// Tests chunked upload with a moderately sized file.
 ///
 /// This test creates a file larger than the default chunk size to verify
 /// the streaming mechanism works correctly across multiple chunks.
@@ -411,11 +411,11 @@ async fn test_upload_file_chunked() {
     let data: Vec<u8> = (0..9 * 1024 * 1024).map(|i| (i % 256) as u8).collect();
     std::fs::write(&file_path, &data).unwrap();
 
-    // Upload using streaming
+    // Upload using chunked method
     let (file, resumable_upload) = client
         .upload_file_chunked_with_mime(&file_path, "text/plain")
         .await
-        .expect("Streaming upload failed");
+        .expect("Chunked upload failed");
 
     // Verify file metadata
     assert!(
@@ -457,7 +457,7 @@ async fn test_upload_file_chunked() {
         .expect("Failed to delete file");
 }
 
-/// Tests streaming upload with automatic MIME type detection.
+/// Tests chunked upload with automatic MIME type detection.
 #[tokio::test]
 #[ignore] // Requires API key
 async fn test_upload_file_chunked_auto_mime() {
@@ -471,11 +471,11 @@ async fn test_upload_file_chunked_auto_mime() {
     let data = vec![0u8; 1024]; // 1KB fake video
     std::fs::write(&file_path, &data).unwrap();
 
-    // Upload using streaming with auto MIME detection
+    // Upload using chunked method with auto MIME detection
     let (file, _) = client
         .upload_file_chunked(&file_path)
         .await
-        .expect("Streaming upload failed");
+        .expect("Chunked upload failed");
 
     // Verify MIME type was detected correctly
     assert_eq!(
@@ -488,7 +488,7 @@ async fn test_upload_file_chunked_auto_mime() {
     client.delete_file(&file.name).await.unwrap();
 }
 
-/// Tests streaming upload with a custom chunk size.
+/// Tests chunked upload with a custom chunk size.
 #[tokio::test]
 #[ignore] // Requires API key
 async fn test_upload_file_chunked_custom_chunk_size() {
@@ -507,7 +507,7 @@ async fn test_upload_file_chunked_custom_chunk_size() {
     let (file, resumable_upload) = client
         .upload_file_chunked_with_options(&file_path, "text/plain", chunk_size)
         .await
-        .expect("Streaming upload with custom chunk size failed");
+        .expect("Chunked upload with custom chunk size failed");
 
     // Verify upload succeeded
     assert!(file.name.starts_with("files/"));
@@ -517,7 +517,7 @@ async fn test_upload_file_chunked_custom_chunk_size() {
     client.delete_file(&file.name).await.unwrap();
 }
 
-/// Tests streaming upload validates empty files.
+/// Tests chunked upload validates empty files.
 #[tokio::test]
 #[ignore] // Requires API key
 async fn test_upload_file_chunked_empty_file_error() {
@@ -528,7 +528,7 @@ async fn test_upload_file_chunked_empty_file_error() {
     let file_path = temp_dir.path().join("empty.txt");
     std::fs::write(&file_path, b"").unwrap();
 
-    // Streaming upload should fail for empty files
+    // Chunked upload should fail for empty files
     let result = client
         .upload_file_chunked_with_mime(&file_path, "text/plain")
         .await;
@@ -542,7 +542,7 @@ async fn test_upload_file_chunked_empty_file_error() {
     );
 }
 
-/// Tests streaming upload with nonexistent file returns appropriate error.
+/// Tests chunked upload with nonexistent file returns appropriate error.
 #[tokio::test]
 #[ignore] // Requires API key
 async fn test_upload_file_chunked_nonexistent_file_error() {
@@ -562,24 +562,24 @@ async fn test_upload_file_chunked_nonexistent_file_error() {
     );
 }
 
-/// Tests that streamed file can be used in an interaction.
+/// Tests that file uploaded via chunked method can be used in an interaction.
 #[tokio::test]
 #[ignore] // Requires API key
-async fn test_streaming_upload_in_interaction() {
+async fn test_chunked_upload_in_interaction() {
     let client = get_client();
 
     // Create a text file with content
     let temp_dir = tempfile::tempdir().unwrap();
     let file_path = temp_dir.path().join("interact.txt");
     let content =
-        "The quick brown fox jumps over the lazy dog. This file was uploaded via streaming.";
+        "The quick brown fox jumps over the lazy dog. This file was uploaded via chunked upload.";
     std::fs::write(&file_path, content).unwrap();
 
-    // Upload using streaming
+    // Upload using chunked method
     let (file, _) = client
         .upload_file_chunked_with_mime(&file_path, "text/plain")
         .await
-        .expect("Streaming upload failed");
+        .expect("Chunked upload failed");
 
     // Wait for file to be ready
     let ready_file = client
