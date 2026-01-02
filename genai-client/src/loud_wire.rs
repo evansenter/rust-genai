@@ -61,10 +61,10 @@ fn truncate_long_fields(value: &mut serde_json::Value) {
         serde_json::Value::Object(map) => {
             for (key, val) in map.iter_mut() {
                 if TRUNCATE_FIELDS.contains(&key.as_str()) {
-                    if let serde_json::Value::String(s) = val {
-                        if s.len() > TRUNCATE_THRESHOLD {
-                            *s = format!("{}...", &s[..TRUNCATE_THRESHOLD]);
-                        }
+                    if let serde_json::Value::String(s) = val
+                        && s.len() > TRUNCATE_THRESHOLD
+                    {
+                        *s = format!("{}...", &s[..TRUNCATE_THRESHOLD]);
                     }
                 } else {
                     truncate_long_fields(val);
@@ -314,7 +314,10 @@ mod tests {
         let result = value["data"].as_str().unwrap();
         assert!(result.ends_with("..."), "Long data should be truncated");
         assert_eq!(result.len(), 103, "Should be 100 chars + '...'");
-        assert!(result.starts_with(&"A".repeat(100)), "Should preserve first 100 chars");
+        assert!(
+            result.starts_with(&"A".repeat(100)),
+            "Should preserve first 100 chars"
+        );
     }
 
     #[test]
@@ -324,7 +327,10 @@ mod tests {
         truncate_long_fields(&mut value);
 
         let result = value["signature"].as_str().unwrap();
-        assert!(result.ends_with("..."), "Long signature should be truncated");
+        assert!(
+            result.ends_with("..."),
+            "Long signature should be truncated"
+        );
     }
 
     #[test]
@@ -336,8 +342,14 @@ mod tests {
         });
         truncate_long_fields(&mut value);
 
-        assert_eq!(value["text"], long_text, "Text field should not be truncated");
-        assert!(value["data"].as_str().unwrap().ends_with("..."), "Data should be truncated");
+        assert_eq!(
+            value["text"], long_text,
+            "Text field should not be truncated"
+        );
+        assert!(
+            value["data"].as_str().unwrap().ends_with("..."),
+            "Data should be truncated"
+        );
     }
 
     #[test]
