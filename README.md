@@ -810,6 +810,22 @@ RUST_LOG=rust_genai=warn cargo run
 
 The library logs request/response details, streaming events, and interaction lifecycle at the `debug` level.
 
+### Wire-Level Debugging
+
+For quick debugging of raw API traffic without configuring a logging backend, use the `LOUD_WIRE` environment variable:
+
+```bash
+LOUD_WIRE=1 cargo run --example simple_interaction
+```
+
+This prints pretty-formatted JSON of all API requests and responses to stderr with:
+- Color-coded output (green for requests, red for responses, blue for SSE chunks)
+- Request IDs for correlating requests with responses
+- Automatic truncation of base64 data fields
+- Timestamps for timing analysis
+
+See [docs/LOGGING_STRATEGY.md](docs/LOGGING_STRATEGY.md) for a detailed comparison of `RUST_LOG` vs `LOUD_WIRE`.
+
 ## Project Structure
 
 The project consists of three main components:

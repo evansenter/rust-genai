@@ -286,3 +286,60 @@ Log filtering by level:
 RUST_LOG=rust_genai=debug cargo run --example simple_interaction
 RUST_LOG=genai_client=debug cargo run --example streaming
 ```
+
+## Wire-Level Debugging with LOUD_WIRE
+
+For zero-config debugging of raw API traffic, use the `LOUD_WIRE` environment variable:
+
+```bash
+LOUD_WIRE=1 cargo run --example simple_interaction
+```
+
+### LOUD_WIRE vs RUST_LOG
+
+| Feature | RUST_LOG | LOUD_WIRE |
+|---------|----------|-----------|
+| **Purpose** | Structured logging for all modules | Raw API traffic inspection |
+| **Output** | Plain text to configured logger | Pretty-printed JSON to stderr |
+| **Filtering** | Per-module level control | All-or-nothing |
+| **Colors** | Depends on backend | Always (green requests, red responses, blue SSE) |
+| **Base64 data** | Full content at debug level | Truncated to 100 chars |
+| **Timestamps** | Depends on backend | Always included with request IDs |
+| **SSE streaming** | Individual events at debug | Always included with correlation |
+
+### When to Use Each
+
+**Use RUST_LOG when:**
+- Diagnosing internal library behavior
+- Filtering specific modules or log levels
+- Integrating with your application's logging pipeline
+- Production debugging with controlled verbosity
+
+**Use LOUD_WIRE when:**
+- "What exactly is being sent to the API?"
+- Debugging request/response mismatches
+- Sharing API traces for bug reports
+- Quick development iteration
+
+### LOUD_WIRE Output Format
+
+```
+[LOUD_WIRE] 2026-01-02T10:30:45Z [REQ#1] >>> POST https://...
+[LOUD_WIRE] 2026-01-02T10:30:45Z [REQ#1] Body:
+{
+  "model": "gemini-3-flash-preview",
+  "input": "Hello",
+  ...
+}
+[LOUD_WIRE] 2026-01-02T10:30:46Z [REQ#1] <<< 200 OK
+[LOUD_WIRE] 2026-01-02T10:30:46Z [REQ#1] SSE:
+{
+  "delta": {
+    "text": "Hello"
+  }
+}
+```
+
+- Request IDs (`[REQ#N]`) correlate requests with their responses and SSE chunks
+- Base64 `"data"` fields are truncated: `"data": "AAAA..."`
+- File uploads show progress: `>>> UPLOAD "video.mp4" (video/mp4, 150.25 MB)`

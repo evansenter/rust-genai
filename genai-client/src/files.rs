@@ -52,6 +52,7 @@
 use crate::common::API_KEY_HEADER;
 use crate::error_helpers::{check_response, deserialize_with_context};
 use crate::errors::GenaiError;
+use crate::loud_wire;
 use reqwest::Client as ReqwestClient;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -372,6 +373,15 @@ pub async fn upload_file(
         display_name
     );
 
+    // LOUD_WIRE: Log upload start
+    let request_id = loud_wire::next_request_id();
+    loud_wire::log_upload_start(
+        request_id,
+        display_name.unwrap_or("(unnamed)"),
+        mime_type,
+        file_size as u64,
+    );
+
     // Step 1: Start the resumable upload
     let metadata = if let Some(name) = display_name {
         serde_json::json!({ "file": { "displayName": name } })
@@ -425,6 +435,9 @@ pub async fn upload_file(
         file_response.file.name,
         file_response.file.uri
     );
+
+    // LOUD_WIRE: Log upload complete
+    loud_wire::log_upload_complete(request_id, &file_response.file.uri);
 
     Ok(file_response.file)
 }
@@ -744,6 +757,13 @@ pub async fn upload_file_chunked_with_chunk_size(
         chunk_size
     );
 
+    // LOUD_WIRE: Log chunked upload start
+    let request_id = loud_wire::next_request_id();
+    let loud_wire_name = display_name
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| path.to_string_lossy().into_owned());
+    loud_wire::log_upload_start(request_id, &loud_wire_name, mime_type, file_size);
+
     // Step 1: Start the resumable upload session
     let metadata_json = if let Some(name) = display_name {
         serde_json::json!({ "file": { "displayName": name } })
@@ -815,6 +835,9 @@ pub async fn upload_file_chunked_with_chunk_size(
         file_response.file.uri
     );
 
+    // LOUD_WIRE: Log upload complete
+    loud_wire::log_upload_complete(request_id, &file_response.file.uri);
+
     Ok((file_response.file, resumable_upload))
 }
 
@@ -838,13 +861,25 @@ pub async fn get_file(
 
     let url = format!("{BASE_URL}/{API_VERSION}/{file_name}");
 
+    // LOUD_WIRE: Log outgoing request
+    let request_id = loud_wire::next_request_id();
+    loud_wire::log_request(request_id, "GET", &url, None);
+
     let response = http_client
         .get(&url)
         .header(API_KEY_HEADER, api_key)
         .send()
         .await?;
+
+    // LOUD_WIRE: Log response status
+    loud_wire::log_response_status(request_id, response.status().as_u16());
+
     let response = check_response(response).await?;
     let response_text = response.text().await.map_err(GenaiError::Http)?;
+
+    // LOUD_WIRE: Log response body
+    loud_wire::log_response_body(request_id, &response_text);
+
     let file: FileMetadata = deserialize_with_context(&response_text, "FileMetadata")?;
 
     log::debug!("Got file: state={:?}", file.state);
@@ -889,13 +924,25 @@ pub async fn list_files(
         url.push_str(&format!("{separator}pageToken={token}"));
     }
 
+    // LOUD_WIRE: Log outgoing request
+    let request_id = loud_wire::next_request_id();
+    loud_wire::log_request(request_id, "GET", &url, None);
+
     let response = http_client
         .get(&url)
         .header(API_KEY_HEADER, api_key)
         .send()
         .await?;
+
+    // LOUD_WIRE: Log response status
+    loud_wire::log_response_status(request_id, response.status().as_u16());
+
     let response = check_response(response).await?;
     let response_text = response.text().await.map_err(GenaiError::Http)?;
+
+    // LOUD_WIRE: Log response body
+    loud_wire::log_response_body(request_id, &response_text);
+
     let list_response: ListFilesResponse =
         deserialize_with_context(&response_text, "ListFilesResponse")?;
 
@@ -924,11 +971,19 @@ pub async fn delete_file(
 
     let url = format!("{BASE_URL}/{API_VERSION}/{file_name}");
 
+    // LOUD_WIRE: Log outgoing request
+    let request_id = loud_wire::next_request_id();
+    loud_wire::log_request(request_id, "DELETE", &url, None);
+
     let response = http_client
         .delete(&url)
         .header(API_KEY_HEADER, api_key)
         .send()
         .await?;
+
+    // LOUD_WIRE: Log response status
+    loud_wire::log_response_status(request_id, response.status().as_u16());
+
     check_response(response).await?;
 
     log::debug!("File deleted successfully");

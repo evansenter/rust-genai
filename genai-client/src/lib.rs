@@ -18,12 +18,13 @@
 //! - These capture unrecognized API types without deserialization failures
 //! - Use `#[non_exhaustive]` to ensure match statements handle future variants
 
-// Declare modules (common, error_helpers, sse_parser are crate-internal)
+// Declare modules (common, error_helpers, loud_wire, sse_parser are crate-internal)
 pub(crate) mod common;
 pub(crate) mod error_helpers;
 pub mod errors;
 pub mod files;
 pub mod interactions;
+pub(crate) mod loud_wire;
 pub mod models;
 pub(crate) mod sse_parser;
 
