@@ -6,6 +6,13 @@
 //! use common::*;
 //! ```
 //!
+//! # Note on `#[allow(dead_code)]`
+//!
+//! Many items in this module are annotated with `#[allow(dead_code)]` even though
+//! they ARE used. This is because Rust compiles each test file (`*_tests.rs`) as a
+//! separate compilation unit, and the compiler can't see cross-file usage. Without
+//! these annotations, you'd get spurious "function is never used" warnings.
+//!
 //! # Note on URI Support
 //!
 //! The Interactions API does NOT support Google Cloud Storage (gs://) URIs.
