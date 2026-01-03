@@ -19,7 +19,7 @@
 mod common;
 
 use common::{get_client, interaction_builder, stateful_builder};
-use rust_genai::{GenerationConfig, InteractionStatus, ThinkingLevel, Tool};
+use rust_genai::{GenerationConfig, InteractionStatus, ThinkingLevel, ThinkingSummaries, Tool};
 use serde_json::json;
 
 // =============================================================================
@@ -1488,4 +1488,35 @@ async fn test_generation_config_new_fields_combined() {
         .expect("Should have items array");
     assert!(!items.is_empty(), "Items array should not be empty");
     println!("✓ Combined new generation config fields work correctly");
+}
+
+/// Test thinking_summaries with the builder method.
+///
+/// This test validates that with_thinking_summaries() works correctly with the API.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_generation_config_thinking_summaries() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Use thinking with summaries enabled
+    let response = stateful_builder(&client)
+        .with_text("What is the capital of France?")
+        .with_thinking_level(ThinkingLevel::Medium)
+        .with_thinking_summaries(ThinkingSummaries::Auto)
+        .create()
+        .await
+        .expect("Thinking with summaries request should succeed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().unwrap();
+    println!("Thinking with summaries response: {}", text);
+
+    // Verify we got a reasonable response
+    assert!(!text.is_empty(), "Response should not be empty");
+    println!("✓ with_thinking_summaries() builder method works with API");
 }
