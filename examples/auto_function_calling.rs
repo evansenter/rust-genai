@@ -200,9 +200,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n=== FUNCTION CALLING MODES ===\n");
 
+    // AUTO mode (default): Model decides whether to call functions
+    let auto_prompt = "What's the weather in Berlin?";
+    println!("AUTO mode - User: {}\n", auto_prompt);
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text(auto_prompt)
+        .with_function(GetWeatherCallable.declaration())
+        .with_function_calling_mode(FunctionCallingMode::Auto) // Model decides
+        .create()
+        .await?;
+
+    if result.has_function_calls() {
+        println!(
+            "  Model chose to call: {} (decided function was appropriate)",
+            result.function_calls()[0].name
+        );
+    } else if let Some(text) = result.text() {
+        println!(
+            "  Model chose text response: {}",
+            text.chars().take(100).collect::<String>()
+        );
+    }
+
     // ANY mode: Model MUST call a function
     let any_prompt = "Greet the user Alice";
-    println!("ANY mode - User: {}\n", any_prompt);
+    println!("\nANY mode - User: {}\n", any_prompt);
 
     let result = client
         .interaction()
@@ -242,8 +267,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    // VALIDATED mode: Schema adherence for both function calls AND text
+    let validated_prompt = "What's the weather in Sydney?";
+    println!("\nVALIDATED mode - User: {}\n", validated_prompt);
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text(validated_prompt)
+        .with_function(GetWeatherCallable.declaration())
+        .with_function_calling_mode(FunctionCallingMode::Validated) // Schema adherence
+        .create()
+        .await?;
+
+    if result.has_function_calls() {
+        println!(
+            "  Model called: {} (with schema adherence guaranteed)",
+            result.function_calls()[0].name
+        );
+    } else if let Some(text) = result.text() {
+        println!(
+            "  Text response (with schema adherence): {}",
+            text.chars().take(100).collect::<String>()
+        );
+    }
+
     println!("\n  Function Calling Modes:");
-    println!("  • Auto (default): Model decides");
+    println!("  • Auto (default): Model decides whether to call functions");
     println!("  • Any: MUST call a function");
     println!("  • None: Function calling disabled");
     println!("  • Validated: Schema adherence for both outputs");
@@ -276,12 +326,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  [REQ#5] POST streaming with input + time tool");
     println!("  [RES#5] SSE stream: text deltas (no function call for weather-only query)\n");
     println!("Example 4: Function calling modes");
-    println!("  [REQ#6] POST with input + weather tool + toolChoice: ANY");
-    println!("  [RES#6] requires_action: get_weather (forced function call)");
-    println!("  [REQ#7] POST with input + weather tool + toolChoice: NONE");
-    println!(
-        "  [RES#7] completed: text response (no function call despite tool being available)\n"
-    );
+    println!("  [REQ#6] POST with input + weather tool + toolChoice: AUTO");
+    println!("  [RES#6] requires_action: get_weather (model decided to call)");
+    println!("  [REQ#7] POST with input + weather tool + toolChoice: ANY");
+    println!("  [RES#7] requires_action: get_weather (forced function call)");
+    println!("  [REQ#8] POST with input + weather tool + toolChoice: NONE");
+    println!("  [RES#8] completed: text response (no function call despite tool available)");
+    println!("  [REQ#9] POST with input + weather tool + toolChoice: VALIDATED");
+    println!("  [RES#9] requires_action: get_weather (with schema adherence)\n");
 
     println!("--- Production Considerations ---");
     println!("• Use #[tool] for stateless functions, ToolService for stateful ones");
