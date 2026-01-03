@@ -126,9 +126,97 @@ fn test_thinking_summaries_deserialization() {
         ThinkingSummaries::None
     );
 
-    // Test unknown value deserializes to Unknown (Evergreen principle)
+    // Test unknown value deserializes to Unknown with data preserved (Evergreen principle)
     let unknown: ThinkingSummaries = serde_json::from_str("\"future_variant\"").unwrap();
-    assert_eq!(unknown, ThinkingSummaries::Unknown);
+    assert!(unknown.is_unknown());
+    assert_eq!(unknown.unknown_summaries_type(), Some("future_variant"));
+    assert_eq!(
+        unknown.unknown_data(),
+        Some(&serde_json::Value::String("future_variant".to_string()))
+    );
+}
+
+#[test]
+fn test_thinking_summaries_unknown_roundtrip() {
+    // Test that unknown values roundtrip correctly
+    let unknown = ThinkingSummaries::Unknown {
+        summaries_type: "new_mode".to_string(),
+        data: serde_json::Value::String("new_mode".to_string()),
+    };
+
+    let json = serde_json::to_string(&unknown).expect("Serialization failed");
+    assert_eq!(json, "\"new_mode\"");
+
+    let deserialized: ThinkingSummaries = serde_json::from_str(&json).unwrap();
+    assert!(deserialized.is_unknown());
+    assert_eq!(deserialized.unknown_summaries_type(), Some("new_mode"));
+}
+
+#[test]
+fn test_thinking_level_deserialization() {
+    // Test known values
+    assert_eq!(
+        serde_json::from_str::<ThinkingLevel>("\"minimal\"").unwrap(),
+        ThinkingLevel::Minimal
+    );
+    assert_eq!(
+        serde_json::from_str::<ThinkingLevel>("\"low\"").unwrap(),
+        ThinkingLevel::Low
+    );
+    assert_eq!(
+        serde_json::from_str::<ThinkingLevel>("\"medium\"").unwrap(),
+        ThinkingLevel::Medium
+    );
+    assert_eq!(
+        serde_json::from_str::<ThinkingLevel>("\"high\"").unwrap(),
+        ThinkingLevel::High
+    );
+
+    // Test unknown value deserializes to Unknown with data preserved (Evergreen principle)
+    let unknown: ThinkingLevel = serde_json::from_str("\"extreme\"").unwrap();
+    assert!(unknown.is_unknown());
+    assert_eq!(unknown.unknown_level_type(), Some("extreme"));
+    assert_eq!(
+        unknown.unknown_data(),
+        Some(&serde_json::Value::String("extreme".to_string()))
+    );
+}
+
+#[test]
+fn test_thinking_level_serialization() {
+    // Test known variants serialize correctly
+    assert_eq!(
+        serde_json::to_string(&ThinkingLevel::Minimal).unwrap(),
+        "\"minimal\""
+    );
+    assert_eq!(
+        serde_json::to_string(&ThinkingLevel::Low).unwrap(),
+        "\"low\""
+    );
+    assert_eq!(
+        serde_json::to_string(&ThinkingLevel::Medium).unwrap(),
+        "\"medium\""
+    );
+    assert_eq!(
+        serde_json::to_string(&ThinkingLevel::High).unwrap(),
+        "\"high\""
+    );
+}
+
+#[test]
+fn test_thinking_level_unknown_roundtrip() {
+    // Test that unknown values roundtrip correctly
+    let unknown = ThinkingLevel::Unknown {
+        level_type: "extreme".to_string(),
+        data: serde_json::Value::String("extreme".to_string()),
+    };
+
+    let json = serde_json::to_string(&unknown).expect("Serialization failed");
+    assert_eq!(json, "\"extreme\"");
+
+    let deserialized: ThinkingLevel = serde_json::from_str(&json).unwrap();
+    assert!(deserialized.is_unknown());
+    assert_eq!(deserialized.unknown_level_type(), Some("extreme"));
 }
 
 #[test]
