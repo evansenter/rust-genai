@@ -302,7 +302,7 @@ LOUD_WIRE=1 cargo run --example simple_interaction
 | **Purpose** | Structured logging for all modules | Raw API traffic inspection |
 | **Output** | Plain text to configured logger | Pretty-printed JSON to stderr |
 | **Filtering** | Per-module level control | All-or-nothing |
-| **Colors** | Depends on backend | Always (green requests, red responses, blue SSE) |
+| **Colors** | Depends on backend | Always (alternating for visual grouping, blue SSE) |
 | **Base64 data** | Full content at debug level | Truncated to 100 chars |
 | **Timestamps** | Depends on backend | Always included with request IDs |
 | **SSE streaming** | Individual events at debug | Always included with correlation |
@@ -325,21 +325,19 @@ LOUD_WIRE=1 cargo run --example simple_interaction
 
 ```
 [LOUD_WIRE] 2026-01-02T10:30:45Z [REQ#1] >>> POST https://...
-[LOUD_WIRE] 2026-01-02T10:30:45Z [REQ#1] Body:
-{
-  "model": "gemini-3-flash-preview",
-  "input": "Hello",
-  ...
-}
+[LOUD_WIRE] 2026-01-02T10:30:45Z [REQ#1] Body: {...}
 [LOUD_WIRE] 2026-01-02T10:30:46Z [RES#1] <<< 200 OK
-[LOUD_WIRE] 2026-01-02T10:30:46Z [RES#1] SSE:
-{
-  "delta": {
-    "text": "Hello"
-  }
-}
+[LOUD_WIRE] 2026-01-02T10:30:46Z [RES#1] SSE: {...}
+[LOUD_WIRE] 2026-01-02T10:30:47Z [REQ#2] >>> POST https://...
+[LOUD_WIRE] 2026-01-02T10:30:47Z [REQ#2] Body: {...}
+[LOUD_WIRE] 2026-01-02T10:30:48Z [RES#2] <<< 200 OK
 ```
 
-- Request IDs (`[REQ#N]`) and response IDs (`[RES#N]`) correlate requests with their responses
-- Base64 `"data"` fields are truncated: `"data": "AAAA..."`
-- File uploads show progress: `>>> UPLOAD "video.mp4" (video/mp4, 150.25 MB)`
+**Key features:**
+- **Request/response IDs** (`[REQ#N]`, `[RES#N]`) correlate requests with their responses
+- **Alternating colors** make it easy to visually group request/response pairs:
+  - Odd requests: Yellow `[REQ#1]`, Cyan `[RES#1]`
+  - Even requests: Green `[REQ#2]`, Magenta `[RES#2]`
+- **SSE chunks** are shown in blue for streaming responses
+- **Base64 data** is truncated: `"data": "AAAA..."`
+- **File uploads** show progress: `>>> UPLOAD "video.mp4" (video/mp4, 150.25 MB)`

@@ -25,7 +25,7 @@
 //! ## Running
 //!
 //! ```bash
-//! LOUD_WIRE=1 cargo run --example stateless_multi_turn_agent_manual
+//! LOUD_WIRE=1 cargo run --example multi_turn_agent_manual_stateless
 //! ```
 //!
 //! ## Prerequisites

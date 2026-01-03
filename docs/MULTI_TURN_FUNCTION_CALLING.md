@@ -325,7 +325,9 @@ response = client.interaction()
 **When parallel calls occur:**
 - Functions are independent (no data dependencies)
 - Model determines parallelism automatically based on the request
-- Results can be provided in any order
+- **Order independence**: The API correlates results to their calls via `call_id`,
+  not by position. However, since this is undocumented behavior, we recommend
+  maintaining the same order as the original calls as a best practice
 
 ### Compositional (Sequential) Function Calls
 
@@ -457,13 +459,21 @@ for call in response.function_calls() {
 }
 ```
 
-### When Thoughts Matter
+### When Thought Signatures Matter
 
-Thought signatures matter when:
-- Using `thought_echo` feature (echoing thinking back to the model)
-- Verifying thought integrity for compliance/auditing
+Thought signatures are cryptographic proofs that the model's thinking wasn't modified. They appear on responses but are **not required** when echoing thoughts back:
 
-For standard function calling, you can ignore them entirely.
+1. **`thought_echo` feature**: Our tests confirm that echoing thoughts back to the model works **without** including signatures. You can use plain `thought_content(text)` without signature data. See `test_thought_echo_manual_history` in `tests/interactions_api_tests.rs`.
+
+2. **Compliance/auditing**: If you need to prove that logged thoughts match what the model actually produced, you can capture and store signatures from responses.
+
+**For standard function calling, you can ignore thought signatures entirely.** They're just metadata on the response - you don't need to capture, store, or return them.
+
+> **Verified behavior**: See `tests/thinking_function_tests.rs` for comprehensive tests covering:
+> - `test_thought_signature_parallel_only_first` - Only first parallel call has signature
+> - `test_thought_signature_sequential_each_step` - Each sequential call has its own signature
+> - `test_function_calling_without_thinking` - No signatures without thinking mode
+> - `test_thought_echo_manual_history` in `tests/interactions_api_tests.rs` - Echoing thoughts
 
 ## Design Patterns
 
@@ -614,14 +624,22 @@ Standard agent? ─────────────────────�
 
 ## Examples Reference
 
+Examples are ordered from simple to complex:
+
 | Example | State | Functions | Execution |
 |---------|-------|-----------|-----------|
-| `multi_turn_agent_auto` | Stateful | `#[tool]` | Auto |
-| `multi_turn_agent_manual` | Stateful | `FunctionDeclaration` | Manual |
-| `stateless_multi_turn_agent_manual` | Stateless | `FunctionDeclaration` | Manual |
-| `tool_service` | Stateful | `ToolService` | Auto |
+| **Single-Turn (Getting Started)** |
 | `auto_function_calling` | Single-turn | `#[tool]` | Auto |
 | `manual_function_calling` | Single-turn | `FunctionDeclaration` | Manual |
+| `streaming_auto_functions` | Single-turn | `#[tool]` | Auto + Streaming |
+| **Multi-Turn Stateful** |
+| `multi_turn_agent_auto` | Stateful | `#[tool]` | Auto |
+| `multi_turn_agent_manual` | Stateful | `FunctionDeclaration` | Manual |
+| `tool_service` | Stateful | `ToolService` | Auto |
+| **Multi-Turn Stateless** |
+| `multi_turn_agent_manual_stateless` | Stateless | `FunctionDeclaration` | Manual |
+| **Advanced Patterns** |
+| `parallel_and_compositional_functions` | Stateful | `FunctionDeclaration` | Manual + Parallel |
 
 Run any example:
 
@@ -629,5 +647,5 @@ Run any example:
 cargo run --example multi_turn_agent_auto
 
 # With wire-level debugging
-LOUD_WIRE=1 cargo run --example stateless_multi_turn_agent_manual
+LOUD_WIRE=1 cargo run --example multi_turn_agent_manual_stateless
 ```

@@ -75,8 +75,8 @@ name = "multi_turn_agent_manual"
 path = "examples/real_world/multi_turn_agent_manual/main.rs"
 
 [[example]]
-name = "stateless_multi_turn_agent_manual"
-path = "examples/real_world/stateless_multi_turn_agent_manual/main.rs"
+name = "multi_turn_agent_manual_stateless"
+path = "examples/real_world/multi_turn_agent_manual_stateless/main.rs"
 
 [[example]]
 name = "code_assistant"

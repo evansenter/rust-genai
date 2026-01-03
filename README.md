@@ -239,6 +239,8 @@ When using `previous_interaction_id`, different fields have different inheritanc
 
 See `examples/real_world/multi_turn_agent_manual/main.rs` for detailed comments on this pattern.
 
+**For comprehensive multi-turn and function calling patterns**: See [`docs/MULTI_TURN_FUNCTION_CALLING.md`](docs/MULTI_TURN_FUNCTION_CALLING.md) - covers stateful vs stateless, auto vs manual execution, parallel function calls, thought signatures, and design patterns.
+
 ### Function Calling
 
 There are two categories of tools in this library:
