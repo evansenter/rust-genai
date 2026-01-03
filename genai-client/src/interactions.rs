@@ -166,6 +166,8 @@ pub fn create_interaction_stream<'a>(
                     // Interaction has started - provides early access to interaction ID
                     if let Some(interaction) = event.interaction {
                         yield StreamEvent::new(StreamChunk::Start { interaction }, event_id);
+                    } else {
+                        warn!("interaction.start event missing interaction field - event dropped");
                     }
                 }
                 "interaction.status_update" => {
@@ -178,8 +180,8 @@ pub fn create_interaction_stream<'a>(
                             );
                         }
                         (has_id, has_status) => {
-                            debug!(
-                                "interaction.status_update missing required fields: interaction_id={:?}, status={:?}",
+                            warn!(
+                                "interaction.status_update missing required fields: interaction_id={}, status={} - event dropped",
                                 has_id.is_some(),
                                 has_status.is_some()
                             );
@@ -201,13 +203,15 @@ pub fn create_interaction_stream<'a>(
                         });
                         yield StreamEvent::new(StreamChunk::ContentStart { index, content_type }, event_id);
                     } else {
-                        debug!("content.start event missing index field");
+                        warn!("content.start event missing index field - event dropped");
                     }
                 }
                 "content.delta" => {
                     // Incremental content update
                     if let Some(delta) = event.delta {
                         yield StreamEvent::new(StreamChunk::Delta(delta), event_id);
+                    } else {
+                        warn!("content.delta event missing delta field - event dropped");
                     }
                 }
                 "content.stop" => {
@@ -215,13 +219,15 @@ pub fn create_interaction_stream<'a>(
                     if let Some(index) = event.index {
                         yield StreamEvent::new(StreamChunk::ContentStop { index }, event_id);
                     } else {
-                        debug!("content.stop event missing index field");
+                        warn!("content.stop event missing index field - event dropped");
                     }
                 }
                 "interaction.complete" => {
                     // Final complete response
                     if let Some(interaction) = event.interaction {
                         yield StreamEvent::new(StreamChunk::Complete(interaction), event_id);
+                    } else {
+                        warn!("interaction.complete event missing interaction field - event dropped");
                     }
                 }
                 "error" => {

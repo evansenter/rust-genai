@@ -1196,4 +1196,80 @@ mod tests {
         assert_eq!(result.executions.len(), 1);
         assert_eq!(result.response.id.as_deref(), Some("max-loops-response"));
     }
+
+    #[test]
+    fn test_auto_function_stream_event_with_event_id_roundtrip() {
+        let event = AutoFunctionStreamEvent::new(
+            AutoFunctionStreamChunk::Delta(InteractionContent::Text {
+                text: Some("Hello from auto-function".to_string()),
+                annotations: None,
+            }),
+            Some("evt_auto_abc123".to_string()),
+        );
+
+        // Test helper methods
+        assert!(event.is_delta());
+        assert!(!event.is_complete());
+        assert!(!event.is_unknown());
+
+        let json = serde_json::to_string(&event).expect("Serialization should succeed");
+        assert!(json.contains("evt_auto_abc123"), "Should have event_id");
+        assert!(
+            json.contains("Hello from auto-function"),
+            "Should have content"
+        );
+
+        let deserialized: AutoFunctionStreamEvent =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+        assert_eq!(deserialized.event_id.as_deref(), Some("evt_auto_abc123"));
+        assert!(deserialized.is_delta());
+    }
+
+    #[test]
+    fn test_auto_function_stream_event_without_event_id() {
+        // Client-generated events like FunctionResults don't have event_id
+        let event = AutoFunctionStreamEvent::new(
+            AutoFunctionStreamChunk::FunctionResults(vec![FunctionExecutionResult::new(
+                "weather",
+                "call-123",
+                json!({"temp": 72}),
+                Duration::from_millis(50),
+            )]),
+            None,
+        );
+
+        assert!(!event.is_delta());
+        assert!(!event.is_complete());
+        assert!(event.event_id.is_none());
+
+        let json = serde_json::to_string(&event).expect("Serialization should succeed");
+        assert!(!json.contains("event_id"), "Should not have event_id field");
+        assert!(json.contains("weather"), "Should have function name");
+
+        let deserialized: AutoFunctionStreamEvent =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+        assert!(deserialized.event_id.is_none());
+    }
+
+    #[test]
+    fn test_auto_function_stream_event_with_empty_event_id() {
+        // Edge case: empty string event_id should still serialize/deserialize
+        let event = AutoFunctionStreamEvent::new(
+            AutoFunctionStreamChunk::Delta(InteractionContent::Text {
+                text: Some("Test".to_string()),
+                annotations: None,
+            }),
+            Some(String::new()),
+        );
+
+        let json = serde_json::to_string(&event).expect("Serialization should succeed");
+        assert!(
+            json.contains(r#""event_id":"""#),
+            "Should have empty event_id"
+        );
+
+        let deserialized: AutoFunctionStreamEvent =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+        assert_eq!(deserialized.event_id.as_deref(), Some(""));
+    }
 }

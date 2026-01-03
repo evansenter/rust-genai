@@ -226,6 +226,28 @@ mod tests {
     }
 
     #[test]
+    fn test_endpoint_get_interaction_non_streaming_ignores_last_event_id() {
+        // When stream=false, last_event_id should be silently ignored
+        // since resume is only meaningful for streaming requests
+        let endpoint = Endpoint::GetInteraction {
+            id: "interaction-123",
+            stream: false,
+            last_event_id: Some("evt_should_be_ignored"),
+        };
+        let url = construct_endpoint_url(endpoint);
+
+        assert_eq!(
+            url,
+            "https://generativelanguage.googleapis.com/v1beta/interactions/interaction-123"
+        );
+        // Verify last_event_id is NOT in the URL when stream=false
+        assert!(!url.contains("last_event_id"));
+        assert!(!url.contains("evt_should_be_ignored"));
+        // Also verify no SSE params
+        assert!(!url.contains("alt=sse"));
+    }
+
+    #[test]
     fn test_endpoint_delete_interaction() {
         let endpoint = Endpoint::DeleteInteraction {
             id: "interaction-456",
