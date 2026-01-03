@@ -6,6 +6,13 @@
 //! use common::*;
 //! ```
 //!
+//! # Note on `#[allow(dead_code)]`
+//!
+//! Many items in this module are annotated with `#[allow(dead_code)]` even though
+//! they ARE used. This is because Rust compiles each test file (`*_tests.rs`) as a
+//! separate compilation unit, and the compiler can't see cross-file usage. Without
+//! these annotations, you'd get spurious "function is never used" warnings.
+//!
 //! # Note on URI Support
 //!
 //! The Interactions API does NOT support Google Cloud Storage (gs://) URIs.
@@ -169,12 +176,23 @@ macro_rules! retry_request {
 }
 
 /// Creates a client from the GEMINI_API_KEY environment variable.
-/// Returns None if the API key is not set.
+/// Returns None if the API key is not set or client build fails.
+///
+/// Note: If the API key is set but client build fails (e.g., TLS issues),
+/// a warning is printed to distinguish from missing API key.
 #[allow(dead_code)]
 pub fn get_client() -> Option<Client> {
-    env::var("GEMINI_API_KEY")
-        .ok()
-        .map(|key| Client::builder(key).build())
+    let api_key = env::var("GEMINI_API_KEY").ok()?;
+    match Client::builder(api_key).build() {
+        Ok(client) => Some(client),
+        Err(e) => {
+            eprintln!(
+                "WARNING: GEMINI_API_KEY is set but client build failed: {}",
+                e
+            );
+            None
+        }
+    }
 }
 
 // =============================================================================
@@ -651,27 +669,6 @@ pub fn interaction_builder(client: &Client) -> rust_genai::InteractionBuilder<'_
 #[allow(dead_code)]
 pub fn stateful_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
     interaction_builder(client).with_store_enabled()
-}
-
-/// Creates an interaction builder with thinking enabled.
-///
-/// Use this for tests that need model reasoning. Note that thoughts may not
-/// always be visible in the response depending on API behavior.
-///
-/// # Example
-///
-/// ```ignore
-/// let response = thinking_builder(&client)
-///     .with_text("Solve this step by step: 2+2")
-///     .create()
-///     .await?;
-/// if response.has_thoughts() {
-///     println!("Model reasoning: {:?}", response.thoughts());
-/// }
-/// ```
-#[allow(dead_code)]
-pub fn thinking_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
-    interaction_builder(client).with_thinking_level(rust_genai::ThinkingLevel::Medium)
 }
 
 // =============================================================================

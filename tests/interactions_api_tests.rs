@@ -50,9 +50,17 @@ use std::env;
 // =============================================================================
 
 fn get_client() -> Option<Client> {
-    env::var("GEMINI_API_KEY")
-        .ok()
-        .map(|key| Client::builder(key).build())
+    let api_key = env::var("GEMINI_API_KEY").ok()?;
+    match Client::builder(api_key).build() {
+        Ok(client) => Some(client),
+        Err(e) => {
+            eprintln!(
+                "WARNING: GEMINI_API_KEY is set but client build failed: {}",
+                e
+            );
+            None
+        }
+    }
 }
 
 // Define a test function that will be registered in the global registry.

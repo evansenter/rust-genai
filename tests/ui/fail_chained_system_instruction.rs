@@ -7,7 +7,7 @@
 use rust_genai::Client;
 
 fn main() {
-    let client = Client::builder("test-key".to_string()).build();
+    let client = Client::builder("test-key".to_string()).build().unwrap();
 
     // This should fail to compile: Chained cannot use with_system_instruction()
     // because system instructions are only available on FirstTurn

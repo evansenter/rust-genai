@@ -8,7 +8,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
 
     // Create the client
-    let client = Client::builder(api_key).build();
+    let client = Client::builder(api_key).build()?;
 
     // 2. Create an interaction using the builder pattern
     let model_name = "gemini-3-flash-preview";
@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             println!("✅ Simple Interaction Demo Complete\n");
 
             println!("--- Key Takeaways ---");
-            println!("• Client::builder(api_key).build() creates the API client");
+            println!("• Client::builder(api_key).build()? creates the API client");
             println!("• client.interaction().with_model().with_text().create() sends a request");
             println!("• response.text() extracts the model's text output");
             println!("• with_store_enabled() saves the interaction for potential follow-ups\n");

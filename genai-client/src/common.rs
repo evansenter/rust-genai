@@ -1,8 +1,9 @@
 /// Represents the API version to target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApiVersion {
-    /// V1 Alpha API version (reserved for future use)
-    #[allow(dead_code)]
+    /// V1 Alpha API version (reserved for future use).
+    /// Kept for API completeness and tested in unit tests.
+    #[allow(dead_code)] // Used in tests, reserved for future API versions
     V1Alpha,
     /// V1 Beta API version (current)
     V1Beta,

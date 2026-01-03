@@ -304,7 +304,7 @@ impl WebResearchAgent {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
-    let client = Client::builder(api_key).build();
+    let client = Client::builder(api_key).build()?;
     let agent = WebResearchAgent::new(client);
 
     println!("=== Web Research Agent Example ===\n");
