@@ -880,16 +880,17 @@ async fn test_thinking_levels_with_function_calling() {
         let get_weather_fn = get_weather.clone();
         let fn_result = function_result.clone();
         let level_clone = level.clone();
-        let response2 = retry_request!([client, prev_id, get_weather_fn, fn_result, level_clone] => {
-            stateful_builder(&client)
-                .with_previous_interaction(&prev_id)
-                .with_content(vec![fn_result])
-                .with_function(get_weather_fn)
-                .with_thinking_level(level_clone)
-                .create()
-                .await
-        })
-        .unwrap_or_else(|e| panic!("Turn 2 failed for ThinkingLevel::{}: {}", level_name, e));
+        let response2 =
+            retry_request!([client, prev_id, get_weather_fn, fn_result, level_clone] => {
+                stateful_builder(&client)
+                    .with_previous_interaction(&prev_id)
+                    .with_content(vec![fn_result])
+                    .with_function(get_weather_fn)
+                    .with_thinking_level(level_clone)
+                    .create()
+                    .await
+            })
+            .unwrap_or_else(|e| panic!("Turn 2 failed for ThinkingLevel::{}: {}", level_name, e));
 
         println!(
             "  Turn 2 status: {:?}, has_thoughts: {}, has_text: {}",
