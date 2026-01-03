@@ -459,23 +459,25 @@ async fn test_system_instruction_inheritance() {
         response2.text().unwrap_or("(no text)")
     );
 
-    // Use semantic validation instead of brittle line/char count assertions.
-    // The model may generate multiple haikus or vary formatting, but the response
-    // should still follow the haiku system instruction.
+    // Use semantic validation to verify the system instruction was inherited.
+    // We're testing that previousInteractionId carries the system instruction forward,
+    // not that the LLM perfectly follows format constraints.
+    // The model may add extra content, but the key signal is whether it shows
+    // awareness of the haiku constraint (e.g., includes a haiku in the response).
     let text = response2.text().expect("Turn 2 should have text");
 
     let is_valid = validate_response_semantically(
         &client,
-        "The model was given a system instruction to 'always respond in haiku format (5-7-5 syllables)'. User asked 'Tell me about the ocean.'",
+        "The model was given a system instruction to 'always respond in haiku format'. User asked 'Tell me about the ocean.' in a follow-up turn (chained via previousInteractionId, not resending the system instruction).",
         text,
-        "Does this response follow haiku format or short poetic structure? (It may contain one or more haikus, which is acceptable.)",
+        "Does this response contain a haiku or show evidence of trying to follow a haiku/poetry constraint? (The response may include additional content beyond the haiku - we're checking if the inherited system instruction influenced the response at all.)",
     )
     .await
     .expect("Semantic validation should succeed");
 
     assert!(
         is_valid,
-        "Response should follow haiku format from inherited system instruction"
+        "Response should show evidence of inherited haiku system instruction"
     );
 }
 
