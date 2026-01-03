@@ -86,10 +86,19 @@ async fn test_simple_interaction() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(!response.outputs.is_empty(), "Outputs are empty");
 
-    // Verify output contains expected answer
+    // Verify output contains expected answer using semantic validation
+    // (the model might say "four" instead of "4", or phrase the answer differently)
     assert!(response.has_text(), "Should have text response");
     let text = response.text().unwrap();
-    assert!(text.contains('4'), "Response should contain '4'");
+    let is_valid = validate_response_semantically(
+        &client,
+        "User asked 'What is 2 + 2?'",
+        text,
+        "Does this response correctly answer that 2+2 equals 4?",
+    )
+    .await
+    .expect("Semantic validation should succeed");
+    assert!(is_valid, "Response should correctly answer 2+2");
 }
 
 #[tokio::test]
@@ -892,7 +901,17 @@ async fn test_generation_config_temperature() {
     assert!(response.has_text(), "Should have text response");
     let text = response.text().unwrap();
     println!("Response: {}", text);
-    assert!(text.contains('4'), "Should contain the answer 4");
+
+    // Use semantic validation - the model might say "four" instead of "4"
+    let is_valid = validate_response_semantically(
+        &client,
+        "User asked 'What is 2 + 2? Answer with just the number.' with temperature=0.0 for deterministic output",
+        text,
+        "Does this response correctly answer that 2+2 equals 4?",
+    )
+    .await
+    .expect("Semantic validation should succeed");
+    assert!(is_valid, "Response should correctly answer 2+2");
 }
 
 #[tokio::test]
@@ -953,14 +972,19 @@ async fn test_system_instruction_text() {
         .expect("Interaction failed");
 
     assert!(response.has_text(), "Should have text response");
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Response: {}", text);
 
-    // Check for common pirate vocabulary - model may not always include all of these
-    assert!(
-        text.contains("arr") || text.contains("matey") || text.contains("ahoy"),
-        "Response should contain pirate speak"
-    );
+    // Use semantic validation - model may use various pirate expressions
+    let is_valid = validate_response_semantically(
+        &client,
+        "Model was given system instruction: 'You are a pirate. Always respond in pirate speak with Arrr! somewhere in your response.' User said 'Hello, how are you?'",
+        text,
+        "Does this response sound like a pirate speaking? (Using pirate vocabulary, phrases, or mannerisms)",
+    )
+    .await
+    .expect("Semantic validation should succeed");
+    assert!(is_valid, "Response should sound like a pirate");
 }
 
 #[tokio::test]
@@ -1032,20 +1056,26 @@ async fn test_system_instruction_streaming() {
             "Should receive streaming chunks or final response"
         );
 
-        // Check for pirate vocabulary in collected text or final response
+        // Use semantic validation for pirate vocabulary
         let text_to_check = if !result.collected_text.is_empty() {
-            result.collected_text.to_lowercase()
+            result.collected_text.clone()
         } else if let Some(ref response) = result.final_response {
-            response.text().unwrap_or_default().to_lowercase()
+            response.text().unwrap_or_default().to_string()
         } else {
             String::new()
         };
 
+        let is_valid = validate_response_semantically(
+            &client,
+            "Model was given system instruction: 'You are a pirate. Always respond in pirate speak with Arrr! somewhere in your response.' User said 'Hello, how are you?' (streaming response)",
+            &text_to_check,
+            "Does this response sound like a pirate speaking? (Using pirate vocabulary, phrases, or mannerisms)",
+        )
+        .await
+        .expect("Semantic validation should succeed");
         assert!(
-            text_to_check.contains("arr")
-                || text_to_check.contains("matey")
-                || text_to_check.contains("ahoy"),
-            "Response should contain pirate speak. Got: {}",
+            is_valid,
+            "Response should sound like a pirate. Got: {}",
             text_to_check
         );
 

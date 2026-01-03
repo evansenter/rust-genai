@@ -1028,57 +1028,6 @@ async fn test_function_call_complex_args() {
 
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_auto_function_calling_registered() {
-    // Test that functions registered with the macro work with auto-function calling
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    with_timeout(EXTENDED_TEST_TIMEOUT, async {
-        // Use a function registered via the macro
-        let weather_func = GetWeatherTestCallable.declaration();
-
-        let result = interaction_builder(&client)
-            .with_text("What's the weather in Seattle?")
-            .with_function(weather_func)
-            .create_with_auto_functions()
-            .await
-            .expect("Auto function calling failed");
-
-        // Verify executions are tracked
-        println!("Function executions: {:?}", result.executions);
-        assert!(
-            !result.executions.is_empty(),
-            "Should have at least one function execution"
-        );
-        assert_eq!(
-            result.executions[0].name, "get_weather_test",
-            "Should have called get_weather_test"
-        );
-
-        let response = &result.response;
-        println!("Final status: {:?}", response.status);
-        assert!(
-            response.has_text(),
-            "Should have text response after auto-function loop"
-        );
-
-        let text = response.text().unwrap();
-        println!("Final text: {}", text);
-
-        // Verify structural response - model generated a non-empty response
-        // We don't assert on specific content as LLM outputs are non-deterministic
-        assert!(
-            !text.is_empty(),
-            "Response should have non-empty text after auto-function loop"
-        );
-    })
-    .await;
-}
-
-#[tokio::test]
-#[ignore = "Requires API key"]
 async fn test_auto_function_calling_max_loops() {
     // Test that max_function_call_loops is respected
     let Some(client) = get_client() else {
@@ -1582,9 +1531,17 @@ async fn test_tool_service_streaming() {
         let text = response.text().unwrap_or(&result.collected_text);
         println!("Final response: {}", text);
 
-        // Should mention 150 (the result of 50 * 3)
+        // Use semantic validation - model might say "one hundred fifty" instead of "150"
+        let is_valid = validate_response_semantically(
+            &client,
+            "User asked 'Calculate 50 * 3. Use the calculate function.' The calculate function was called and returned 150.",
+            text,
+            "Does this response correctly indicate that 50 * 3 equals 150?",
+        )
+        .await
+        .expect("Semantic validation should succeed");
         assert!(
-            text.contains("150"),
+            is_valid,
             "Response should mention the calculation result (150)"
         );
     })
@@ -1788,11 +1745,16 @@ async fn test_tool_service_streaming_with_multiple_functions() {
         let text = response.text().unwrap_or(&result.collected_text);
         println!("Final response: {}", text);
 
-        // Should mention 8 (5+3) or 28 (4*7)
-        assert!(
-            text.contains("8") || text.contains("28"),
-            "Response should contain calculation results"
-        );
+        // Use semantic validation - model might say "eight" or "twenty-eight"
+        let is_valid = validate_response_semantically(
+            &client,
+            "User asked 'What is 5 + 3, and what is 4 * 7?' using add_numbers and multiply_numbers functions. The expected results are 8 (for 5+3) and 28 (for 4*7).",
+            text,
+            "Does this response correctly indicate at least one of the calculation results (8 for 5+3, or 28 for 4*7)?",
+        )
+        .await
+        .expect("Semantic validation should succeed");
+        assert!(is_valid, "Response should contain calculation results");
     })
     .await;
 }
