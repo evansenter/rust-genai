@@ -8,10 +8,15 @@ use super::response::{InteractionResponse, InteractionStatus};
 /// A chunk from the streaming API
 ///
 /// During streaming, the API sends different types of events:
+/// - `Start`: Initial interaction event (first event, contains ID)
+/// - `StatusUpdate`: Status changes during processing
+/// - `ContentStart`: Content generation begins for an output
 /// - `Delta`: Incremental content updates (text, thought, function_call, etc.)
+/// - `ContentStop`: Content generation ends for an output
 /// - `Complete`: The final complete interaction response
+/// - `Error`: Error occurred during streaming
 ///
-/// Both variants implement `Serialize` and `Deserialize` for logging,
+/// All variants implement `Serialize` and `Deserialize` for logging,
 /// persistence, and replay of streaming events.
 ///
 /// # Forward Compatibility
@@ -24,10 +29,61 @@ use super::response::{InteractionResponse, InteractionStatus};
 #[non_exhaustive]
 #[allow(clippy::large_enum_variant)]
 pub enum StreamChunk {
+    /// Interaction started (first event, contains ID).
+    ///
+    /// Sent when the interaction is accepted by the API. Provides early access
+    /// to the interaction ID before any content is generated.
+    Start {
+        /// The full interaction response at start time
+        interaction: InteractionResponse,
+    },
+
+    /// Status update for in-progress interaction.
+    ///
+    /// Sent when the interaction status changes during processing.
+    /// Useful for tracking progress of background/agent interactions.
+    StatusUpdate {
+        /// The interaction ID
+        interaction_id: String,
+        /// The updated status
+        status: InteractionStatus,
+    },
+
+    /// Content generation started for an output.
+    ///
+    /// Sent when a new content block begins generation.
+    /// The `index` indicates which output position this content will occupy.
+    ContentStart {
+        /// Position index for this content block
+        index: usize,
+        /// The content type being started (e.g., "text", "thought")
+        content_type: Option<String>,
+    },
+
     /// Incremental content update
     Delta(InteractionContent),
+
+    /// Content generation stopped for an output.
+    ///
+    /// Sent when a content block finishes generation.
+    ContentStop {
+        /// Position index for the completed content block
+        index: usize,
+    },
+
     /// Complete interaction response (final event)
     Complete(InteractionResponse),
+
+    /// Error occurred during streaming.
+    ///
+    /// Indicates a terminal error condition. The stream will end after this event.
+    Error {
+        /// Human-readable error message
+        message: String,
+        /// Error code from the API (if provided)
+        code: Option<String>,
+    },
+
     /// Unknown chunk type (for forward compatibility).
     ///
     /// This variant is used when deserializing JSON that contains an unrecognized
@@ -72,6 +128,77 @@ impl StreamChunk {
             _ => None,
         }
     }
+
+    /// Returns the interaction ID if this event contains one.
+    ///
+    /// Available for `Start`, `StatusUpdate`, and `Complete` variants.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::StreamChunk;
+    /// # fn example(chunk: StreamChunk) {
+    /// if let Some(id) = chunk.interaction_id() {
+    ///     println!("Interaction ID: {}", id);
+    /// }
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn interaction_id(&self) -> Option<&str> {
+        match self {
+            Self::Start { interaction } => interaction.id.as_deref(),
+            Self::StatusUpdate { interaction_id, .. } => Some(interaction_id),
+            Self::Complete(response) => response.id.as_deref(),
+            _ => None,
+        }
+    }
+
+    /// Returns true if this is a terminal event.
+    ///
+    /// Terminal events indicate the stream has ended (either successfully or with an error).
+    /// After receiving a terminal event, no more events will be sent.
+    ///
+    /// Terminal events are:
+    /// - `Complete`: Successful completion
+    /// - `Error`: Error occurred
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::StreamChunk;
+    /// # fn example(chunk: StreamChunk) {
+    /// if chunk.is_terminal() {
+    ///     println!("Stream has ended");
+    /// }
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn is_terminal(&self) -> bool {
+        matches!(self, Self::Complete(_) | Self::Error { .. })
+    }
+
+    /// Returns the status if this event contains one.
+    ///
+    /// Available for `StatusUpdate` and `Complete` variants.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::StreamChunk;
+    /// # fn example(chunk: StreamChunk) {
+    /// if let Some(status) = chunk.status() {
+    ///     println!("Status: {:?}", status);
+    /// }
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn status(&self) -> Option<&InteractionStatus> {
+        match self {
+            Self::StatusUpdate { status, .. } => Some(status),
+            Self::Complete(response) => Some(&response.status),
+            _ => None,
+        }
+    }
 }
 
 impl Serialize for StreamChunk {
@@ -82,16 +209,70 @@ impl Serialize for StreamChunk {
         use serde::ser::SerializeMap;
 
         match self {
+            Self::Start { interaction } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("chunk_type", "start")?;
+                map.serialize_entry("data", interaction)?;
+                map.end()
+            }
+            Self::StatusUpdate {
+                interaction_id,
+                status,
+            } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("chunk_type", "status_update")?;
+                map.serialize_entry(
+                    "data",
+                    &serde_json::json!({
+                        "interaction_id": interaction_id,
+                        "status": status,
+                    }),
+                )?;
+                map.end()
+            }
+            Self::ContentStart {
+                index,
+                content_type,
+            } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("chunk_type", "content_start")?;
+                map.serialize_entry(
+                    "data",
+                    &serde_json::json!({
+                        "index": index,
+                        "content_type": content_type,
+                    }),
+                )?;
+                map.end()
+            }
             Self::Delta(content) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("chunk_type", "delta")?;
                 map.serialize_entry("data", content)?;
                 map.end()
             }
+            Self::ContentStop { index } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("chunk_type", "content_stop")?;
+                map.serialize_entry("data", &serde_json::json!({ "index": index }))?;
+                map.end()
+            }
             Self::Complete(response) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("chunk_type", "complete")?;
                 map.serialize_entry("data", response)?;
+                map.end()
+            }
+            Self::Error { message, code } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("chunk_type", "error")?;
+                map.serialize_entry(
+                    "data",
+                    &serde_json::json!({
+                        "message": message,
+                        "code": code,
+                    }),
+                )?;
                 map.end()
             }
             Self::Unknown { chunk_type, data } => {
@@ -133,6 +314,90 @@ impl<'de> Deserialize<'de> for StreamChunk {
         };
 
         match chunk_type {
+            "start" => {
+                let data = match value.get("data").cloned() {
+                    Some(d) => d,
+                    None => {
+                        log::warn!(
+                            "StreamChunk::Start is missing the 'data' field. \
+                             This may indicate a malformed API response."
+                        );
+                        serde_json::Value::Null
+                    }
+                };
+                let interaction: InteractionResponse =
+                    serde_json::from_value(data).map_err(|e| {
+                        serde::de::Error::custom(format!(
+                            "Failed to deserialize StreamChunk::Start data: {}",
+                            e
+                        ))
+                    })?;
+                Ok(Self::Start { interaction })
+            }
+            "status_update" => {
+                let data = value
+                    .get("data")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+                let interaction_id = data
+                    .get("interaction_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+                    .unwrap_or_else(|| {
+                        log::warn!(
+                            "StreamChunk::StatusUpdate is missing interaction_id. \
+                             This may indicate a malformed API response."
+                        );
+                        String::new()
+                    });
+                let status: InteractionStatus = data
+                    .get("status")
+                    .cloned()
+                    .map(serde_json::from_value)
+                    .transpose()
+                    .map_err(|e| {
+                        serde::de::Error::custom(format!(
+                            "Failed to deserialize StreamChunk::StatusUpdate status: {}",
+                            e
+                        ))
+                    })?
+                    .unwrap_or_else(|| {
+                        log::warn!(
+                            "StreamChunk::StatusUpdate is missing status. \
+                             This may indicate a malformed API response."
+                        );
+                        InteractionStatus::InProgress
+                    });
+                Ok(Self::StatusUpdate {
+                    interaction_id,
+                    status,
+                })
+            }
+            "content_start" => {
+                let data = value
+                    .get("data")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+                let index = data
+                    .get("index")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize)
+                    .unwrap_or_else(|| {
+                        log::warn!(
+                            "StreamChunk::ContentStart is missing index. \
+                             This may indicate a malformed API response."
+                        );
+                        0
+                    });
+                let content_type = data
+                    .get("content_type")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                Ok(Self::ContentStart {
+                    index,
+                    content_type,
+                })
+            }
             "delta" => {
                 let data = match value.get("data").cloned() {
                     Some(d) => d,
@@ -152,6 +417,24 @@ impl<'de> Deserialize<'de> for StreamChunk {
                 })?;
                 Ok(Self::Delta(content))
             }
+            "content_stop" => {
+                let data = value
+                    .get("data")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+                let index = data
+                    .get("index")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize)
+                    .unwrap_or_else(|| {
+                        log::warn!(
+                            "StreamChunk::ContentStop is missing index. \
+                             This may indicate a malformed API response."
+                        );
+                        0
+                    });
+                Ok(Self::ContentStop { index })
+            }
             "complete" => {
                 let data = match value.get("data").cloned() {
                     Some(d) => d,
@@ -170,6 +453,25 @@ impl<'de> Deserialize<'de> for StreamChunk {
                     ))
                 })?;
                 Ok(Self::Complete(response))
+            }
+            "error" => {
+                let data = value
+                    .get("data")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+                let message = data
+                    .get("message")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+                    .unwrap_or_else(|| {
+                        log::warn!(
+                            "StreamChunk::Error is missing message. \
+                             This may indicate a malformed API response."
+                        );
+                        "Unknown error".to_string()
+                    });
+                let code = data.get("code").and_then(|v| v.as_str()).map(String::from);
+                Ok(Self::Error { message, code })
             }
             other => {
                 log::warn!(
@@ -194,15 +496,20 @@ impl<'de> Deserialize<'de> for StreamChunk {
 /// Wrapper for SSE streaming events from the Interactions API
 ///
 /// The API returns different event types during streaming:
-/// - `content.delta`: Contains incremental content in the `delta` field
-/// - `interaction.complete`: Contains the full interaction in the `interaction` field
+/// - `interaction.start`: Initial event with interaction data
+/// - `interaction.status_update`: Status changes during processing
+/// - `content.start`: Content generation begins
+/// - `content.delta`: Incremental content updates
+/// - `content.stop`: Content generation ends
+/// - `interaction.complete`: Final complete interaction
+/// - `error`: Error occurred during streaming
 #[derive(Clone, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct InteractionStreamEvent {
     /// Event type (e.g., "content.delta", "interaction.complete")
     pub event_type: String,
 
-    /// The full interaction data (present in "interaction.complete" events)
+    /// The full interaction data (present in "interaction.start" and "interaction.complete")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interaction: Option<InteractionResponse>,
 
@@ -210,13 +517,40 @@ pub struct InteractionStreamEvent {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub delta: Option<InteractionContent>,
 
-    /// Interaction ID (present in various events)
+    /// Interaction ID (present in various events like "interaction.status_update")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interaction_id: Option<String>,
 
-    /// Status (present in status update events)
+    /// Status (present in "interaction.status_update" events)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<InteractionStatus>,
+
+    /// Position index for content blocks (present in "content.start" and "content.stop")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index: Option<usize>,
+
+    /// Content object being started (present in "content.start" events)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<InteractionContent>,
+
+    /// Error details (present in "error" events)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<StreamError>,
+}
+
+/// Error details from SSE streaming.
+///
+/// Represents error information sent in "error" type SSE events.
+#[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct StreamError {
+    /// Human-readable error message
+    #[serde(default)]
+    pub message: String,
+
+    /// Error code from the API (if provided)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
 }
 
 #[cfg(test)]
@@ -326,5 +660,241 @@ mod tests {
         // Data should be null when not provided
         let data = deserialized.unknown_data().expect("Should have data field");
         assert!(data.is_null());
+    }
+
+    #[test]
+    fn test_stream_chunk_start_roundtrip() {
+        let response = InteractionResponse {
+            id: Some("test-interaction-456".to_string()),
+            model: Some("gemini-3-flash-preview".to_string()),
+            agent: None,
+            input: vec![InteractionContent::Text {
+                text: Some("Hello".to_string()),
+            }],
+            outputs: vec![],
+            status: InteractionStatus::InProgress,
+            usage: None,
+            tools: None,
+            grounding_metadata: None,
+            url_context_metadata: None,
+            previous_interaction_id: None,
+        };
+
+        let chunk = StreamChunk::Start {
+            interaction: response,
+        };
+
+        let json = serde_json::to_string(&chunk).expect("Serialization should succeed");
+        assert!(json.contains("chunk_type"), "Should have chunk_type tag");
+        assert!(json.contains("start"), "Should have start variant");
+        assert!(
+            json.contains("test-interaction-456"),
+            "Should have interaction id"
+        );
+
+        let deserialized: StreamChunk =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        match deserialized {
+            StreamChunk::Start { interaction } => {
+                assert_eq!(interaction.id.as_deref(), Some("test-interaction-456"));
+                assert_eq!(interaction.status, InteractionStatus::InProgress);
+            }
+            _ => panic!("Expected Start variant"),
+        }
+    }
+
+    #[test]
+    fn test_stream_chunk_status_update_roundtrip() {
+        let chunk = StreamChunk::StatusUpdate {
+            interaction_id: "test-interaction-789".to_string(),
+            status: InteractionStatus::RequiresAction,
+        };
+
+        let json = serde_json::to_string(&chunk).expect("Serialization should succeed");
+        assert!(json.contains("chunk_type"), "Should have chunk_type tag");
+        assert!(
+            json.contains("status_update"),
+            "Should have status_update variant"
+        );
+        assert!(
+            json.contains("test-interaction-789"),
+            "Should have interaction id"
+        );
+
+        let deserialized: StreamChunk =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        match deserialized {
+            StreamChunk::StatusUpdate {
+                interaction_id,
+                status,
+            } => {
+                assert_eq!(interaction_id, "test-interaction-789");
+                assert_eq!(status, InteractionStatus::RequiresAction);
+            }
+            _ => panic!("Expected StatusUpdate variant"),
+        }
+    }
+
+    #[test]
+    fn test_stream_chunk_content_start_roundtrip() {
+        let chunk = StreamChunk::ContentStart {
+            index: 0,
+            content_type: Some("text".to_string()),
+        };
+
+        let json = serde_json::to_string(&chunk).expect("Serialization should succeed");
+        assert!(json.contains("chunk_type"), "Should have chunk_type tag");
+        assert!(
+            json.contains("content_start"),
+            "Should have content_start variant"
+        );
+        assert!(json.contains("\"index\":0"), "Should have index");
+        assert!(json.contains("text"), "Should have content_type");
+
+        let deserialized: StreamChunk =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        match deserialized {
+            StreamChunk::ContentStart {
+                index,
+                content_type,
+            } => {
+                assert_eq!(index, 0);
+                assert_eq!(content_type, Some("text".to_string()));
+            }
+            _ => panic!("Expected ContentStart variant"),
+        }
+    }
+
+    #[test]
+    fn test_stream_chunk_content_stop_roundtrip() {
+        let chunk = StreamChunk::ContentStop { index: 1 };
+
+        let json = serde_json::to_string(&chunk).expect("Serialization should succeed");
+        assert!(json.contains("chunk_type"), "Should have chunk_type tag");
+        assert!(
+            json.contains("content_stop"),
+            "Should have content_stop variant"
+        );
+        assert!(json.contains("\"index\":1"), "Should have index");
+
+        let deserialized: StreamChunk =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        match deserialized {
+            StreamChunk::ContentStop { index } => {
+                assert_eq!(index, 1);
+            }
+            _ => panic!("Expected ContentStop variant"),
+        }
+    }
+
+    #[test]
+    fn test_stream_chunk_error_roundtrip() {
+        let chunk = StreamChunk::Error {
+            message: "Rate limit exceeded".to_string(),
+            code: Some("RATE_LIMIT".to_string()),
+        };
+
+        let json = serde_json::to_string(&chunk).expect("Serialization should succeed");
+        assert!(json.contains("chunk_type"), "Should have chunk_type tag");
+        assert!(json.contains("error"), "Should have error variant");
+        assert!(json.contains("Rate limit exceeded"), "Should have message");
+        assert!(json.contains("RATE_LIMIT"), "Should have code");
+
+        let deserialized: StreamChunk =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        match deserialized {
+            StreamChunk::Error { message, code } => {
+                assert_eq!(message, "Rate limit exceeded");
+                assert_eq!(code, Some("RATE_LIMIT".to_string()));
+            }
+            _ => panic!("Expected Error variant"),
+        }
+    }
+
+    #[test]
+    fn test_stream_chunk_error_without_code() {
+        let chunk = StreamChunk::Error {
+            message: "Unknown error".to_string(),
+            code: None,
+        };
+
+        let json = serde_json::to_string(&chunk).expect("Serialization should succeed");
+        let deserialized: StreamChunk =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        match deserialized {
+            StreamChunk::Error { message, code } => {
+                assert_eq!(message, "Unknown error");
+                assert!(code.is_none());
+            }
+            _ => panic!("Expected Error variant"),
+        }
+    }
+
+    #[test]
+    fn test_stream_chunk_helper_methods() {
+        // Test interaction_id()
+        let start_chunk = StreamChunk::Start {
+            interaction: InteractionResponse {
+                id: Some("start-id".to_string()),
+                model: None,
+                agent: None,
+                input: vec![],
+                outputs: vec![],
+                status: InteractionStatus::InProgress,
+                usage: None,
+                tools: None,
+                grounding_metadata: None,
+                url_context_metadata: None,
+                previous_interaction_id: None,
+            },
+        };
+        assert_eq!(start_chunk.interaction_id(), Some("start-id"));
+
+        let status_chunk = StreamChunk::StatusUpdate {
+            interaction_id: "status-id".to_string(),
+            status: InteractionStatus::InProgress,
+        };
+        assert_eq!(status_chunk.interaction_id(), Some("status-id"));
+
+        let delta_chunk = StreamChunk::Delta(InteractionContent::Text {
+            text: Some("test".to_string()),
+        });
+        assert_eq!(delta_chunk.interaction_id(), None);
+
+        // Test is_terminal()
+        let complete_chunk = StreamChunk::Complete(InteractionResponse {
+            id: None,
+            model: None,
+            agent: None,
+            input: vec![],
+            outputs: vec![],
+            status: InteractionStatus::Completed,
+            usage: None,
+            tools: None,
+            grounding_metadata: None,
+            url_context_metadata: None,
+            previous_interaction_id: None,
+        });
+        assert!(complete_chunk.is_terminal());
+
+        let error_chunk = StreamChunk::Error {
+            message: "test".to_string(),
+            code: None,
+        };
+        assert!(error_chunk.is_terminal());
+
+        assert!(!delta_chunk.is_terminal());
+        assert!(!start_chunk.is_terminal());
+
+        // Test status()
+        assert_eq!(status_chunk.status(), Some(&InteractionStatus::InProgress));
+        assert_eq!(complete_chunk.status(), Some(&InteractionStatus::Completed));
+        assert_eq!(delta_chunk.status(), None);
     }
 }

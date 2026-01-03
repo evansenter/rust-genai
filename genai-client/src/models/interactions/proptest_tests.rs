@@ -600,16 +600,42 @@ fn arb_interaction_response() -> impl Strategy<Value = InteractionResponse> {
 // StreamChunk Strategy
 // =============================================================================
 
+/// Helper to create the known StreamChunk variants (used by both strict and non-strict modes).
+fn arb_known_stream_chunk() -> impl Strategy<Value = StreamChunk> {
+    prop_oneof![
+        // Start variant
+        arb_interaction_response().prop_map(|interaction| StreamChunk::Start { interaction }),
+        // StatusUpdate variant
+        (arb_identifier(), arb_interaction_status()).prop_map(|(interaction_id, status)| {
+            StreamChunk::StatusUpdate {
+                interaction_id,
+                status,
+            }
+        }),
+        // ContentStart variant
+        (any::<usize>(), proptest::option::of(arb_identifier())).prop_map(
+            |(index, content_type)| StreamChunk::ContentStart {
+                index,
+                content_type,
+            }
+        ),
+        // Delta variant
+        arb_interaction_content().prop_map(StreamChunk::Delta),
+        // ContentStop variant
+        any::<usize>().prop_map(|index| StreamChunk::ContentStop { index }),
+        // Complete variant
+        arb_interaction_response().prop_map(StreamChunk::Complete),
+        // Error variant
+        (arb_text(), proptest::option::of(arb_identifier()))
+            .prop_map(|(message, code)| { StreamChunk::Error { message, code } }),
+    ]
+}
+
 /// Strategy for known StreamChunk variants only.
 /// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
 #[cfg(feature = "strict-unknown")]
 fn arb_stream_chunk() -> impl Strategy<Value = StreamChunk> {
-    prop_oneof![
-        // Delta variant
-        arb_interaction_content().prop_map(StreamChunk::Delta),
-        // Complete variant
-        arb_interaction_response().prop_map(StreamChunk::Complete),
-    ]
+    arb_known_stream_chunk()
 }
 
 /// Strategy for all StreamChunk variants including Unknown.
@@ -617,10 +643,7 @@ fn arb_stream_chunk() -> impl Strategy<Value = StreamChunk> {
 #[cfg(not(feature = "strict-unknown"))]
 fn arb_stream_chunk() -> impl Strategy<Value = StreamChunk> {
     prop_oneof![
-        // Delta variant
-        arb_interaction_content().prop_map(StreamChunk::Delta),
-        // Complete variant
-        arb_interaction_response().prop_map(StreamChunk::Complete),
+        arb_known_stream_chunk(),
         // Unknown variant for forward compatibility
         (arb_identifier(), arb_json_value())
             .prop_map(|(chunk_type, data)| StreamChunk::Unknown { chunk_type, data }),
