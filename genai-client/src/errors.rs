@@ -59,6 +59,12 @@ pub enum GenaiError {
     /// was allowed to run before being cancelled.
     #[error("Request timed out after {0:?}")]
     Timeout(std::time::Duration),
+    /// Failed to build the HTTP client.
+    ///
+    /// This typically only occurs in exceptional circumstances such as
+    /// TLS backend initialization failures.
+    #[error("Failed to build HTTP client: {0}")]
+    ClientBuild(String),
 }
 
 #[cfg(test)]
@@ -221,5 +227,21 @@ mod tests {
         let debug = format!("{:?}", error);
         assert!(debug.contains("Timeout"));
         assert!(debug.contains("500ms"));
+    }
+
+    #[test]
+    fn test_genai_error_client_build_display() {
+        let error = GenaiError::ClientBuild("TLS initialization failed".to_string());
+        let display = format!("{}", error);
+        assert!(display.contains("Failed to build HTTP client"));
+        assert!(display.contains("TLS initialization failed"));
+    }
+
+    #[test]
+    fn test_genai_error_client_build_debug() {
+        let error = GenaiError::ClientBuild("some error".to_string());
+        let debug = format!("{:?}", error);
+        assert!(debug.contains("ClientBuild"));
+        assert!(debug.contains("some error"));
     }
 }

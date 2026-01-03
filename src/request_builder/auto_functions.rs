@@ -142,7 +142,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     /// # use rust_genai::{Client, FunctionDeclaration};
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::builder("api_key".to_string()).build();
+    /// let client = Client::builder("api_key".to_string()).build()?;
     ///
     /// // Functions are auto-discovered from registry
     /// let result = client.interaction()
@@ -434,7 +434,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     /// # use futures_util::StreamExt;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::builder("api_key".to_string()).build();
+    /// let client = Client::builder("api_key".to_string()).build()?;
     ///
     /// let mut stream = client.interaction()
     ///     .with_model("gemini-3-flash-preview")

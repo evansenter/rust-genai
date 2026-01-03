@@ -169,12 +169,23 @@ macro_rules! retry_request {
 }
 
 /// Creates a client from the GEMINI_API_KEY environment variable.
-/// Returns None if the API key is not set.
+/// Returns None if the API key is not set or client build fails.
+///
+/// Note: If the API key is set but client build fails (e.g., TLS issues),
+/// a warning is printed to distinguish from missing API key.
 #[allow(dead_code)]
 pub fn get_client() -> Option<Client> {
-    env::var("GEMINI_API_KEY")
-        .ok()
-        .map(|key| Client::builder(key).build())
+    let api_key = env::var("GEMINI_API_KEY").ok()?;
+    match Client::builder(api_key).build() {
+        Ok(client) => Some(client),
+        Err(e) => {
+            eprintln!(
+                "WARNING: GEMINI_API_KEY is set but client build failed: {}",
+                e
+            );
+            None
+        }
+    }
 }
 
 // =============================================================================

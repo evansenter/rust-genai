@@ -437,7 +437,7 @@ Remember to:
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
-    let client = Client::builder(api_key).build();
+    let client = Client::builder(api_key).build()?;
 
     println!("=== Multi-Turn Customer Support Agent (Manual Functions) ===\n");
     println!("Simulating a customer support conversation...\n");

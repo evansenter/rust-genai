@@ -379,7 +379,7 @@ Remember to use the available tools to look up real data."#
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
-    let client = Client::builder(api_key).build();
+    let client = Client::builder(api_key).build()?;
 
     println!("=== Stateless Multi-Turn Support Agent (store: false) ===\n");
     println!("This example demonstrates manual history management.\n");
