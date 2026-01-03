@@ -10,6 +10,7 @@ use super::metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
     WebSource,
 };
+use super::request::{ThinkingLevel, ThinkingSummaries};
 use super::response::{
     InteractionResponse, InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, UsageMetadata,
 };
@@ -109,6 +110,65 @@ fn arb_interaction_status() -> impl Strategy<Value = InteractionStatus> {
         arb_identifier().prop_map(|status_type| InteractionStatus::Unknown {
             status_type: status_type.clone(),
             data: serde_json::Value::String(status_type),
+        }),
+    ]
+}
+
+// =============================================================================
+// ThinkingLevel Strategies
+// =============================================================================
+
+/// Strategy for known ThinkingLevel variants only.
+/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
+#[cfg(feature = "strict-unknown")]
+fn arb_thinking_level() -> impl Strategy<Value = ThinkingLevel> {
+    prop_oneof![
+        Just(ThinkingLevel::Minimal),
+        Just(ThinkingLevel::Low),
+        Just(ThinkingLevel::Medium),
+        Just(ThinkingLevel::High),
+    ]
+}
+
+/// Strategy for all ThinkingLevel variants including Unknown.
+/// Used in normal mode (Unknown variants are gracefully handled).
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_thinking_level() -> impl Strategy<Value = ThinkingLevel> {
+    prop_oneof![
+        Just(ThinkingLevel::Minimal),
+        Just(ThinkingLevel::Low),
+        Just(ThinkingLevel::Medium),
+        Just(ThinkingLevel::High),
+        // Unknown variant with preserved data
+        arb_identifier().prop_map(|level_type| ThinkingLevel::Unknown {
+            level_type: level_type.clone(),
+            data: serde_json::Value::String(level_type),
+        }),
+    ]
+}
+
+// =============================================================================
+// ThinkingSummaries Strategies
+// =============================================================================
+
+/// Strategy for known ThinkingSummaries variants only.
+/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
+#[cfg(feature = "strict-unknown")]
+fn arb_thinking_summaries() -> impl Strategy<Value = ThinkingSummaries> {
+    prop_oneof![Just(ThinkingSummaries::Auto), Just(ThinkingSummaries::None),]
+}
+
+/// Strategy for all ThinkingSummaries variants including Unknown.
+/// Used in normal mode (Unknown variants are gracefully handled).
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_thinking_summaries() -> impl Strategy<Value = ThinkingSummaries> {
+    prop_oneof![
+        Just(ThinkingSummaries::Auto),
+        Just(ThinkingSummaries::None),
+        // Unknown variant with preserved data
+        arb_identifier().prop_map(|summaries_type| ThinkingSummaries::Unknown {
+            summaries_type: summaries_type.clone(),
+            data: serde_json::Value::String(summaries_type),
         }),
     ]
 }
@@ -585,6 +645,28 @@ proptest! {
         let json = serde_json::to_string(&outcome).expect("Serialization should succeed");
         let restored: CodeExecutionOutcome = serde_json::from_str(&json).expect("Deserialization should succeed");
         prop_assert_eq!(outcome, restored);
+    }
+
+    /// Test that ThinkingLevel roundtrips correctly through JSON.
+    #[test]
+    fn thinking_level_roundtrip(level in arb_thinking_level()) {
+        let json = serde_json::to_string(&level).expect("Serialization should succeed");
+        let restored: ThinkingLevel = serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        // ThinkingLevel doesn't derive PartialEq, so we verify roundtrip by comparing JSON strings
+        let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test that ThinkingSummaries roundtrips correctly through JSON.
+    #[test]
+    fn thinking_summaries_roundtrip(summaries in arb_thinking_summaries()) {
+        let json = serde_json::to_string(&summaries).expect("Serialization should succeed");
+        let restored: ThinkingSummaries = serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        // ThinkingSummaries doesn't derive PartialEq, so we verify roundtrip by comparing JSON strings
+        let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
     }
 
     /// Test that UrlRetrievalStatus roundtrips correctly through JSON.
