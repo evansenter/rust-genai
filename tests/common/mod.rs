@@ -114,6 +114,74 @@ where
     Err(last_error.expect("Should have an error if we exhausted retries"))
 }
 
+/// Retries an async operation that may fail due to flaky API behavior.
+///
+/// Unlike `retry_on_transient` which checks for specific error types, this function
+/// retries on ANY error. Use this for operations where the API may intermittently
+/// fail in unpredictable ways (e.g., image generation returning text instead of images).
+///
+/// # Arguments
+///
+/// * `max_retries` - Maximum number of retry attempts (0 = no retries, just run once)
+/// * `delay` - Fixed delay between retries
+/// * `operation` - A closure that returns a future producing `Result<T, E>`
+///
+/// # Returns
+///
+/// The result of the operation if it succeeds, or the last error if all retries fail.
+///
+/// # Example
+///
+/// ```ignore
+/// let response = retry_on_any_error(2, Duration::from_secs(2), || async {
+///     let resp = client.interaction()
+///         .with_model("gemini-3-pro-image-preview")
+///         .with_text("Generate an image of a cat")
+///         .create()
+///         .await?;
+///
+///     // Check if we got an image (not text)
+///     if resp.outputs.iter().any(|o| matches!(o, InteractionContent::Image { .. })) {
+///         Ok(resp)
+///     } else {
+///         Err(anyhow::anyhow!("No image in response"))
+///     }
+/// }).await;
+/// ```
+#[allow(dead_code)]
+pub async fn retry_on_any_error<F, Fut, T, E>(
+    max_retries: u32,
+    delay: Duration,
+    operation: F,
+) -> Result<T, E>
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<T, E>>,
+    E: std::fmt::Debug,
+{
+    let mut last_error = None;
+
+    for attempt in 0..=max_retries {
+        match operation().await {
+            Ok(result) => return Ok(result),
+            Err(err) if attempt < max_retries => {
+                println!(
+                    "Attempt {} of {} failed: {:?}, retrying in {:?}...",
+                    attempt + 1,
+                    max_retries + 1,
+                    err,
+                    delay
+                );
+                last_error = Some(err);
+                sleep(delay).await;
+            }
+            Err(err) => return Err(err),
+        }
+    }
+
+    Err(last_error.expect("Should have an error if we exhausted retries"))
+}
+
 /// Macro to reduce boilerplate when using `retry_on_transient`.
 ///
 /// The `retry_on_transient` function requires double-cloning: once for the outer
