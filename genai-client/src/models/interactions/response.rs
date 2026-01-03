@@ -133,6 +133,31 @@ impl<'de> Deserialize<'de> for InteractionStatus {
     }
 }
 
+/// Token count for a specific modality.
+///
+/// Used in per-modality breakdowns like [`UsageMetadata::input_tokens_by_modality`].
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::UsageMetadata;
+/// # let usage: UsageMetadata = Default::default();
+/// if let Some(breakdown) = &usage.input_tokens_by_modality {
+///     for modality_tokens in breakdown {
+///         println!("{}: {} tokens", modality_tokens.modality, modality_tokens.tokens);
+///     }
+/// }
+/// ```
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
+pub struct ModalityTokens {
+    /// The modality type (e.g., "text", "image", "audio").
+    ///
+    /// Uses string for forward compatibility with new modalities per Evergreen principles.
+    pub modality: String,
+    /// Token count for this modality.
+    pub tokens: i32,
+}
+
 /// Token usage information from the Interactions API
 #[derive(Clone, Deserialize, Serialize, Debug, Default, PartialEq)]
 #[serde(default)]
@@ -155,6 +180,33 @@ pub struct UsageMetadata {
     /// Total number of tokens used for tool/function calling overhead
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_tool_use_tokens: Option<i32>,
+
+    // =========================================================================
+    // Per-Modality Breakdowns
+    // =========================================================================
+    /// Input token counts broken down by modality (text, image, audio).
+    ///
+    /// Useful for understanding cost distribution in multi-modal prompts.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_tokens_by_modality: Option<Vec<ModalityTokens>>,
+
+    /// Output token counts broken down by modality.
+    ///
+    /// Useful for understanding output cost distribution in multi-modal responses.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_tokens_by_modality: Option<Vec<ModalityTokens>>,
+
+    /// Cached token counts broken down by modality.
+    ///
+    /// Shows which modalities benefit from context caching.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cached_tokens_by_modality: Option<Vec<ModalityTokens>>,
+
+    /// Tool use token counts broken down by modality.
+    ///
+    /// Shows tool invocation overhead per modality.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_use_tokens_by_modality: Option<Vec<ModalityTokens>>,
 }
 
 impl UsageMetadata {
@@ -167,6 +219,70 @@ impl UsageMetadata {
             || self.total_cached_tokens.is_some()
             || self.total_reasoning_tokens.is_some()
             || self.total_tool_use_tokens.is_some()
+            || self.input_tokens_by_modality.is_some()
+            || self.output_tokens_by_modality.is_some()
+            || self.cached_tokens_by_modality.is_some()
+            || self.tool_use_tokens_by_modality.is_some()
+    }
+
+    /// Returns the input token count for a specific modality.
+    ///
+    /// # Arguments
+    ///
+    /// * `modality` - The modality name (e.g., "TEXT", "IMAGE", "AUDIO")
+    ///
+    /// # Returns
+    ///
+    /// The token count for the specified modality, or `None` if the modality
+    /// is not present in the breakdown or if modality data is unavailable.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::UsageMetadata;
+    /// # let usage: UsageMetadata = Default::default();
+    /// if let Some(image_tokens) = usage.input_tokens_for_modality("IMAGE") {
+    ///     println!("Image input cost: {} tokens", image_tokens);
+    /// }
+    /// ```
+    #[must_use]
+    pub fn input_tokens_for_modality(&self, modality: &str) -> Option<i32> {
+        self.input_tokens_by_modality
+            .as_ref()?
+            .iter()
+            .find(|m| m.modality == modality)
+            .map(|m| m.tokens)
+    }
+
+    /// Returns the cache hit rate as a fraction (0.0 to 1.0).
+    ///
+    /// The cache hit rate is the ratio of cached tokens to total input tokens.
+    /// A higher rate indicates better cache utilization and lower costs.
+    ///
+    /// # Returns
+    ///
+    /// - `Some(rate)` where `rate` is between 0.0 and 1.0
+    /// - `None` if either `total_cached_tokens` or `total_input_tokens` is unavailable,
+    ///   or if `total_input_tokens` is zero
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::UsageMetadata;
+    /// # let usage: UsageMetadata = Default::default();
+    /// if let Some(rate) = usage.cache_hit_rate() {
+    ///     println!("Cache hit rate: {:.1}%", rate * 100.0);
+    /// }
+    /// ```
+    #[must_use]
+    pub fn cache_hit_rate(&self) -> Option<f32> {
+        let cached = self.total_cached_tokens? as f32;
+        let total = self.total_input_tokens? as f32;
+        if total > 0.0 {
+            Some(cached / total)
+        } else {
+            None
+        }
     }
 }
 
@@ -1532,6 +1648,7 @@ mod tests {
             total_cached_tokens: Some(25),
             total_reasoning_tokens: Some(10),
             total_tool_use_tokens: Some(5),
+            ..Default::default()
         }));
 
         assert_eq!(response.input_tokens(), Some(100));
@@ -1564,6 +1681,7 @@ mod tests {
             total_cached_tokens: None,
             total_reasoning_tokens: None,
             total_tool_use_tokens: None,
+            ..Default::default()
         }));
 
         assert_eq!(response.input_tokens(), Some(100));
@@ -1572,5 +1690,187 @@ mod tests {
         assert_eq!(response.cached_tokens(), None);
         assert_eq!(response.reasoning_tokens(), None);
         assert_eq!(response.tool_use_tokens(), None);
+    }
+
+    // =========================================================================
+    // ModalityTokens Tests
+    // =========================================================================
+
+    #[test]
+    fn test_modality_tokens_serialization() {
+        let tokens = ModalityTokens {
+            modality: "TEXT".to_string(),
+            tokens: 100,
+        };
+
+        let json = serde_json::to_string(&tokens).unwrap();
+        assert!(json.contains("\"modality\":\"TEXT\""));
+        assert!(json.contains("\"tokens\":100"));
+
+        // Roundtrip
+        let deserialized: ModalityTokens = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.modality, "TEXT");
+        assert_eq!(deserialized.tokens, 100);
+    }
+
+    #[test]
+    fn test_modality_tokens_deserialization() {
+        let json = r#"{"modality": "IMAGE", "tokens": 500}"#;
+        let tokens: ModalityTokens = serde_json::from_str(json).unwrap();
+        assert_eq!(tokens.modality, "IMAGE");
+        assert_eq!(tokens.tokens, 500);
+    }
+
+    #[test]
+    fn test_input_tokens_for_modality() {
+        let usage = UsageMetadata {
+            input_tokens_by_modality: Some(vec![
+                ModalityTokens {
+                    modality: "TEXT".to_string(),
+                    tokens: 100,
+                },
+                ModalityTokens {
+                    modality: "IMAGE".to_string(),
+                    tokens: 500,
+                },
+                ModalityTokens {
+                    modality: "AUDIO".to_string(),
+                    tokens: 200,
+                },
+            ]),
+            ..Default::default()
+        };
+
+        assert_eq!(usage.input_tokens_for_modality("TEXT"), Some(100));
+        assert_eq!(usage.input_tokens_for_modality("IMAGE"), Some(500));
+        assert_eq!(usage.input_tokens_for_modality("AUDIO"), Some(200));
+        assert_eq!(usage.input_tokens_for_modality("VIDEO"), None);
+    }
+
+    #[test]
+    fn test_input_tokens_for_modality_none() {
+        let usage = UsageMetadata::default();
+        assert_eq!(usage.input_tokens_for_modality("TEXT"), None);
+    }
+
+    #[test]
+    fn test_cache_hit_rate() {
+        // 25% cache hit rate
+        let usage = UsageMetadata {
+            total_input_tokens: Some(100),
+            total_cached_tokens: Some(25),
+            ..Default::default()
+        };
+        let rate = usage.cache_hit_rate().unwrap();
+        assert!((rate - 0.25).abs() < f32::EPSILON);
+
+        // 100% cache hit rate
+        let usage = UsageMetadata {
+            total_input_tokens: Some(100),
+            total_cached_tokens: Some(100),
+            ..Default::default()
+        };
+        let rate = usage.cache_hit_rate().unwrap();
+        assert!((rate - 1.0).abs() < f32::EPSILON);
+
+        // 0% cache hit rate
+        let usage = UsageMetadata {
+            total_input_tokens: Some(100),
+            total_cached_tokens: Some(0),
+            ..Default::default()
+        };
+        let rate = usage.cache_hit_rate().unwrap();
+        assert!((rate - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_cache_hit_rate_none_cases() {
+        // Missing cached tokens
+        let usage = UsageMetadata {
+            total_input_tokens: Some(100),
+            total_cached_tokens: None,
+            ..Default::default()
+        };
+        assert!(usage.cache_hit_rate().is_none());
+
+        // Missing input tokens
+        let usage = UsageMetadata {
+            total_input_tokens: None,
+            total_cached_tokens: Some(25),
+            ..Default::default()
+        };
+        assert!(usage.cache_hit_rate().is_none());
+
+        // Zero input tokens (avoid division by zero)
+        let usage = UsageMetadata {
+            total_input_tokens: Some(0),
+            total_cached_tokens: Some(0),
+            ..Default::default()
+        };
+        assert!(usage.cache_hit_rate().is_none());
+    }
+
+    #[test]
+    fn test_has_data_with_modality_breakdowns() {
+        // Only modality breakdowns present
+        let usage = UsageMetadata {
+            input_tokens_by_modality: Some(vec![ModalityTokens {
+                modality: "TEXT".to_string(),
+                tokens: 100,
+            }]),
+            ..Default::default()
+        };
+        assert!(usage.has_data());
+
+        // Empty default
+        let usage = UsageMetadata::default();
+        assert!(!usage.has_data());
+    }
+
+    #[test]
+    fn test_usage_metadata_with_modality_breakdowns_serialization() {
+        let usage = UsageMetadata {
+            total_input_tokens: Some(600),
+            total_output_tokens: Some(100),
+            input_tokens_by_modality: Some(vec![
+                ModalityTokens {
+                    modality: "TEXT".to_string(),
+                    tokens: 100,
+                },
+                ModalityTokens {
+                    modality: "IMAGE".to_string(),
+                    tokens: 500,
+                },
+            ]),
+            output_tokens_by_modality: Some(vec![ModalityTokens {
+                modality: "TEXT".to_string(),
+                tokens: 100,
+            }]),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&usage).unwrap();
+        assert!(json.contains("inputTokensByModality"));
+        assert!(json.contains("outputTokensByModality"));
+
+        // Roundtrip
+        let deserialized: UsageMetadata = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.total_input_tokens, Some(600));
+        assert_eq!(
+            deserialized
+                .input_tokens_by_modality
+                .as_ref()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            deserialized
+                .output_tokens_by_modality
+                .as_ref()
+                .unwrap()
+                .len(),
+            1
+        );
     }
 }

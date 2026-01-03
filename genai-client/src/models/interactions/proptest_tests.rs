@@ -162,6 +162,7 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
                     total_cached_tokens,
                     total_reasoning_tokens,
                     total_tool_use_tokens,
+                    ..Default::default()
                 }
             },
         )
