@@ -1201,7 +1201,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// ```no_run
     /// # use rust_genai::{Client, ThinkingLevel, ThinkingSummaries};
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::builder("api-key".to_string()).build();
+    /// let client = Client::builder("api-key".to_string()).build()?;
     /// let response = client
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
@@ -1231,7 +1231,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// ```no_run
     /// # use rust_genai::Client;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::builder("api-key".to_string()).build();
+    /// let client = Client::builder("api-key".to_string()).build()?;
     ///
     /// // Two requests with the same seed should produce the same output
     /// let response1 = client
@@ -1272,7 +1272,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// ```no_run
     /// # use rust_genai::Client;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::builder("api-key".to_string()).build();
+    /// let client = Client::builder("api-key".to_string()).build()?;
     /// let response = client
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
@@ -1301,7 +1301,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # use rust_genai::Client;
     /// # use serde_json::json;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::builder("api-key".to_string()).build();
+    /// let client = Client::builder("api-key".to_string()).build()?;
     /// let response = client
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
