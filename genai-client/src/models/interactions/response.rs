@@ -705,7 +705,7 @@ impl InteractionResponse {
     /// # use genai_client::models::interactions::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if response.has_annotations() {
-    ///     println!("Response includes {} citations", response.all_annotations().len());
+    ///     println!("Response includes {} citations", response.all_annotations().count());
     /// }
     /// ```
     #[must_use]
@@ -730,13 +730,11 @@ impl InteractionResponse {
     ///     }
     /// }
     /// ```
-    #[must_use]
-    pub fn all_annotations(&self) -> Vec<&Annotation> {
+    pub fn all_annotations(&self) -> impl Iterator<Item = &Annotation> {
         self.outputs
             .iter()
             .filter_map(|c| c.annotations())
             .flatten()
-            .collect()
     }
 
     // =========================================================================

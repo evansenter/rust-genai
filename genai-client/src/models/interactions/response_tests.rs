@@ -2058,7 +2058,7 @@ fn test_interaction_response_all_annotations() {
         url_context_metadata: None,
     };
 
-    let annotations = response.all_annotations();
+    let annotations: Vec<_> = response.all_annotations().collect();
 
     // Should collect all 3 annotations from the two Text outputs with annotations
     assert_eq!(annotations.len(), 3);
@@ -2104,8 +2104,8 @@ fn test_interaction_response_all_annotations_empty() {
         url_context_metadata: None,
     };
 
-    let annotations = response.all_annotations();
-    assert!(annotations.is_empty());
+    let count = response.all_annotations().count();
+    assert_eq!(count, 0);
 }
 
 #[test]
@@ -2144,7 +2144,7 @@ fn test_interaction_response_all_annotations_skips_non_text() {
         url_context_metadata: None,
     };
 
-    let annotations = response.all_annotations();
+    let annotations: Vec<_> = response.all_annotations().collect();
 
     // Should only find the one annotation from the Text content
     assert_eq!(annotations.len(), 1);

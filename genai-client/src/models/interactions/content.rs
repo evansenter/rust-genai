@@ -59,6 +59,7 @@ use std::fmt;
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct Annotation {
     /// Start of the segment in the text (byte position, inclusive).
     ///
@@ -81,6 +82,32 @@ pub struct Annotation {
 }
 
 impl Annotation {
+    /// Creates a new annotation with the given span indices and optional source.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_index` - Start of the segment in the text (byte position, inclusive)
+    /// * `end_index` - End of the segment in the text (byte position, exclusive)
+    /// * `source` - Optional source attribution (URL, title, or identifier)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use genai_client::models::interactions::Annotation;
+    /// let annotation = Annotation::new(0, 10, Some("https://example.com".to_string()));
+    /// assert_eq!(annotation.start_index, 0);
+    /// assert_eq!(annotation.end_index, 10);
+    /// assert!(annotation.has_source());
+    /// ```
+    #[must_use]
+    pub fn new(start_index: usize, end_index: usize, source: Option<String>) -> Self {
+        Self {
+            start_index,
+            end_index,
+            source,
+        }
+    }
+
     /// Returns the byte length of the annotated span.
     ///
     /// This is equivalent to `end_index - start_index`.
