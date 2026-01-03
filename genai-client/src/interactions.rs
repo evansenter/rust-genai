@@ -66,15 +66,23 @@ pub async fn create_interaction(
 /// Creates a new interaction with streaming responses.
 ///
 /// Returns a stream of `StreamChunk` items as they arrive from the server.
-/// Each chunk can be either:
-/// - `StreamChunk::Delta`: Incremental content (text or thought)
+/// Each chunk can be:
+/// - `StreamChunk::Start`: Initial event with interaction ID
+/// - `StreamChunk::StatusUpdate`: Status changes during processing
+/// - `StreamChunk::ContentStart`: Content generation begins for an output
+/// - `StreamChunk::Delta`: Incremental content (text, thought, function_call)
+/// - `StreamChunk::ContentStop`: Content generation ends for an output
 /// - `StreamChunk::Complete`: The final complete interaction response
+/// - `StreamChunk::Error`: Error occurred during streaming
 ///
 /// # Example
 /// ```ignore
 /// let stream = create_interaction_stream(&client, &api_key, request);
 /// while let Some(chunk) = stream.next().await {
 ///     match chunk? {
+///         StreamChunk::Start { interaction } => {
+///             println!("Started: {:?}", interaction.id);
+///         }
 ///         StreamChunk::Delta(delta) => {
 ///             if let Some(text) = delta.text() {
 ///                 print!("{}", text);
@@ -83,6 +91,10 @@ pub async fn create_interaction(
 ///         StreamChunk::Complete(response) => {
 ///             println!("\nComplete: {} tokens", response.usage.map(|u| u.total_tokens).flatten().unwrap_or(0));
 ///         }
+///         StreamChunk::Error { message, .. } => {
+///             eprintln!("Error: {}", message);
+///         }
+///         _ => {} // Handle other event types as needed
 ///     }
 /// }
 /// ```
