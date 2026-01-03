@@ -17,7 +17,7 @@
 
 mod common;
 
-use common::{get_client, validate_response_semantically};
+use common::{get_client, retry_on_any_error, validate_response_semantically};
 use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 
@@ -415,70 +415,95 @@ async fn test_multiturn_manual_functions_error_handling() {
 ///
 /// This test verifies that a system instruction set on the first turn
 /// affects behavior on subsequent turns without needing to resend it.
+///
+/// Note: Uses retry logic because LLM behavior is non-deterministic and the
+/// semantic validation may fail intermittently even when the API works correctly.
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_system_instruction_inheritance() {
+    use std::time::Duration;
+
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
     };
 
-    // Turn 1: Set system instruction to always respond in haiku format
-    println!("--- Turn 1: Set haiku system instruction ---");
-    let response1 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("Hello!")
-        .with_store_enabled()
-        .with_system_instruction("You are a haiku poet. Always respond in haiku format (5-7-5 syllables). Never break from this format.")
-        .create()
-        .await
-        .expect("Turn 1 should succeed");
+    // Retry up to 2 times (3 total attempts) because LLM behavior is non-deterministic
+    // and the semantic validation may fail even when the API works correctly
+    type BoxError = Box<dyn std::error::Error + Send + Sync>;
+    let result: Result<(), BoxError> = retry_on_any_error(2, Duration::from_secs(3), || {
+        let client = client.clone();
+        async move {
+            // Turn 1: Set system instruction to always respond in haiku format
+            println!("--- Turn 1: Set haiku system instruction ---");
+            let response1 = client
+                .interaction()
+                .with_model("gemini-3-flash-preview")
+                .with_text("Hello!")
+                .with_store_enabled()
+                .with_system_instruction("You are a haiku poet. Always respond in haiku format (5-7-5 syllables). Never break from this format.")
+                .create()
+                .await?;
 
-    let turn1_id = response1.id.clone().expect("Turn 1 should have ID");
-    println!(
-        "Turn 1 response: {}",
-        response1.text().unwrap_or("(no text)")
-    );
+            let turn1_id = response1
+                .id
+                .clone()
+                .ok_or("Turn 1 should have ID")?;
+            println!(
+                "Turn 1 response: {}",
+                response1.text().unwrap_or("(no text)")
+            );
 
-    // Turn 2: Chained - system instruction should still be in effect
-    println!("\n--- Turn 2: Verify system instruction still active ---");
-    let response2 = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_text("Tell me about the ocean.")
-        .with_store_enabled()
-        .with_previous_interaction(&turn1_id)
-        // Note: NOT resending system instruction - it should be inherited
-        .create()
-        .await
-        .expect("Turn 2 should succeed");
+            // Turn 2: Chained - system instruction should still be in effect
+            println!("\n--- Turn 2: Verify system instruction still active ---");
+            let response2 = client
+                .interaction()
+                .with_model("gemini-3-flash-preview")
+                .with_text("Tell me about the ocean.")
+                .with_store_enabled()
+                .with_previous_interaction(&turn1_id)
+                // Note: NOT resending system instruction - it should be inherited
+                .create()
+                .await?;
 
-    println!(
-        "Turn 2 response: {}",
-        response2.text().unwrap_or("(no text)")
-    );
+            println!(
+                "Turn 2 response: {}",
+                response2.text().unwrap_or("(no text)")
+            );
 
-    // Use semantic validation to verify the system instruction was inherited.
-    // We're testing that previousInteractionId carries the system instruction forward,
-    // not that the LLM perfectly follows format constraints.
-    // The model may add extra content, but the key signal is whether it shows
-    // awareness of the haiku constraint (e.g., includes a haiku in the response).
-    let text = response2.text().expect("Turn 2 should have text");
+            // Use semantic validation to verify the system instruction was inherited.
+            // We're testing that previousInteractionId carries the system instruction forward,
+            // not that the LLM perfectly follows format constraints.
+            let text = response2
+                .text()
+                .ok_or("Turn 2 should have text")?;
 
-    let is_valid = validate_response_semantically(
-        &client,
-        "The model was given a system instruction to 'always respond in haiku format'. User asked 'Tell me about the ocean.' in a follow-up turn (chained via previousInteractionId, not resending the system instruction).",
-        text,
-        "Does this response contain a haiku or show evidence of trying to follow a haiku/poetry constraint? (The response may include additional content beyond the haiku - we're checking if the inherited system instruction influenced the response at all.)",
-    )
-    .await
-    .expect("Semantic validation should succeed");
+            let is_valid = validate_response_semantically(
+                &client,
+                "The model was given a system instruction to 'always respond in haiku format'. User asked 'Tell me about the ocean.' in a follow-up turn (chained via previousInteractionId, not resending the system instruction).",
+                text,
+                "Does this response contain a haiku or show evidence of trying to follow a haiku/poetry constraint? (The response may include additional content beyond the haiku - we're checking if the inherited system instruction influenced the response at all.)",
+            )
+            .await?;
 
-    assert!(
-        is_valid,
-        "Response should show evidence of inherited haiku system instruction"
-    );
+            if is_valid {
+                Ok(())
+            } else {
+                Err("Response did not show evidence of inherited haiku system instruction".into())
+            }
+        }
+    })
+    .await;
+
+    match result {
+        Ok(()) => println!("\n✓ System instruction inheritance test passed"),
+        Err(e) => {
+            panic!(
+                "System instruction inheritance test failed after retries: {}",
+                e
+            );
+        }
+    }
 }
 
 /// Test streaming multi-turn with auto functions.
