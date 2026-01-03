@@ -135,11 +135,7 @@ impl Annotation {
     ///
     /// ```
     /// # use genai_client::models::interactions::Annotation;
-    /// let annotation = Annotation {
-    ///     start_index: 0,
-    ///     end_index: 5,
-    ///     source: Some("https://example.com".to_string()),
-    /// };
+    /// let annotation = Annotation::new(0, 5, Some("https://example.com".to_string()));
     ///
     /// let text = "Hello, world!";
     /// assert_eq!(annotation.extract_span(text), Some("Hello"));

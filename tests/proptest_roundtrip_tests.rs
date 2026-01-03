@@ -154,9 +154,8 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
 // =============================================================================
 
 fn arb_annotation() -> impl Strategy<Value = Annotation> {
-    (0usize..1000, 0usize..1000, proptest::option::of(".{0,100}")).prop_map(
-        |(start, len, source)| Annotation::new(start, start.saturating_add(len), source),
-    )
+    (0usize..1000, 0usize..1000, proptest::option::of(".{0,100}"))
+        .prop_map(|(start, len, source)| Annotation::new(start, start.saturating_add(len), source))
 }
 
 // =============================================================================
