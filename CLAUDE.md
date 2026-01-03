@@ -80,6 +80,7 @@ cargo run --example thinking
 cargo run --example deep_research
 cargo run --example thought_echo
 cargo run --example files_api
+cargo run --example cancel_interaction
 ```
 
 **Multimodal:**
