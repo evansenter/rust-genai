@@ -76,7 +76,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("Note: No grounding metadata returned (may vary by API response)");
             }
 
-            // 6. Show token usage
+            // 6. Display inline citations (annotations)
+            if response.has_annotations() {
+                println!("\n--- Inline Citations ---");
+                let text = response.all_text();
+                for annotation in response.all_annotations() {
+                    if let Some(span) = annotation.extract_span(&text) {
+                        println!(
+                            "  \"{}\" (bytes {}..{}) → {}",
+                            span,
+                            annotation.start_index,
+                            annotation.end_index,
+                            annotation.source.as_deref().unwrap_or("<no source>")
+                        );
+                    }
+                }
+            }
+
+            // 7. Show token usage
             if let Some(usage) = response.usage {
                 println!("\n--- Token Usage ---");
                 if let Some(input) = usage.total_input_tokens {
@@ -164,6 +181,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("--- Key Takeaways ---");
     println!("• with_google_search() enables real-time web search grounding");
     println!("• response.google_search_metadata() provides source citations");
+    println!("• response.all_annotations() links text spans to sources (inline citations)");
     println!("• Grounding chunks include title, domain, and full URI");
     println!("• Works with both streaming and non-streaming requests\n");
 
