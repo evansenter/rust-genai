@@ -7,6 +7,127 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+// =============================================================================
+// Annotation Types (for Text Content with Citations)
+// =============================================================================
+
+/// An annotation linking a text span to its source.
+///
+/// Annotations provide citation information for specific portions of generated text,
+/// typically appearing when using grounding tools like `GoogleSearch` or `UrlContext`.
+///
+/// # Byte Indices
+///
+/// **Important:** The `start_index` and `end_index` fields are **byte positions** (not
+/// character indices) in the text content. This matches the UTF-8 byte offsets used
+/// by the Gemini API. For multi-byte characters (like emoji or non-ASCII text), you
+/// may need to use byte-slicing rather than character indexing.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::{InteractionResponse, Annotation};
+/// # let response: InteractionResponse = todo!();
+/// // Get all annotations from the response
+/// for annotation in response.all_annotations() {
+///     println!(
+///         "Text at bytes {}..{} sourced from: {}",
+///         annotation.start_index,
+///         annotation.end_index,
+///         annotation.source.as_deref().unwrap_or("<no source>")
+///     );
+/// }
+/// ```
+///
+/// # Extracting Annotated Text
+///
+/// To extract the annotated substring from the response text:
+///
+/// ```no_run
+/// # use genai_client::models::interactions::{InteractionResponse, Annotation};
+/// # let response: InteractionResponse = todo!();
+/// # let annotation: &Annotation = todo!();
+/// if let Some(text) = response.text() {
+///     // Use byte slicing since indices are byte positions
+///     let bytes = text.as_bytes();
+///     if annotation.end_index <= bytes.len() {
+///         if let Ok(span) = std::str::from_utf8(&bytes[annotation.start_index..annotation.end_index]) {
+///             println!("Cited text: {}", span);
+///         }
+///     }
+/// }
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Annotation {
+    /// Start of the segment in the text (byte position, inclusive).
+    ///
+    /// This is a byte offset into the UTF-8 encoded text, not a character index.
+    #[serde(default)]
+    pub start_index: usize,
+
+    /// End of the segment in the text (byte position, exclusive).
+    ///
+    /// This is a byte offset into the UTF-8 encoded text, not a character index.
+    #[serde(default)]
+    pub end_index: usize,
+
+    /// Source attributed for this portion of the text.
+    ///
+    /// This could be a URL, title, or other identifier depending on the grounding
+    /// tool used (e.g., `GoogleSearch` or `UrlContext`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+}
+
+impl Annotation {
+    /// Returns the byte length of the annotated span.
+    ///
+    /// This is equivalent to `end_index - start_index`.
+    #[must_use]
+    pub fn byte_len(&self) -> usize {
+        self.end_index.saturating_sub(self.start_index)
+    }
+
+    /// Returns `true` if this annotation has a source attribution.
+    #[must_use]
+    pub fn has_source(&self) -> bool {
+        self.source.is_some()
+    }
+
+    /// Extracts the annotated substring from the given text.
+    ///
+    /// Returns `None` if the indices are out of bounds or if the byte slice
+    /// doesn't form valid UTF-8.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The full text content to extract from
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use genai_client::models::interactions::Annotation;
+    /// let annotation = Annotation {
+    ///     start_index: 0,
+    ///     end_index: 5,
+    ///     source: Some("https://example.com".to_string()),
+    /// };
+    ///
+    /// let text = "Hello, world!";
+    /// assert_eq!(annotation.extract_span(text), Some("Hello"));
+    /// ```
+    #[must_use]
+    pub fn extract_span<'a>(&self, text: &'a str) -> Option<&'a str> {
+        let bytes = text.as_bytes();
+        if self.end_index <= bytes.len() && self.start_index <= self.end_index {
+            std::str::from_utf8(&bytes[self.start_index..self.end_index]).ok()
+        } else {
+            None
+        }
+    }
+}
+
 /// Outcome of a code execution operation.
 ///
 /// This enum represents the result status of code executed via the CodeExecution tool.
@@ -132,7 +253,12 @@ impl fmt::Display for CodeExecutionLanguage {
 /// # let response: InteractionResponse = todo!();
 /// for content in &response.outputs {
 ///     match content {
-///         InteractionContent::Text { text } => println!("Text: {:?}", text),
+///         InteractionContent::Text { text, annotations } => {
+///             println!("Text: {:?}", text);
+///             if let Some(annots) = annotations {
+///                 println!("  {} annotations", annots.len());
+///             }
+///         }
 ///         InteractionContent::FunctionCall { name, .. } => println!("Function: {}", name),
 ///         InteractionContent::Unknown { content_type, .. } => {
 ///             println!("Unknown content type: {}", content_type);
@@ -145,8 +271,19 @@ impl fmt::Display for CodeExecutionLanguage {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum InteractionContent {
-    /// Text content
-    Text { text: Option<String> },
+    /// Text content with optional source annotations.
+    ///
+    /// Annotations are present when grounding tools like `GoogleSearch` or `UrlContext`
+    /// provide citation information linking text spans to their sources.
+    Text {
+        /// The text content.
+        text: Option<String>,
+        /// Source annotations for portions of the text.
+        ///
+        /// Present when the response includes citation information from grounding tools.
+        /// Use [`annotations()`](Self::annotations) for convenient access.
+        annotations: Option<Vec<Annotation>>,
+    },
     /// Thought content (internal reasoning)
     Thought { text: Option<String> },
     /// Thought signature (cryptographic signature for thought verification)
@@ -404,11 +541,16 @@ impl Serialize for InteractionContent {
         use serde::ser::SerializeMap;
 
         match self {
-            Self::Text { text } => {
+            Self::Text { text, annotations } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "text")?;
                 if let Some(t) = text {
                     map.serialize_entry("text", t)?;
+                }
+                if let Some(annots) = annotations
+                    && !annots.is_empty()
+                {
+                    map.serialize_entry("annotations", annots)?;
                 }
                 map.end()
             }
@@ -609,7 +751,40 @@ impl InteractionContent {
     #[must_use]
     pub fn text(&self) -> Option<&str> {
         match self {
-            Self::Text { text: Some(t) } if !t.is_empty() => Some(t),
+            Self::Text { text: Some(t), .. } if !t.is_empty() => Some(t),
+            _ => None,
+        }
+    }
+
+    /// Returns annotations if this is Text content with annotations.
+    ///
+    /// Returns `Some` with a slice of annotations only for `Text` variants that
+    /// have non-empty annotations. Returns `None` for all other variants.
+    ///
+    /// Annotations are typically present when using grounding tools like
+    /// `GoogleSearch` or `UrlContext`.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::{InteractionContent, Annotation};
+    /// # let content: InteractionContent = todo!();
+    /// if let Some(annotations) = content.annotations() {
+    ///     for annotation in annotations {
+    ///         println!("Source: {:?} for bytes {}..{}",
+    ///             annotation.source,
+    ///             annotation.start_index,
+    ///             annotation.end_index);
+    ///     }
+    /// }
+    /// ```
+    #[must_use]
+    pub fn annotations(&self) -> Option<&[Annotation]> {
+        match self {
+            Self::Text {
+                annotations: Some(annots),
+                ..
+            } if !annots.is_empty() => Some(annots),
             _ => None,
         }
     }
@@ -740,6 +915,8 @@ impl<'de> Deserialize<'de> for InteractionContent {
         enum KnownContent {
             Text {
                 text: Option<String>,
+                #[serde(default)]
+                annotations: Option<Vec<Annotation>>,
             },
             Thought {
                 text: Option<String>,
@@ -824,7 +1001,9 @@ impl<'de> Deserialize<'de> for InteractionContent {
         // Try to deserialize as a known type
         match serde_json::from_value::<KnownContent>(value.clone()) {
             Ok(known) => Ok(match known {
-                KnownContent::Text { text } => InteractionContent::Text { text },
+                KnownContent::Text { text, annotations } => {
+                    InteractionContent::Text { text, annotations }
+                }
                 KnownContent::Thought { text } => InteractionContent::Thought { text },
                 KnownContent::ThoughtSignature { signature } => {
                     InteractionContent::ThoughtSignature { signature }

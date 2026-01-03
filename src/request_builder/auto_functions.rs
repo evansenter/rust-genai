@@ -444,7 +444,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     /// while let Some(chunk) = stream.next().await {
     ///     match chunk? {
     ///         AutoFunctionStreamChunk::Delta(content) => {
-    ///             if let InteractionContent::Text { text: Some(t) } = content {
+    ///             if let InteractionContent::Text { text: Some(t), .. } = content {
     ///                 print!("{}", t);
     ///             }
     ///         }

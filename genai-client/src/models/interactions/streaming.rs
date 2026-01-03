@@ -561,6 +561,7 @@ mod tests {
     fn test_stream_chunk_delta_roundtrip() {
         let chunk = StreamChunk::Delta(InteractionContent::Text {
             text: Some("Hello, world!".to_string()),
+            annotations: None,
         });
 
         let json = serde_json::to_string(&chunk).expect("Serialization should succeed");
@@ -587,9 +588,11 @@ mod tests {
             agent: None,
             input: vec![InteractionContent::Text {
                 text: Some("What is 2+2?".to_string()),
+                annotations: None,
             }],
             outputs: vec![InteractionContent::Text {
                 text: Some("The answer is 4.".to_string()),
+                annotations: None,
             }],
             status: InteractionStatus::Completed,
             usage: None,

@@ -22,9 +22,11 @@ fn test_interaction_builder_with_complex_content_input() {
     let complex_input = InteractionInput::Content(vec![
         InteractionContent::Text {
             text: Some("First message".to_string()),
+            annotations: None,
         },
         InteractionContent::Text {
             text: Some("Second message".to_string()),
+            annotations: None,
         },
         InteractionContent::Thought {
             text: Some("Internal reasoning".to_string()),
@@ -655,7 +657,7 @@ fn test_add_image_data_converts_text_to_content() {
             // First should be text
             assert!(matches!(
                 &items[0],
-                InteractionContent::Text { text }
+                InteractionContent::Text { text, .. }
                 if text.as_deref() == Some("Analyze this image")
             ));
             // Second should be image with data
@@ -700,6 +702,7 @@ fn test_add_methods_after_with_content() {
 
     let initial_content = vec![InteractionContent::Text {
         text: Some("Initial text".to_string()),
+        annotations: None,
     }];
 
     let builder = client

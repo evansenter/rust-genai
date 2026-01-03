@@ -38,6 +38,7 @@ pub use models::shared::FunctionParameters;
 pub use models::shared::Tool;
 
 // Interactions API types
+pub use models::interactions::Annotation;
 pub use models::interactions::CodeExecutionCallInfo;
 pub use models::interactions::CodeExecutionLanguage;
 pub use models::interactions::CodeExecutionOutcome;

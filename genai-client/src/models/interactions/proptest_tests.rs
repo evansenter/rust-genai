@@ -5,7 +5,7 @@
 
 use proptest::prelude::*;
 
-use super::content::{CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
+use super::content::{Annotation, CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
 use super::metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
     WebSource,
@@ -77,6 +77,21 @@ fn arb_identifier() -> impl Strategy<Value = String> {
 /// Strategy for generating text strings up to 500 characters (may be empty).
 fn arb_text() -> impl Strategy<Value = String> {
     ".{0,500}"
+}
+
+// =============================================================================
+// Annotation Strategies
+// =============================================================================
+
+/// Strategy for generating Annotation objects for text content.
+fn arb_annotation() -> impl Strategy<Value = Annotation> {
+    (0usize..1000, 0usize..1000, proptest::option::of(".{0,100}")).prop_map(
+        |(start, len, source)| Annotation {
+            start_index: start,
+            end_index: start.saturating_add(len),
+            source,
+        },
+    )
 }
 
 // =============================================================================
@@ -325,8 +340,12 @@ fn arb_owned_function_call_info() -> impl Strategy<Value = OwnedFunctionCallInfo
 /// Helper to create the known InteractionContent variants (used by both strict and non-strict modes).
 fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> {
     prop_oneof![
-        // Text content
-        proptest::option::of(arb_text()).prop_map(|text| InteractionContent::Text { text }),
+        // Text content (with optional annotations)
+        (
+            proptest::option::of(arb_text()),
+            proptest::option::of(proptest::collection::vec(arb_annotation(), 0..3))
+        )
+            .prop_map(|(text, annotations)| InteractionContent::Text { text, annotations }),
         // Thought content
         proptest::option::of(arb_text()).prop_map(|text| InteractionContent::Thought { text }),
         // ThoughtSignature content
@@ -838,7 +857,7 @@ proptest! {
     /// Test empty strings are handled correctly.
     #[test]
     fn empty_text_content_roundtrip(_unused in Just(())) {
-        let content = InteractionContent::Text { text: Some(String::new()) };
+        let content = InteractionContent::Text { text: Some(String::new()), annotations: None };
         let json = serde_json::to_string(&content).expect("Serialization should succeed");
         let restored: InteractionContent = serde_json::from_str(&json).expect("Deserialization should succeed");
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
@@ -848,7 +867,7 @@ proptest! {
     /// Test None text content is handled correctly.
     #[test]
     fn none_text_content_roundtrip(_unused in Just(())) {
-        let content = InteractionContent::Text { text: None };
+        let content = InteractionContent::Text { text: None, annotations: None };
         let json = serde_json::to_string(&content).expect("Serialization should succeed");
         let restored: InteractionContent = serde_json::from_str(&json).expect("Deserialization should succeed");
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
@@ -858,7 +877,7 @@ proptest! {
     /// Test special characters in strings are handled correctly.
     #[test]
     fn special_chars_in_text(text in ".*[\n\r\t\"\\\\].*") {
-        let content = InteractionContent::Text { text: Some(text) };
+        let content = InteractionContent::Text { text: Some(text), annotations: None };
         let json = serde_json::to_string(&content).expect("Serialization should succeed");
         let restored: InteractionContent = serde_json::from_str(&json).expect("Deserialization should succeed");
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
@@ -868,7 +887,7 @@ proptest! {
     /// Test Unicode in strings is handled correctly.
     #[test]
     fn unicode_in_text(text in ".*[\\u{1F600}-\\u{1F64F}].*") {
-        let content = InteractionContent::Text { text: Some(text) };
+        let content = InteractionContent::Text { text: Some(text), annotations: None };
         let json = serde_json::to_string(&content).expect("Serialization should succeed");
         let restored: InteractionContent = serde_json::from_str(&json).expect("Deserialization should succeed");
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");

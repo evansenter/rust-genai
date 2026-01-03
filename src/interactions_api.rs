@@ -64,6 +64,7 @@ use serde_json::Value;
 pub fn text_content(text: impl Into<String>) -> InteractionContent {
     InteractionContent::Text {
         text: Some(text.into()),
+        annotations: None,
     }
 }
 
@@ -698,7 +699,7 @@ mod tests {
     fn test_text_content() {
         let content = text_content("Hello");
         match content {
-            InteractionContent::Text { text } => assert_eq!(text, Some("Hello".to_string())),
+            InteractionContent::Text { text, .. } => assert_eq!(text, Some("Hello".to_string())),
             _ => panic!("Expected Text variant"),
         }
     }

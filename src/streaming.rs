@@ -616,6 +616,7 @@ mod tests {
         // Test that Delta and FunctionResults variants can be created
         let _delta = AutoFunctionStreamChunk::Delta(InteractionContent::Text {
             text: Some("Hello".to_string()),
+            annotations: None,
         });
 
         let _results = AutoFunctionStreamChunk::FunctionResults(vec![FunctionExecutionResult {
@@ -658,6 +659,7 @@ mod tests {
         // Test Delta variant roundtrip
         let delta = AutoFunctionStreamChunk::Delta(InteractionContent::Text {
             text: Some("Hello, world!".to_string()),
+            annotations: None,
         });
 
         let json_str = serde_json::to_string(&delta).expect("Serialization should succeed");
@@ -748,13 +750,16 @@ mod tests {
                 agent: None,
                 input: vec![InteractionContent::Text {
                     text: Some("What's the weather in Paris and London?".to_string()),
+                    annotations: None,
                 }],
                 outputs: vec![
                     InteractionContent::Text {
                         text: Some("Based on the weather data:".to_string()),
+                        annotations: None,
                     },
                     InteractionContent::Text {
                         text: Some("Paris is 18°C and London is 15°C.".to_string()),
+                        annotations: None,
                     },
                 ],
                 status: InteractionStatus::Completed,
@@ -867,6 +872,7 @@ mod tests {
                 agent: None,
                 input: vec![InteractionContent::Text {
                     text: Some("What's the weather?".to_string()),
+                    annotations: None,
                 }],
                 outputs: vec![InteractionContent::FunctionCall {
                     id: Some("call-stuck".to_string()),

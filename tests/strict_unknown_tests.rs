@@ -399,6 +399,7 @@ mod common {
     fn known_types_roundtrip_correctly() {
         let text = InteractionContent::Text {
             text: Some("hello".to_string()),
+            annotations: None,
         };
         let json = serde_json::to_value(&text).unwrap();
         assert_eq!(json["type"], "text");

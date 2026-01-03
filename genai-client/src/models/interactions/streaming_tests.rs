@@ -10,7 +10,7 @@ fn test_deserialize_streaming_text_content() {
         serde_json::from_str(delta_json).expect("Deserialization failed");
 
     match &delta {
-        InteractionContent::Text { text } => {
+        InteractionContent::Text { text, .. } => {
             assert_eq!(text.as_deref(), Some("Hello world"));
         }
         _ => panic!("Expected Text content"),

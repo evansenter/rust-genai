@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeSet;
 use std::fmt;
 
-use super::content::{CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
+use super::content::{Annotation, CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
 use super::metadata::{GroundingMetadata, UrlContextMetadata};
 use crate::models::shared::Tool;
 
@@ -654,7 +654,7 @@ impl InteractionResponse {
     #[must_use]
     pub fn text(&self) -> Option<&str> {
         self.outputs.iter().find_map(|content| {
-            if let InteractionContent::Text { text: Some(t) } = content {
+            if let InteractionContent::Text { text: Some(t), .. } = content {
                 Some(t.as_str())
             } else {
                 None
@@ -679,7 +679,7 @@ impl InteractionResponse {
         self.outputs
             .iter()
             .filter_map(|content| {
-                if let InteractionContent::Text { text: Some(t) } = content {
+                if let InteractionContent::Text { text: Some(t), .. } = content {
                     Some(t.as_str())
                 } else {
                     None
@@ -687,6 +687,56 @@ impl InteractionResponse {
             })
             .collect::<Vec<_>>()
             .join("")
+    }
+
+    // =========================================================================
+    // Annotation Helpers (Citation Support)
+    // =========================================================================
+
+    /// Check if response contains annotations (citations).
+    ///
+    /// Returns `true` if any text output contains source annotations.
+    /// Annotations are typically present when grounding tools like
+    /// `GoogleSearch` or `UrlContext` were used.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if response.has_annotations() {
+    ///     println!("Response includes {} citations", response.all_annotations().len());
+    /// }
+    /// ```
+    #[must_use]
+    pub fn has_annotations(&self) -> bool {
+        self.outputs.iter().any(|c| c.annotations().is_some())
+    }
+
+    /// Returns all annotations from text outputs.
+    ///
+    /// Collects all [`Annotation`] references from all text outputs in the response.
+    /// Annotations link specific text spans to their sources, enabling citation tracking.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// let text = response.all_text();
+    /// for annotation in response.all_annotations() {
+    ///     if let Some(span) = annotation.extract_span(&text) {
+    ///         println!("'{}' sourced from: {:?}", span, annotation.source);
+    ///     }
+    /// }
+    /// ```
+    #[must_use]
+    pub fn all_annotations(&self) -> Vec<&Annotation> {
+        self.outputs
+            .iter()
+            .filter_map(|c| c.annotations())
+            .flatten()
+            .collect()
     }
 
     // =========================================================================
@@ -743,7 +793,7 @@ impl InteractionResponse {
     pub fn has_text(&self) -> bool {
         self.outputs
             .iter()
-            .any(|c| matches!(c, InteractionContent::Text { text: Some(_) }))
+            .any(|c| matches!(c, InteractionContent::Text { text: Some(_), .. }))
     }
 
     /// Check if response contains function calls
