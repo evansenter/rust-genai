@@ -6,7 +6,9 @@ use genai_client::Tool;
 use serde_json::json;
 
 fn create_test_client() -> Client {
-    Client::builder("test-api-key".to_string()).build()
+    Client::builder("test-api-key".to_string())
+        .build()
+        .expect("test client should build")
 }
 
 #[test]

@@ -65,7 +65,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
 
     // Create the client
-    let client = Client::builder(api_key).build();
+    let client = Client::builder(api_key).build()?;
 
     // The Deep Research agent identifier
     let agent_name = "deep-research-pro-preview-12-2025";

@@ -222,7 +222,7 @@ fn create_sample_knowledge_base() -> DocumentStore {
 async fn main() -> Result<(), Box<dyn Error>> {
     // Initialize client
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
-    let client = Client::builder(api_key).build();
+    let client = Client::builder(api_key).build()?;
 
     println!("=== RAG System Example ===\n");
 

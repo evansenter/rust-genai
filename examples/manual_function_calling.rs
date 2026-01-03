@@ -42,7 +42,7 @@ use std::env;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY environment variable not set");
-    let client = Client::builder(api_key).build();
+    let client = Client::builder(api_key).build()?;
 
     println!("=== MANUAL FUNCTION CALLING EXAMPLE ===\n");
 

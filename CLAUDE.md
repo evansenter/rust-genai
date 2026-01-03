@@ -370,7 +370,8 @@ This requires a custom `Deserialize` implementation. See `InteractionContent` in
 - **Integration tests** (`tests/`):
   - `function_declaration_builder_tests.rs`, `interaction_builder_tests.rs`, `macro_tests.rs`, `ui_tests.rs`: No API key needed
   - `interactions_api_tests.rs`: Core CRUD, streaming
-  - `advanced_function_calling_tests.rs`: Complex function scenarios
+  - `advanced_function_calling_tests.rs`: Complex function scenarios (parallel calls, auto-functions)
+  - `tool_service_tests.rs`: ToolService dependency injection patterns
   - `agents_tests.rs`, `multiturn_tests.rs`, `streaming_multiturn_tests.rs`: Stateful conversations
   - `thinking_function_tests.rs`, `tools_multiturn_tests.rs`: Thinking and tool multi-turn tests
   - `multimodal_tests.rs`: Image/media handling

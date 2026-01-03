@@ -40,7 +40,8 @@ impl std::fmt::Debug for Client {
 /// let client = Client::builder("api_key".to_string())
 ///     .timeout(Duration::from_secs(120))
 ///     .connect_timeout(Duration::from_secs(10))
-///     .build();
+///     .build()?;
+/// # Ok::<(), rust_genai::GenaiError>(())
 /// ```
 pub struct ClientBuilder {
     api_key: String,
@@ -79,7 +80,8 @@ impl ClientBuilder {
     ///
     /// let client = Client::builder("api_key".to_string())
     ///     .timeout(Duration::from_secs(120))
-    ///     .build();
+    ///     .build()?;
+    /// # Ok::<(), rust_genai::GenaiError>(())
     /// ```
     #[must_use]
     pub const fn timeout(mut self, timeout: Duration) -> Self {
@@ -102,7 +104,8 @@ impl ClientBuilder {
     ///
     /// let client = Client::builder("api_key".to_string())
     ///     .connect_timeout(Duration::from_secs(10))
-    ///     .build();
+    ///     .build()?;
+    /// # Ok::<(), rust_genai::GenaiError>(())
     /// ```
     #[must_use]
     pub const fn connect_timeout(mut self, timeout: Duration) -> Self {
@@ -112,12 +115,11 @@ impl ClientBuilder {
 
     /// Builds the `Client`.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the underlying HTTP client cannot be constructed. This should only
+    /// Returns an error if the underlying HTTP client cannot be constructed. This should only
     /// happen in exceptional circumstances such as TLS backend initialization failures.
-    #[must_use]
-    pub fn build(self) -> Client {
+    pub fn build(self) -> Result<Client, GenaiError> {
         let mut builder = ReqwestClient::builder();
 
         if let Some(timeout) = self.timeout {
@@ -128,13 +130,14 @@ impl ClientBuilder {
             builder = builder.connect_timeout(connect_timeout);
         }
 
-        // This should never fail with our configuration
-        let http_client = builder.build().expect("Failed to build HTTP client");
+        let http_client = builder
+            .build()
+            .map_err(|e| GenaiError::ClientBuild(e.to_string()))?;
 
-        Client {
+        Ok(Client {
             api_key: self.api_key,
             http_client,
-        }
+        })
     }
 }
 
@@ -180,7 +183,7 @@ impl Client {
     /// # use rust_genai::Client;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::builder("api_key".to_string()).build();
+    /// let client = Client::builder("api_key".to_string()).build()?;
     ///
     /// // Simple interaction
     /// let response = client.interaction()
@@ -286,7 +289,7 @@ impl Client {
     /// use futures_util::StreamExt;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::builder("api_key".to_string()).build();
+    /// let client = Client::builder("api_key".to_string()).build()?;
     /// let request = CreateInteractionRequest {
     ///     model: Some("gemini-3-flash-preview".to_string()),
     ///     agent: None,
@@ -1063,7 +1066,7 @@ mod tests {
 
     #[test]
     fn test_client_builder_default() {
-        let client = Client::builder("test_key".to_string()).build();
+        let client = Client::builder("test_key".to_string()).build().unwrap();
         assert_eq!(client.api_key, "test_key");
     }
 
@@ -1071,7 +1074,8 @@ mod tests {
     fn test_client_builder_with_timeout() {
         let client = Client::builder("test_key".to_string())
             .timeout(Duration::from_secs(120))
-            .build();
+            .build()
+            .unwrap();
         assert_eq!(client.api_key, "test_key");
         // Note: We can't easily inspect the reqwest client's timeout,
         // but this test verifies the builder chain works
@@ -1081,7 +1085,8 @@ mod tests {
     fn test_client_builder_with_connect_timeout() {
         let client = Client::builder("test_key".to_string())
             .connect_timeout(Duration::from_secs(10))
-            .build();
+            .build()
+            .unwrap();
         assert_eq!(client.api_key, "test_key");
     }
 
@@ -1090,7 +1095,8 @@ mod tests {
         let client = Client::builder("test_key".to_string())
             .timeout(Duration::from_secs(120))
             .connect_timeout(Duration::from_secs(10))
-            .build();
+            .build()
+            .unwrap();
         assert_eq!(client.api_key, "test_key");
     }
 
@@ -1117,6 +1123,12 @@ mod tests {
             "Debug output should contain [REDACTED]: {}",
             debug_output
         );
+    }
+
+    #[test]
+    fn test_client_builder_returns_result() {
+        let result = Client::builder("test_key".to_string()).build();
+        assert!(result.is_ok());
     }
 
     #[test]

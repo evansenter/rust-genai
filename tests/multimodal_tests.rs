@@ -882,7 +882,9 @@ async fn test_add_multiple_image_files_builder() {
 #[tokio::test]
 async fn test_add_image_file_not_found() {
     // This test doesn't require an API key - just tests local file loading error
-    let client = rust_genai::Client::builder("fake-key-for-testing".to_string()).build();
+    let client = rust_genai::Client::builder("fake-key-for-testing".to_string())
+        .build()
+        .unwrap();
 
     let result = client
         .interaction()

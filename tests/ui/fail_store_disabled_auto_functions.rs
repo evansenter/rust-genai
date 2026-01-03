@@ -7,7 +7,7 @@
 use rust_genai::Client;
 
 fn main() {
-    let client = Client::builder("test-key".to_string()).build();
+    let client = Client::builder("test-key".to_string()).build().unwrap();
 
     // This should fail to compile: StoreDisabled cannot use create_with_auto_functions()
     // because CanAutoFunction is not implemented for StoreDisabled

@@ -448,7 +448,7 @@ fn test_error_request_id_extraction() {
 #[test]
 fn test_client_with_empty_api_key() {
     // Empty API key should still create a client (validation happens at request time)
-    let client = rust_genai::Client::builder("".to_string()).build();
+    let client = rust_genai::Client::builder("".to_string()).build().unwrap();
     // Client creation succeeds - the API will return 401 when used
     assert!(
         client
@@ -462,7 +462,9 @@ fn test_client_with_empty_api_key() {
 
 #[test]
 fn test_interaction_builder_missing_model() {
-    let client = rust_genai::Client::builder("fake-key".to_string()).build();
+    let client = rust_genai::Client::builder("fake-key".to_string())
+        .build()
+        .unwrap();
 
     // Building a request without a model should fail
     let result = client.interaction().with_text("test").build_request();
@@ -478,7 +480,9 @@ fn test_interaction_builder_missing_model() {
 
 #[test]
 fn test_interaction_builder_missing_content() {
-    let client = rust_genai::Client::builder("fake-key".to_string()).build();
+    let client = rust_genai::Client::builder("fake-key".to_string())
+        .build()
+        .unwrap();
 
     // Building a request without content should fail
     let result = client
@@ -508,7 +512,9 @@ fn test_interaction_builder_missing_content() {
 #[tokio::test]
 async fn test_invalid_api_key_returns_auth_error() {
     // Create client with intentionally invalid API key
-    let client = rust_genai::Client::builder("invalid-api-key-12345".to_string()).build();
+    let client = rust_genai::Client::builder("invalid-api-key-12345".to_string())
+        .build()
+        .unwrap();
 
     let result = client
         .interaction()
@@ -554,7 +560,7 @@ async fn test_invalid_api_key_returns_auth_error() {
 #[tokio::test]
 async fn test_malformed_api_key() {
     // Create client with empty API key
-    let client = rust_genai::Client::builder("".to_string()).build();
+    let client = rust_genai::Client::builder("".to_string()).build().unwrap();
 
     let result = client
         .interaction()

@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get API key from environment
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY environment variable not set");
 
-    let client = Client::builder(api_key).build();
+    let client = Client::builder(api_key).build()?;
 
     println!("=== IMAGE GENERATION EXAMPLE ===\n");
 
