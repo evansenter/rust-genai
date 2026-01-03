@@ -252,34 +252,79 @@ async fn test_thinking_with_function_calling_multi_turn() {
                 }),
             );
 
-            // Make follow-up request with function result
-            let prev_id = response3.id.clone().expect("id should exist");
-            let response3_followup =
-                retry_request!([client, prev_id, get_weather, function_result] => {
-                    stateful_builder(&client)
-                        .with_previous_interaction(&prev_id)
-                        .with_content(vec![function_result])
-                        .with_function(get_weather)
-                        .with_thinking_level(ThinkingLevel::Medium)
-                        .with_store_enabled()
-                        .create()
-                        .await
-                })
-                .expect("Turn 3 follow-up failed");
+            // Handle multiple function calls with a max iterations guard.
+            // LLMs are non-deterministic - the model might request additional function
+            // calls even after receiving results (e.g., "let me also check tomorrow's weather").
+            const MAX_FUNCTION_ITERATIONS: usize = 3;
+            let mut prev_id = response3.id.clone().expect("id should exist");
+            let mut current_result = function_result;
+            let mut iteration = 0;
 
-            // Guard against infinite function call loops - fail early before any processing
-            assert_ne!(
-                response3_followup.status,
-                InteractionStatus::RequiresAction,
-                "Turn 3 follow-up should not request another function call (would loop infinitely)"
-            );
+            let response3_final = loop {
+                iteration += 1;
+                println!(
+                    "Turn 3 follow-up iteration {}/{}",
+                    iteration, MAX_FUNCTION_ITERATIONS
+                );
 
-            println!("Turn 3 follow-up status: {:?}", response3_followup.status);
-            let text = response3_followup
+                let response =
+                    retry_request!([client, prev_id, get_weather, current_result] => {
+                        stateful_builder(&client)
+                            .with_previous_interaction(&prev_id)
+                            .with_content(vec![current_result])
+                            .with_function(get_weather)
+                            .with_thinking_level(ThinkingLevel::Medium)
+                            .with_store_enabled()
+                            .create()
+                            .await
+                    })
+                    .expect("Turn 3 follow-up failed");
+
+                println!("Turn 3 follow-up status: {:?}", response.status);
+
+                if response.status != InteractionStatus::RequiresAction {
+                    // Model is done calling functions, break with final response
+                    break response;
+                }
+
+                // Model wants another function call - check iteration limit
+                if iteration >= MAX_FUNCTION_ITERATIONS {
+                    panic!(
+                        "Model requested more than {} function calls - possible infinite loop",
+                        MAX_FUNCTION_ITERATIONS
+                    );
+                }
+
+                // Provide another function result and continue
+                let function_calls = response.function_calls();
+                assert!(
+                    !function_calls.is_empty(),
+                    "RequiresAction but no function calls"
+                );
+                let call = &function_calls[0];
+                println!(
+                    "Model requested another function call: {} (iteration {})",
+                    call.name, iteration
+                );
+
+                current_result = function_result_content(
+                    call.name,
+                    call.id.expect("call_id should exist").to_string(),
+                    json!({
+                        "temperature": "18°C",
+                        "conditions": "rainy",
+                        "precipitation": "80%",
+                        "humidity": "85%"
+                    }),
+                );
+                prev_id = response.id.clone().expect("id should exist");
+            };
+
+            let text = response3_final
                 .text()
                 .expect("Turn 3 follow-up should have text")
                 .to_string();
-            (response3_followup, text)
+            (response3_final, text)
         } else {
             panic!("RequiresAction but no function calls");
         }
