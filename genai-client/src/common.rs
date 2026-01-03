@@ -36,7 +36,13 @@ pub enum Endpoint<'a> {
     /// Create a new interaction
     CreateInteraction { stream: bool },
     /// Retrieve an interaction by ID
-    GetInteraction { id: &'a str },
+    GetInteraction {
+        id: &'a str,
+        /// Enable streaming mode for the GET request
+        stream: bool,
+        /// Resume streaming from this event ID (only valid when stream=true)
+        last_event_id: Option<&'a str>,
+    },
     /// Delete an interaction by ID
     DeleteInteraction { id: &'a str },
     /// Cancel a background interaction by ID
@@ -50,7 +56,7 @@ impl Endpoint<'_> {
             Self::CreateInteraction { .. } => {
                 format!("/{}/interactions", version.as_str())
             }
-            Self::GetInteraction { id } => {
+            Self::GetInteraction { id, .. } => {
                 format!("/{}/interactions/{}", version.as_str(), id)
             }
             Self::DeleteInteraction { id } => {
@@ -66,9 +72,20 @@ impl Endpoint<'_> {
     const fn requires_sse(&self) -> bool {
         match self {
             Self::CreateInteraction { stream } => *stream,
-            Self::GetInteraction { .. }
-            | Self::DeleteInteraction { .. }
-            | Self::CancelInteraction { .. } => false,
+            Self::GetInteraction { stream, .. } => *stream,
+            Self::DeleteInteraction { .. } | Self::CancelInteraction { .. } => false,
+        }
+    }
+
+    /// Returns additional query parameters for this endpoint (if any)
+    fn query_params(&self) -> Option<String> {
+        match self {
+            Self::GetInteraction {
+                stream: true,
+                last_event_id: Some(event_id),
+                ..
+            } => Some(format!("last_event_id={}", urlencoding::encode(event_id))),
+            _ => None,
         }
     }
 }
@@ -81,13 +98,23 @@ impl Endpoint<'_> {
 pub fn construct_endpoint_url(endpoint: Endpoint) -> String {
     let version = ApiVersion::V1Beta; // Default version for new function
     let path = endpoint.to_path(version);
-    let sse_param = if endpoint.requires_sse() {
-        "?alt=sse"
+
+    // Build query string from SSE requirement and additional params
+    let mut query_parts = Vec::new();
+    if endpoint.requires_sse() {
+        query_parts.push("alt=sse".to_string());
+    }
+    if let Some(additional) = endpoint.query_params() {
+        query_parts.push(additional);
+    }
+
+    let query_string = if query_parts.is_empty() {
+        String::new()
     } else {
-        ""
+        format!("?{}", query_parts.join("&"))
     };
 
-    format!("{BASE_URL_PREFIX}{path}{sse_param}")
+    format!("{BASE_URL_PREFIX}{path}{query_string}")
 }
 
 #[cfg(test)]
@@ -129,9 +156,11 @@ mod tests {
     }
 
     #[test]
-    fn test_endpoint_get_interaction() {
+    fn test_endpoint_get_interaction_non_streaming() {
         let endpoint = Endpoint::GetInteraction {
             id: "interaction-123",
+            stream: false,
+            last_event_id: None,
         };
         let url = construct_endpoint_url(endpoint);
 
@@ -142,6 +171,54 @@ mod tests {
         assert!(url.contains("/interactions/interaction-123"));
         assert!(!url.contains("alt=sse"));
         assert!(!url.contains("key=")); // API key should not be in URL
+    }
+
+    #[test]
+    fn test_endpoint_get_interaction_streaming() {
+        let endpoint = Endpoint::GetInteraction {
+            id: "interaction-123",
+            stream: true,
+            last_event_id: None,
+        };
+        let url = construct_endpoint_url(endpoint);
+
+        assert_eq!(
+            url,
+            "https://generativelanguage.googleapis.com/v1beta/interactions/interaction-123?alt=sse"
+        );
+        assert!(url.contains("/interactions/interaction-123"));
+        assert!(url.contains("alt=sse"));
+    }
+
+    #[test]
+    fn test_endpoint_get_interaction_streaming_with_resume() {
+        let endpoint = Endpoint::GetInteraction {
+            id: "interaction-123",
+            stream: true,
+            last_event_id: Some("evt_abc123"),
+        };
+        let url = construct_endpoint_url(endpoint);
+
+        assert_eq!(
+            url,
+            "https://generativelanguage.googleapis.com/v1beta/interactions/interaction-123?alt=sse&last_event_id=evt_abc123"
+        );
+        assert!(url.contains("alt=sse"));
+        assert!(url.contains("last_event_id=evt_abc123"));
+    }
+
+    #[test]
+    fn test_endpoint_get_interaction_streaming_with_resume_special_chars() {
+        // Event IDs with special characters should be URL-encoded
+        let endpoint = Endpoint::GetInteraction {
+            id: "interaction-123",
+            stream: true,
+            last_event_id: Some("evt+abc&123=test"),
+        };
+        let url = construct_endpoint_url(endpoint);
+
+        // + becomes %2B, & becomes %26, = becomes %3D
+        assert!(url.contains("last_event_id=evt%2Babc%26123%3Dtest"));
     }
 
     #[test]
@@ -169,7 +246,22 @@ mod tests {
     fn test_endpoint_requires_sse() {
         assert!(Endpoint::CreateInteraction { stream: true }.requires_sse());
         assert!(!Endpoint::CreateInteraction { stream: false }.requires_sse());
-        assert!(!Endpoint::GetInteraction { id: "test" }.requires_sse());
+        assert!(
+            Endpoint::GetInteraction {
+                id: "test",
+                stream: true,
+                last_event_id: None
+            }
+            .requires_sse()
+        );
+        assert!(
+            !Endpoint::GetInteraction {
+                id: "test",
+                stream: false,
+                last_event_id: None
+            }
+            .requires_sse()
+        );
         assert!(!Endpoint::DeleteInteraction { id: "test" }.requires_sse());
     }
 
@@ -190,12 +282,32 @@ mod tests {
         let endpoint2 = endpoint1.clone();
         assert_eq!(endpoint1, endpoint2);
 
-        let endpoint3 = Endpoint::GetInteraction { id: "test-id" };
-        let endpoint4 = Endpoint::GetInteraction { id: "test-id" };
+        let endpoint3 = Endpoint::GetInteraction {
+            id: "test-id",
+            stream: false,
+            last_event_id: None,
+        };
+        let endpoint4 = Endpoint::GetInteraction {
+            id: "test-id",
+            stream: false,
+            last_event_id: None,
+        };
         assert_eq!(endpoint3, endpoint4);
 
-        let endpoint5 = Endpoint::GetInteraction { id: "different-id" };
+        let endpoint5 = Endpoint::GetInteraction {
+            id: "different-id",
+            stream: false,
+            last_event_id: None,
+        };
         assert_ne!(endpoint3, endpoint5);
+
+        // Test that stream and last_event_id affect equality
+        let endpoint6 = Endpoint::GetInteraction {
+            id: "test-id",
+            stream: true,
+            last_event_id: Some("evt_123"),
+        };
+        assert_ne!(endpoint3, endpoint6);
     }
 
     #[test]

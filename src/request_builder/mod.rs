@@ -14,7 +14,7 @@ use std::time::Duration;
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
     self, CreateInteractionRequest, FunctionCallingMode, FunctionDeclaration, GenerationConfig,
-    InteractionContent, InteractionInput, InteractionResponse, StreamChunk, ThinkingLevel,
+    InteractionContent, InteractionInput, InteractionResponse, StreamEvent, ThinkingLevel,
     ThinkingSummaries, Tool as InternalTool,
 };
 
@@ -133,8 +133,10 @@ impl CanAutoFunction for Chained {}
 ///     .with_text("Count to 5")
 ///     .create_stream();
 ///
-/// while let Some(chunk) = stream.next().await {
-///     match chunk? {
+/// while let Some(result) = stream.next().await {
+///     let event = result?;
+///     // event.event_id can be saved for stream resume support
+///     match event.chunk {
 ///         StreamChunk::Delta(delta) => {
 ///             if let Some(text) = delta.text() {
 ///                 print!("{}", text);
@@ -1541,7 +1543,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Examples
     ///
     /// ```no_run
-    /// # use rust_genai::{Client, StreamChunk};
+    /// # use rust_genai::{Client, StreamChunk, StreamEvent};
     /// # use futures_util::StreamExt;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1552,8 +1554,10 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .with_text("Count to 5")
     ///     .create_stream();
     ///
-    /// while let Some(chunk) = stream.next().await {
-    ///     match chunk? {
+    /// while let Some(event) = stream.next().await {
+    ///     let event = event?;
+    ///     // event.event_id can be saved for stream resumption
+    ///     match &event.chunk {
     ///         StreamChunk::Delta(delta) => {
     ///             if let Some(text) = delta.text() {
     ///                 print!("{}", text);
@@ -1570,7 +1574,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// ```
     ///
     /// [`GenaiError::Timeout`]: crate::GenaiError::Timeout
-    pub fn create_stream(self) -> BoxStream<'a, Result<StreamChunk, GenaiError>> {
+    pub fn create_stream(self) -> BoxStream<'a, Result<StreamEvent, GenaiError>> {
         let client = self.client;
         let timeout = self.timeout;
         Box::pin(async_stream::try_stream! {
@@ -1596,7 +1600,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
                 };
 
                 match result {
-                    Some(Ok(chunk)) => yield chunk,
+                    Some(Ok(event)) => yield event,
                     Some(Err(e)) => Err(e)?,
                     None => break,
                 }

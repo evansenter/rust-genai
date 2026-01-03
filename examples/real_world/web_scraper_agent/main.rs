@@ -230,7 +230,7 @@ impl WebResearchAgent {
 
         while let Some(result) = stream.next().await {
             match result {
-                Ok(chunk) => match chunk {
+                Ok(event) => match event.chunk {
                     StreamChunk::Delta(content) => {
                         if let Some(text) = content.text() {
                             print!("{}", text);
