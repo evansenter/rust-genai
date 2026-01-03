@@ -275,6 +275,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Example 3: Manual streaming");
     println!("  [REQ#5] POST streaming with input + time tool");
     println!("  [RES#5] SSE stream: text deltas (no function call for weather-only query)\n");
+    println!("Example 4: Function calling modes");
+    println!("  [REQ#6] POST with input + weather tool + toolChoice: ANY");
+    println!("  [RES#6] requires_action: get_weather (forced function call)");
+    println!("  [REQ#7] POST with input + weather tool + toolChoice: NONE");
+    println!("  [RES#7] completed: text response (no function call despite tool being available)\n");
 
     println!("--- Production Considerations ---");
     println!("• Use #[tool] for stateless functions, ToolService for stateful ones");
