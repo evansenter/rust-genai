@@ -5,7 +5,10 @@
 
 use proptest::prelude::*;
 
-use super::content::{Annotation, CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
+use super::content::{
+    Annotation, CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem,
+    InteractionContent,
+};
 use super::metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
     WebSource,
@@ -90,6 +93,21 @@ fn arb_annotation() -> impl Strategy<Value = Annotation> {
             start_index: start,
             end_index: start.saturating_add(len),
             source,
+        },
+    )
+}
+
+// =============================================================================
+// GoogleSearchResultItem Strategies
+// =============================================================================
+
+/// Strategy for generating GoogleSearchResultItem objects.
+fn arb_google_search_result_item() -> impl Strategy<Value = GoogleSearchResultItem> {
+    (arb_text(), arb_text(), proptest::option::of(arb_text())).prop_map(
+        |(title, url, rendered_content)| GoogleSearchResultItem {
+            title,
+            url,
+            rendered_content,
         },
     )
 }
@@ -430,9 +448,17 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
             }
         ),
         // GoogleSearchCall content
-        arb_text().prop_map(|query| InteractionContent::GoogleSearchCall { query }),
+        (arb_text(), proptest::collection::vec(arb_text(), 0..3))
+            .prop_map(|(id, queries)| InteractionContent::GoogleSearchCall { id, queries }),
         // GoogleSearchResult content
-        arb_json_value().prop_map(|results| InteractionContent::GoogleSearchResult { results }),
+        (
+            arb_text(),
+            proptest::collection::vec(arb_google_search_result_item(), 0..3)
+        )
+            .prop_map(|(call_id, result)| InteractionContent::GoogleSearchResult {
+                call_id,
+                result
+            }),
         // UrlContextCall content
         arb_text().prop_map(|url| InteractionContent::UrlContextCall { url }),
         // UrlContextResult content

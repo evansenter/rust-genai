@@ -527,10 +527,12 @@ fn test_content_summary_with_built_in_tools() {
                 output: "1\n2\n".to_string(),
             },
             InteractionContent::GoogleSearchCall {
-                query: "test".to_string(),
+                id: "search1".to_string(),
+                queries: vec!["test".to_string()],
             },
             InteractionContent::GoogleSearchResult {
-                results: serde_json::json!({}),
+                call_id: "search1".to_string(),
+                result: vec![],
             },
             InteractionContent::UrlContextCall {
                 url: "https://example.com".to_string(),
@@ -616,6 +618,8 @@ fn test_interaction_response_code_execution_helpers() {
 
 #[test]
 fn test_interaction_response_google_search_helpers() {
+    use super::content::GoogleSearchResultItem;
+
     let response = InteractionResponse {
         id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
@@ -623,7 +627,8 @@ fn test_interaction_response_google_search_helpers() {
         input: vec![],
         outputs: vec![
             InteractionContent::GoogleSearchResult {
-                results: serde_json::json!({"items": [{"title": "Test"}]}),
+                call_id: "call123".to_string(),
+                result: vec![GoogleSearchResultItem::new("Test", "https://example.com")],
             },
             InteractionContent::Text {
                 text: Some("Based on search results...".to_string()),
@@ -642,7 +647,8 @@ fn test_interaction_response_google_search_helpers() {
 
     let search_results = response.google_search_results();
     assert_eq!(search_results.len(), 1);
-    assert_eq!(search_results[0]["items"][0]["title"], "Test");
+    assert_eq!(search_results[0].title, "Test");
+    assert_eq!(search_results[0].url, "https://example.com");
 }
 
 #[test]
@@ -836,10 +842,12 @@ fn test_interaction_response_google_search_call_helpers() {
         input: vec![],
         outputs: vec![
             InteractionContent::GoogleSearchCall {
-                query: "Rust programming language".to_string(),
+                id: "search1".to_string(),
+                queries: vec!["Rust programming language".to_string()],
             },
             InteractionContent::GoogleSearchCall {
-                query: "async await Rust".to_string(),
+                id: "search2".to_string(),
+                queries: vec!["async await Rust".to_string()],
             },
             InteractionContent::Text {
                 text: Some("Search results...".to_string()),
@@ -1241,10 +1249,20 @@ fn test_interaction_response_google_search_results() {
         input: vec![],
         outputs: vec![
             InteractionContent::GoogleSearchResult {
-                results: serde_json::json!({"items": [{"title": "Rust Lang"}]}),
+                call_id: "search1".to_string(),
+                result: vec![GoogleSearchResultItem {
+                    title: "Rust Lang".to_string(),
+                    url: "https://rust-lang.org".to_string(),
+                    rendered_content: None,
+                }],
             },
             InteractionContent::GoogleSearchResult {
-                results: serde_json::json!({"items": [{"title": "Cargo"}]}),
+                call_id: "search2".to_string(),
+                result: vec![GoogleSearchResultItem {
+                    title: "Cargo".to_string(),
+                    url: "https://doc.rust-lang.org/cargo/".to_string(),
+                    rendered_content: None,
+                }],
             },
         ],
         status: InteractionStatus::Completed,
@@ -1259,8 +1277,8 @@ fn test_interaction_response_google_search_results() {
 
     let results = response.google_search_results();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0]["items"][0]["title"], "Rust Lang");
-    assert_eq!(results[1]["items"][0]["title"], "Cargo");
+    assert_eq!(results[0].title, "Rust Lang");
+    assert_eq!(results[1].title, "Cargo");
 }
 
 #[test]
@@ -1401,10 +1419,16 @@ fn test_interaction_response_complex_roundtrip() {
             },
             // Google search
             InteractionContent::GoogleSearchCall {
-                query: "weather in Tokyo".to_string(),
+                id: "gsearch-001".to_string(),
+                queries: vec!["weather in Tokyo".to_string()],
             },
             InteractionContent::GoogleSearchResult {
-                results: serde_json::json!({"query": "weather tokyo", "results": []}),
+                call_id: "gsearch-001".to_string(),
+                result: vec![GoogleSearchResultItem {
+                    title: "Tokyo Weather".to_string(),
+                    url: "https://weather.example.com/tokyo".to_string(),
+                    rendered_content: None,
+                }],
             },
             // URL context
             InteractionContent::UrlContextCall {

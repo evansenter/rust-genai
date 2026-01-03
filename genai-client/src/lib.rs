@@ -48,6 +48,7 @@ pub use models::interactions::CreateInteractionRequest;
 pub use models::interactions::FunctionCallInfo;
 pub use models::interactions::FunctionResultInfo;
 pub use models::interactions::GenerationConfig;
+pub use models::interactions::GoogleSearchResultItem;
 pub use models::interactions::GroundingChunk;
 pub use models::interactions::GroundingMetadata;
 pub use models::interactions::InteractionContent;

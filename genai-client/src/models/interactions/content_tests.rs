@@ -606,12 +606,16 @@ fn test_code_execution_outcome_enum() {
 
 #[test]
 fn test_deserialize_google_search_call() {
-    let json = r#"{"type": "google_search_call", "query": "Rust programming"}"#;
+    // Test the actual API format: arguments.queries is an array
+    let json = r#"{"type": "google_search_call", "id": "call123", "arguments": {"queries": ["Rust programming", "latest version"]}}"#;
     let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::GoogleSearchCall { query } => {
-            assert_eq!(query, "Rust programming");
+        InteractionContent::GoogleSearchCall { id, queries } => {
+            assert_eq!(id, "call123");
+            assert_eq!(queries.len(), 2);
+            assert_eq!(queries[0], "Rust programming");
+            assert_eq!(queries[1], "latest version");
         }
         _ => panic!("Expected GoogleSearchCall variant, got {:?}", content),
     }
@@ -622,13 +626,17 @@ fn test_deserialize_google_search_call() {
 
 #[test]
 fn test_deserialize_google_search_result() {
-    let json = r#"{"type": "google_search_result", "results": {"items": [{"title": "Rust", "url": "https://rust-lang.org"}]}}"#;
+    // Test the actual API format: result is an array of objects with title/url
+    let json = r#"{"type": "google_search_result", "call_id": "call123", "result": [{"title": "Rust", "url": "https://rust-lang.org", "renderedContent": "Some content"}]}"#;
     let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::GoogleSearchResult { results } => {
-            assert!(results["items"].is_array());
-            assert_eq!(results["items"][0]["title"], "Rust");
+        InteractionContent::GoogleSearchResult { call_id, result } => {
+            assert_eq!(call_id, "call123");
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[0].title, "Rust");
+            assert_eq!(result[0].url, "https://rust-lang.org");
+            assert_eq!(result[0].rendered_content.as_deref(), Some("Some content"));
         }
         _ => panic!("Expected GoogleSearchResult variant, got {:?}", content),
     }
@@ -784,7 +792,8 @@ fn test_roundtrip_built_in_tool_content() {
 
     // GoogleSearchCall roundtrip
     let original = InteractionContent::GoogleSearchCall {
-        query: "test query".to_string(),
+        id: "call123".to_string(),
+        queries: vec!["test query".to_string()],
     };
     let json = serde_json::to_string(&original).unwrap();
     let restored: InteractionContent = serde_json::from_str(&json).unwrap();
@@ -795,7 +804,8 @@ fn test_roundtrip_built_in_tool_content() {
 
     // GoogleSearchResult roundtrip
     let original = InteractionContent::GoogleSearchResult {
-        results: serde_json::json!({"items": []}),
+        call_id: "call123".to_string(),
+        result: vec![],
     };
     let json = serde_json::to_string(&original).unwrap();
     let restored: InteractionContent = serde_json::from_str(&json).unwrap();
@@ -849,7 +859,8 @@ fn test_edge_cases_empty_values() {
 
     // Empty results in GoogleSearchResult
     let content = InteractionContent::GoogleSearchResult {
-        results: serde_json::json!({}),
+        call_id: "call_empty".to_string(),
+        result: vec![],
     };
     let json = serde_json::to_string(&content).unwrap();
     let restored: InteractionContent = serde_json::from_str(&json).unwrap();

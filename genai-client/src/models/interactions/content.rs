@@ -151,6 +151,56 @@ impl Annotation {
     }
 }
 
+// =============================================================================
+// Google Search Result Item
+// =============================================================================
+
+/// A single result from a Google Search.
+///
+/// Contains the source information for a grounding chunk including the title,
+/// URL, and optionally the rendered content that was used for grounding.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::{InteractionContent, GoogleSearchResultItem};
+/// # let content: InteractionContent = todo!();
+/// if let InteractionContent::GoogleSearchResult { result, .. } = content {
+///     for item in result {
+///         println!("Source: {} - {}", item.title, item.url);
+///     }
+/// }
+/// ```
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct GoogleSearchResultItem {
+    /// Title of the search result (often the domain name)
+    pub title: String,
+    /// URL of the source (typically a grounding redirect URL)
+    pub url: String,
+    /// The rendered content from the source (if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rendered_content: Option<String>,
+}
+
+impl GoogleSearchResultItem {
+    /// Creates a new GoogleSearchResultItem.
+    #[must_use]
+    pub fn new(title: impl Into<String>, url: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            url: url.into(),
+            rendered_content: None,
+        }
+    }
+
+    /// Returns `true` if this result has rendered content.
+    #[must_use]
+    pub fn has_rendered_content(&self) -> bool {
+        self.rendered_content.is_some()
+    }
+}
+
 /// Outcome of a code execution operation.
 ///
 /// This enum represents the result status of code executed via the CodeExecution tool.
@@ -415,16 +465,22 @@ pub enum InteractionContent {
     /// Google Search call (model requesting a search)
     ///
     /// Appears when the model initiates a Google Search via the `GoogleSearch` tool.
+    /// The model may execute multiple queries in a single call.
     GoogleSearchCall {
-        /// Search query
-        query: String,
+        /// Unique identifier for this search call (used to match with result)
+        id: String,
+        /// Search queries executed by the model
+        queries: Vec<String>,
     },
     /// Google Search result (grounding data from search)
     ///
     /// Contains the results returned by the `GoogleSearch` built-in tool.
+    /// Each result includes a title and URL for the source.
     GoogleSearchResult {
-        /// Search result data (flexible structure as API evolves)
-        results: serde_json::Value,
+        /// ID of the corresponding GoogleSearchCall
+        call_id: String,
+        /// Search results with source information
+        result: Vec<GoogleSearchResultItem>,
     },
     /// URL Context call (model requesting URL content)
     ///
@@ -713,16 +769,20 @@ impl Serialize for InteractionContent {
                 map.serialize_entry("output", output)?;
                 map.end()
             }
-            Self::GoogleSearchCall { query } => {
+            Self::GoogleSearchCall { id, queries } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "google_search_call")?;
-                map.serialize_entry("query", query)?;
+                map.serialize_entry("id", id)?;
+                // Serialize as nested arguments.queries to match API format
+                let arguments = serde_json::json!({ "queries": queries });
+                map.serialize_entry("arguments", &arguments)?;
                 map.end()
             }
-            Self::GoogleSearchResult { results } => {
+            Self::GoogleSearchResult { call_id, result } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "google_search_result")?;
-                map.serialize_entry("results", results)?;
+                map.serialize_entry("call_id", call_id)?;
+                map.serialize_entry("result", result)?;
                 map.end()
             }
             Self::UrlContextCall { url } => {
@@ -1007,10 +1067,14 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 result: Option<String>,
             },
             GoogleSearchCall {
-                query: String,
+                id: String,
+                #[serde(default)]
+                arguments: Option<serde_json::Value>,
             },
             GoogleSearchResult {
-                results: serde_json::Value,
+                call_id: String,
+                #[serde(default)]
+                result: Vec<GoogleSearchResultItem>,
             },
             UrlContextCall {
                 url: String,
@@ -1184,11 +1248,23 @@ impl<'de> Deserialize<'de> for InteractionContent {
                         output: exec_output,
                     }
                 }
-                KnownContent::GoogleSearchCall { query } => {
-                    InteractionContent::GoogleSearchCall { query }
+                KnownContent::GoogleSearchCall { id, arguments } => {
+                    // Extract queries from arguments.queries
+                    let queries = arguments
+                        .as_ref()
+                        .and_then(|args| args.get("queries"))
+                        .and_then(|q| q.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+
+                    InteractionContent::GoogleSearchCall { id, queries }
                 }
-                KnownContent::GoogleSearchResult { results } => {
-                    InteractionContent::GoogleSearchResult { results }
+                KnownContent::GoogleSearchResult { call_id, result } => {
+                    InteractionContent::GoogleSearchResult { call_id, result }
                 }
                 KnownContent::UrlContextCall { url } => InteractionContent::UrlContextCall { url },
                 KnownContent::UrlContextResult { url, content } => {

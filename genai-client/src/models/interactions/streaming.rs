@@ -673,6 +673,7 @@ mod tests {
             agent: None,
             input: vec![InteractionContent::Text {
                 text: Some("Hello".to_string()),
+                annotations: None,
             }],
             outputs: vec![],
             status: InteractionStatus::InProgress,
@@ -867,6 +868,7 @@ mod tests {
 
         let delta_chunk = StreamChunk::Delta(InteractionContent::Text {
             text: Some("test".to_string()),
+            annotations: None,
         });
         assert_eq!(delta_chunk.interaction_id(), None);
 
