@@ -101,7 +101,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
              Use simple language suitable for a 10-year-old.",
         )
         .with_text("What is multiplication?")
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -192,6 +192,32 @@ async fn main() -> Result<(), Box<dyn Error>> {
         },
     }
 
-    println!("=== Examples Complete ===");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ System Instructions Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• with_system_instruction() sets persistent model behavior");
+    println!("• System instructions persist across multi-turn conversations");
+    println!("• Use for personas, output format control, and behavioral constraints");
+    println!("• Works with streaming and non-streaming requests\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("  [REQ#1] POST with systemInstruction + input text");
+    println!("  [RES#1] completed: text following system instruction\n");
+    println!("Multi-turn:");
+    println!("  [REQ#2] POST with systemInstruction + input + store:true");
+    println!("  [RES#2] completed: text response");
+    println!("  [REQ#3] POST with input + previousInteractionId (system instruction inherited)");
+    println!("  [RES#3] completed: response maintains persona/behavior\n");
+
+    println!("--- Production Considerations ---");
+    println!("• System instructions consume tokens - keep them concise");
+    println!("• Use structured output (with_response_format) for guaranteed JSON");
+    println!("• Empty system instructions are handled gracefully");
+    println!("• Combine with thinking for complex reasoning personas");
+
     Ok(())
 }

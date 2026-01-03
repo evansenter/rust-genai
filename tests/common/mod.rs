@@ -650,7 +650,7 @@ pub fn interaction_builder(client: &Client) -> rust_genai::InteractionBuilder<'_
 /// ```
 #[allow(dead_code)]
 pub fn stateful_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
-    interaction_builder(client).with_store(true)
+    interaction_builder(client).with_store_enabled()
 }
 
 /// Creates an interaction builder with thinking enabled.

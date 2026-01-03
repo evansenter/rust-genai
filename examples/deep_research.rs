@@ -85,7 +85,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_agent(agent_name)
         .with_text(prompt)
         .with_background(true) // Required for agent interactions
-        .with_store(true) // Required to retrieve results by interaction ID
+        .with_store_enabled() // Required to retrieve results by interaction ID
         .create()
         .await;
 
@@ -304,3 +304,35 @@ fn handle_research_error(e: &GenaiError) {
         }
     }
 }
+
+// =============================================================================
+// Summary (printed by display_research_results, but documented here for clarity)
+// =============================================================================
+//
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ✅ Deep Research Demo Complete
+//
+// --- Key Takeaways ---
+// • with_agent("deep-research-pro-preview-12-2025") uses the research agent
+// • with_background(true) is required for agent interactions
+// • Poll for completion using client.get_interaction(id)
+// • Research typically takes 30-120 seconds
+//
+// --- What You'll See with LOUD_WIRE=1 ---
+// Start research:
+//   [REQ#1] POST with input + agent + background:true + store:true
+//   [RES#1] in_progress: interaction ID returned
+//
+// Polling (multiple rounds):
+//   [REQ#2] GET interaction by ID
+//   [RES#2] in_progress: still researching
+//   ...
+//   [REQ#N] GET interaction by ID
+//   [RES#N] completed: research report
+//
+// --- Production Considerations ---
+// • Implement exponential backoff when polling (see INITIAL_POLL_DELAY)
+// • Set appropriate timeouts (MAX_POLL_DURATION) for your use case
+// • Handle PollError::Timeout gracefully - research may still complete
+// • Store interaction IDs to retrieve results later if timeout occurs
+// • Deep Research may not be available in all accounts/regions

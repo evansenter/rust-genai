@@ -1,6 +1,8 @@
-# Multi-Turn Customer Support Agent
+# Multi-Turn Customer Support Agent (Auto Functions)
 
-A stateful customer support chatbot demonstrating conversation context and backend integration.
+A stateful customer support chatbot using `create_with_auto_functions()` for seamless tool execution.
+
+See also: [multi_turn_agent_manual](../multi_turn_agent_manual/) for manual function calling.
 
 ## Overview
 
@@ -31,18 +33,31 @@ This example demonstrates a production-style support agent that:
 
 ### Stateful Conversations
 
-Uses `with_previous_interaction()` to chain conversation turns:
+Uses `with_previous_interaction()` to chain conversation turns. The typestate
+pattern enforces constraints at compile time (e.g., `with_system_instruction()`
+is only available on first turn):
 
 ```rust
-let mut builder = client
-    .interaction()
-    .with_model("gemini-3-flash-preview")
-    .with_text(message)
-    .with_store(true);
-
-if let Some(prev_id) = &self.last_interaction_id {
-    builder = builder.with_previous_interaction(prev_id);
-}
+let result = match &self.last_interaction_id {
+    Some(prev_id) => {
+        // Subsequent turns: chain to previous
+        client.interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text(message)
+            .with_previous_interaction(prev_id)
+            .create_with_auto_functions()
+            .await?
+    }
+    None => {
+        // First turn: set system instruction
+        client.interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text(message)
+            .with_system_instruction("You are a helpful assistant")
+            .create_with_auto_functions()
+            .await?
+    }
+};
 ```
 
 ### Integrated Tools
@@ -72,7 +87,7 @@ let result = builder
 
 ```bash
 export GEMINI_API_KEY=your_api_key
-cargo run --example multi_turn_agent
+cargo run --example multi_turn_agent_auto
 ```
 
 ## Sample Conversation

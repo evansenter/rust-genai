@@ -5,6 +5,7 @@ A Rust client library for interacting with Google's Generative AI (Gemini) API u
 ## Table of Contents
 
 - [Features](#features)
+- [External Documentation](#external-documentation)
 - [Installation](#installation)
 - [Usage](#usage)
   - [Simple Interaction](#simple-interaction)
@@ -40,14 +41,25 @@ A Rust client library for interacting with Google's Generative AI (Gemini) API u
 - Type-safe function argument handling with serde
 - Support for both synchronous and asynchronous functions
 
+## External Documentation
+
+For authoritative Gemini API documentation, consult these sources:
+
+| Document | Description |
+|----------|-------------|
+| [Interactions API Reference](https://ai.google.dev/static/api/interactions.md.txt) | API specification and endpoint details |
+| [Interactions API Guide](https://ai.google.dev/static/api/interactions-api.md.txt) | Usage patterns and best practices |
+| [Function Calling Guide](https://ai.google.dev/gemini-api/docs/function-calling.md.txt) | Function declaration and execution |
+| [Thought Signatures](https://ai.google.dev/gemini-api/docs/thought-signatures.md.txt) | Reasoning and thought content |
+
 ## Installation
 
 Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rust-genai = "0.2.0"
-rust-genai-macros = "0.2.0"  # Only if using the procedural macros
+rust-genai = "0.3.0"
+rust-genai-macros = "0.3.0"  # Only if using the procedural macros
 tokio = { version = "1.0", features = ["full"] }
 serde_json = "1.0"  # For JSON values in function calls
 futures-util = "0.3"  # Only if using streaming responses
@@ -68,6 +80,7 @@ Note: `async-trait` and `inventory` are already included as dependencies of `rus
 > - `system_instructions.rs` - Custom system prompts
 > - `stateful_interaction.rs` - Multi-turn conversations
 > - `auto_function_calling.rs` - Automatic function execution
+> - `parallel_and_compositional_functions.rs` - Parallel and chained function execution
 > - `structured_output.rs` - JSON schema enforcement
 > - `google_search.rs` - Web search grounding
 > - `code_execution.rs` - Python code execution
@@ -201,7 +214,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("My name is Alice and I live in New York.")
-        .with_store(true)  // Store for later reference
+        .with_store_enabled()  // Store for later reference
         .create()
         .await?;
 
@@ -222,6 +235,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+#### Multi-Turn Inheritance Rules
+
+When using `previous_interaction_id`, different fields have different inheritance behavior:
+
+| Field | Inherited? | Notes |
+|-------|------------|-------|
+| `systemInstruction` | ✅ Yes | Only send on first turn |
+| `tools` | ❌ No | Must resend on every new user message turn |
+| Conversation history | ✅ Yes | Automatically included via the chain |
+
+**Important**: Function result returns do NOT need to resend `tools`. When returning results after executing a tool, the model already knows about available tools from the interaction that triggered the function call. Only new user message turns require tools to be included.
+
+**Debugging tip**: Use `LOUD_WIRE=1` to see exactly what's being sent on each request. This shows tools, systemInstruction, and previousInteractionId for each turn, making it easy to verify correct behavior.
+
+See `examples/real_world/multi_turn_agent_manual/main.rs` for detailed comments on this pattern.
+
+**For comprehensive multi-turn and function calling patterns**: See [`docs/MULTI_TURN_FUNCTION_CALLING.md`](docs/MULTI_TURN_FUNCTION_CALLING.md) - covers stateful vs stateless, auto vs manual execution, parallel function calls, thought signatures, and design patterns.
 
 ### Function Calling
 
@@ -699,7 +730,7 @@ client
     .with_generation_config(config)             // Set generation parameters
     .with_response_modalities(vec![...])        // Set response modalities
     .with_response_format(schema)               // Set JSON schema for output
-    .with_store(true)                           // Whether to store the interaction
+    .with_store_enabled()                           // Whether to store the interaction
     .with_background(false)                     // Run in background mode
     // Multimodal content (accumulate, don't replace)
     .add_image_file("path").await?              // Add image from file

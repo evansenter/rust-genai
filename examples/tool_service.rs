@@ -204,7 +204,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("Assistant: {}", result2.response.text().unwrap_or_default());
 
-    println!("\n=== END EXAMPLE ===");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Tool Service Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• ToolService trait enables dependency injection for function calling");
+    println!("• Use Arc<RwLock<T>> for shared mutable state across requests");
+    println!("• service.clone() clones the Arc, not the service - same instance is reused");
+    println!("• Configuration changes apply to all subsequent function calls\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("Request 1 (precision=2):");
+    println!("  [REQ#1] POST with input + calculate tool");
+    println!("  [RES#1] requires_action: calculate(\"123.456 + 789.012\")");
+    println!("  [REQ#2] POST with function_result + previousInteractionId (no tools)");
+    println!("  [RES#2] completed: text response (result with 2 decimal places)\n");
+    println!("Request 2 (precision=8, same service):");
+    println!("  [REQ#3] POST with input + calculate tool");
+    println!("  [RES#3] requires_action: calculate(\"1.0 * 3.0\")");
+    println!("  [REQ#4] POST with function_result + previousInteractionId (no tools)");
+    println!("  [RES#4] completed: text response (result with 8 decimal places)\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Use ToolService when tools need DB pools, API clients, or config");
+    println!("• #[tool] macro is simpler but stateless - use ToolService for state");
+    println!("• Consider per-request context (user ID, tracing) via ToolService");
+    println!("• Arc<RwLock<T>> allows runtime config changes without restart");
 
     Ok(())
 }

@@ -54,7 +54,7 @@ async fn test_google_search_multi_turn() {
             "What is the current weather in Tokyo, Japan today? Use search to find current data.",
         )
         .with_google_search()
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await;
 
@@ -102,7 +102,7 @@ async fn test_google_search_multi_turn() {
         stateful_builder(&client)
             .with_previous_interaction(&prev_id)
             .with_text("Based on the weather information you just found, should I bring an umbrella if I visit Tokyo today?")
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     });
@@ -179,7 +179,7 @@ async fn test_url_context_multi_turn() {
             "Fetch and summarize the main content from https://example.com using URL context.",
         )
         .with_url_context()
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await;
 
@@ -303,7 +303,7 @@ async fn test_code_execution_multi_turn() {
         stateful_builder(&client)
             .with_text("Calculate the factorial of 5 using code execution. Return just the number.")
             .with_code_execution()
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     });
@@ -352,7 +352,7 @@ async fn test_code_execution_multi_turn() {
                 "Multiply the factorial result you just calculated by 2. What is the answer?",
             )
             .with_code_execution()
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     });

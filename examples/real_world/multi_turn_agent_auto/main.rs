@@ -1,23 +1,23 @@
-//! # Multi-Turn Customer Support Agent
+//! # Multi-Turn Customer Support Agent (Auto Functions)
 //!
-//! This example demonstrates a stateful customer support bot that:
+//! This example demonstrates a stateful customer support bot using
+//! `create_with_auto_functions()` for automatic function execution.
+//!
+//! ## Features
+//!
 //! - Maintains conversation context across multiple turns
-//! - Uses function calling to access backend systems
+//! - Uses `create_with_auto_functions()` for seamless tool execution
 //! - Provides personalized responses based on customer data
 //! - Handles escalation and handoff scenarios
 //!
-//! ## Production Patterns Demonstrated
+//! ## See Also
 //!
-//! - Stateful conversation management with `with_previous_interaction()`
-//! - Function calling for backend integration
-//! - System instructions for agent behavior
-//! - Graceful error handling and fallbacks
-//! - Session management and cleanup
+//! - `multi_turn_agent_manual` - Same example using manual function calling
 //!
 //! ## Running
 //!
 //! ```bash
-//! cargo run --example multi_turn_agent
+//! cargo run --example multi_turn_agent_auto
 //! ```
 //!
 //! ## Prerequisites
@@ -247,23 +247,42 @@ impl SupportSession {
             InitiateRefundCallable.declaration(),
         ];
 
-        // Build the interaction
-        let mut builder = self
-            .client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
-            .with_system_instruction(self.system_prompt())
-            .with_text(message)
-            .with_functions(functions)
-            .with_store(true); // Enable stateful conversation
-
-        // Chain to previous interaction if exists
-        if let Some(prev_id) = &self.last_interaction_id {
-            builder = builder.with_previous_interaction(prev_id);
-        }
-
-        // Execute with automatic function calling
-        let result = builder.create_with_auto_functions().await?;
+        // Build and execute the interaction
+        //
+        // Inheritance behavior with previousInteractionId:
+        // - systemInstruction: IS inherited (only need to send on first turn)
+        // - tools: NOT inherited (must send on every turn that needs function calling)
+        // - conversation history: IS inherited
+        //
+        // The typestate pattern enforces these constraints at compile time:
+        // - with_system_instruction() is only available on FirstTurn
+        // - with_previous_interaction() transitions FirstTurn -> Chained
+        let result = match &self.last_interaction_id {
+            Some(prev_id) => {
+                // Subsequent turns: chain to previous, tools required, systemInstruction inherited
+                self.client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_text(message)
+                    .with_functions(functions)
+                    .with_store_enabled()
+                    .with_previous_interaction(prev_id)
+                    .create_with_auto_functions()
+                    .await?
+            }
+            None => {
+                // First turn: set up systemInstruction
+                self.client
+                    .interaction()
+                    .with_model("gemini-3-flash-preview")
+                    .with_text(message)
+                    .with_functions(functions)
+                    .with_store_enabled()
+                    .with_system_instruction(self.system_prompt())
+                    .create_with_auto_functions()
+                    .await?
+            }
+        };
 
         // Update session state
         self.last_interaction_id = result.response.id.clone();
@@ -320,7 +339,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not found in environment");
     let client = Client::builder(api_key).build();
 
-    println!("=== Multi-Turn Customer Support Agent ===\n");
+    println!("=== Multi-Turn Customer Support Agent (Auto Functions) ===\n");
     println!("Simulating a customer support conversation...\n");
 
     let mut session = SupportSession::new(client);

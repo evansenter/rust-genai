@@ -183,5 +183,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Total delta chunks: {}", delta_count);
     println!("Functions executed: {}", function_count);
 
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Streaming Auto Function Calling Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• create_stream_with_auto_functions() combines streaming + auto-execution");
+    println!("• AutoFunctionStreamChunk::Delta delivers text as it arrives");
+    println!("• ExecutingFunctions/FunctionResults show function lifecycle events");
+    println!("• Functions execute between streaming rounds, then response continues\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("  [REQ#1] POST streaming with input + 3 function declarations");
+    println!("  [RES#1] SSE stream → requires_action: get_weather(), get_time()");
+    println!("  (library auto-executes functions)");
+    println!("  [REQ#2] POST streaming with function_results + previousInteractionId (no tools)");
+    println!("  [RES#2] SSE stream: text deltas → completed\n");
+
+    println!("--- Production Considerations ---");
+    println!("• ExecutingFunctions may show empty calls (they arrived via deltas)");
+    println!("• FunctionResults includes execution timing for performance monitoring");
+    println!("• Handle stream errors gracefully - partial responses may have been sent");
+    println!("• Use buffering for high-frequency UI updates");
+
     Ok(())
 }

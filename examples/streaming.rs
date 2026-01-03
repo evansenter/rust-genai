@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(prompt)
-        .with_store(true)
+        .with_store_enabled()
         .create_stream();
 
     let mut delta_count = 0;
@@ -81,7 +81,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- Stream Stats ---");
     println!("Delta chunks received: {}", delta_count);
     println!("Total characters: {}", total_chars);
-    println!("--- End ---");
+
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Streaming Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• create_stream() returns a Stream of chunks instead of waiting for full response");
+    println!("• StreamChunk::Delta contains incremental text/thought content");
+    println!("• StreamChunk::Complete provides final response with usage metadata");
+    println!("• Flush stdout after each delta for immediate display\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("  [REQ#1] POST with input text + model + store:true");
+    println!("  [RES#1] SSE stream: multiple text deltas → completed\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Handle stream errors gracefully (connection drops, timeouts)");
+    println!("• Use buffering strategies for high-frequency deltas");
+    println!("• Consider progress indicators for long-running streams");
+    println!("• StreamChunk::Complete contains the same data as non-streaming response");
 
     Ok(())
 }

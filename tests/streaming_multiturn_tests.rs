@@ -37,7 +37,7 @@ async fn test_streaming_multi_turn_basic() {
             .with_text(
                 "My favorite programming language is Python. Please acknowledge this.",
             )
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     })
@@ -50,7 +50,7 @@ async fn test_streaming_multi_turn_basic() {
     let stream = stateful_builder(&client)
         .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
         .with_text("What is my favorite programming language? Answer in one word.")
-        .with_store(true)
+        .with_store_enabled()
         .create_stream();
 
     let result = consume_stream(stream).await;
@@ -101,7 +101,7 @@ async fn test_streaming_multi_turn_function_calling() {
         stateful_builder(&client)
             .with_text("What's the weather in Paris?")
             .with_function(get_weather)
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     })
@@ -131,7 +131,7 @@ async fn test_streaming_multi_turn_function_calling() {
             .with_previous_interaction(&prev_id)
             .with_content(vec![function_result])
             .with_function(get_weather)
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await
     })
@@ -147,7 +147,7 @@ async fn test_streaming_multi_turn_function_calling() {
         .with_previous_interaction(response2.id.as_ref().expect("id should exist"))
         .with_text("Should I bring an umbrella? Answer briefly.")
         .with_function(get_weather)
-        .with_store(true)
+        .with_store_enabled()
         .create_stream();
 
     let result = consume_stream(stream).await;

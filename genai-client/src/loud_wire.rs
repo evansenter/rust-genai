@@ -15,6 +15,9 @@
 //! - Red `<<<` for incoming responses
 //! - Blue for SSE streaming chunks
 //! - Timestamps and request IDs for correlation
+//! - Request IDs use alternating colors (even/odd) for visual distinction:
+//!   - `[REQ#N]`: Green (even) / Yellow (odd)
+//!   - `[RES#N]`: Magenta (even) / Cyan (odd)
 //!
 //! Base64-encoded media content is truncated to keep output readable.
 
@@ -143,25 +146,29 @@ fn day_of_year_to_month_day(day_of_year: u32, leap: bool) -> (u32, u32) {
 }
 
 /// Log prefix with timestamp and request ID (for outgoing requests).
+/// Colors alternate: green (even) / yellow (odd) for visual distinction.
 fn request_prefix(request_id: usize) -> String {
     let ts = timestamp().dimmed();
-    format!(
-        "{} {} {}",
-        "[LOUD_WIRE]".bold(),
-        ts,
-        format!("[REQ#{}]", request_id).cyan()
-    )
+    let req_label = format!("[REQ#{}]", request_id);
+    let colored_label = if request_id.is_multiple_of(2) {
+        req_label.green().bold()
+    } else {
+        req_label.yellow().bold()
+    };
+    format!("{} {} {}", "[LOUD_WIRE]".bold(), ts, colored_label)
 }
 
 /// Log prefix with timestamp and response ID (for incoming responses).
+/// Colors alternate: magenta (even) / cyan (odd) for visual distinction.
 fn response_prefix(request_id: usize) -> String {
     let ts = timestamp().dimmed();
-    format!(
-        "{} {} {}",
-        "[LOUD_WIRE]".bold(),
-        ts,
-        format!("[RES#{}]", request_id).cyan()
-    )
+    let res_label = format!("[RES#{}]", request_id);
+    let colored_label = if request_id.is_multiple_of(2) {
+        res_label.magenta().bold()
+    } else {
+        res_label.cyan().bold()
+    };
+    format!("{} {} {}", "[LOUD_WIRE]".bold(), ts, colored_label)
 }
 
 /// Log an outgoing HTTP request.

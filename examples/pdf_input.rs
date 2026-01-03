@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_text("What text content does this PDF document contain?")
         .add_document_data(SAMPLE_PDF_BASE64, "application/pdf")
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -84,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .expect("id should exist when store=true"),
         )
         .with_text("What format is this document? Is it a valid PDF structure?")
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -161,7 +161,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  use rust_genai::document_from_file;");
     println!("  let doc = document_from_file(\"doc.pdf\").await?;");
 
-    println!("\n=== END EXAMPLE ===");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ PDF Document Input Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• add_document_data(base64, \"application/pdf\") for inline PDF");
+    println!("• add_document_file(path) loads PDF automatically");
+    println!("• document_from_file() helper for programmatic loading");
+    println!("• PDFs up to 1000 pages supported (~258 tokens/page)\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("  [REQ#1] POST with text + inlineData (PDF base64 truncated)");
+    println!("  [RES#1] completed: text extraction or analysis\n");
+    println!("Follow-up:");
+    println!("  [REQ#2] POST with text + previousInteractionId");
+    println!("  [RES#2] completed: answer using PDF context\n");
+    println!("Streaming:");
+    println!("  [REQ#3] POST streaming with PDF content");
+    println!("  [RES#3] SSE stream: analysis chunks → completed\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Native text extraction + OCR for scanned pages");
+    println!("• Images, diagrams, tables are understood");
+    println!("• Each page tokenized as image (~258 tokens)");
+    println!("• For large PDFs, use Files API for efficiency");
 
     Ok(())
 }

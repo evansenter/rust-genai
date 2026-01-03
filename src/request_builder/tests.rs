@@ -165,15 +165,29 @@ fn test_interaction_builder_with_background() {
 }
 
 #[test]
-fn test_interaction_builder_with_store() {
+fn test_interaction_builder_with_store_disabled() {
     let client = create_test_client();
     let builder = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Temporary interaction")
-        .with_store(false);
+        .with_store_disabled();
 
+    // Note: with_store_disabled() transitions to StoreDisabled state
+    // and sets store = Some(false) internally
     assert_eq!(builder.store, Some(false));
+}
+
+#[test]
+fn test_interaction_builder_with_store_enabled() {
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Stored interaction")
+        .with_store_enabled();
+
+    assert_eq!(builder.store, Some(true));
 }
 
 #[test]
@@ -267,71 +281,112 @@ fn test_interaction_builder_with_max_function_call_loops() {
     assert_eq!(builder.max_function_call_loops, 1);
 }
 
-// --- Auto-Function store=false Validation Tests ---
+// --- Typestate Tests ---
+//
+// These tests verify compile-time enforcement of API constraints via typestate.
+// The actual compile-time checks are verified by the fact that this code compiles -
+// invalid combinations won't compile. See ui_tests.rs for compile-fail tests.
 
-#[tokio::test]
-async fn test_auto_functions_rejects_store_false() {
+#[test]
+fn test_typestate_first_turn_has_system_instruction() {
+    // FirstTurn builders can set system instruction
     let client = create_test_client();
-    let func = FunctionDeclaration::builder("test_func")
-        .description("Test function")
-        .build();
-
-    let result = client
+    let builder = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("Test")
-        .with_function(func)
-        .with_store(false)
-        .create_with_auto_functions()
-        .await;
+        .with_text("Hello")
+        .with_system_instruction("Be helpful");
 
-    assert!(result.is_err());
-    let err = result.unwrap_err();
-    assert!(
-        matches!(err, crate::GenaiError::InvalidInput(_)),
-        "Expected InvalidInput error, got: {:?}",
-        err
-    );
-    assert!(
-        err.to_string().contains("stored interactions"),
-        "Error message should mention stored interactions: {}",
-        err
-    );
+    assert!(builder.system_instruction.is_some());
 }
 
-#[tokio::test]
-async fn test_auto_functions_stream_rejects_store_false() {
-    use futures_util::StreamExt;
-
+#[test]
+fn test_typestate_chained_preserves_fields() {
+    // When transitioning FirstTurn -> Chained, fields are preserved
     let client = create_test_client();
-    let func = FunctionDeclaration::builder("test_func")
-        .description("Test function")
-        .build();
-
-    let mut stream = client
+    let builder = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("Test")
-        .with_function(func)
-        .with_store(false)
-        .create_stream_with_auto_functions();
+        .with_text("Hello")
+        .with_system_instruction("Be helpful")
+        .with_previous_interaction("prev-123");
 
-    // The first item should be an error
-    let first = stream.next().await;
-    assert!(first.is_some(), "Stream should yield at least one item");
-
-    let err = first.unwrap().unwrap_err();
-    assert!(
-        matches!(err, crate::GenaiError::InvalidInput(_)),
-        "Expected InvalidInput error, got: {:?}",
-        err
-    );
-    assert!(
-        err.to_string().contains("stored interactions"),
-        "Error message should mention stored interactions: {}",
-        err
-    );
+    // Fields should be preserved through the transition
+    assert_eq!(builder.model.as_deref(), Some("gemini-3-flash-preview"));
+    assert!(builder.system_instruction.is_some());
+    assert_eq!(builder.previous_interaction_id.as_deref(), Some("prev-123"));
 }
+
+#[test]
+fn test_typestate_store_disabled_sets_store_false() {
+    // StoreDisabled transition sets store = Some(false)
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Hello")
+        .with_store_disabled();
+
+    assert_eq!(builder.store, Some(false));
+}
+
+#[test]
+fn test_typestate_store_disabled_clears_background() {
+    // StoreDisabled transition clears background
+    let client = create_test_client();
+    let first_turn = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Hello")
+        .with_background(true);
+
+    assert_eq!(first_turn.background, Some(true));
+
+    // Transitioning to StoreDisabled clears background
+    let disabled = first_turn.with_store_disabled();
+    assert_eq!(disabled.background, None);
+}
+
+#[test]
+fn test_typestate_chained_can_set_background() {
+    // Chained builders can set background (unlike StoreDisabled)
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Hello")
+        .with_previous_interaction("prev-123")
+        .with_background(true);
+
+    assert_eq!(builder.background, Some(true));
+}
+
+#[test]
+fn test_typestate_first_turn_can_set_background() {
+    // FirstTurn builders can set background
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Hello")
+        .with_background(true);
+
+    assert_eq!(builder.background, Some(true));
+}
+
+// NOTE: The following compile-time constraints are enforced by typestate:
+//
+// 1. StoreDisabled builders cannot call:
+//    - with_previous_interaction() - requires storage
+//    - with_background(true) - requires storage
+//    - create_with_auto_functions() - requires storage
+//    - create_stream_with_auto_functions() - requires storage
+//
+// 2. Chained builders cannot call:
+//    - with_system_instruction() - inherited from previous
+//    - with_store_disabled() - chained requires storage
+//
+// These are verified by compile-fail tests in tests/ui_tests.rs
 
 #[tokio::test]
 async fn test_auto_functions_allows_store_true() {
@@ -347,7 +402,7 @@ async fn test_auto_functions_allows_store_true() {
         .with_model("gemini-3-flash-preview")
         .with_text("Test")
         .with_function(func)
-        .with_store(true) // Explicitly true
+        .with_store_enabled() // Explicitly true
         .create_with_auto_functions()
         .await;
 

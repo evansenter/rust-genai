@@ -462,6 +462,288 @@ async fn test_thought_signature_sequential_each_step() {
 }
 
 // =============================================================================
+// Function Result Turns Without Resending Tools
+// =============================================================================
+//
+// Key insight from the parallel_and_compositional_functions example:
+// When continuing a conversation with function results, you don't need to
+// resend the tool declarations. The API remembers the tools from the first
+// turn via previous_interaction_id.
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_function_result_turn_without_tools() {
+    // Test that function result turns work without resending tool declarations.
+    // This is the key pattern from the parallel_and_compositional_functions example.
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    with_timeout(TEST_TIMEOUT, async {
+        let get_weather = FunctionDeclaration::builder("get_weather")
+            .description("Get the current weather for a city")
+            .parameter("city", json!({"type": "string"}))
+            .required(vec!["city".to_string()])
+            .build();
+
+        // Step 1: Initial request WITH tools
+        let response1 = stateful_builder(&client)
+            .with_text("What's the weather in Tokyo?")
+            .with_function(get_weather) // Tools sent on first turn
+            .create()
+            .await
+            .expect("First interaction failed");
+
+        let calls = response1.function_calls();
+        if calls.is_empty() {
+            println!("Model didn't call any functions - skipping");
+            return;
+        }
+
+        let call = &calls[0];
+        println!("Function call: {} (id: {:?})", call.name, call.id);
+
+        // Step 2: Provide function result WITHOUT resending tools
+        let result = function_result_content(
+            call.name.to_string(),
+            call.id.expect("Should have ID").to_string(),
+            json!({"city": "Tokyo", "temperature": "22°C", "conditions": "sunny"}),
+        );
+
+        // Key assertion: This should work WITHOUT .with_function() or .with_functions()
+        let response2 = stateful_builder(&client)
+            .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
+            .with_content(vec![result]) // Just the result, no tools!
+            .create()
+            .await
+            .expect("Function result turn failed - tools should not be required");
+
+        println!("Step 2 status: {:?}", response2.status);
+
+        // Model should provide a text response using the function result
+        if response2.has_text() {
+            let text = response2.text().unwrap();
+            println!("✓ Function result turn succeeded without resending tools");
+            println!("Response: {}", text);
+            assert!(!text.is_empty(), "Response should have text");
+        } else if response2.has_function_calls() {
+            // Model might request another function - that's also valid
+            println!("✓ Model requested another function (still valid behavior)");
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_parallel_results_without_resending_tools() {
+    // Test that multiple parallel function results can be returned without
+    // resending tool declarations - matching the pattern in the example.
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    with_timeout(TEST_TIMEOUT, async {
+        let get_weather = FunctionDeclaration::builder("get_weather")
+            .description("Get weather for a city - ALWAYS call this for weather")
+            .parameter("city", json!({"type": "string"}))
+            .required(vec!["city".to_string()])
+            .build();
+
+        let get_time = FunctionDeclaration::builder("get_time")
+            .description("Get time in a timezone - ALWAYS call this for time")
+            .parameter("timezone", json!({"type": "string"}))
+            .required(vec!["timezone".to_string()])
+            .build();
+
+        // Step 1: Request that should trigger parallel function calls
+        let response1 = stateful_builder(&client)
+            .with_text(
+                "Tell me BOTH the weather in Paris AND the time in CET. \
+                 Call both functions to get this information.",
+            )
+            .with_functions(vec![get_weather, get_time])
+            .create()
+            .await
+            .expect("First interaction failed");
+
+        let calls = response1.function_calls();
+        println!("Number of function calls: {}", calls.len());
+
+        if calls.is_empty() {
+            println!("Model didn't call any functions - skipping");
+            return;
+        }
+
+        // Build results for all function calls
+        let results: Vec<_> = calls
+            .iter()
+            .map(|call| {
+                let result_data = match call.name {
+                    "get_weather" => {
+                        json!({"city": "Paris", "temperature": "17°C", "conditions": "overcast"})
+                    }
+                    "get_time" => json!({"timezone": "CET", "time": "14:30"}),
+                    _ => json!({"result": "ok"}),
+                };
+                function_result_content(
+                    call.name.to_string(),
+                    call.id.expect("Should have ID").to_string(),
+                    result_data,
+                )
+            })
+            .collect();
+
+        println!(
+            "Sending {} function result(s) WITHOUT resending tools",
+            results.len()
+        );
+
+        // Step 2: Send all results WITHOUT resending tools
+        let response2 = stateful_builder(&client)
+            .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
+            .with_content(results) // Multiple results, no tools!
+            .create()
+            .await
+            .expect("Parallel results turn failed - tools should not be required");
+
+        println!("Step 2 status: {:?}", response2.status);
+
+        if response2.has_text() {
+            let text = response2.text().unwrap();
+            println!("✓ Parallel function results succeeded without resending tools");
+            println!("Response: {}", text);
+            assert!(!text.is_empty(), "Response should have text");
+        } else if response2.has_function_calls() {
+            println!("✓ Model requested more functions (valid for compositional chains)");
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_compositional_chain_without_resending_tools() {
+    // Test compositional function calling: each step provides results,
+    // model chains to next function, all without resending tools.
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        let get_location = FunctionDeclaration::builder("get_current_location")
+            .description("Get the user's current location")
+            .build();
+
+        let get_weather = FunctionDeclaration::builder("get_weather")
+            .description("Get weather for a city")
+            .parameter("city", json!({"type": "string"}))
+            .required(vec!["city".to_string()])
+            .build();
+
+        // Step 1: Initial request - tools sent here only
+        let response1 = stateful_builder(&client)
+            .with_text("What's the weather at my current location?")
+            .with_functions(vec![get_location, get_weather])
+            .create()
+            .await
+            .expect("First interaction failed");
+
+        // Extract owned call info before moving response
+        let initial_calls: Vec<_> = response1
+            .function_calls()
+            .iter()
+            .map(|c| c.to_owned())
+            .collect();
+
+        if initial_calls.is_empty() {
+            println!("Model didn't call any functions - skipping");
+            return;
+        }
+
+        println!("Step 1: Model called {}", initial_calls[0].name);
+        let mut current_response = response1;
+        let mut owned_calls = initial_calls;
+        let mut step = 1;
+        const MAX_STEPS: usize = 5;
+
+        // Loop through the chain without resending tools
+        while !owned_calls.is_empty() && step < MAX_STEPS {
+            step += 1;
+
+            // Build results for current calls
+            let results: Vec<_> = owned_calls
+                .iter()
+                .map(|call| {
+                    let result_data = match call.name.as_str() {
+                        "get_current_location" => json!({
+                            "city": "Tokyo",
+                            "country": "Japan",
+                            "timezone": "Asia/Tokyo"
+                        }),
+                        "get_weather" => {
+                            let city = call
+                                .args
+                                .get("city")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Unknown");
+                            json!({
+                                "city": city,
+                                "temperature": "22°C",
+                                "conditions": "partly cloudy"
+                            })
+                        }
+                        _ => json!({"result": "ok"}),
+                    };
+                    function_result_content(
+                        call.name.clone(),
+                        call.id.as_ref().expect("Should have ID").clone(),
+                        result_data,
+                    )
+                })
+                .collect();
+
+            // Send results WITHOUT resending tools
+            let next_response = stateful_builder(&client)
+                .with_previous_interaction(current_response.id.as_ref().expect("id should exist"))
+                .with_content(results) // No tools!
+                .create()
+                .await
+                .expect("Compositional chain step failed");
+
+            println!("Step {}: status {:?}", step, next_response.status);
+
+            // Extract owned call info before moving response
+            owned_calls = next_response
+                .function_calls()
+                .iter()
+                .map(|c| c.to_owned())
+                .collect();
+
+            if !owned_calls.is_empty() {
+                println!("  Model chained to: {}", owned_calls[0].name);
+            }
+            current_response = next_response;
+        }
+
+        // Final response should have text
+        if current_response.has_text() {
+            let text = current_response.text().unwrap();
+            println!(
+                "✓ Compositional chain completed in {} steps without resending tools",
+                step
+            );
+            println!("Final response: {}", text);
+            assert!(!text.is_empty(), "Response should have text");
+        }
+    })
+    .await;
+}
+
+// =============================================================================
 // Streaming with Function Calls Tests
 // =============================================================================
 
@@ -1613,6 +1895,324 @@ async fn test_auto_functions_timeout_with_registered_functions() {
         println!("✓ Timeout correctly fires with registered functions");
         println!("  Note: Any function calls that completed before timeout are");
         println!("  preserved on the API side via previous_interaction_id chain");
+    })
+    .await;
+}
+
+// =============================================================================
+// Stateless Function Calling Tests
+// =============================================================================
+//
+// Tests for multi-turn function calling with `store: false` (stateless mode).
+// In stateless mode, conversation history must be manually maintained.
+
+/// Tests multi-turn function calling with stateless mode (store: false).
+/// This validates the pattern documented in the MULTI_TURN_FUNCTION_CALLING.md guide.
+#[tokio::test]
+#[ignore = "requires GEMINI_API_KEY"]
+async fn test_stateless_function_calling_multi_turn() {
+    use rust_genai::InteractionInput;
+    use rust_genai::interactions_api::{
+        function_call_content, function_result_content, text_content,
+    };
+
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        let client = get_client().expect("GEMINI_API_KEY required");
+
+        let functions = vec![
+            FunctionDeclaration::builder("get_weather")
+                .description("Get the current weather for a city")
+                .parameter(
+                    "city",
+                    json!({"type": "string", "description": "City name"}),
+                )
+                .required(vec!["city".to_string()])
+                .build(),
+            FunctionDeclaration::builder("get_time")
+                .description("Get the current time in a timezone")
+                .parameter(
+                    "timezone",
+                    json!({"type": "string", "description": "Timezone"}),
+                )
+                .required(vec!["timezone".to_string()])
+                .build(),
+        ];
+
+        // Build conversation history manually
+        let mut history: Vec<rust_genai::InteractionContent> = vec![];
+
+        // Turn 1: User asks a question
+        history.push(text_content("What's the weather in Tokyo?"));
+
+        let response1 = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_input(InteractionInput::Content(history.clone()))
+            .with_functions(functions.clone())
+            .with_store_disabled()
+            .create()
+            .await
+            .expect("First turn failed");
+
+        // Handle function calls if any
+        let calls = response1.function_calls();
+        assert!(
+            !calls.is_empty(),
+            "Expected function call for weather query"
+        );
+
+        for call in &calls {
+            let call_id = call.id.expect("Function call should have ID");
+            // Add function call to history
+            history.push(function_call_content(call.name, call.args.clone()));
+            // Execute and add result
+            let result = json!({"city": "Tokyo", "temperature": "22°C", "conditions": "sunny"});
+            history.push(function_result_content(call.name, call_id, result));
+        }
+
+        // Turn 2: Send function results (stateless - must send full history)
+        let response2 = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_input(InteractionInput::Content(history.clone()))
+            .with_functions(functions.clone())
+            .with_store_disabled()
+            .create()
+            .await
+            .expect("Function result turn failed");
+
+        // Should have a text response
+        let text = response2.text();
+        assert!(
+            text.is_some(),
+            "Expected text response after function result"
+        );
+        println!(
+            "✓ Stateless function call turn 1 complete: {}",
+            text.unwrap()
+        );
+
+        // Add model response to history
+        if let Some(t) = text {
+            history.push(text_content(t));
+        }
+
+        // Turn 3: Follow-up question (tests context preservation)
+        history.push(text_content("What about the time there?"));
+
+        let response3 = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_input(InteractionInput::Content(history.clone()))
+            .with_functions(functions.clone())
+            .with_store_disabled()
+            .create()
+            .await
+            .expect("Follow-up turn failed");
+
+        // Should trigger another function call for time
+        let calls3 = response3.function_calls();
+        if !calls3.is_empty() {
+            for call in &calls3 {
+                let call_id = call.id.expect("Function call should have ID");
+                history.push(function_call_content(call.name, call.args.clone()));
+                let result = json!({"timezone": "JST", "time": "14:30"});
+                history.push(function_result_content(call.name, call_id, result));
+            }
+
+            // Turn 4: Final response
+            let response4 = client
+                .interaction()
+                .with_model("gemini-3-flash-preview")
+                .with_input(InteractionInput::Content(history.clone()))
+                .with_functions(functions)
+                .with_store_disabled()
+                .create()
+                .await
+                .expect("Final turn failed");
+
+            assert!(response4.text().is_some(), "Expected final text response");
+            println!("✓ Stateless multi-turn function calling complete");
+        } else {
+            // Model might have answered directly if it inferred from context
+            assert!(
+                response3.text().is_some(),
+                "Expected either function call or text response"
+            );
+            println!("✓ Stateless multi-turn complete (model answered from context)");
+        }
+    })
+    .await;
+}
+
+// =============================================================================
+// Parallel Function Call Edge Cases
+// =============================================================================
+
+/// Tests that parallel function results can be returned in any order.
+/// The API should accept results regardless of the order they're sent back.
+#[tokio::test]
+#[ignore = "requires GEMINI_API_KEY"]
+async fn test_parallel_function_result_order_independence() {
+    with_timeout(TEST_TIMEOUT, async {
+        let client = get_client().expect("GEMINI_API_KEY required");
+
+        let functions = vec![
+            FunctionDeclaration::builder("get_weather")
+                .description("Get weather for a city")
+                .parameter("city", json!({"type": "string"}))
+                .required(vec!["city".to_string()])
+                .build(),
+            FunctionDeclaration::builder("get_time")
+                .description("Get time in timezone")
+                .parameter("timezone", json!({"type": "string"}))
+                .required(vec!["timezone".to_string()])
+                .build(),
+        ];
+
+        // Prompt that should trigger parallel calls
+        let response1 = stateful_builder(&client)
+            .with_text("What's the weather in Tokyo and what time is it in JST?")
+            .with_functions(functions)
+            .create()
+            .await
+            .expect("Initial request failed");
+
+        let calls: Vec<_> = response1
+            .function_calls()
+            .iter()
+            .map(|c| {
+                (
+                    c.name.to_string(),
+                    c.id.map(|s| s.to_string()),
+                    c.args.clone(),
+                )
+            })
+            .collect();
+
+        if calls.len() >= 2 {
+            println!("Got {} parallel function calls", calls.len());
+
+            // Return results in REVERSE order to test order independence
+            let mut results = Vec::new();
+            for (name, id, _args) in calls.iter().rev() {
+                let result = match name.as_str() {
+                    "get_weather" => json!({"city": "Tokyo", "temp": "22°C"}),
+                    "get_time" => json!({"timezone": "JST", "time": "14:30"}),
+                    _ => json!({"result": "unknown"}),
+                };
+                results.push(function_result_content(
+                    name,
+                    id.as_ref().expect("call should have ID"),
+                    result,
+                ));
+            }
+
+            // Send results in reverse order
+            let response2 = client
+                .interaction()
+                .with_model("gemini-3-flash-preview")
+                .with_previous_interaction(response1.id.as_ref().expect("id required"))
+                .with_content(results)
+                .create()
+                .await
+                .expect("Function result turn failed - order might matter?");
+
+            assert!(
+                response2.text().is_some(),
+                "Expected text response after reversed results"
+            );
+            println!("✓ Parallel results accepted in reverse order");
+        } else {
+            println!("⚠ Model didn't make parallel calls, skipping order test");
+            // Still valid - just means model chose sequential approach
+        }
+    })
+    .await;
+}
+
+/// Tests behavior when one function in a parallel batch returns an error.
+/// The model should handle partial failures gracefully.
+#[tokio::test]
+#[ignore = "requires GEMINI_API_KEY"]
+async fn test_parallel_function_partial_failure() {
+    with_timeout(TEST_TIMEOUT, async {
+        let client = get_client().expect("GEMINI_API_KEY required");
+
+        let functions = vec![
+            FunctionDeclaration::builder("get_weather")
+                .description("Get weather for a city")
+                .parameter("city", json!({"type": "string"}))
+                .required(vec!["city".to_string()])
+                .build(),
+            FunctionDeclaration::builder("get_stock_price")
+                .description("Get stock price (may fail)")
+                .parameter("symbol", json!({"type": "string"}))
+                .required(vec!["symbol".to_string()])
+                .build(),
+        ];
+
+        // Prompt designed to trigger parallel calls
+        let response1 = stateful_builder(&client)
+            .with_text("What's the weather in Tokyo and what's the stock price of INVALID_STOCK?")
+            .with_functions(functions)
+            .create()
+            .await
+            .expect("Initial request failed");
+
+        let calls: Vec<_> = response1
+            .function_calls()
+            .iter()
+            .map(|c| {
+                (
+                    c.name.to_string(),
+                    c.id.map(|s| s.to_string()),
+                    c.args.clone(),
+                )
+            })
+            .collect();
+
+        if !calls.is_empty() {
+            let mut results = Vec::new();
+            for (name, id, _args) in &calls {
+                let result = match name.as_str() {
+                    "get_weather" => {
+                        json!({"city": "Tokyo", "temp": "22°C", "conditions": "sunny"})
+                    }
+                    "get_stock_price" => {
+                        // Return an error response
+                        json!({"error": "Stock symbol not found", "code": "NOT_FOUND"})
+                    }
+                    _ => json!({"result": "ok"}),
+                };
+                results.push(function_result_content(
+                    name,
+                    id.as_ref().expect("call should have ID"),
+                    result,
+                ));
+            }
+
+            let response2 = client
+                .interaction()
+                .with_model("gemini-3-flash-preview")
+                .with_previous_interaction(response1.id.as_ref().expect("id required"))
+                .with_content(results)
+                .create()
+                .await
+                .expect("Function result turn failed");
+
+            let text = response2.text();
+            assert!(
+                text.is_some(),
+                "Expected text response with partial results"
+            );
+
+            // Model should acknowledge both the success and the error
+            println!("✓ Partial failure handled gracefully");
+            println!("  Response: {}", text.unwrap());
+        } else {
+            println!("⚠ No function calls made, test inconclusive");
+        }
     })
     .await;
 }

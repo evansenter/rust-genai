@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_text(initial_prompt)
         .with_thinking_level(ThinkingLevel::Medium)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -99,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_input(InteractionInput::Content(history))
         .with_thinking_level(ThinkingLevel::Medium)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -128,7 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_text("What is 17 * 23?")
         .with_thinking_level(ThinkingLevel::Low)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -146,7 +146,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .expect("id should exist when store=true"),
         )
         .with_thinking_level(ThinkingLevel::Low)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -168,7 +168,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  - Server handles thought signatures automatically");
     println!("  - No need to manually track conversation content");
 
-    println!("\n=== END EXAMPLE ===");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Thought Echo Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• thought_content() echoes model thoughts in manual multi-turn");
+    println!("• Useful for custom conversation stores or history filtering");
+    println!("• with_previous_interaction() handles this automatically (preferred)");
+    println!("• Thoughts from response1.thoughts() can be echoed back\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("Manual history:");
+    println!("  [REQ#1] POST with input + thinkingConfig");
+    println!("  [RES#1] completed: thoughts + text");
+    println!("  [REQ#2] POST with manual history (text + thoughts + text + followup)");
+    println!("  [RES#2] completed: continuation with context\n");
+    println!("Using previous_interaction_id (recommended):");
+    println!("  [REQ#3] POST with input + thinkingConfig + store:true");
+    println!("  [RES#3] completed: thoughts + text + interaction ID");
+    println!("  [REQ#4] POST with input + previousInteractionId");
+    println!("  [RES#4] completed: server-side thought context preserved\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Prefer with_previous_interaction() for simplicity");
+    println!("• Manual echoing needed only for custom conversation management");
+    println!("• Thought signatures are handled automatically with previous_interaction_id");
+    println!("• Store conversation history in database for replay scenarios");
 
     Ok(())
 }

@@ -172,7 +172,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("\n(Warning: Max loops reached, model may still want to call functions)");
     }
 
-    println!("\n=== END EXAMPLE ===");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Manual Function Calling Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• Use create() (not create_with_auto_functions()) for manual control");
+    println!("• Check response.has_function_calls() to detect pending calls");
+    println!("• Execute functions yourself, then send results with function_result_content()");
+    println!("• Use with_previous_interaction() to maintain conversation context\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("  [REQ#1] POST with input + 2 function declarations");
+    println!("  [RES#1] requires_action: get_weather(Tokyo)");
+    println!("  [REQ#2] POST with function_result + previousInteractionId + tools");
+    println!("  [RES#2] requires_action: convert_temperature(22, celsius, fahrenheit)");
+    println!("  [REQ#3] POST with function_result + previousInteractionId + tools");
+    println!("  [RES#3] completed: text response with converted temperature\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Implement MAX_LOOPS to prevent infinite function call chains");
+    println!("• Add custom error handling, logging, and metrics in execute_function()");
+    println!("• Consider rate limiting and circuit breakers for external API calls");
+    println!("• Validate function arguments before execution");
 
     Ok(())
 }

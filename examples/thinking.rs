@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_text(prompt)
         .with_thinking_level(ThinkingLevel::Medium)
-        .with_store(true)
+        .with_store_enabled()
         .create()
         .await?;
 
@@ -109,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_model("gemini-3-flash-preview")
             .with_text(complex_prompt)
             .with_thinking_level(level)
-            .with_store(true)
+            .with_store_enabled()
             .create()
             .await?;
 
@@ -223,7 +223,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  3. Check response.has_thoughts() before iterating");
     println!("  4. Monitor total_reasoning_tokens in usage for cost tracking");
 
-    println!("\n=== END EXAMPLE ===");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Thinking/Reasoning Levels Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• with_thinking_level() exposes model's chain-of-thought reasoning");
+    println!("• Levels: minimal, low, medium (default), high (extensive reasoning)");
+    println!("• response.thoughts() iterates over reasoning blocks");
+    println!("• Higher levels use more tokens but improve complex problem solving\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("Non-streaming:");
+    println!("  [REQ#1] POST with input + thinkingConfig(medium)");
+    println!("  [RES#1] completed: thoughts + text (usage includes reasoningTokens)\n");
+    println!("Streaming:");
+    println!("  [REQ#2] POST streaming with input + thinkingConfig");
+    println!("  [RES#2] SSE stream: thought deltas → text deltas → completed\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Monitor total_reasoning_tokens in usage for cost tracking");
+    println!("• Use 'high' for math, logic, and complex reasoning tasks");
+    println!("• Thought content may be internal (not exposed) in some cases");
+    println!("• ThoughtSignature provides authenticity verification");
 
     Ok(())
 }

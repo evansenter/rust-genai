@@ -52,6 +52,35 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("\n--- Example 4: Streaming Structured Output ---");
     streaming_structured_output(&client).await?;
 
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Structured Output Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• with_response_format(schema) enforces JSON schema on model output");
+    println!("• Response is guaranteed valid JSON - parse directly with serde");
+    println!("• Supports nested objects, arrays, and enums in schema");
+    println!("• Works with streaming and can combine with Google Search\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("Example 1-2 (basic/nested schemas):");
+    println!("  [REQ#1] POST with input + responseFormat schema");
+    println!("  [RES#1] completed: JSON matching schema\n");
+    println!("Example 3 (structured + search):");
+    println!("  [REQ#3] POST with input + responseFormat + googleSearch tool");
+    println!("  [RES#3] completed: JSON with grounding metadata\n");
+    println!("Example 4 (streaming):");
+    println!("  [REQ#4] POST streaming with input + responseFormat");
+    println!("  [RES#4] SSE stream: JSON chunks → completed\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Define Rust structs matching your schema for type-safe parsing");
+    println!("• Use enums in schema to constrain model outputs to valid values");
+    println!("• Combine with Google Search for grounded structured data");
+    println!("• Schema validation is server-side - invalid prompts may still fail");
+
     Ok(())
 }
 

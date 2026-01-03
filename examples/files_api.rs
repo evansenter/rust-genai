@@ -140,7 +140,33 @@ to analyze multiple times without resending the data.
     client.delete_file(&bytes_file.name).await?;
     println!("Cleaned up.");
 
-    println!("\n=== Example Complete ===");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Files API Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• upload_file() uploads files up to 2GB to server storage");
+    println!("• with_file() references uploaded files in interactions");
+    println!("• Files can be reused across multiple interactions (efficient)");
+    println!("• Files auto-expire after 48 hours; use delete_file() to clean up\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("Upload:");
+    println!("  [REQ#1] POST to files.upload endpoint");
+    println!("  [RES#1] file metadata with name, uri, state\n");
+    println!("Use in interaction:");
+    println!("  [REQ#2] POST with file reference (uri) + input text");
+    println!("  [RES#2] completed: text analyzing file content\n");
+    println!("List/Get/Delete:");
+    println!("  [REQ#N] GET files, GET file/:name, DELETE file/:name\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Wait for file state=ACTIVE before using (wait_for_file_ready)");
+    println!("• Use for large files or files reused across interactions");
+    println!("• For small inline content, use add_image_data() etc.");
+    println!("• upload_file_bytes() uploads from memory without disk I/O");
 
     Ok(())
 }

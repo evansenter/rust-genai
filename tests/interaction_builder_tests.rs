@@ -213,7 +213,7 @@ fn test_interaction_builder_with_all_features_combined() {
         .with_generation_config(config)
         .with_response_modalities(vec!["TEXT".to_string()])
         .with_background(true)
-        .with_store(false);
+        .with_store_disabled();
 
     // Builder supports combining all features without conflicts
 }
