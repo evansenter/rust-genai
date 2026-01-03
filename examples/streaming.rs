@@ -175,7 +175,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");
     println!("  [REQ#1] POST with input text + model + store:true");
-    println!("  [RES#1] SSE stream: interaction.start → content.start → content.delta(s) → content.stop → interaction.complete\n");
+    println!(
+        "  [RES#1] SSE stream: interaction.start → content.start → content.delta(s) → content.stop → interaction.complete\n"
+    );
 
     println!("--- Production Considerations ---");
     println!("• Handle stream errors gracefully (connection drops, timeouts)");
