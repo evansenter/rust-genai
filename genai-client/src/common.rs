@@ -38,6 +38,8 @@ pub enum Endpoint<'a> {
     GetInteraction { id: &'a str },
     /// Delete an interaction by ID
     DeleteInteraction { id: &'a str },
+    /// Cancel a background interaction by ID
+    CancelInteraction { id: &'a str },
 }
 
 impl Endpoint<'_> {
@@ -53,6 +55,9 @@ impl Endpoint<'_> {
             Self::DeleteInteraction { id } => {
                 format!("/{}/interactions/{}", version.as_str(), id)
             }
+            Self::CancelInteraction { id } => {
+                format!("/{}/interactions/{}/cancel", version.as_str(), id)
+            }
         }
     }
 
@@ -60,7 +65,9 @@ impl Endpoint<'_> {
     const fn requires_sse(&self) -> bool {
         match self {
             Self::CreateInteraction { stream } => *stream,
-            Self::GetInteraction { .. } | Self::DeleteInteraction { .. } => false,
+            Self::GetInteraction { .. }
+            | Self::DeleteInteraction { .. }
+            | Self::CancelInteraction { .. } => false,
         }
     }
 }
@@ -188,5 +195,26 @@ mod tests {
 
         let endpoint5 = Endpoint::GetInteraction { id: "different-id" };
         assert_ne!(endpoint3, endpoint5);
+    }
+
+    #[test]
+    fn test_endpoint_cancel_interaction() {
+        let endpoint = Endpoint::CancelInteraction {
+            id: "interaction-789",
+        };
+        let url = construct_endpoint_url(endpoint);
+
+        assert_eq!(
+            url,
+            "https://generativelanguage.googleapis.com/v1beta/interactions/interaction-789/cancel"
+        );
+        assert!(url.contains("/interactions/interaction-789/cancel"));
+        assert!(!url.contains("alt=sse"));
+        assert!(!url.contains("key=")); // API key should not be in URL
+    }
+
+    #[test]
+    fn test_cancel_interaction_requires_sse() {
+        assert!(!Endpoint::CancelInteraction { id: "test" }.requires_sse());
     }
 }

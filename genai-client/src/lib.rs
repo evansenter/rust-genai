@@ -76,6 +76,7 @@ pub use files::{
 };
 
 // Re-export Interactions API functions from the interactions module
+pub use interactions::cancel_interaction;
 pub use interactions::create_interaction;
 pub use interactions::create_interaction_stream;
 pub use interactions::delete_interaction;
