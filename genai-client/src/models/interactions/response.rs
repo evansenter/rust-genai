@@ -1850,8 +1850,8 @@ mod tests {
         };
 
         let json = serde_json::to_string(&usage).unwrap();
-        assert!(json.contains("inputTokensByModality"));
-        assert!(json.contains("outputTokensByModality"));
+        assert!(json.contains("input_tokens_by_modality"));
+        assert!(json.contains("output_tokens_by_modality"));
 
         // Roundtrip
         let deserialized: UsageMetadata = serde_json::from_str(&json).unwrap();
