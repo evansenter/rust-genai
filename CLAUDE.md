@@ -424,7 +424,7 @@ See `tests/thinking_function_tests.rs::test_thinking_with_function_calling_multi
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/rust.yml`) runs 9 parallel jobs: check, test, test-strict-unknown, 4× test-integration (core, tools, functions, multimodal), fmt, clippy, doc, security. Integration tests are split into 4 matrix jobs for faster execution (~2.5 min vs ~4 min). Integration tests require same-repo origin (protects API key). CI runs on all PRs regardless of file type.
+GitHub Actions (`.github/workflows/rust.yml`) runs these jobs: check, test, test-strict-unknown, test-integration (4 matrix groups: core, tools, functions, multimodal), fmt, clippy, doc, security, build-metrics. Integration tests are split into 4 parallel matrix jobs for faster execution (~2.5 min vs ~4 min). Integration tests require same-repo origin (protects API key). Build-metrics runs only on PRs. CI runs on all PRs regardless of file type.
 
 ## Project Conventions
 
