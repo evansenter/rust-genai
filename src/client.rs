@@ -394,6 +394,73 @@ impl Client {
         Ok(())
     }
 
+    /// Cancels an in-progress background interaction.
+    ///
+    /// Only applicable to interactions created with `background: true` that are
+    /// still in `InProgress` status. Returns the updated interaction with
+    /// status `Cancelled`.
+    ///
+    /// This is useful for:
+    /// - Halting long-running agent tasks (e.g., deep-research) when requirements change
+    /// - Cost control by stopping interactions consuming significant tokens
+    /// - Implementing timeout handling in application logic
+    /// - Supporting user-initiated cancellation in UIs
+    ///
+    /// # Arguments
+    ///
+    /// * `interaction_id` - The unique identifier of the interaction to cancel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The interaction doesn't exist
+    /// - The interaction is not in a cancellable state (not background or already complete)
+    /// - The HTTP request fails
+    /// - The API returns an error
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, InteractionStatus};
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("your-api-key".to_string());
+    ///
+    /// // Start a background agent interaction
+    /// let response = client.interaction()
+    ///     .with_agent("deep-research-pro-preview-12-2025")
+    ///     .with_text("Research AI safety")
+    ///     .with_background(true)
+    ///     .with_store_enabled()
+    ///     .create()
+    ///     .await?;
+    ///
+    /// let interaction_id = response.id.as_ref().expect("stored interaction has id");
+    ///
+    /// // Later, cancel if still in progress
+    /// if response.status == InteractionStatus::InProgress {
+    ///     let cancelled = client.cancel_interaction(interaction_id).await?;
+    ///     assert_eq!(cancelled.status, InteractionStatus::Cancelled);
+    ///     println!("Interaction cancelled");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn cancel_interaction(
+        &self,
+        interaction_id: &str,
+    ) -> Result<genai_client::InteractionResponse, GenaiError> {
+        log::debug!("Cancelling interaction: ID={interaction_id}");
+
+        let response =
+            genai_client::cancel_interaction(&self.http_client, &self.api_key, interaction_id)
+                .await?;
+
+        log::debug!("Interaction cancelled: status={:?}", response.status);
+
+        Ok(response)
+    }
+
     // --- Files API methods ---
 
     /// Uploads a file from a path to the Files API.

@@ -17,7 +17,7 @@
 
 mod common;
 
-use common::get_client;
+use common::{get_client, validate_response_semantically};
 use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 
@@ -459,16 +459,23 @@ async fn test_system_instruction_inheritance() {
         response2.text().unwrap_or("(no text)")
     );
 
-    // Response should still be in haiku format (short, poetic)
-    let text = response2.text().unwrap_or("");
-    let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
+    // Use semantic validation instead of brittle line/char count assertions.
+    // The model may generate multiple haikus or vary formatting, but the response
+    // should still follow the haiku system instruction.
+    let text = response2.text().expect("Turn 2 should have text");
 
-    // Haiku should have 3 lines or be very short
+    let is_valid = validate_response_semantically(
+        &client,
+        "The model was given a system instruction to 'always respond in haiku format (5-7-5 syllables)'. User asked 'Tell me about the ocean.'",
+        text,
+        "Does this response follow haiku format or short poetic structure? (It may contain one or more haikus, which is acceptable.)",
+    )
+    .await
+    .expect("Semantic validation should succeed");
+
     assert!(
-        lines.len() <= 5 && text.len() < 200,
-        "Response should be short/haiku-like, got {} lines, {} chars",
-        lines.len(),
-        text.len()
+        is_valid,
+        "Response should follow haiku format from inherited system instruction"
     );
 }
 

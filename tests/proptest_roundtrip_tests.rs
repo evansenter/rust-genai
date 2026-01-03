@@ -11,7 +11,9 @@ use rust_genai::{AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionR
 use std::time::Duration;
 
 // Re-export genai_client types for testing
-use genai_client::{InteractionContent, InteractionResponse, InteractionStatus, UsageMetadata};
+use genai_client::{
+    InteractionContent, InteractionResponse, InteractionStatus, ModalityTokens, UsageMetadata,
+};
 
 // =============================================================================
 // Strategy Generators
@@ -76,17 +78,46 @@ fn arb_interaction_status() -> impl Strategy<Value = InteractionStatus> {
 }
 
 // =============================================================================
+// ModalityTokens Strategy
+// =============================================================================
+
+/// Strategy for generating a single ModalityTokens value.
+fn arb_modality_tokens() -> impl Strategy<Value = ModalityTokens> {
+    // Use realistic modality names that the API might return
+    (
+        prop_oneof![
+            Just("TEXT".to_string()),
+            Just("IMAGE".to_string()),
+            Just("AUDIO".to_string()),
+            Just("VIDEO".to_string()),
+            arb_identifier(), // For forward compatibility with unknown modalities
+        ],
+        any::<u32>(),
+    )
+        .prop_map(|(modality, tokens)| ModalityTokens { modality, tokens })
+}
+
+/// Strategy for generating an optional Vec of ModalityTokens.
+fn arb_modality_tokens_vec() -> impl Strategy<Value = Option<Vec<ModalityTokens>>> {
+    proptest::option::of(prop::collection::vec(arb_modality_tokens(), 0..4))
+}
+
+// =============================================================================
 // UsageMetadata Strategy
 // =============================================================================
 
 fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
     (
-        proptest::option::of(any::<i32>()),
-        proptest::option::of(any::<i32>()),
-        proptest::option::of(any::<i32>()),
-        proptest::option::of(any::<i32>()),
-        proptest::option::of(any::<i32>()),
-        proptest::option::of(any::<i32>()),
+        proptest::option::of(any::<u32>()),
+        proptest::option::of(any::<u32>()),
+        proptest::option::of(any::<u32>()),
+        proptest::option::of(any::<u32>()),
+        proptest::option::of(any::<u32>()),
+        proptest::option::of(any::<u32>()),
+        arb_modality_tokens_vec(),
+        arb_modality_tokens_vec(),
+        arb_modality_tokens_vec(),
+        arb_modality_tokens_vec(),
     )
         .prop_map(
             |(
@@ -96,6 +127,10 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
                 total_cached_tokens,
                 total_reasoning_tokens,
                 total_tool_use_tokens,
+                input_tokens_by_modality,
+                output_tokens_by_modality,
+                cached_tokens_by_modality,
+                tool_use_tokens_by_modality,
             )| {
                 UsageMetadata {
                     total_input_tokens,
@@ -104,6 +139,10 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
                     total_cached_tokens,
                     total_reasoning_tokens,
                     total_tool_use_tokens,
+                    input_tokens_by_modality,
+                    output_tokens_by_modality,
+                    cached_tokens_by_modality,
+                    tool_use_tokens_by_modality,
                 }
             },
         )

@@ -32,7 +32,7 @@ pub use request::{
 };
 pub use response::{
     CodeExecutionCallInfo, CodeExecutionResultInfo, ContentSummary, FunctionCallInfo,
-    FunctionResultInfo, InteractionResponse, InteractionStatus, OwnedFunctionCallInfo,
-    UrlContextResultInfo, UsageMetadata,
+    FunctionResultInfo, InteractionResponse, InteractionStatus, ModalityTokens,
+    OwnedFunctionCallInfo, UrlContextResultInfo, UsageMetadata,
 };
 pub use streaming::{InteractionStreamEvent, StreamChunk};

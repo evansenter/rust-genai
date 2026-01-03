@@ -257,6 +257,53 @@ pub async fn delete_interaction(
     Ok(())
 }
 
+/// Cancels a background interaction by its ID.
+///
+/// Halts an in-progress background interaction. Only applicable to interactions
+/// created with `background: true` that are still in `InProgress` status.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The HTTP request fails
+/// - The response status is not successful
+/// - The response cannot be parsed as JSON
+/// - The interaction is not in a cancellable state
+pub async fn cancel_interaction(
+    http_client: &ReqwestClient,
+    api_key: &str,
+    interaction_id: &str,
+) -> Result<InteractionResponse, GenaiError> {
+    let endpoint = Endpoint::CancelInteraction { id: interaction_id };
+    let url = construct_endpoint_url(endpoint);
+
+    // LOUD_WIRE: Log outgoing request
+    let request_id = loud_wire::next_request_id();
+    loud_wire::log_request(request_id, "POST", &url, Some("{}"));
+
+    // Send empty JSON body - the API requires Content-Length header
+    let response = http_client
+        .post(&url)
+        .header(API_KEY_HEADER, api_key)
+        .json(&serde_json::json!({}))
+        .send()
+        .await?;
+
+    // LOUD_WIRE: Log response status
+    loud_wire::log_response_status(request_id, response.status().as_u16());
+
+    let response = check_response(response).await?;
+    let response_text = response.text().await.map_err(GenaiError::Http)?;
+
+    // LOUD_WIRE: Log response body
+    loud_wire::log_response_body(request_id, &response_text);
+
+    let interaction_response: InteractionResponse =
+        deserialize_with_context(&response_text, "InteractionResponse from cancel")?;
+
+    Ok(interaction_response)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279,6 +326,11 @@ mod tests {
         let endpoint_delete = Endpoint::DeleteInteraction { id: "test_id_456" };
         let url = construct_endpoint_url(endpoint_delete);
         assert!(url.contains("/v1beta/interactions/test_id_456"));
+        assert!(!url.contains("key=")); // API key should not be in URL
+
+        let endpoint_cancel = Endpoint::CancelInteraction { id: "test_id_789" };
+        let url = construct_endpoint_url(endpoint_cancel);
+        assert!(url.contains("/v1beta/interactions/test_id_789/cancel"));
         assert!(!url.contains("key=")); // API key should not be in URL
     }
 
@@ -331,5 +383,24 @@ mod tests {
             }
             _ => panic!("Expected Text content"),
         }
+    }
+
+    #[test]
+    fn test_cancelled_interaction_response_deserialization() {
+        // Verify we can deserialize a cancelled interaction response
+        let response_json = r#"{
+            "id": "cancelled_interaction_123",
+            "model": "deep-research-pro-preview-12-2025",
+            "input": [{"type": "text", "text": "Research topic"}],
+            "outputs": [],
+            "status": "cancelled"
+        }"#;
+
+        let response: InteractionResponse =
+            serde_json::from_str(response_json).expect("Deserialization should work");
+
+        assert_eq!(response.id.as_deref(), Some("cancelled_interaction_123"));
+        assert_eq!(response.status, InteractionStatus::Cancelled);
+        assert!(response.outputs.is_empty());
     }
 }
