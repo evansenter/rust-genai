@@ -51,7 +51,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             println!("--- End Response ---");
 
             // Summary
-            println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            println!(
+                "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            );
             println!("✅ Simple Interaction Demo Complete\n");
 
             println!("--- Key Takeaways ---");

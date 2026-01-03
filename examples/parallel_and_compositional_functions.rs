@@ -334,10 +334,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("✅ Parallel and Compositional Function Calling Demo Complete\n");
 
     println!("--- Key Takeaways ---");
-    println!("• Parallel calls: Model returns multiple function calls at once for independent operations");
+    println!(
+        "• Parallel calls: Model returns multiple function calls at once for independent operations"
+    );
     println!("• Use futures_util::future::join_all() to execute parallel calls concurrently");
     println!("• Compositional calls: Model chains functions where output informs next function");
-    println!("• Function result turns don't need tools resent (API remembers via previous_interaction_id)\n");
+    println!(
+        "• Function result turns don't need tools resent (API remembers via previous_interaction_id)\n"
+    );
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");
     println!("Demo 1: Parallel (6 calls at once)");
