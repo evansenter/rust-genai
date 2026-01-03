@@ -131,31 +131,91 @@ pub fn create_interaction_stream<'a>(
                 event.interaction_id
             );
 
-            // Handle different event types
-            // Known event types from the Interactions API:
+            // Handle different event types from the Interactions API:
+            // - interaction.start: Initial event with interaction data (yields Start)
+            // - interaction.status_update: Status changes (yields StatusUpdate)
+            // - content.start: Content block begins (yields ContentStart)
             // - content.delta: Incremental content updates (yields Delta)
-            // - interaction.complete: Final response with full content (yields Complete)
-            // - interaction.start: Lifecycle signal, has interaction but NOT final
-            // - interaction.status_update: Status changes (no content)
-            // - content.start/content.stop: Content block boundaries (no content)
+            // - content.stop: Content block ends (yields ContentStop)
+            // - interaction.complete: Final response (yields Complete)
+            // - error: Error occurred (yields Error)
             match event.event_type.as_str() {
+                "interaction.start" => {
+                    // Interaction has started - provides early access to interaction ID
+                    if let Some(interaction) = event.interaction {
+                        yield StreamChunk::Start { interaction };
+                    }
+                }
+                "interaction.status_update" => {
+                    // Status change during processing
+                    match (event.interaction_id, event.status) {
+                        (Some(interaction_id), Some(status)) => {
+                            yield StreamChunk::StatusUpdate {
+                                interaction_id,
+                                status,
+                            };
+                        }
+                        (has_id, has_status) => {
+                            debug!(
+                                "interaction.status_update missing required fields: interaction_id={:?}, status={:?}",
+                                has_id.is_some(),
+                                has_status.is_some()
+                            );
+                        }
+                    }
+                }
+                "content.start" => {
+                    // Content generation begins
+                    if let Some(index) = event.index {
+                        // Try to get content type from the content field if present
+                        let content_type = event.content.as_ref().and_then(|c| {
+                            // Get the content type name from the variant
+                            match c {
+                                crate::models::interactions::InteractionContent::Text { .. } => Some("text".to_string()),
+                                crate::models::interactions::InteractionContent::Thought { .. } => Some("thought".to_string()),
+                                crate::models::interactions::InteractionContent::FunctionCall { .. } => Some("function_call".to_string()),
+                                _ => None,
+                            }
+                        });
+                        yield StreamChunk::ContentStart { index, content_type };
+                    } else {
+                        debug!("content.start event missing index field");
+                    }
+                }
                 "content.delta" => {
                     // Incremental content update
                     if let Some(delta) = event.delta {
                         yield StreamChunk::Delta(delta);
                     }
                 }
+                "content.stop" => {
+                    // Content generation ends
+                    if let Some(index) = event.index {
+                        yield StreamChunk::ContentStop { index };
+                    } else {
+                        debug!("content.stop event missing index field");
+                    }
+                }
                 "interaction.complete" => {
-                    // Final complete response - only yield Complete for this event type
+                    // Final complete response
                     if let Some(interaction) = event.interaction {
                         yield StreamChunk::Complete(interaction);
                     }
                 }
-                "interaction.start" | "interaction.status_update" | "content.start" | "content.stop" => {
-                    // Known lifecycle events - skip silently (they don't contain useful content)
-                    // - interaction.start: Signals interaction has started (has interaction field but not final)
-                    // - interaction.status_update: Status changes during processing
-                    // - content.start/content.stop: Content block boundaries
+                "error" => {
+                    // Error occurred during streaming
+                    if let Some(error) = event.error {
+                        yield StreamChunk::Error {
+                            message: error.message,
+                            code: error.code,
+                        };
+                    } else {
+                        // If no error object, treat as unknown error
+                        yield StreamChunk::Error {
+                            message: "Unknown streaming error".to_string(),
+                            code: None,
+                        };
+                    }
                 }
                 _ => {
                     // For unknown event types, only yield if they have delta content.
