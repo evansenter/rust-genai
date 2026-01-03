@@ -28,7 +28,7 @@
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
 use futures_util::StreamExt;
-use rust_genai::{CallableFunction, Client, StreamChunk};
+use rust_genai::{CallableFunction, Client, FunctionCallingMode, StreamChunk};
 use rust_genai_macros::tool;
 use std::env;
 use std::io::{Write, stdout};
@@ -188,6 +188,66 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // ==========================================================================
+    // Example 4: Function Calling Modes
+    // ==========================================================================
+    //
+    // Control how the model uses function calling:
+    // - Auto (default): Model decides whether to call functions or respond naturally
+    // - Any: Model MUST call a function (guarantees function call output)
+    // - None: Disable function calling entirely
+    // - Validated: Schema adherence for both function calls AND text responses
+
+    println!("\n=== FUNCTION CALLING MODES ===\n");
+
+    // ANY mode: Model MUST call a function
+    let any_prompt = "Greet the user Alice";
+    println!("ANY mode - User: {}\n", any_prompt);
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text(any_prompt)
+        .with_function(GetWeatherCallable.declaration())
+        .with_function_calling_mode(FunctionCallingMode::Any) // MUST call a function
+        .create()
+        .await?;
+
+    if result.has_function_calls() {
+        println!(
+            "  Model called: {} (as required by ANY mode)",
+            result.function_calls()[0].name
+        );
+    } else if let Some(text) = result.text() {
+        println!("  Unexpected text response: {}", text);
+    }
+
+    // NONE mode: Disable function calling
+    let none_prompt = "What's the weather like in Tokyo?";
+    println!("\nNONE mode - User: {}\n", none_prompt);
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text(none_prompt)
+        .with_function(GetWeatherCallable.declaration())
+        .with_function_calling_mode(FunctionCallingMode::None) // Disabled
+        .create()
+        .await?;
+
+    if let Some(text) = result.text() {
+        println!(
+            "  Text response (no function call): {}",
+            text.chars().take(100).collect::<String>()
+        );
+    }
+
+    println!("\n  Function Calling Modes:");
+    println!("  • Auto (default): Model decides");
+    println!("  • Any: MUST call a function");
+    println!("  • None: Function calling disabled");
+    println!("  • Validated: Schema adherence for both outputs");
+
     // =========================================================================
     // Summary
     // =========================================================================
@@ -198,6 +258,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("• #[tool] macro auto-registers functions for discovery");
     println!("• create_with_auto_functions() discovers and executes functions automatically");
     println!("• with_function() limits available functions to a specific subset");
+    println!("• with_function_calling_mode() controls Auto/Any/None/Validated behavior");
     println!("• Manual streaming (create_stream) requires you to handle function calls yourself\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");
