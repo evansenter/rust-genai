@@ -1712,8 +1712,7 @@ async fn test_image_generation() {
 
                     // Verify base64 can be decoded
                     use base64::Engine;
-                    let decoded = base64::engine::general_purpose::STANDARD
-                        .decode(base64_data)?;
+                    let decoded = base64::engine::general_purpose::STANDARD.decode(base64_data)?;
                     println!("  Decoded size: {} bytes", decoded.len());
 
                     return Ok(());
