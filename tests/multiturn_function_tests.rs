@@ -510,21 +510,23 @@ async fn test_multiturn_streaming_auto_functions() {
     let mut function_count = 0;
     let mut delta_count = 0;
 
-    while let Some(chunk) = stream.next().await {
-        match chunk {
-            Ok(AutoFunctionStreamChunk::Delta(_)) => {
-                delta_count += 1;
-            }
-            Ok(AutoFunctionStreamChunk::FunctionResults(execs)) => {
-                for exec in &execs {
-                    println!("  Function executed: {}", exec.name);
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(event) => match event.chunk {
+                AutoFunctionStreamChunk::Delta(_) => {
+                    delta_count += 1;
                 }
-                function_count += execs.len();
-            }
-            Ok(AutoFunctionStreamChunk::Complete(response)) => {
-                final_response = Some(response);
-            }
-            Ok(_) => {} // Unknown future variants
+                AutoFunctionStreamChunk::FunctionResults(execs) => {
+                    for exec in &execs {
+                        println!("  Function executed: {}", exec.name);
+                    }
+                    function_count += execs.len();
+                }
+                AutoFunctionStreamChunk::Complete(response) => {
+                    final_response = Some(response);
+                }
+                _ => {} // Unknown future variants
+            },
             Err(e) => panic!("Stream error: {:?}", e),
         }
     }
@@ -554,24 +556,26 @@ async fn test_multiturn_streaming_auto_functions() {
     let mut turn2_deltas = 0;
     let mut turn2_functions = 0;
 
-    while let Some(chunk) = stream2.next().await {
-        match chunk {
-            Ok(AutoFunctionStreamChunk::Delta(_)) => {
-                turn2_deltas += 1;
-            }
-            Ok(AutoFunctionStreamChunk::FunctionResults(execs)) => {
-                for exec in &execs {
-                    println!("  Turn 2 function: {}", exec.name);
+    while let Some(result) = stream2.next().await {
+        match result {
+            Ok(event) => match event.chunk {
+                AutoFunctionStreamChunk::Delta(_) => {
+                    turn2_deltas += 1;
                 }
-                turn2_functions += execs.len();
-            }
-            Ok(AutoFunctionStreamChunk::Complete(response)) => {
-                println!("Turn 2 complete: {:?}", response.status);
-                if response.has_text() {
-                    println!("Response: {}", response.text().unwrap());
+                AutoFunctionStreamChunk::FunctionResults(execs) => {
+                    for exec in &execs {
+                        println!("  Turn 2 function: {}", exec.name);
+                    }
+                    turn2_functions += execs.len();
                 }
-            }
-            Ok(_) => {}
+                AutoFunctionStreamChunk::Complete(response) => {
+                    println!("Turn 2 complete: {:?}", response.status);
+                    if response.has_text() {
+                        println!("Response: {}", response.text().unwrap());
+                    }
+                }
+                _ => {}
+            },
             Err(e) => panic!("Stream error: {:?}", e),
         }
     }

@@ -2,7 +2,8 @@
 //!
 //! This module contains types for streaming responses with automatic function execution.
 //! The [`AutoFunctionStreamChunk`] enum provides events for tracking the progress of
-//! an interaction that may involve multiple function call rounds.
+//! an interaction that may involve multiple function call rounds. Events are wrapped
+//! in [`AutoFunctionStreamEvent`] to include `event_id` for stream resume support.
 //!
 //! # Example
 //!
@@ -19,8 +20,15 @@
 //!     .with_text("What's the weather in London?")
 //!     .create_stream_with_auto_functions();
 //!
-//! while let Some(chunk) = stream.next().await {
-//!     match chunk? {
+//! let mut last_event_id = None;
+//! while let Some(result) = stream.next().await {
+//!     let event = result?;
+//!     // Track event_id for potential resume
+//!     if event.event_id.is_some() {
+//!         last_event_id = event.event_id.clone();
+//!     }
+//!
+//!     match &event.chunk {
 //!         AutoFunctionStreamChunk::Delta(content) => {
 //!             if let Some(t) = content.text() {
 //!                 print!("{}", t);
@@ -28,7 +36,7 @@
 //!         }
 //!         AutoFunctionStreamChunk::ExecutingFunctions(response) => {
 //!             let calls = response.function_calls();
-//!             println!("[Executing: {:?}]", calls.iter().map(|c| c.name).collect::<Vec<_>>());
+//!             println!("[Executing: {:?}]", calls.iter().map(|c| &c.name).collect::<Vec<_>>());
 //!         }
 //!         AutoFunctionStreamChunk::FunctionResults(results) => {
 //!             println!("[Got {} results]", results.len());
@@ -129,6 +137,18 @@ impl AutoFunctionStreamChunk {
     #[must_use]
     pub const fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown { .. })
+    }
+
+    /// Check if this chunk is a Delta variant.
+    #[must_use]
+    pub const fn is_delta(&self) -> bool {
+        matches!(self, Self::Delta(_))
+    }
+
+    /// Check if this chunk is a Complete variant.
+    #[must_use]
+    pub const fn is_complete(&self) -> bool {
+        matches!(self, Self::Complete(_))
     }
 
     /// Returns the chunk type name if this is an unknown chunk type.
@@ -347,6 +367,155 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
     }
 }
 
+/// Streaming event with position metadata for auto-function stream resumption.
+///
+/// This wrapper pairs an [`AutoFunctionStreamChunk`] with its `event_id`,
+/// enabling stream resumption after network interruptions or reconnects.
+///
+/// # Stream Resumption
+///
+/// Save the `event_id` from each event. If the connection drops, you can resume
+/// the stream from the last received event by calling `get_interaction_stream()`
+/// with the saved `event_id`.
+///
+/// **Note**: The auto-function streaming loop is client-side. If interrupted during
+/// function execution, you may need to restart the full loop rather than resuming.
+/// However, the underlying API stream can be resumed.
+///
+/// # Example
+///
+/// ```no_run
+/// use futures_util::StreamExt;
+/// use rust_genai::{Client, AutoFunctionStreamEvent, AutoFunctionStreamChunk};
+///
+/// # async fn example() -> Result<(), rust_genai::GenaiError> {
+/// let client = Client::new("your-api-key".to_string());
+///
+/// let mut stream = client
+///     .interaction()
+///     .with_model("gemini-3-flash-preview")
+///     .with_text("What's the weather in London?")
+///     .create_stream_with_auto_functions();
+///
+/// let mut last_event_id: Option<String> = None;
+///
+/// while let Some(event) = stream.next().await {
+///     let event = event?;
+///
+///     // Save event_id for potential resume
+///     if let Some(id) = &event.event_id {
+///         last_event_id = Some(id.clone());
+///     }
+///
+///     match &event.chunk {
+///         AutoFunctionStreamChunk::Delta(content) => {
+///             if let Some(text) = content.text() {
+///                 print!("{}", text);
+///             }
+///         }
+///         AutoFunctionStreamChunk::Complete(_) => {
+///             println!("\n[Done]");
+///         }
+///         _ => {}
+///     }
+/// }
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct AutoFunctionStreamEvent {
+    /// The auto-function stream chunk content
+    pub chunk: AutoFunctionStreamChunk,
+    /// Event ID for stream resumption.
+    ///
+    /// Pass this to `last_event_id` when resuming a stream to continue from
+    /// this position. This is the `event_id` from the underlying API stream.
+    ///
+    /// May be `None` for client-generated events (like `ExecutingFunctions`
+    /// and `FunctionResults`) that don't come from the API stream.
+    pub event_id: Option<String>,
+}
+
+impl AutoFunctionStreamEvent {
+    /// Creates a new auto-function stream event.
+    #[must_use]
+    pub fn new(chunk: AutoFunctionStreamChunk, event_id: Option<String>) -> Self {
+        Self { chunk, event_id }
+    }
+
+    /// Check if the inner chunk is a Delta variant.
+    #[must_use]
+    pub const fn is_delta(&self) -> bool {
+        self.chunk.is_delta()
+    }
+
+    /// Check if the inner chunk is a Complete variant.
+    #[must_use]
+    pub const fn is_complete(&self) -> bool {
+        self.chunk.is_complete()
+    }
+
+    /// Check if the inner chunk is an Unknown variant.
+    #[must_use]
+    pub const fn is_unknown(&self) -> bool {
+        self.chunk.is_unknown()
+    }
+
+    /// Returns the unrecognized chunk type if this is an Unknown variant.
+    #[must_use]
+    pub fn unknown_chunk_type(&self) -> Option<&str> {
+        self.chunk.unknown_chunk_type()
+    }
+
+    /// Returns the preserved JSON data if this is an Unknown variant.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        self.chunk.unknown_data()
+    }
+}
+
+impl Serialize for AutoFunctionStreamEvent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut map = serializer.serialize_map(None)?;
+        map.serialize_entry("chunk", &self.chunk)?;
+        if let Some(id) = &self.event_id {
+            map.serialize_entry("event_id", id)?;
+        }
+        map.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for AutoFunctionStreamEvent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        let chunk = match value.get("chunk") {
+            Some(chunk_value) => {
+                serde_json::from_value(chunk_value.clone()).map_err(serde::de::Error::custom)?
+            }
+            None => {
+                return Err(serde::de::Error::missing_field("chunk"));
+            }
+        };
+
+        let event_id = value
+            .get("event_id")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        Ok(Self { chunk, event_id })
+    }
+}
+
 /// Result of executing a function locally.
 ///
 /// This represents the output from a function that was executed by the library
@@ -508,18 +677,18 @@ pub struct AutoFunctionResult {
 ///
 /// let mut accumulator = AutoFunctionResultAccumulator::new();
 ///
-/// while let Some(chunk) = stream.next().await {
-///     let chunk = chunk?;
+/// while let Some(event) = stream.next().await {
+///     let event = event?;
 ///
 ///     // Process deltas for UI updates
-///     if let AutoFunctionStreamChunk::Delta(content) = &chunk {
+///     if let AutoFunctionStreamChunk::Delta(content) = &event.chunk {
 ///         if let Some(text) = content.text() {
 ///             print!("{}", text);
 ///         }
 ///     }
 ///
 ///     // Feed all chunks to the accumulator
-///     if let Some(result) = accumulator.push(chunk) {
+///     if let Some(result) = accumulator.push(event.chunk) {
 ///         // Stream is complete, we have the full result
 ///         println!("\n\nExecuted {} functions", result.executions.len());
 ///         for exec in &result.executions {
@@ -1038,5 +1207,81 @@ mod tests {
         );
         assert_eq!(result.executions.len(), 1);
         assert_eq!(result.response.id.as_deref(), Some("max-loops-response"));
+    }
+
+    #[test]
+    fn test_auto_function_stream_event_with_event_id_roundtrip() {
+        let event = AutoFunctionStreamEvent::new(
+            AutoFunctionStreamChunk::Delta(InteractionContent::Text {
+                text: Some("Hello from auto-function".to_string()),
+                annotations: None,
+            }),
+            Some("evt_auto_abc123".to_string()),
+        );
+
+        // Test helper methods
+        assert!(event.is_delta());
+        assert!(!event.is_complete());
+        assert!(!event.is_unknown());
+
+        let json = serde_json::to_string(&event).expect("Serialization should succeed");
+        assert!(json.contains("evt_auto_abc123"), "Should have event_id");
+        assert!(
+            json.contains("Hello from auto-function"),
+            "Should have content"
+        );
+
+        let deserialized: AutoFunctionStreamEvent =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+        assert_eq!(deserialized.event_id.as_deref(), Some("evt_auto_abc123"));
+        assert!(deserialized.is_delta());
+    }
+
+    #[test]
+    fn test_auto_function_stream_event_without_event_id() {
+        // Client-generated events like FunctionResults don't have event_id
+        let event = AutoFunctionStreamEvent::new(
+            AutoFunctionStreamChunk::FunctionResults(vec![FunctionExecutionResult::new(
+                "weather",
+                "call-123",
+                json!({"temp": 72}),
+                Duration::from_millis(50),
+            )]),
+            None,
+        );
+
+        assert!(!event.is_delta());
+        assert!(!event.is_complete());
+        assert!(event.event_id.is_none());
+
+        let json = serde_json::to_string(&event).expect("Serialization should succeed");
+        assert!(!json.contains("event_id"), "Should not have event_id field");
+        assert!(json.contains("weather"), "Should have function name");
+
+        let deserialized: AutoFunctionStreamEvent =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+        assert!(deserialized.event_id.is_none());
+    }
+
+    #[test]
+    fn test_auto_function_stream_event_with_empty_event_id() {
+        // Edge case: empty string event_id should still serialize/deserialize
+        let event = AutoFunctionStreamEvent::new(
+            AutoFunctionStreamChunk::Delta(InteractionContent::Text {
+                text: Some("Test".to_string()),
+                annotations: None,
+            }),
+            Some(String::new()),
+        );
+
+        let json = serde_json::to_string(&event).expect("Serialization should succeed");
+        assert!(
+            json.contains(r#""event_id":"""#),
+            "Should have empty event_id"
+        );
+
+        let deserialized: AutoFunctionStreamEvent =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+        assert_eq!(deserialized.event_id.as_deref(), Some(""));
     }
 }

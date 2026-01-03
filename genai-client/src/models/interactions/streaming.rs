@@ -493,6 +493,203 @@ impl<'de> Deserialize<'de> for StreamChunk {
     }
 }
 
+/// A streaming event with position metadata for resume support.
+///
+/// This wrapper pairs a [`StreamChunk`] with its `event_id`, enabling stream resumption
+/// after network interruptions. To resume a stream, pass the `event_id` from the last
+/// successfully received event to [`get_interaction_stream()`](crate::get_interaction_stream).
+///
+/// # Example
+///
+/// ```ignore
+/// let mut last_event_id = None;
+/// let mut stream = client.interaction().with_model("gemini-3-flash-preview")
+///     .with_text("Count to 100").create_stream();
+///
+/// while let Some(result) = stream.next().await {
+///     let event = result?;
+///     last_event_id = event.event_id.clone();  // Track for resume
+///     match event.chunk {
+///         StreamChunk::Delta(content) => { /* process */ }
+///         StreamChunk::Complete(response) => { /* done */ }
+///         _ => {}
+///     }
+/// }
+///
+/// // If interrupted, resume from last_event_id:
+/// let resumed_stream = client.get_interaction_stream(&interaction_id, last_event_id.as_deref());
+/// ```
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct StreamEvent {
+    /// The chunk content (Delta, Complete, or Unknown).
+    pub chunk: StreamChunk,
+
+    /// Event ID for stream resumption.
+    ///
+    /// Pass this to `last_event_id` when calling `get_interaction_stream()` to resume
+    /// the stream from this point. Events are ordered, so resuming from an event_id
+    /// will replay all subsequent events.
+    pub event_id: Option<String>,
+}
+
+impl StreamEvent {
+    /// Creates a new StreamEvent with the given chunk and event_id.
+    #[must_use]
+    pub fn new(chunk: StreamChunk, event_id: Option<String>) -> Self {
+        Self { chunk, event_id }
+    }
+
+    /// Returns `true` if the chunk is a Delta variant.
+    #[must_use]
+    pub const fn is_delta(&self) -> bool {
+        matches!(self.chunk, StreamChunk::Delta(_))
+    }
+
+    /// Returns `true` if the chunk is a Complete variant.
+    #[must_use]
+    pub const fn is_complete(&self) -> bool {
+        matches!(self.chunk, StreamChunk::Complete(_))
+    }
+
+    /// Returns `true` if the chunk is an Unknown variant.
+    #[must_use]
+    pub const fn is_unknown(&self) -> bool {
+        self.chunk.is_unknown()
+    }
+
+    /// Returns `true` if the chunk is a terminal event (Complete or Error).
+    #[must_use]
+    pub const fn is_terminal(&self) -> bool {
+        self.chunk.is_terminal()
+    }
+
+    /// Returns the interaction ID from the chunk, if available.
+    #[must_use]
+    pub fn interaction_id(&self) -> Option<&str> {
+        self.chunk.interaction_id()
+    }
+
+    /// Returns the status from the chunk, if available.
+    #[must_use]
+    pub fn status(&self) -> Option<&InteractionStatus> {
+        self.chunk.status()
+    }
+
+    /// Returns the unrecognized chunk type if this is an Unknown variant.
+    #[must_use]
+    pub fn unknown_chunk_type(&self) -> Option<&str> {
+        self.chunk.unknown_chunk_type()
+    }
+
+    /// Returns the preserved JSON data if this is an Unknown variant.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        self.chunk.unknown_data()
+    }
+}
+
+impl Serialize for StreamEvent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        // Serialize as a map containing the chunk fields plus event_id
+        let mut map = serializer.serialize_map(None)?;
+
+        // First serialize the chunk's fields (delegate to StreamChunk's logic)
+        match &self.chunk {
+            StreamChunk::Start { interaction } => {
+                map.serialize_entry("chunk_type", "start")?;
+                map.serialize_entry("data", interaction)?;
+            }
+            StreamChunk::StatusUpdate {
+                interaction_id,
+                status,
+            } => {
+                map.serialize_entry("chunk_type", "status_update")?;
+                map.serialize_entry(
+                    "data",
+                    &serde_json::json!({
+                        "interaction_id": interaction_id,
+                        "status": status,
+                    }),
+                )?;
+            }
+            StreamChunk::ContentStart {
+                index,
+                content_type,
+            } => {
+                map.serialize_entry("chunk_type", "content_start")?;
+                map.serialize_entry(
+                    "data",
+                    &serde_json::json!({
+                        "index": index,
+                        "content_type": content_type,
+                    }),
+                )?;
+            }
+            StreamChunk::Delta(content) => {
+                map.serialize_entry("chunk_type", "delta")?;
+                map.serialize_entry("data", content)?;
+            }
+            StreamChunk::ContentStop { index } => {
+                map.serialize_entry("chunk_type", "content_stop")?;
+                map.serialize_entry("data", &serde_json::json!({ "index": index }))?;
+            }
+            StreamChunk::Complete(response) => {
+                map.serialize_entry("chunk_type", "complete")?;
+                map.serialize_entry("data", response)?;
+            }
+            StreamChunk::Error { message, code } => {
+                map.serialize_entry("chunk_type", "error")?;
+                map.serialize_entry(
+                    "data",
+                    &serde_json::json!({
+                        "message": message,
+                        "code": code,
+                    }),
+                )?;
+            }
+            StreamChunk::Unknown { chunk_type, data } => {
+                map.serialize_entry("chunk_type", chunk_type)?;
+                if !data.is_null() {
+                    map.serialize_entry("data", data)?;
+                }
+            }
+        }
+
+        // Add event_id if present
+        if let Some(event_id) = &self.event_id {
+            map.serialize_entry("event_id", event_id)?;
+        }
+
+        map.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for StreamEvent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        // Extract event_id first
+        let event_id = value
+            .get("event_id")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        // Deserialize the chunk from the same value
+        let chunk: StreamChunk = serde_json::from_value(value).map_err(serde::de::Error::custom)?;
+
+        Ok(Self { chunk, event_id })
+    }
+}
+
 /// Wrapper for SSE streaming events from the Interactions API
 ///
 /// The API returns different event types during streaming:
@@ -536,6 +733,13 @@ pub struct InteractionStreamEvent {
     /// Error details (present in "error" events)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<StreamError>,
+
+    /// Event ID for stream resumption.
+    ///
+    /// Pass this to `last_event_id` when calling `get_interaction_stream()` to resume
+    /// the stream from this point after a network interruption.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub event_id: Option<String>,
 }
 
 /// Error details from SSE streaming.
@@ -901,5 +1105,79 @@ mod tests {
         assert_eq!(status_chunk.status(), Some(&InteractionStatus::InProgress));
         assert_eq!(complete_chunk.status(), Some(&InteractionStatus::Completed));
         assert_eq!(delta_chunk.status(), None);
+    }
+
+    #[test]
+    fn test_stream_event_with_event_id_roundtrip() {
+        let event = StreamEvent::new(
+            StreamChunk::Delta(InteractionContent::Text {
+                text: Some("Hello".to_string()),
+                annotations: None,
+            }),
+            Some("evt_abc123".to_string()),
+        );
+
+        // Test helper methods
+        assert!(event.is_delta());
+        assert!(!event.is_complete());
+        assert!(!event.is_unknown());
+
+        let json = serde_json::to_string(&event).expect("Serialization should succeed");
+        assert!(json.contains("evt_abc123"), "Should have event_id");
+        assert!(json.contains("Hello"), "Should have content");
+
+        let deserialized: StreamEvent =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+        assert_eq!(deserialized.event_id.as_deref(), Some("evt_abc123"));
+        assert!(deserialized.is_delta());
+    }
+
+    #[test]
+    fn test_stream_event_without_event_id() {
+        let event = StreamEvent::new(
+            StreamChunk::Complete(InteractionResponse {
+                id: Some("interaction-123".to_string()),
+                model: Some("gemini-3-flash-preview".to_string()),
+                agent: None,
+                input: vec![],
+                outputs: vec![InteractionContent::Text {
+                    text: Some("Response".to_string()),
+                    annotations: None,
+                }],
+                status: InteractionStatus::Completed,
+                usage: None,
+                tools: None,
+                grounding_metadata: None,
+                url_context_metadata: None,
+                previous_interaction_id: None,
+            }),
+            None,
+        );
+
+        assert!(event.is_complete());
+        assert!(!event.is_delta());
+        assert!(event.event_id.is_none());
+
+        let json = serde_json::to_string(&event).expect("Serialization should succeed");
+        assert!(!json.contains("event_id"), "Should not have event_id field");
+
+        let deserialized: StreamEvent =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+        assert!(deserialized.event_id.is_none());
+        assert!(deserialized.is_complete());
+    }
+
+    #[test]
+    fn test_interaction_stream_event_with_event_id() {
+        let json = r#"{
+            "event_type": "content.delta",
+            "delta": {"type": "text", "text": "Hello"},
+            "event_id": "evt_resume_token_123"
+        }"#;
+
+        let event: InteractionStreamEvent = serde_json::from_str(json).expect("Should deserialize");
+        assert_eq!(event.event_type, "content.delta");
+        assert_eq!(event.event_id.as_deref(), Some("evt_resume_token_123"));
+        assert!(event.delta.is_some());
     }
 }

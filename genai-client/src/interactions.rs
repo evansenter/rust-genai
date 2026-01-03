@@ -3,7 +3,7 @@ use crate::error_helpers::{check_response, deserialize_with_context};
 use crate::errors::GenaiError;
 use crate::loud_wire;
 use crate::models::interactions::{
-    CreateInteractionRequest, InteractionResponse, InteractionStreamEvent, StreamChunk,
+    CreateInteractionRequest, InteractionResponse, InteractionStreamEvent, StreamChunk, StreamEvent,
 };
 use crate::sse_parser::parse_sse_stream;
 use async_stream::try_stream;
@@ -65,8 +65,12 @@ pub async fn create_interaction(
 
 /// Creates a new interaction with streaming responses.
 ///
-/// Returns a stream of `StreamChunk` items as they arrive from the server.
-/// Each chunk can be:
+/// Returns a stream of `StreamEvent` items as they arrive from the server.
+/// Each event contains:
+/// - `chunk`: The content (Start, StatusUpdate, Delta, Complete, Error, etc.)
+/// - `event_id`: An identifier for stream resumption
+///
+/// Chunk types:
 /// - `StreamChunk::Start`: Initial event with interaction ID
 /// - `StreamChunk::StatusUpdate`: Status changes during processing
 /// - `StreamChunk::ContentStart`: Content generation begins for an output
@@ -77,9 +81,12 @@ pub async fn create_interaction(
 ///
 /// # Example
 /// ```ignore
+/// let mut last_event_id = None;
 /// let stream = create_interaction_stream(&client, &api_key, request);
-/// while let Some(chunk) = stream.next().await {
-///     match chunk? {
+/// while let Some(event) = stream.next().await {
+///     let event = event?;
+///     last_event_id = event.event_id.clone();  // Track for resume
+///     match event.chunk {
 ///         StreamChunk::Start { interaction } => {
 ///             println!("Started: {:?}", interaction.id);
 ///         }
@@ -102,7 +109,7 @@ pub fn create_interaction_stream<'a>(
     http_client: &'a ReqwestClient,
     api_key: &'a str,
     request: CreateInteractionRequest,
-) -> impl Stream<Item = Result<StreamChunk, GenaiError>> + Send + 'a {
+) -> impl Stream<Item = Result<StreamEvent, GenaiError>> + Send + 'a {
     let endpoint = Endpoint::CreateInteraction { stream: true };
     let url = construct_endpoint_url(endpoint);
 
@@ -136,12 +143,15 @@ pub fn create_interaction_stream<'a>(
         while let Some(result) = parsed_stream.next().await {
             let event = result?;
             debug!(
-                "SSE event received: event_type={:?}, has_delta={}, has_interaction={}, interaction_id={:?}",
+                "SSE event received: event_type={:?}, has_delta={}, has_interaction={}, event_id={:?}",
                 event.event_type,
                 event.delta.is_some(),
                 event.interaction.is_some(),
-                event.interaction_id
+                event.event_id
             );
+
+            // Extract event_id for the StreamEvent wrapper
+            let event_id = event.event_id.clone();
 
             // Handle different event types from the Interactions API:
             // - interaction.start: Initial event with interaction data (yields Start)
@@ -155,21 +165,23 @@ pub fn create_interaction_stream<'a>(
                 "interaction.start" => {
                     // Interaction has started - provides early access to interaction ID
                     if let Some(interaction) = event.interaction {
-                        yield StreamChunk::Start { interaction };
+                        yield StreamEvent::new(StreamChunk::Start { interaction }, event_id);
+                    } else {
+                        warn!("interaction.start event missing interaction field - event dropped");
                     }
                 }
                 "interaction.status_update" => {
                     // Status change during processing
                     match (event.interaction_id, event.status) {
                         (Some(interaction_id), Some(status)) => {
-                            yield StreamChunk::StatusUpdate {
-                                interaction_id,
-                                status,
-                            };
+                            yield StreamEvent::new(
+                                StreamChunk::StatusUpdate { interaction_id, status },
+                                event_id,
+                            );
                         }
                         (has_id, has_status) => {
-                            debug!(
-                                "interaction.status_update missing required fields: interaction_id={:?}, status={:?}",
+                            warn!(
+                                "interaction.status_update missing required fields: interaction_id={}, status={} - event dropped",
                                 has_id.is_some(),
                                 has_status.is_some()
                             );
@@ -189,44 +201,48 @@ pub fn create_interaction_stream<'a>(
                                 _ => None,
                             }
                         });
-                        yield StreamChunk::ContentStart { index, content_type };
+                        yield StreamEvent::new(StreamChunk::ContentStart { index, content_type }, event_id);
                     } else {
-                        debug!("content.start event missing index field");
+                        warn!("content.start event missing index field - event dropped");
                     }
                 }
                 "content.delta" => {
                     // Incremental content update
                     if let Some(delta) = event.delta {
-                        yield StreamChunk::Delta(delta);
+                        yield StreamEvent::new(StreamChunk::Delta(delta), event_id);
+                    } else {
+                        warn!("content.delta event missing delta field - event dropped");
                     }
                 }
                 "content.stop" => {
                     // Content generation ends
                     if let Some(index) = event.index {
-                        yield StreamChunk::ContentStop { index };
+                        yield StreamEvent::new(StreamChunk::ContentStop { index }, event_id);
                     } else {
-                        debug!("content.stop event missing index field");
+                        warn!("content.stop event missing index field - event dropped");
                     }
                 }
                 "interaction.complete" => {
                     // Final complete response
                     if let Some(interaction) = event.interaction {
-                        yield StreamChunk::Complete(interaction);
+                        yield StreamEvent::new(StreamChunk::Complete(interaction), event_id);
+                    } else {
+                        warn!("interaction.complete event missing interaction field - event dropped");
                     }
                 }
                 "error" => {
                     // Error occurred during streaming
                     if let Some(error) = event.error {
-                        yield StreamChunk::Error {
-                            message: error.message,
-                            code: error.code,
-                        };
+                        yield StreamEvent::new(
+                            StreamChunk::Error { message: error.message, code: error.code },
+                            event_id,
+                        );
                     } else {
                         // If no error object, treat as unknown error
-                        yield StreamChunk::Error {
-                            message: "Unknown streaming error".to_string(),
-                            code: None,
-                        };
+                        yield StreamEvent::new(
+                            StreamChunk::Error { message: "Unknown streaming error".to_string(), code: None },
+                            event_id,
+                        );
                     }
                 }
                 _ => {
@@ -234,7 +250,7 @@ pub fn create_interaction_stream<'a>(
                     // Do NOT yield Complete for other event types that happen to have
                     // an interaction field - only interaction.complete is the final response.
                     if let Some(delta) = event.delta {
-                        yield StreamChunk::Delta(delta);
+                        yield StreamEvent::new(StreamChunk::Delta(delta), event_id);
                     } else if event.interaction.is_some() {
                         // Warn about unknown event types with interaction fields - this could
                         // indicate API version drift that needs attention
@@ -266,7 +282,11 @@ pub async fn get_interaction(
     api_key: &str,
     interaction_id: &str,
 ) -> Result<InteractionResponse, GenaiError> {
-    let endpoint = Endpoint::GetInteraction { id: interaction_id };
+    let endpoint = Endpoint::GetInteraction {
+        id: interaction_id,
+        stream: false,
+        last_event_id: None,
+    };
     let url = construct_endpoint_url(endpoint);
 
     // LOUD_WIRE: Log outgoing request
@@ -292,6 +312,119 @@ pub async fn get_interaction(
         deserialize_with_context(&response_text, "InteractionResponse from get")?;
 
     Ok(interaction_response)
+}
+
+/// Retrieves an existing interaction by its ID with streaming.
+///
+/// Returns a stream of `StreamEvent` items as they arrive from the server.
+/// This is useful for:
+/// - Resuming an interrupted stream using `last_event_id`
+/// - Streaming a long-running interaction's progress (e.g., deep research)
+///
+/// Each event includes an `event_id` that can be used to resume the stream
+/// from that point if the connection is interrupted.
+///
+/// # Arguments
+///
+/// * `http_client` - The reqwest HTTP client
+/// * `api_key` - The Gemini API key
+/// * `interaction_id` - The ID of the interaction to stream
+/// * `last_event_id` - Optional event ID to resume from (for stream resumption)
+///
+/// # Example
+/// ```ignore
+/// // Resume a stream after interruption
+/// let mut stream = get_interaction_stream(&client, &api_key, &id, Some("evt_abc123"));
+/// while let Some(event) = stream.next().await {
+///     let event = event?;
+///     println!("Received chunk: {:?}", event.chunk);
+///     // Track event_id for potential future resume
+///     if let Some(evt_id) = &event.event_id {
+///         last_event_id = Some(evt_id.clone());
+///     }
+/// }
+/// ```
+pub fn get_interaction_stream<'a>(
+    http_client: &'a ReqwestClient,
+    api_key: &'a str,
+    interaction_id: &'a str,
+    last_event_id: Option<&'a str>,
+) -> impl Stream<Item = Result<StreamEvent, GenaiError>> + Send + 'a {
+    let endpoint = Endpoint::GetInteraction {
+        id: interaction_id,
+        stream: true,
+        last_event_id,
+    };
+    let url = construct_endpoint_url(endpoint);
+
+    // LOUD_WIRE: Log outgoing request
+    let request_id = loud_wire::next_request_id();
+    let resume_info = last_event_id
+        .map(|id| format!(" (resuming from {})", id))
+        .unwrap_or_default();
+    loud_wire::log_request(
+        request_id,
+        &format!("GET (stream){}", resume_info),
+        &url,
+        None,
+    );
+
+    try_stream! {
+        let response = http_client
+            .get(&url)
+            .header(API_KEY_HEADER, api_key)
+            .send()
+            .await?;
+
+        // LOUD_WIRE: Log response status
+        loud_wire::log_response_status(request_id, response.status().as_u16());
+
+        let response = check_response(response).await?;
+        let byte_stream = response.bytes_stream();
+        let parsed_stream = parse_sse_stream::<InteractionStreamEvent>(byte_stream, request_id);
+        futures_util::pin_mut!(parsed_stream);
+
+        while let Some(result) = parsed_stream.next().await {
+            let event = result?;
+            debug!(
+                "SSE event received: event_type={:?}, has_delta={}, has_interaction={}, event_id={:?}",
+                event.event_type,
+                event.delta.is_some(),
+                event.interaction.is_some(),
+                event.event_id
+            );
+
+            // Extract event_id for the StreamEvent wrapper
+            let event_id = event.event_id.clone();
+
+            // Handle different event types (same logic as create_interaction_stream)
+            match event.event_type.as_str() {
+                "content.delta" => {
+                    if let Some(delta) = event.delta {
+                        yield StreamEvent::new(StreamChunk::Delta(delta), event_id);
+                    }
+                }
+                "interaction.complete" => {
+                    if let Some(interaction) = event.interaction {
+                        yield StreamEvent::new(StreamChunk::Complete(interaction), event_id);
+                    }
+                }
+                "interaction.start" | "interaction.status_update" | "content.start" | "content.stop" => {
+                    // Known lifecycle events - skip silently
+                }
+                _ => {
+                    if let Some(delta) = event.delta {
+                        yield StreamEvent::new(StreamChunk::Delta(delta), event_id);
+                    } else if event.interaction.is_some() {
+                        warn!(
+                            "Unknown event type '{}' has interaction field but is not 'interaction.complete' - skipping",
+                            event.event_type
+                        );
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Deletes an interaction by its ID.
@@ -390,7 +523,11 @@ mod tests {
         assert!(url.contains("/v1beta/interactions"));
         assert!(!url.contains("key=")); // API key should not be in URL
 
-        let endpoint_get = Endpoint::GetInteraction { id: "test_id_123" };
+        let endpoint_get = Endpoint::GetInteraction {
+            id: "test_id_123",
+            stream: false,
+            last_event_id: None,
+        };
         let url = construct_endpoint_url(endpoint_get);
         assert!(url.contains("/v1beta/interactions/test_id_123"));
         assert!(!url.contains("key=")); // API key should not be in URL

@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING CHANGES
 
+#### Streaming Returns StreamEvent Wrapper (#262)
+- **`create_stream()`** now returns `Stream<Item = Result<StreamEvent, GenaiError>>` instead of `Stream<Item = Result<StreamChunk, GenaiError>>`
+- **`create_stream_with_auto_functions()`** now returns `Stream<Item = Result<AutoFunctionStreamEvent, GenaiError>>` instead of `Stream<Item = Result<AutoFunctionStreamChunk, GenaiError>>`
+- **New `StreamEvent` struct**: Wraps `StreamChunk` with `event_id` field for stream resume support
+- **New `AutoFunctionStreamEvent` struct**: Wraps `AutoFunctionStreamChunk` with `event_id` field
+- **New `get_interaction_stream()` method**: Resume streams from a specific `event_id` position
+
+**Migration guide:**
+```rust
+// Before:
+while let Some(chunk) = stream.next().await {
+    match chunk? {
+        StreamChunk::Delta(content) => { /* ... */ }
+        StreamChunk::Complete(response) => { /* ... */ }
+        _ => {}
+    }
+}
+
+// After:
+while let Some(result) = stream.next().await {
+    let event = result?;
+    // Optionally track event_id for resume support
+    if let Some(id) = &event.event_id {
+        last_event_id = Some(id.clone());
+    }
+    match event.chunk {  // Access .chunk on the event
+        StreamChunk::Delta(content) => { /* ... */ }
+        StreamChunk::Complete(response) => { /* ... */ }
+        _ => {}
+    }
+}
+
+// To resume an interrupted stream:
+let resumed = client.get_interaction_stream(&interaction_id, Some(&last_event_id));
+```
+
 #### Additional Enums Now #[non_exhaustive] (#196)
 - **`GenaiError`**: Match statements must include a wildcard arm
 - **`FunctionError`**: Match statements must include a wildcard arm

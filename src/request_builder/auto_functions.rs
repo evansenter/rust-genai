@@ -18,7 +18,9 @@ use crate::GenaiError;
 use crate::ToolService;
 use crate::function_calling::{CallableFunction, FunctionRegistry, get_global_function_registry};
 use crate::interactions_api::function_result_content;
-use crate::streaming::{AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionResult};
+use crate::streaming::{
+    AutoFunctionResult, AutoFunctionStreamChunk, AutoFunctionStreamEvent, FunctionExecutionResult,
+};
 
 use super::{CanAutoFunction, InteractionBuilder};
 
@@ -441,8 +443,10 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     ///     .with_text("What's the weather in Tokyo?")
     ///     .create_stream_with_auto_functions();
     ///
-    /// while let Some(chunk) = stream.next().await {
-    ///     match chunk? {
+    /// while let Some(result) = stream.next().await {
+    ///     let event = result?;
+    ///     // event.event_id can be saved for stream resume support
+    ///     match event.chunk {
     ///         AutoFunctionStreamChunk::Delta(content) => {
     ///             if let InteractionContent::Text { text: Some(t), .. } = content {
     ///                 print!("{}", t);
@@ -523,7 +527,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     /// - `max_function_call_loops` is set to 0 (invalid configuration)
     pub fn create_stream_with_auto_functions(
         self,
-    ) -> BoxStream<'a, Result<AutoFunctionStreamChunk, GenaiError>> {
+    ) -> BoxStream<'a, Result<AutoFunctionStreamEvent, GenaiError>> {
         // Note: The `CanAutoFunction` trait bound ensures at compile-time that this method
         // is not available on `StoreDisabled` builders. No runtime check needed.
 
@@ -592,6 +596,8 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                 let mut complete_response: Option<InteractionResponse> = None;
                 // Accumulate function calls from deltas (streaming API may not include them in Complete)
                 let mut accumulated_calls: Vec<(Option<String>, String, serde_json::Value)> = Vec::new();
+                // Track last event_id for resume support
+                let mut last_event_id: Option<String> = None;
 
                 // Apply per-chunk timeout if set (function execution time not included)
                 loop {
@@ -612,18 +618,34 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                     };
 
                     let Some(result) = result else { break };
-                    match result? {
+                    let event = result?;
+                    // Track event_id for resume support
+                    if event.event_id.is_some() {
+                        last_event_id = event.event_id.clone();
+                    }
+                    match event.chunk {
                         StreamChunk::Delta(delta) => {
                             // Check for function calls in delta
                             if let genai_client::InteractionContent::FunctionCall { id, name, args, .. } = &delta {
                                 accumulated_calls.push((id.clone(), name.clone(), args.clone()));
                             }
-                            yield AutoFunctionStreamChunk::Delta(delta);
+                            yield AutoFunctionStreamEvent::new(
+                                AutoFunctionStreamChunk::Delta(delta),
+                                event.event_id,
+                            );
                         }
                         StreamChunk::Complete(response) => {
                             complete_response = Some(response);
                         }
-                        // Ignore unknown chunk types for forward compatibility
+                        // Log unknown chunk types for observability, but continue for forward compatibility
+                        StreamChunk::Unknown { chunk_type, .. } => {
+                            log::warn!(
+                                "Received unknown StreamChunk type '{}' during auto-function streaming. \
+                                 This may indicate a new API feature.",
+                                chunk_type
+                            );
+                        }
+                        // Wildcard for future non-exhaustive variants
                         _ => {}
                     }
                 }
@@ -661,7 +683,10 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                 // If no function calls, we're done!
                 if !has_function_calls {
                     debug!("No function calls in response, completing auto-function streaming loop");
-                    yield AutoFunctionStreamChunk::Complete(response);
+                    yield AutoFunctionStreamEvent::new(
+                        AutoFunctionStreamChunk::Complete(response),
+                        last_event_id.clone(),
+                    );
                     return;
                 }
 
@@ -672,7 +697,11 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                     accumulated_calls.len()
                 };
                 debug!("Executing {} function call(s)", call_count);
-                yield AutoFunctionStreamChunk::ExecutingFunctions(response.clone());
+                // ExecutingFunctions is client-generated, no API event_id
+                yield AutoFunctionStreamEvent::new(
+                    AutoFunctionStreamChunk::ExecutingFunctions(response.clone()),
+                    None,
+                );
 
                 // Determine which function calls to execute.
                 // Prefer response.function_calls() if available (finalized data),
@@ -729,8 +758,11 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                     ));
                 }
 
-                // Yield function results
-                yield AutoFunctionStreamChunk::FunctionResults(execution_results);
+                // Yield function results (client-generated, no API event_id)
+                yield AutoFunctionStreamEvent::new(
+                    AutoFunctionStreamChunk::FunctionResults(execution_results),
+                    None,
+                );
 
                 // Save this response before moving to next iteration
                 // (in case we hit max loops, we want to return the last response)
@@ -757,7 +789,11 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                 ))
             })?;
 
-            yield AutoFunctionStreamChunk::MaxLoopsReached(response);
+            // MaxLoopsReached is client-generated (loop limit hit), no API event_id
+            yield AutoFunctionStreamEvent::new(
+                AutoFunctionStreamChunk::MaxLoopsReached(response),
+                None,
+            );
         })
     }
 }
