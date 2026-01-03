@@ -12,7 +12,8 @@ use std::time::Duration;
 
 // Re-export genai_client types for testing
 use genai_client::{
-    InteractionContent, InteractionResponse, InteractionStatus, ModalityTokens, UsageMetadata,
+    Annotation, InteractionContent, InteractionResponse, InteractionStatus, ModalityTokens,
+    UsageMetadata,
 };
 
 // =============================================================================
@@ -149,13 +150,26 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
 }
 
 // =============================================================================
+// Annotation Strategy
+// =============================================================================
+
+fn arb_annotation() -> impl Strategy<Value = Annotation> {
+    (0usize..1000, 0usize..1000, proptest::option::of(".{0,100}"))
+        .prop_map(|(start, len, source)| Annotation::new(start, start.saturating_add(len), source))
+}
+
+// =============================================================================
 // InteractionContent Strategy (subset for streaming tests)
 // =============================================================================
 
 fn arb_interaction_content() -> impl Strategy<Value = InteractionContent> {
     prop_oneof![
-        // Text content
-        proptest::option::of(arb_text()).prop_map(|text| InteractionContent::Text { text }),
+        // Text content with optional annotations
+        (
+            proptest::option::of(arb_text()),
+            proptest::option::of(proptest::collection::vec(arb_annotation(), 0..3))
+        )
+            .prop_map(|(text, annotations)| InteractionContent::Text { text, annotations }),
         // Thought content
         proptest::option::of(arb_text()).prop_map(|text| InteractionContent::Thought { text }),
         // FunctionCall content

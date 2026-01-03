@@ -375,12 +375,20 @@ mod common {
         .unwrap();
 
         // GoogleSearchCall
-        let _: InteractionContent =
-            serde_json::from_value(json!({"type": "google_search_call", "query": "test"})).unwrap();
+        let _: InteractionContent = serde_json::from_value(json!({
+            "type": "google_search_call",
+            "id": "test-id",
+            "arguments": {"queries": ["test query"]}
+        }))
+        .unwrap();
 
         // GoogleSearchResult
-        let _: InteractionContent =
-            serde_json::from_value(json!({"type": "google_search_result", "results": []})).unwrap();
+        let _: InteractionContent = serde_json::from_value(json!({
+            "type": "google_search_result",
+            "call_id": "test-id",
+            "result": [{"title": "Test", "url": "https://example.com"}]
+        }))
+        .unwrap();
 
         // UrlContextCall
         let _: InteractionContent = serde_json::from_value(
@@ -399,6 +407,7 @@ mod common {
     fn known_types_roundtrip_correctly() {
         let text = InteractionContent::Text {
             text: Some("hello".to_string()),
+            annotations: None,
         };
         let json = serde_json::to_value(&text).unwrap();
         assert_eq!(json["type"], "text");

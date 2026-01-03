@@ -450,7 +450,7 @@ mod tests {
 
         // Verify we can access the text content
         match &response.outputs[0] {
-            InteractionContent::Text { text } => {
+            InteractionContent::Text { text, .. } => {
                 assert_eq!(text.as_ref().unwrap(), "Hi there!")
             }
             _ => panic!("Expected Text content"),

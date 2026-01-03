@@ -22,7 +22,10 @@ mod streaming_tests;
 mod proptest_tests;
 
 // Re-export all public types at module root for backwards compatibility
-pub use content::{CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
+pub use content::{
+    Annotation, CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem,
+    InteractionContent,
+};
 pub use metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
     WebSource,

@@ -39,7 +39,9 @@
 ///
 /// For manual conversation construction (without `previous_interaction_id`), use
 /// [`function_call_content_with_signature`] to include the signature when echoing function calls.
-use genai_client::{CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
+use genai_client::{
+    CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem, InteractionContent,
+};
 use serde_json::Value;
 
 // ============================================================================
@@ -64,6 +66,7 @@ use serde_json::Value;
 pub fn text_content(text: impl Into<String>) -> InteractionContent {
     InteractionContent::Text {
         text: Some(text.into()),
+        annotations: None,
     }
 }
 
@@ -587,11 +590,15 @@ pub fn code_execution_error(
 /// ```
 /// use rust_genai::interactions_api::google_search_call_content;
 ///
-/// let search = google_search_call_content("Rust programming language");
+/// let search = google_search_call_content("call-123", vec!["Rust programming language"]);
 /// ```
-pub fn google_search_call_content(query: impl Into<String>) -> InteractionContent {
+pub fn google_search_call_content(
+    id: impl Into<String>,
+    queries: Vec<impl Into<String>>,
+) -> InteractionContent {
     InteractionContent::GoogleSearchCall {
-        query: query.into(),
+        id: id.into(),
+        queries: queries.into_iter().map(|q| q.into()).collect(),
     }
 }
 
@@ -602,14 +609,20 @@ pub fn google_search_call_content(query: impl Into<String>) -> InteractionConten
 /// # Example
 /// ```
 /// use rust_genai::interactions_api::google_search_result_content;
-/// use serde_json::json;
+/// use genai_client::GoogleSearchResultItem;
 ///
-/// let results = google_search_result_content(json!({
-///     "results": [{"title": "Rust", "url": "https://rust-lang.org"}]
-/// }));
+/// let results = google_search_result_content("call-123", vec![
+///     GoogleSearchResultItem::new("Rust", "https://rust-lang.org"),
+/// ]);
 /// ```
-pub fn google_search_result_content(results: serde_json::Value) -> InteractionContent {
-    InteractionContent::GoogleSearchResult { results }
+pub fn google_search_result_content(
+    call_id: impl Into<String>,
+    result: Vec<GoogleSearchResultItem>,
+) -> InteractionContent {
+    InteractionContent::GoogleSearchResult {
+        call_id: call_id.into(),
+        result,
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -698,7 +711,7 @@ mod tests {
     fn test_text_content() {
         let content = text_content("Hello");
         match content {
-            InteractionContent::Text { text } => assert_eq!(text, Some("Hello".to_string())),
+            InteractionContent::Text { text, .. } => assert_eq!(text, Some("Hello".to_string())),
             _ => panic!("Expected Text variant"),
         }
     }
@@ -981,10 +994,12 @@ mod tests {
 
     #[test]
     fn test_google_search_call_content() {
-        let content = google_search_call_content("Rust programming");
+        let content =
+            google_search_call_content("call123", vec!["Rust programming", "latest version"]);
         match content {
-            InteractionContent::GoogleSearchCall { query } => {
-                assert_eq!(query, "Rust programming");
+            InteractionContent::GoogleSearchCall { id, queries } => {
+                assert_eq!(id, "call123");
+                assert_eq!(queries, vec!["Rust programming", "latest version"]);
             }
             _ => panic!("Expected GoogleSearchCall variant"),
         }
@@ -992,11 +1007,15 @@ mod tests {
 
     #[test]
     fn test_google_search_result_content() {
-        let results = json!({"items": [{"title": "Rust"}]});
-        let content = google_search_result_content(results.clone());
+        use genai_client::GoogleSearchResultItem;
+        let result = vec![GoogleSearchResultItem::new("Rust", "https://rust-lang.org")];
+        let content = google_search_result_content("call123", result.clone());
         match content {
-            InteractionContent::GoogleSearchResult { results: r } => {
-                assert_eq!(r, results);
+            InteractionContent::GoogleSearchResult { call_id, result: r } => {
+                assert_eq!(call_id, "call123");
+                assert_eq!(r.len(), 1);
+                assert_eq!(r[0].title, "Rust");
+                assert_eq!(r[0].url, "https://rust-lang.org");
             }
             _ => panic!("Expected GoogleSearchResult variant"),
         }

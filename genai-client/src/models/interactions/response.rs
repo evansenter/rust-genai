@@ -7,7 +7,10 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeSet;
 use std::fmt;
 
-use super::content::{CodeExecutionLanguage, CodeExecutionOutcome, InteractionContent};
+use super::content::{
+    Annotation, CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem,
+    InteractionContent,
+};
 use super::metadata::{GroundingMetadata, UrlContextMetadata};
 use crate::models::shared::Tool;
 
@@ -654,7 +657,7 @@ impl InteractionResponse {
     #[must_use]
     pub fn text(&self) -> Option<&str> {
         self.outputs.iter().find_map(|content| {
-            if let InteractionContent::Text { text: Some(t) } = content {
+            if let InteractionContent::Text { text: Some(t), .. } = content {
                 Some(t.as_str())
             } else {
                 None
@@ -679,7 +682,7 @@ impl InteractionResponse {
         self.outputs
             .iter()
             .filter_map(|content| {
-                if let InteractionContent::Text { text: Some(t) } = content {
+                if let InteractionContent::Text { text: Some(t), .. } = content {
                     Some(t.as_str())
                 } else {
                     None
@@ -687,6 +690,54 @@ impl InteractionResponse {
             })
             .collect::<Vec<_>>()
             .join("")
+    }
+
+    // =========================================================================
+    // Annotation Helpers (Citation Support)
+    // =========================================================================
+
+    /// Check if response contains annotations (citations).
+    ///
+    /// Returns `true` if any text output contains source annotations.
+    /// Annotations are typically present when grounding tools like
+    /// `GoogleSearch` or `UrlContext` were used.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if response.has_annotations() {
+    ///     println!("Response includes {} citations", response.all_annotations().count());
+    /// }
+    /// ```
+    #[must_use]
+    pub fn has_annotations(&self) -> bool {
+        self.outputs.iter().any(|c| c.annotations().is_some())
+    }
+
+    /// Returns all annotations from text outputs.
+    ///
+    /// Collects all [`Annotation`] references from all text outputs in the response.
+    /// Annotations link specific text spans to their sources, enabling citation tracking.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// let text = response.all_text();
+    /// for annotation in response.all_annotations() {
+    ///     if let Some(span) = annotation.extract_span(&text) {
+    ///         println!("'{}' sourced from: {:?}", span, annotation.source);
+    ///     }
+    /// }
+    /// ```
+    pub fn all_annotations(&self) -> impl Iterator<Item = &Annotation> {
+        self.outputs
+            .iter()
+            .filter_map(|c| c.annotations())
+            .flatten()
     }
 
     // =========================================================================
@@ -743,7 +794,7 @@ impl InteractionResponse {
     pub fn has_text(&self) -> bool {
         self.outputs
             .iter()
-            .any(|c| matches!(c, InteractionContent::Text { text: Some(_) }))
+            .any(|c| matches!(c, InteractionContent::Text { text: Some(_), .. }))
     }
 
     /// Check if response contains function calls
@@ -918,6 +969,10 @@ impl InteractionResponse {
     ///
     /// Returns true if the response was grounded using the GoogleSearch tool.
     ///
+    /// This checks for both:
+    /// - Explicit `grounding_metadata` field (future API support)
+    /// - GoogleSearchCall/GoogleSearchResult outputs (current Interactions API)
+    ///
     /// # Example
     ///
     /// ```no_run
@@ -930,23 +985,31 @@ impl InteractionResponse {
     #[must_use]
     pub fn has_google_search_metadata(&self) -> bool {
         self.grounding_metadata.is_some()
+            || self.has_google_search_calls()
+            || self.has_google_search_results()
     }
 
-    /// Get Google Search grounding metadata if present.
+    /// Get Google Search grounding metadata if explicitly present.
+    ///
+    /// **Note:** The Interactions API embeds Google Search data in outputs rather than
+    /// a top-level `grounding_metadata` field. Use [`google_search_calls()`](Self::google_search_calls)
+    /// and [`google_search_results()`](Self::google_search_results) to access the search
+    /// data from outputs. This method returns `None` for Interactions API responses.
     ///
     /// Returns the grounding metadata containing search queries and web sources
-    /// when the GoogleSearch tool was used.
+    /// when the GoogleSearch tool was used and the API provides explicit metadata.
     ///
     /// # Example
     ///
     /// ```no_run
     /// # use genai_client::models::interactions::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
-    /// if let Some(metadata) = response.google_search_metadata() {
-    ///     println!("Search queries: {:?}", metadata.web_search_queries);
-    ///     for chunk in &metadata.grounding_chunks {
-    ///         println!("Source: {} - {}", chunk.web.title, chunk.web.uri);
-    ///     }
+    /// // For Interactions API, use direct output accessors:
+    /// for query in response.google_search_calls() {
+    ///     println!("Search query: {}", query);
+    /// }
+    /// for result in response.google_search_results() {
+    ///     println!("Source: {} - {}", result.title, result.url);
     /// }
     /// ```
     #[must_use]
@@ -1195,17 +1258,18 @@ impl InteractionResponse {
     #[must_use]
     pub fn google_search_call(&self) -> Option<&str> {
         self.outputs.iter().find_map(|content| {
-            if let InteractionContent::GoogleSearchCall { query } = content {
-                Some(query.as_str())
+            if let InteractionContent::GoogleSearchCall { queries, .. } = content {
+                // Return first non-empty query
+                queries.iter().find(|q| !q.is_empty()).map(|q| q.as_str())
             } else {
                 None
             }
         })
     }
 
-    /// Extract Google Search calls (queries) from outputs
+    /// Extract all Google Search queries from outputs
     ///
-    /// Returns a vector of search query strings.
+    /// Returns a vector of search query strings (flattened from all search calls).
     ///
     /// # Example
     ///
@@ -1221,12 +1285,13 @@ impl InteractionResponse {
         self.outputs
             .iter()
             .filter_map(|content| {
-                if let InteractionContent::GoogleSearchCall { query } = content {
-                    Some(query.as_str())
+                if let InteractionContent::GoogleSearchCall { queries, .. } = content {
+                    Some(queries.iter().map(|q| q.as_str()))
                 } else {
                     None
                 }
             })
+            .flatten()
             .collect()
     }
 
@@ -1238,20 +1303,21 @@ impl InteractionResponse {
             .any(|c| matches!(c, InteractionContent::GoogleSearchResult { .. }))
     }
 
-    /// Extract Google Search results from outputs
+    /// Extract Google Search result items from outputs
     ///
-    /// Returns a vector of references to the search result JSON data.
+    /// Returns a vector of references to the search result items with title/URL info.
     #[must_use]
-    pub fn google_search_results(&self) -> Vec<&serde_json::Value> {
+    pub fn google_search_results(&self) -> Vec<&GoogleSearchResultItem> {
         self.outputs
             .iter()
             .filter_map(|content| {
-                if let InteractionContent::GoogleSearchResult { results } = content {
-                    Some(results)
+                if let InteractionContent::GoogleSearchResult { result, .. } = content {
+                    Some(result.iter())
                 } else {
                     None
                 }
             })
+            .flatten()
             .collect()
     }
 

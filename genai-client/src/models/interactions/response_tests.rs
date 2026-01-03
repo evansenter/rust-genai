@@ -94,9 +94,11 @@ fn test_interaction_response_text() {
         outputs: vec![
             InteractionContent::Text {
                 text: Some("Hello".to_string()),
+                annotations: None,
             },
             InteractionContent::Text {
                 text: Some("World".to_string()),
+                annotations: None,
             },
         ],
         status: InteractionStatus::Completed,
@@ -129,6 +131,7 @@ fn test_interaction_response_thoughts() {
             },
             InteractionContent::Text {
                 text: Some("The answer is 42.".to_string()),
+                annotations: None,
             },
             // Thought with None text should be filtered out
             InteractionContent::Thought { text: None },
@@ -161,6 +164,7 @@ fn test_interaction_response_no_thoughts() {
         input: vec![],
         outputs: vec![InteractionContent::Text {
             text: Some("Just text, no thoughts.".to_string()),
+            annotations: None,
         }],
         status: InteractionStatus::Completed,
         usage: None,
@@ -264,6 +268,7 @@ fn test_interaction_response_mixed_content() {
         outputs: vec![
             InteractionContent::Text {
                 text: Some("Let me check".to_string()),
+                annotations: None,
             },
             InteractionContent::FunctionCall {
                 id: Some("call_mixed".to_string()),
@@ -273,6 +278,7 @@ fn test_interaction_response_mixed_content() {
             },
             InteractionContent::Text {
                 text: Some("Done!".to_string()),
+                annotations: None,
             },
         ],
         status: InteractionStatus::Completed,
@@ -325,6 +331,7 @@ fn test_interaction_response_has_unknown() {
         outputs: vec![
             InteractionContent::Text {
                 text: Some("Here's the result:".to_string()),
+                annotations: None,
             },
             InteractionContent::Unknown {
                 content_type: "code_execution_result".to_string(),
@@ -361,6 +368,7 @@ fn test_interaction_response_no_unknown() {
         input: vec![],
         outputs: vec![InteractionContent::Text {
             text: Some("Normal response".to_string()),
+            annotations: None,
         }],
         status: InteractionStatus::Completed,
         usage: None,
@@ -386,9 +394,11 @@ fn test_content_summary() {
         outputs: vec![
             InteractionContent::Text {
                 text: Some("Text 1".to_string()),
+                annotations: None,
             },
             InteractionContent::Text {
                 text: Some("Text 2".to_string()),
+                annotations: None,
             },
             InteractionContent::Thought {
                 text: Some("Thinking".to_string()),
@@ -517,10 +527,12 @@ fn test_content_summary_with_built_in_tools() {
                 output: "1\n2\n".to_string(),
             },
             InteractionContent::GoogleSearchCall {
-                query: "test".to_string(),
+                id: "search1".to_string(),
+                queries: vec!["test".to_string()],
             },
             InteractionContent::GoogleSearchResult {
-                results: serde_json::json!({}),
+                call_id: "search1".to_string(),
+                result: vec![],
             },
             InteractionContent::UrlContextCall {
                 url: "https://example.com".to_string(),
@@ -561,6 +573,7 @@ fn test_interaction_response_code_execution_helpers() {
         outputs: vec![
             InteractionContent::Text {
                 text: Some("Here's the code:".to_string()),
+                annotations: None,
             },
             InteractionContent::CodeExecutionCall {
                 id: "call_123".to_string(),
@@ -605,6 +618,8 @@ fn test_interaction_response_code_execution_helpers() {
 
 #[test]
 fn test_interaction_response_google_search_helpers() {
+    use super::content::GoogleSearchResultItem;
+
     let response = InteractionResponse {
         id: Some("test_id".to_string()),
         model: Some("gemini-3-flash-preview".to_string()),
@@ -612,10 +627,12 @@ fn test_interaction_response_google_search_helpers() {
         input: vec![],
         outputs: vec![
             InteractionContent::GoogleSearchResult {
-                results: serde_json::json!({"items": [{"title": "Test"}]}),
+                call_id: "call123".to_string(),
+                result: vec![GoogleSearchResultItem::new("Test", "https://example.com")],
             },
             InteractionContent::Text {
                 text: Some("Based on search results...".to_string()),
+                annotations: None,
             },
         ],
         status: InteractionStatus::Completed,
@@ -630,7 +647,8 @@ fn test_interaction_response_google_search_helpers() {
 
     let search_results = response.google_search_results();
     assert_eq!(search_results.len(), 1);
-    assert_eq!(search_results[0]["items"][0]["title"], "Test");
+    assert_eq!(search_results[0].title, "Test");
+    assert_eq!(search_results[0].url, "https://example.com");
 }
 
 #[test]
@@ -767,6 +785,7 @@ fn test_interaction_response_function_results() {
             },
             InteractionContent::Text {
                 text: Some("Here are the results".to_string()),
+                annotations: None,
             },
         ],
         status: InteractionStatus::Completed,
@@ -798,6 +817,7 @@ fn test_interaction_response_no_function_results() {
         input: vec![],
         outputs: vec![InteractionContent::Text {
             text: Some("Just text".to_string()),
+            annotations: None,
         }],
         status: InteractionStatus::Completed,
         usage: None,
@@ -822,13 +842,16 @@ fn test_interaction_response_google_search_call_helpers() {
         input: vec![],
         outputs: vec![
             InteractionContent::GoogleSearchCall {
-                query: "Rust programming language".to_string(),
+                id: "search1".to_string(),
+                queries: vec!["Rust programming language".to_string()],
             },
             InteractionContent::GoogleSearchCall {
-                query: "async await Rust".to_string(),
+                id: "search2".to_string(),
+                queries: vec!["async await Rust".to_string()],
             },
             InteractionContent::Text {
                 text: Some("Search results...".to_string()),
+                annotations: None,
             },
         ],
         status: InteractionStatus::Completed,
@@ -863,6 +886,7 @@ fn test_interaction_response_no_google_search_calls() {
         input: vec![],
         outputs: vec![InteractionContent::Text {
             text: Some("No search".to_string()),
+            annotations: None,
         }],
         status: InteractionStatus::Completed,
         usage: None,
@@ -982,6 +1006,7 @@ fn test_interaction_response_no_code_execution_call() {
         input: vec![],
         outputs: vec![InteractionContent::Text {
             text: Some("No code".to_string()),
+            annotations: None,
         }],
         status: InteractionStatus::Completed,
         usage: None,
@@ -1007,6 +1032,7 @@ fn test_interaction_response_google_search_metadata_helpers() {
         input: vec![],
         outputs: vec![InteractionContent::Text {
             text: Some("Response grounded with search".to_string()),
+            annotations: None,
         }],
         status: InteractionStatus::Completed,
         usage: None,
@@ -1124,6 +1150,7 @@ fn test_interaction_response_code_execution_calls_plural() {
             },
             InteractionContent::Text {
                 text: Some("Results".to_string()),
+                annotations: None,
             },
         ],
         status: InteractionStatus::Completed,
@@ -1198,6 +1225,7 @@ fn test_interaction_response_no_code_execution_results() {
         input: vec![],
         outputs: vec![InteractionContent::Text {
             text: Some("No code".to_string()),
+            annotations: None,
         }],
         status: InteractionStatus::Completed,
         usage: None,
@@ -1221,10 +1249,20 @@ fn test_interaction_response_google_search_results() {
         input: vec![],
         outputs: vec![
             InteractionContent::GoogleSearchResult {
-                results: serde_json::json!({"items": [{"title": "Rust Lang"}]}),
+                call_id: "search1".to_string(),
+                result: vec![GoogleSearchResultItem {
+                    title: "Rust Lang".to_string(),
+                    url: "https://rust-lang.org".to_string(),
+                    rendered_content: None,
+                }],
             },
             InteractionContent::GoogleSearchResult {
-                results: serde_json::json!({"items": [{"title": "Cargo"}]}),
+                call_id: "search2".to_string(),
+                result: vec![GoogleSearchResultItem {
+                    title: "Cargo".to_string(),
+                    url: "https://doc.rust-lang.org/cargo/".to_string(),
+                    rendered_content: None,
+                }],
             },
         ],
         status: InteractionStatus::Completed,
@@ -1239,8 +1277,8 @@ fn test_interaction_response_google_search_results() {
 
     let results = response.google_search_results();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0]["items"][0]["title"], "Rust Lang");
-    assert_eq!(results[1]["items"][0]["title"], "Cargo");
+    assert_eq!(results[0].title, "Rust Lang");
+    assert_eq!(results[1].title, "Cargo");
 }
 
 #[test]
@@ -1339,6 +1377,7 @@ fn test_interaction_response_complex_roundtrip() {
         input: vec![
             InteractionContent::Text {
                 text: Some("Analyze this and call the weather function".to_string()),
+                annotations: None,
             },
             InteractionContent::Image {
                 mime_type: Some("image/png".to_string()),
@@ -1380,10 +1419,16 @@ fn test_interaction_response_complex_roundtrip() {
             },
             // Google search
             InteractionContent::GoogleSearchCall {
-                query: "weather in Tokyo".to_string(),
+                id: "gsearch-001".to_string(),
+                queries: vec!["weather in Tokyo".to_string()],
             },
             InteractionContent::GoogleSearchResult {
-                results: serde_json::json!({"query": "weather tokyo", "results": []}),
+                call_id: "gsearch-001".to_string(),
+                result: vec![GoogleSearchResultItem {
+                    title: "Tokyo Weather".to_string(),
+                    url: "https://weather.example.com/tokyo".to_string(),
+                    rendered_content: None,
+                }],
             },
             // URL context
             InteractionContent::UrlContextCall {
@@ -1396,6 +1441,7 @@ fn test_interaction_response_complex_roundtrip() {
             // Final text response
             InteractionContent::Text {
                 text: Some("The weather in Tokyo is 22°C and sunny.".to_string()),
+                annotations: None,
             },
         ],
         status: InteractionStatus::Completed,
@@ -1680,6 +1726,7 @@ fn test_interaction_response_serialize_without_id() {
         input: vec![],
         outputs: vec![InteractionContent::Text {
             text: Some("Hello".to_string()),
+            annotations: None,
         }],
         status: InteractionStatus::Completed,
         usage: None,
@@ -1708,6 +1755,7 @@ fn test_interaction_response_roundtrip_without_id() {
         input: vec![],
         outputs: vec![InteractionContent::Text {
             text: Some("Test response".to_string()),
+            annotations: None,
         }],
         status: InteractionStatus::Completed,
         usage: None,
@@ -1909,4 +1957,223 @@ fn test_owned_function_call_info_equality() {
 
     assert_eq!(owned1, owned2);
     assert_ne!(owned1, different);
+}
+
+// --- Annotation Helper Tests ---
+
+#[test]
+fn test_interaction_response_has_annotations() {
+    // Response with annotations
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("According to the source, climate change is accelerating.".to_string()),
+            annotations: Some(vec![Annotation {
+                start_index: 19,
+                end_index: 25,
+                source: Some("https://climate.gov".to_string()),
+            }]),
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(response.has_annotations());
+}
+
+#[test]
+fn test_interaction_response_no_annotations() {
+    // Response without annotations
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("Plain text without citations.".to_string()),
+            annotations: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(!response.has_annotations());
+}
+
+#[test]
+fn test_interaction_response_empty_annotations_not_counted() {
+    // Response with empty annotations array (should not count as having annotations)
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("Text with empty annotations.".to_string()),
+            annotations: Some(vec![]), // Empty array
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    assert!(!response.has_annotations());
+}
+
+#[test]
+fn test_interaction_response_all_annotations() {
+    // Response with multiple text outputs, each with annotations
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::Text {
+                text: Some("First claim from source A.".to_string()),
+                annotations: Some(vec![Annotation {
+                    start_index: 0,
+                    end_index: 11,
+                    source: Some("https://source-a.com".to_string()),
+                }]),
+            },
+            InteractionContent::Thought {
+                text: Some("Thinking about sources...".to_string()),
+            },
+            InteractionContent::Text {
+                text: Some("Second and third claims.".to_string()),
+                annotations: Some(vec![
+                    Annotation {
+                        start_index: 0,
+                        end_index: 6,
+                        source: Some("https://source-b.com".to_string()),
+                    },
+                    Annotation {
+                        start_index: 11,
+                        end_index: 16,
+                        source: Some("https://source-c.com".to_string()),
+                    },
+                ]),
+            },
+            InteractionContent::Text {
+                text: Some("Text without annotations.".to_string()),
+                annotations: None,
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    let annotations: Vec<_> = response.all_annotations().collect();
+
+    // Should collect all 3 annotations from the two Text outputs with annotations
+    assert_eq!(annotations.len(), 3);
+    assert_eq!(
+        annotations[0].source.as_deref(),
+        Some("https://source-a.com")
+    );
+    assert_eq!(
+        annotations[1].source.as_deref(),
+        Some("https://source-b.com")
+    );
+    assert_eq!(
+        annotations[2].source.as_deref(),
+        Some("https://source-c.com")
+    );
+}
+
+#[test]
+fn test_interaction_response_all_annotations_empty() {
+    // Response with no annotations at all
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::Text {
+                text: Some("No annotations here.".to_string()),
+                annotations: None,
+            },
+            InteractionContent::FunctionCall {
+                id: Some("call_1".to_string()),
+                name: "test".to_string(),
+                args: serde_json::json!({}),
+                thought_signature: None,
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    let count = response.all_annotations().count();
+    assert_eq!(count, 0);
+}
+
+#[test]
+fn test_interaction_response_all_annotations_skips_non_text() {
+    // Verify all_annotations only looks at Text content, not other types
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::Image {
+                data: Some("base64".to_string()),
+                uri: None,
+                mime_type: Some("image/png".to_string()),
+            },
+            InteractionContent::CodeExecutionResult {
+                call_id: "call_1".to_string(),
+                outcome: CodeExecutionOutcome::Ok,
+                output: "result".to_string(),
+            },
+            InteractionContent::Text {
+                text: Some("Only text has annotations.".to_string()),
+                annotations: Some(vec![Annotation {
+                    start_index: 0,
+                    end_index: 4,
+                    source: Some("https://example.com".to_string()),
+                }]),
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+    };
+
+    let annotations: Vec<_> = response.all_annotations().collect();
+
+    // Should only find the one annotation from the Text content
+    assert_eq!(annotations.len(), 1);
+    assert_eq!(
+        annotations[0].source.as_deref(),
+        Some("https://example.com")
+    );
 }

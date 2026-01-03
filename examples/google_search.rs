@@ -53,30 +53,47 @@ async fn main() -> Result<(), Box<dyn Error>> {
             if response.has_google_search_metadata() {
                 println!("--- Grounding Information ---");
 
-                if let Some(metadata) = response.google_search_metadata() {
-                    // Display search queries used
-                    if !metadata.web_search_queries.is_empty() {
-                        println!("Search Queries:");
-                        for query in &metadata.web_search_queries {
-                            println!("  - {query}");
-                        }
-                        println!();
+                // Display search queries from GoogleSearchCall outputs
+                let search_queries = response.google_search_calls();
+                if !search_queries.is_empty() {
+                    println!("Search Queries:");
+                    for query in &search_queries {
+                        println!("  - {query}");
                     }
+                    println!();
+                }
 
-                    // Display web sources
-                    if !metadata.grounding_chunks.is_empty() {
-                        println!("Web Sources ({} total):", metadata.grounding_chunks.len());
-                        for (i, chunk) in metadata.grounding_chunks.iter().enumerate() {
-                            println!("  {}. {} [{}]", i + 1, chunk.web.title, chunk.web.domain);
-                            println!("     {}", chunk.web.uri);
-                        }
+                // Display web sources from GoogleSearchResult outputs
+                let search_results = response.google_search_results();
+                if !search_results.is_empty() {
+                    println!("Web Sources ({} total):", search_results.len());
+                    for (i, result) in search_results.iter().enumerate() {
+                        println!("  {}. {}", i + 1, result.title);
+                        println!("     {}", result.url);
                     }
                 }
             } else {
                 println!("Note: No grounding metadata returned (may vary by API response)");
             }
 
-            // 6. Show token usage
+            // 6. Display inline citations (annotations)
+            if response.has_annotations() {
+                println!("\n--- Inline Citations ---");
+                let text = response.all_text();
+                for annotation in response.all_annotations() {
+                    if let Some(span) = annotation.extract_span(&text) {
+                        println!(
+                            "  \"{}\" (bytes {}..{}) → {}",
+                            span,
+                            annotation.start_index,
+                            annotation.end_index,
+                            annotation.source.as_deref().unwrap_or("<no source>")
+                        );
+                    }
+                }
+            }
+
+            // 7. Show token usage
             if let Some(usage) = response.usage {
                 println!("\n--- Token Usage ---");
                 if let Some(input) = usage.total_input_tokens {
@@ -139,10 +156,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
                 StreamChunk::Complete(response) => {
                     println!("\n");
-                    if let Some(metadata) = response.google_search_metadata() {
-                        println!("Sources ({} total):", metadata.grounding_chunks.len());
-                        for chunk in metadata.grounding_chunks.iter().take(3) {
-                            println!("  - {} [{}]", chunk.web.title, chunk.web.domain);
+                    let search_results = response.google_search_results();
+                    if !search_results.is_empty() {
+                        println!("Sources ({} total):", search_results.len());
+                        for result in search_results.iter().take(3) {
+                            println!("  - {}", result.title);
                         }
                     }
                 }
@@ -163,17 +181,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("--- Key Takeaways ---");
     println!("• with_google_search() enables real-time web search grounding");
-    println!("• response.google_search_metadata() provides source citations");
-    println!("• Grounding chunks include title, domain, and full URI");
+    println!("• response.google_search_calls() returns the search queries executed");
+    println!("• response.google_search_results() returns sources with title/url");
+    println!("• response.all_annotations() links text spans to sources (inline citations)");
     println!("• Works with both streaming and non-streaming requests\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");
     println!("Non-streaming:");
     println!("  [REQ#1] POST with input + googleSearch tool");
-    println!("  [RES#1] completed: text + groundingMetadata with sources\n");
+    println!(
+        "  [RES#1] completed: text with annotations + google_search_call + google_search_result\n"
+    );
     println!("Streaming:");
     println!("  [REQ#2] POST streaming with input + googleSearch tool");
-    println!("  [RES#2] SSE stream: text deltas → completed with groundingMetadata\n");
+    println!("  [RES#2] SSE stream: text deltas → completed with grounding outputs\n");
 
     println!("--- Production Considerations ---");
     println!("• Google Search may not be available in all regions/accounts");

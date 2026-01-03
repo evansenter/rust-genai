@@ -286,6 +286,7 @@ mod tests {
             input: vec![],
             outputs: vec![InteractionContent::Text {
                 text: Some("Hello".to_string()),
+                annotations: None,
             }],
             status: InteractionStatus::Completed,
             usage: None,
@@ -344,6 +345,7 @@ mod tests {
                 },
                 InteractionContent::Text {
                     text: Some("text between".to_string()),
+                    annotations: None,
                 },
                 InteractionContent::Image {
                     data: Some("dGVzdDI=".to_string()), // "test2"

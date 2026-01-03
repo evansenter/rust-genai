@@ -68,7 +68,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("{text}");
             }
 
-            // 6. Show token usage
+            // 6. Display inline citations (annotations)
+            if response.has_annotations() {
+                println!("\nInline Citations:");
+                let text = response.all_text();
+                for annotation in response.all_annotations() {
+                    if let Some(span) = annotation.extract_span(&text) {
+                        println!(
+                            "  \"{}...\" → {}",
+                            &span[..span.len().min(50)],
+                            annotation.source.as_deref().unwrap_or("<no source>")
+                        );
+                    }
+                }
+            }
+
+            // 7. Show token usage
             if let Some(usage) = response.usage {
                 println!("\nToken Usage:");
                 if let Some(input) = usage.total_input_tokens {
@@ -78,7 +93,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     println!("  Output tokens: {output}");
                 }
             }
-            println!("\n--- End Non-Streaming Response ---");
+            println!("--- End Non-Streaming Response ---");
         }
         Err(e) => {
             match &e {
@@ -103,7 +118,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // 7. Streaming example with URL Context
+    // 8. Streaming example with URL Context
     println!("\n=== Streaming with URL Context ===\n");
 
     let stream_prompt = "Fetch https://httpbin.org/html and describe what you find on the page.";
@@ -165,6 +180,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("--- Key Takeaways ---");
     println!("• with_url_context() enables server-side URL fetching and analysis");
     println!("• response.url_context_metadata() provides retrieval status per URL");
+    println!("• response.all_annotations() links text spans to fetched URL sources");
     println!("• UrlRetrievalStatus: Success, Error, Unsafe (blocked), Unspecified");
     println!("• Works with both streaming and non-streaming requests\n");
 

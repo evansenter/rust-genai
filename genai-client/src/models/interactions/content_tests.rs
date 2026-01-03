@@ -8,6 +8,7 @@ use super::*;
 fn test_serialize_interaction_content() {
     let content = InteractionContent::Text {
         text: Some("Hello".to_string()),
+        annotations: None,
     };
 
     let json = serde_json::to_string(&content).expect("Serialization failed");
@@ -38,10 +39,14 @@ fn test_deserialize_function_call_content() {
 fn test_content_empty_text_returns_none() {
     let content = InteractionContent::Text {
         text: Some(String::new()),
+        annotations: None,
     };
     assert_eq!(content.text(), None);
 
-    let content_none = InteractionContent::Text { text: None };
+    let content_none = InteractionContent::Text {
+        text: None,
+        annotations: None,
+    };
     assert_eq!(content_none.text(), None);
 }
 
@@ -66,6 +71,7 @@ fn test_content_thought_accessor() {
     // Text variant returns None for thought()
     let text_content = InteractionContent::Text {
         text: Some("hello".to_string()),
+        annotations: None,
     };
     assert_eq!(text_content.thought(), None);
 }
@@ -170,11 +176,15 @@ fn test_serialize_unknown_content_roundtrip() {
 #[test]
 fn test_serialize_known_variant_with_none_fields() {
     // Test that known variants with None fields serialize correctly (omit None fields)
-    let text = InteractionContent::Text { text: None };
+    let text = InteractionContent::Text {
+        text: None,
+        annotations: None,
+    };
     let json = serde_json::to_string(&text).unwrap();
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(value["type"], "text");
     assert!(value.get("text").is_none());
+    assert!(value.get("annotations").is_none());
 
     let image = InteractionContent::Image {
         data: Some("base64data".to_string()),
@@ -596,12 +606,16 @@ fn test_code_execution_outcome_enum() {
 
 #[test]
 fn test_deserialize_google_search_call() {
-    let json = r#"{"type": "google_search_call", "query": "Rust programming"}"#;
+    // Test the actual API format: arguments.queries is an array
+    let json = r#"{"type": "google_search_call", "id": "call123", "arguments": {"queries": ["Rust programming", "latest version"]}}"#;
     let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::GoogleSearchCall { query } => {
-            assert_eq!(query, "Rust programming");
+        InteractionContent::GoogleSearchCall { id, queries } => {
+            assert_eq!(id, "call123");
+            assert_eq!(queries.len(), 2);
+            assert_eq!(queries[0], "Rust programming");
+            assert_eq!(queries[1], "latest version");
         }
         _ => panic!("Expected GoogleSearchCall variant, got {:?}", content),
     }
@@ -612,13 +626,17 @@ fn test_deserialize_google_search_call() {
 
 #[test]
 fn test_deserialize_google_search_result() {
-    let json = r#"{"type": "google_search_result", "results": {"items": [{"title": "Rust", "url": "https://rust-lang.org"}]}}"#;
+    // Test the actual API format: result is an array of objects with title/url
+    let json = r#"{"type": "google_search_result", "call_id": "call123", "result": [{"title": "Rust", "url": "https://rust-lang.org", "renderedContent": "Some content"}]}"#;
     let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::GoogleSearchResult { results } => {
-            assert!(results["items"].is_array());
-            assert_eq!(results["items"][0]["title"], "Rust");
+        InteractionContent::GoogleSearchResult { call_id, result } => {
+            assert_eq!(call_id, "call123");
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[0].title, "Rust");
+            assert_eq!(result[0].url, "https://rust-lang.org");
+            assert_eq!(result[0].rendered_content.as_deref(), Some("Some content"));
         }
         _ => panic!("Expected GoogleSearchResult variant, got {:?}", content),
     }
@@ -774,7 +792,8 @@ fn test_roundtrip_built_in_tool_content() {
 
     // GoogleSearchCall roundtrip
     let original = InteractionContent::GoogleSearchCall {
-        query: "test query".to_string(),
+        id: "call123".to_string(),
+        queries: vec!["test query".to_string()],
     };
     let json = serde_json::to_string(&original).unwrap();
     let restored: InteractionContent = serde_json::from_str(&json).unwrap();
@@ -785,7 +804,8 @@ fn test_roundtrip_built_in_tool_content() {
 
     // GoogleSearchResult roundtrip
     let original = InteractionContent::GoogleSearchResult {
-        results: serde_json::json!({"items": []}),
+        call_id: "call123".to_string(),
+        result: vec![],
     };
     let json = serde_json::to_string(&original).unwrap();
     let restored: InteractionContent = serde_json::from_str(&json).unwrap();
@@ -839,7 +859,8 @@ fn test_edge_cases_empty_values() {
 
     // Empty results in GoogleSearchResult
     let content = InteractionContent::GoogleSearchResult {
-        results: serde_json::json!({}),
+        call_id: "call_empty".to_string(),
+        result: vec![],
     };
     let json = serde_json::to_string(&content).unwrap();
     let restored: InteractionContent = serde_json::from_str(&json).unwrap();
@@ -951,5 +972,321 @@ fn test_deserialize_response_with_unknown_in_outputs() {
         summary
             .unknown_types
             .contains(&"another_unknown_type".to_string())
+    );
+}
+
+// --- Annotation Tests ---
+
+#[test]
+fn test_annotation_struct_basics() {
+    let annotation = Annotation {
+        start_index: 0,
+        end_index: 10,
+        source: Some("https://example.com".to_string()),
+    };
+
+    assert_eq!(annotation.byte_len(), 10);
+    assert!(annotation.has_source());
+
+    let no_source = Annotation {
+        start_index: 5,
+        end_index: 15,
+        source: None,
+    };
+    assert_eq!(no_source.byte_len(), 10);
+    assert!(!no_source.has_source());
+}
+
+#[test]
+fn test_annotation_extract_span() {
+    let text = "Hello, world!";
+    let annotation = Annotation {
+        start_index: 0,
+        end_index: 5,
+        source: None,
+    };
+    assert_eq!(annotation.extract_span(text), Some("Hello"));
+
+    let annotation_mid = Annotation {
+        start_index: 7,
+        end_index: 12,
+        source: None,
+    };
+    assert_eq!(annotation_mid.extract_span(text), Some("world"));
+
+    // Out of bounds
+    let out_of_bounds = Annotation {
+        start_index: 100,
+        end_index: 200,
+        source: None,
+    };
+    assert_eq!(out_of_bounds.extract_span(text), None);
+}
+
+#[test]
+fn test_annotation_extract_span_utf8() {
+    // Test with UTF-8 text - annotations use byte indices
+    let text = "Héllo, 世界!"; // "Héllo" = 6 bytes (H=1, é=2, l=1, l=1, o=1), ", " = 2 bytes, "世界" = 6 bytes
+    let annotation = Annotation {
+        start_index: 0,
+        end_index: 6, // "Héllo" in bytes
+        source: None,
+    };
+    assert_eq!(annotation.extract_span(text), Some("Héllo"));
+
+    // Extract Chinese characters
+    let world_annotation = Annotation {
+        start_index: 8, // After "Héllo, "
+        end_index: 14,  // "世界" is 6 bytes
+        source: None,
+    };
+    assert_eq!(world_annotation.extract_span(text), Some("世界"));
+}
+
+#[test]
+fn test_serialize_text_with_annotations() {
+    let annotations = vec![
+        Annotation {
+            start_index: 0,
+            end_index: 5,
+            source: Some("https://example.com".to_string()),
+        },
+        Annotation {
+            start_index: 10,
+            end_index: 20,
+            source: None,
+        },
+    ];
+
+    let content = InteractionContent::Text {
+        text: Some("Hello, world! This is grounded text.".to_string()),
+        annotations: Some(annotations),
+    };
+
+    let json = serde_json::to_string(&content).expect("Serialization failed");
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(value["type"], "text");
+    assert_eq!(value["text"], "Hello, world! This is grounded text.");
+    assert!(value["annotations"].is_array());
+    assert_eq!(value["annotations"].as_array().unwrap().len(), 2);
+    assert_eq!(value["annotations"][0]["start_index"], 0);
+    assert_eq!(value["annotations"][0]["end_index"], 5);
+    assert_eq!(value["annotations"][0]["source"], "https://example.com");
+    assert_eq!(value["annotations"][1]["start_index"], 10);
+    assert_eq!(value["annotations"][1]["end_index"], 20);
+    assert!(value["annotations"][1].get("source").is_none());
+}
+
+#[test]
+fn test_serialize_text_with_empty_annotations_omitted() {
+    // Empty annotations array should not be serialized
+    let content = InteractionContent::Text {
+        text: Some("Plain text".to_string()),
+        annotations: Some(vec![]),
+    };
+
+    let json = serde_json::to_string(&content).expect("Serialization failed");
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(value["type"], "text");
+    assert_eq!(value["text"], "Plain text");
+    // Empty annotations should not be serialized
+    assert!(value.get("annotations").is_none());
+}
+
+#[test]
+fn test_deserialize_text_with_annotations() {
+    let json = r#"{
+        "type": "text",
+        "text": "This is grounded text.",
+        "annotations": [
+            {"start_index": 0, "end_index": 4, "source": "https://example.com"},
+            {"start_index": 8, "end_index": 16}
+        ]
+    }"#;
+
+    let content: InteractionContent = serde_json::from_str(json).expect("Deserialization failed");
+
+    match content {
+        InteractionContent::Text { text, annotations } => {
+            assert_eq!(text, Some("This is grounded text.".to_string()));
+            let annots = annotations.expect("Should have annotations");
+            assert_eq!(annots.len(), 2);
+            assert_eq!(annots[0].start_index, 0);
+            assert_eq!(annots[0].end_index, 4);
+            assert_eq!(annots[0].source, Some("https://example.com".to_string()));
+            assert_eq!(annots[1].start_index, 8);
+            assert_eq!(annots[1].end_index, 16);
+            assert_eq!(annots[1].source, None);
+        }
+        _ => panic!("Expected Text variant"),
+    }
+}
+
+#[test]
+fn test_deserialize_text_without_annotations() {
+    let json = r#"{"type": "text", "text": "Plain text"}"#;
+
+    let content: InteractionContent = serde_json::from_str(json).expect("Deserialization failed");
+
+    match content {
+        InteractionContent::Text { text, annotations } => {
+            assert_eq!(text, Some("Plain text".to_string()));
+            assert!(annotations.is_none());
+        }
+        _ => panic!("Expected Text variant"),
+    }
+}
+
+#[test]
+fn test_text_with_annotations_roundtrip() {
+    let annotations = vec![Annotation {
+        start_index: 5,
+        end_index: 15,
+        source: Some("https://source.example.com".to_string()),
+    }];
+
+    let original = InteractionContent::Text {
+        text: Some("Some grounded content here.".to_string()),
+        annotations: Some(annotations),
+    };
+
+    let json = serde_json::to_string(&original).expect("Serialization failed");
+    let deserialized: InteractionContent =
+        serde_json::from_str(&json).expect("Deserialization failed");
+
+    // Compare by re-serializing and checking the JSON
+    let roundtrip_json = serde_json::to_string(&deserialized).expect("Serialization failed");
+    assert_eq!(json, roundtrip_json);
+
+    // Also verify content matches
+    match deserialized {
+        InteractionContent::Text { text, annotations } => {
+            assert_eq!(text, Some("Some grounded content here.".to_string()));
+            let annots = annotations.expect("Should have annotations");
+            assert_eq!(annots.len(), 1);
+            assert_eq!(annots[0].start_index, 5);
+            assert_eq!(annots[0].end_index, 15);
+            assert_eq!(
+                annots[0].source,
+                Some("https://source.example.com".to_string())
+            );
+        }
+        _ => panic!("Expected Text variant"),
+    }
+}
+
+#[test]
+fn test_annotations_helper_method() {
+    let content_with_annotations = InteractionContent::Text {
+        text: Some("Hello".to_string()),
+        annotations: Some(vec![Annotation {
+            start_index: 0,
+            end_index: 5,
+            source: None,
+        }]),
+    };
+
+    assert!(content_with_annotations.annotations().is_some());
+    assert_eq!(content_with_annotations.annotations().unwrap().len(), 1);
+
+    let content_without_annotations = InteractionContent::Text {
+        text: Some("Hello".to_string()),
+        annotations: None,
+    };
+
+    assert!(content_without_annotations.annotations().is_none());
+
+    // Non-text content returns None
+    let thought = InteractionContent::Thought {
+        text: Some("Thinking...".to_string()),
+    };
+    assert!(thought.annotations().is_none());
+}
+
+#[test]
+fn test_annotation_extract_span_inverted_indices() {
+    // Edge case: start_index > end_index (malformed annotation)
+    // The implementation should gracefully return None
+    let inverted = Annotation {
+        start_index: 10,
+        end_index: 5, // start > end - invalid range
+        source: None,
+    };
+
+    let text = "Hello, world!";
+    assert_eq!(
+        inverted.extract_span(text),
+        None,
+        "Inverted indices should return None"
+    );
+
+    // byte_len should use saturating_sub to avoid underflow
+    assert_eq!(
+        inverted.byte_len(),
+        0,
+        "byte_len of inverted indices should be 0 (saturating_sub)"
+    );
+}
+
+#[test]
+fn test_annotation_extract_span_zero_length() {
+    // Edge case: start_index == end_index (zero-length span)
+    let zero_len = Annotation {
+        start_index: 5,
+        end_index: 5,
+        source: Some("https://example.com".to_string()),
+    };
+
+    let text = "Hello, world!";
+    assert_eq!(
+        zero_len.extract_span(text),
+        Some(""),
+        "Zero-length span should return empty string"
+    );
+    assert_eq!(zero_len.byte_len(), 0);
+}
+
+#[test]
+fn test_annotation_extract_span_mid_utf8_boundary() {
+    // Edge case: indices that land in the middle of a multi-byte character
+    // "世" is a 3-byte UTF-8 character (E4 B8 96)
+    let text = "Hello, 世界!"; // "世" starts at byte 7, "界" starts at byte 10
+
+    // Try to slice starting in the middle of "世" (byte 8)
+    let mid_start = Annotation {
+        start_index: 8, // Middle of "世"
+        end_index: 13,
+        source: None,
+    };
+    assert_eq!(
+        mid_start.extract_span(text),
+        None,
+        "Slicing from middle of UTF-8 character should return None"
+    );
+
+    // Try to slice ending in the middle of "界" (byte 11)
+    let mid_end = Annotation {
+        start_index: 7, // Start of "世"
+        end_index: 11,  // Middle of "界"
+        source: None,
+    };
+    assert_eq!(
+        mid_end.extract_span(text),
+        None,
+        "Slicing to middle of UTF-8 character should return None"
+    );
+
+    // Valid slice of "世界" (bytes 7-13)
+    let valid_cjk = Annotation {
+        start_index: 7,
+        end_index: 13,
+        source: None,
+    };
+    assert_eq!(
+        valid_cjk.extract_span(text),
+        Some("世界"),
+        "Valid CJK character slice should work"
     );
 }
