@@ -58,6 +58,7 @@ pub use models::interactions::InteractionStatus;
 pub use models::interactions::OwnedFunctionCallInfo;
 pub use models::interactions::StreamChunk;
 pub use models::interactions::ThinkingLevel;
+pub use models::interactions::ThinkingSummaries;
 pub use models::interactions::UrlContextMetadata;
 pub use models::interactions::UrlContextResultInfo;
 pub use models::interactions::UrlMetadataEntry;

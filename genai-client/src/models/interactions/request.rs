@@ -40,6 +40,26 @@ pub enum ThinkingLevel {
     High,
 }
 
+/// Controls whether thinking summaries are included in output.
+///
+/// When using thinking mode (via `with_thinking_level`), you can control
+/// whether the model's reasoning process is summarized in the output.
+///
+/// This enum is marked `#[non_exhaustive]` for forward compatibility.
+/// New summary modes may be added in future versions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum ThinkingSummaries {
+    /// Automatically include thinking summaries (default when thinking is enabled)
+    Auto,
+    /// Do not include thinking summaries
+    None,
+    /// Unknown variant for forward compatibility
+    #[serde(other)]
+    Unknown,
+}
+
 /// Generation configuration for model behavior
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
@@ -55,6 +75,22 @@ pub struct GenerationConfig {
     /// Thinking level for chain-of-thought reasoning
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thinking_level: Option<ThinkingLevel>,
+    /// Seed for deterministic output generation.
+    ///
+    /// Using the same seed with identical inputs will produce the same output,
+    /// useful for testing and debugging.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed: Option<i64>,
+    /// Stop sequences that halt generation.
+    ///
+    /// When the model generates any of these sequences, generation stops immediately.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stop_sequences: Option<Vec<String>>,
+    /// Controls whether thinking summaries are included in output.
+    ///
+    /// Use with `thinking_level` to control reasoning output.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking_summaries: Option<ThinkingSummaries>,
 }
 
 /// Request body for the Interactions API endpoint
@@ -87,6 +123,13 @@ pub struct CreateInteractionRequest {
     /// JSON schema for structured output
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<serde_json::Value>,
+
+    /// Response MIME type for structured output.
+    ///
+    /// Required when using `response_format` with a JSON schema.
+    /// Typically "application/json".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_mime_type: Option<String>,
 
     /// Model configuration
     #[serde(skip_serializing_if = "Option::is_none")]
