@@ -92,7 +92,7 @@ fn arb_modality_tokens() -> impl Strategy<Value = ModalityTokens> {
             Just("VIDEO".to_string()),
             arb_identifier(), // For forward compatibility with unknown modalities
         ],
-        any::<i32>(),
+        any::<u32>(),
     )
         .prop_map(|(modality, tokens)| ModalityTokens { modality, tokens })
 }
@@ -108,12 +108,12 @@ fn arb_modality_tokens_vec() -> impl Strategy<Value = Option<Vec<ModalityTokens>
 
 fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
     (
-        proptest::option::of(any::<i32>()),
-        proptest::option::of(any::<i32>()),
-        proptest::option::of(any::<i32>()),
-        proptest::option::of(any::<i32>()),
-        proptest::option::of(any::<i32>()),
-        proptest::option::of(any::<i32>()),
+        proptest::option::of(any::<u32>()),
+        proptest::option::of(any::<u32>()),
+        proptest::option::of(any::<u32>()),
+        proptest::option::of(any::<u32>()),
+        proptest::option::of(any::<u32>()),
+        proptest::option::of(any::<u32>()),
         arb_modality_tokens_vec(),
         arb_modality_tokens_vec(),
         arb_modality_tokens_vec(),
