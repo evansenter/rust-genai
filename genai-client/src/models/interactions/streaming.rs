@@ -557,6 +557,36 @@ impl StreamEvent {
     pub const fn is_unknown(&self) -> bool {
         self.chunk.is_unknown()
     }
+
+    /// Returns `true` if the chunk is a terminal event (Complete or Error).
+    #[must_use]
+    pub const fn is_terminal(&self) -> bool {
+        self.chunk.is_terminal()
+    }
+
+    /// Returns the interaction ID from the chunk, if available.
+    #[must_use]
+    pub fn interaction_id(&self) -> Option<&str> {
+        self.chunk.interaction_id()
+    }
+
+    /// Returns the status from the chunk, if available.
+    #[must_use]
+    pub fn status(&self) -> Option<&InteractionStatus> {
+        self.chunk.status()
+    }
+
+    /// Returns the unrecognized chunk type if this is an Unknown variant.
+    #[must_use]
+    pub fn unknown_chunk_type(&self) -> Option<&str> {
+        self.chunk.unknown_chunk_type()
+    }
+
+    /// Returns the preserved JSON data if this is an Unknown variant.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        self.chunk.unknown_data()
+    }
 }
 
 impl Serialize for StreamEvent {

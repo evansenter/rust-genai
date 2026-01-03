@@ -461,6 +461,18 @@ impl AutoFunctionStreamEvent {
     pub const fn is_unknown(&self) -> bool {
         self.chunk.is_unknown()
     }
+
+    /// Returns the unrecognized chunk type if this is an Unknown variant.
+    #[must_use]
+    pub fn unknown_chunk_type(&self) -> Option<&str> {
+        self.chunk.unknown_chunk_type()
+    }
+
+    /// Returns the preserved JSON data if this is an Unknown variant.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        self.chunk.unknown_data()
+    }
 }
 
 impl Serialize for AutoFunctionStreamEvent {
