@@ -664,27 +664,6 @@ pub fn stateful_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
     interaction_builder(client).with_store_enabled()
 }
 
-/// Creates an interaction builder with thinking enabled.
-///
-/// Use this for tests that need model reasoning. Note that thoughts may not
-/// always be visible in the response depending on API behavior.
-///
-/// # Example
-///
-/// ```ignore
-/// let response = thinking_builder(&client)
-///     .with_text("Solve this step by step: 2+2")
-///     .create()
-///     .await?;
-/// if response.has_thoughts() {
-///     println!("Model reasoning: {:?}", response.thoughts());
-/// }
-/// ```
-#[allow(dead_code)]
-pub fn thinking_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
-    interaction_builder(client).with_thinking_level(rust_genai::ThinkingLevel::Medium)
-}
-
 // =============================================================================
 // Semantic Validation Using Structured Output
 // =============================================================================
