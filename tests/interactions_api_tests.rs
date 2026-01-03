@@ -1680,7 +1680,8 @@ async fn test_image_generation() {
 
     // Retry up to 2 times (3 total attempts) because the image generation model
     // sometimes returns text instead of images (see issue #287)
-    let result = retry_on_any_error(2, Duration::from_secs(3), || {
+    type BoxError = Box<dyn std::error::Error + Send + Sync>;
+    let result: Result<(), BoxError> = retry_on_any_error(2, Duration::from_secs(3), || {
         let client = client.clone();
         async move {
             let response = client
@@ -1690,12 +1691,11 @@ async fn test_image_generation() {
                 .with_response_modalities(vec!["IMAGE".to_string()])
                 .with_store_enabled()
                 .create()
-                .await
-                .map_err(|e| format!("API error: {:?}", e))?;
+                .await?;
 
             println!("Status: {:?}", response.status);
             if response.status != InteractionStatus::Completed {
-                return Err(format!("Unexpected status: {:?}", response.status));
+                return Err(format!("Unexpected status: {:?}", response.status).into());
             }
 
             // Check for image content in outputs
@@ -1713,8 +1713,7 @@ async fn test_image_generation() {
                     // Verify base64 can be decoded
                     use base64::Engine;
                     let decoded = base64::engine::general_purpose::STANDARD
-                        .decode(base64_data)
-                        .map_err(|e| format!("Base64 decode error: {:?}", e))?;
+                        .decode(base64_data)?;
                     println!("  Decoded size: {} bytes", decoded.len());
 
                     return Ok(());
@@ -1722,7 +1721,7 @@ async fn test_image_generation() {
             }
 
             // No image found - this is the flaky case we want to retry
-            Err("Response did not contain image data (model returned text instead)".to_string())
+            Err("Response did not contain image data (model returned text instead)".into())
         }
     })
     .await;

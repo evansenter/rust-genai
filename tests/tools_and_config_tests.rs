@@ -1009,7 +1009,8 @@ async fn test_response_modalities_image() {
 
     // Retry up to 2 times (3 total attempts) because the image generation model
     // sometimes returns text instead of images (see issue #287)
-    let result = retry_on_any_error(2, Duration::from_secs(3), || {
+    type BoxError = Box<dyn std::error::Error + Send + Sync>;
+    let result: Result<(), BoxError> = retry_on_any_error(2, Duration::from_secs(3), || {
         let client = client.clone();
         async move {
             let response = client
@@ -1019,8 +1020,7 @@ async fn test_response_modalities_image() {
                 .with_response_modalities(vec!["IMAGE".to_string()])
                 .with_store_enabled()
                 .create()
-                .await
-                .map_err(|e| format!("API error: {:?}", e))?;
+                .await?;
 
             println!("Status: {:?}", response.status);
             println!("Outputs count: {}", response.outputs.len());
@@ -1041,7 +1041,7 @@ async fn test_response_modalities_image() {
                 Ok(())
             } else {
                 // No image found - this is the flaky case we want to retry
-                Err("Response did not contain image data (model returned text instead)".to_string())
+                Err("Response did not contain image data (model returned text instead)".into())
             }
         }
     })
