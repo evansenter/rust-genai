@@ -38,4 +38,4 @@ pub use response::{
     FunctionResultInfo, InteractionResponse, InteractionStatus, ModalityTokens,
     OwnedFunctionCallInfo, UrlContextResultInfo, UsageMetadata,
 };
-pub use streaming::{InteractionStreamEvent, StreamChunk};
+pub use streaming::{InteractionStreamEvent, StreamChunk, StreamEvent};

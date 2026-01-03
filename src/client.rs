@@ -306,9 +306,12 @@ impl Client {
     ///     system_instruction: None,
     /// };
     ///
+    /// let mut last_event_id = None;
     /// let mut stream = client.create_interaction_stream(request);
-    /// while let Some(chunk) = stream.next().await {
-    ///     match chunk? {
+    /// while let Some(result) = stream.next().await {
+    ///     let event = result?;
+    ///     last_event_id = event.event_id.clone();  // Track for resume
+    ///     match event.chunk {
     ///         StreamChunk::Delta(delta) => {
     ///             if let Some(text) = delta.text() {
     ///                 print!("{}", text);
@@ -326,7 +329,7 @@ impl Client {
     pub fn create_interaction_stream(
         &self,
         request: genai_client::CreateInteractionRequest,
-    ) -> futures_util::stream::BoxStream<'_, Result<genai_client::StreamChunk, GenaiError>> {
+    ) -> futures_util::stream::BoxStream<'_, Result<genai_client::StreamEvent, GenaiError>> {
         use futures_util::StreamExt;
 
         log::debug!("Creating streaming interaction");
@@ -337,8 +340,12 @@ impl Client {
 
         stream
             .map(move |result| {
-                result.inspect(|chunk| {
-                    log::debug!("Received stream chunk: {:?}", chunk);
+                result.inspect(|event| {
+                    log::debug!(
+                        "Received stream event: chunk={:?}, event_id={:?}",
+                        event.chunk,
+                        event.event_id
+                    );
                 })
             })
             .boxed()
@@ -371,6 +378,88 @@ impl Client {
         log::debug!("Retrieved interaction: status={:?}", response.status);
 
         Ok(response)
+    }
+
+    /// Retrieves an existing interaction by its ID with streaming.
+    ///
+    /// Returns a stream of events for the interaction. This is useful for:
+    /// - Resuming an interrupted stream using `last_event_id`
+    /// - Streaming a long-running interaction's progress (e.g., deep research)
+    ///
+    /// Each event includes an `event_id` that can be used to resume the stream
+    /// from that point if the connection is interrupted.
+    ///
+    /// # Arguments
+    ///
+    /// * `interaction_id` - The unique identifier of the interaction to stream.
+    /// * `last_event_id` - Optional event ID to resume from. Pass the last received
+    ///   event's `event_id` to continue from where you left off.
+    ///
+    /// # Returns
+    /// A boxed stream that yields `StreamEvent` items.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use rust_genai::{Client, StreamChunk};
+    /// use futures_util::StreamExt;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api_key".to_string()).build()?;
+    /// let interaction_id = "some-interaction-id";
+    ///
+    /// // Resume a stream from a previous event
+    /// let last_event_id = Some("evt_abc123");
+    /// let mut stream = client.get_interaction_stream(interaction_id, last_event_id);
+    ///
+    /// while let Some(result) = stream.next().await {
+    ///     let event = result?;
+    ///     println!("Event ID: {:?}", event.event_id);
+    ///     match event.chunk {
+    ///         StreamChunk::Delta(delta) => {
+    ///             if let Some(text) = delta.text() {
+    ///                 print!("{}", text);
+    ///             }
+    ///         }
+    ///         StreamChunk::Complete(response) => {
+    ///             println!("\nDone! Status: {:?}", response.status);
+    ///         }
+    ///         _ => {}
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_interaction_stream<'a>(
+        &'a self,
+        interaction_id: &'a str,
+        last_event_id: Option<&'a str>,
+    ) -> futures_util::stream::BoxStream<'a, Result<genai_client::StreamEvent, GenaiError>> {
+        use futures_util::StreamExt;
+
+        log::debug!(
+            "Getting interaction stream: ID={}, resume_from={:?}",
+            interaction_id,
+            last_event_id
+        );
+
+        let stream = genai_client::get_interaction_stream(
+            &self.http_client,
+            &self.api_key,
+            interaction_id,
+            last_event_id,
+        );
+
+        stream
+            .map(move |result| {
+                result.inspect(|event| {
+                    log::debug!(
+                        "Received stream event: chunk={:?}, event_id={:?}",
+                        event.chunk,
+                        event.event_id
+                    );
+                })
+            })
+            .boxed()
     }
 
     /// Deletes an interaction by its ID.

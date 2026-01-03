@@ -87,8 +87,8 @@ async fn canary_streaming_interaction() {
 
     while let Some(result) = stream.next().await {
         chunk_count += 1;
-        let chunk = result.expect("Stream chunk should be valid");
-        match chunk {
+        let event = result.expect("Stream event should be valid");
+        match event.chunk {
             rust_genai::StreamChunk::Delta(content) => {
                 if let rust_genai::InteractionContent::Unknown { content_type, .. } = &content
                     && !unknown_types_found.contains(content_type)

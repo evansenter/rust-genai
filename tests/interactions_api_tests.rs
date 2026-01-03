@@ -355,21 +355,24 @@ async fn test_streaming_deltas_are_incremental() {
 
         while let Some(result) = stream.next().await {
             match result {
-                Ok(StreamChunk::Delta(delta)) => {
-                    delta_count += 1;
-                    if let Some(text) = delta.text() {
-                        println!("Delta #{}: {:?} (len={})", delta_count, text, text.len());
-                        delta_texts.push(text.to_string());
+                Ok(event) => match event.chunk {
+                    StreamChunk::Delta(delta) => {
+                        delta_count += 1;
+                        if let Some(text) = delta.text() {
+                            println!("Delta #{}: {:?} (len={})", delta_count, text, text.len());
+                            delta_texts.push(text.to_string());
+                        }
                     }
-                }
-                Ok(StreamChunk::Complete(response)) => {
-                    println!("\n--- Complete ---");
-                    println!("Interaction ID: {:?}", response.id);
-                    if let Some(final_text) = response.text() {
-                        println!("Final text length: {}", final_text.len());
+                    StreamChunk::Complete(response) => {
+                        println!("\n--- Complete ---");
+                        println!("Interaction ID: {:?}", response.id);
+                        if let Some(final_text) = response.text() {
+                            println!("Final text length: {}", final_text.len());
+                        }
                     }
-                }
-                _ => {}
+                    _ => {}
+                },
+                Err(_) => break,
             }
         }
 

@@ -115,9 +115,9 @@ async fn test_google_search_streaming() {
 
     while let Some(result) = stream.next().await {
         match result {
-            Ok(chunk) => {
+            Ok(event) => {
                 chunk_count += 1;
-                match chunk {
+                match event.chunk {
                     StreamChunk::Delta(content) => {
                         println!("Delta chunk {}: {:?}", chunk_count, content);
                     }
@@ -393,9 +393,9 @@ async fn test_code_execution_streaming() {
 
     while let Some(result) = stream.next().await {
         match result {
-            Ok(chunk) => {
+            Ok(event) => {
                 chunk_count += 1;
-                match chunk {
+                match event.chunk {
                     StreamChunk::Delta(content) => {
                         println!("Delta chunk {}: {:?}", chunk_count, content);
                         // Track code execution content in deltas.
@@ -554,9 +554,9 @@ async fn test_url_context_streaming() {
 
     while let Some(result) = stream.next().await {
         match result {
-            Ok(chunk) => {
+            Ok(event) => {
                 chunk_count += 1;
-                match chunk {
+                match event.chunk {
                     StreamChunk::Delta(content) => {
                         println!("Delta chunk {}: {:?}", chunk_count, content);
                     }
@@ -944,9 +944,9 @@ async fn test_structured_output_streaming() {
 
     while let Some(result) = stream.next().await {
         match result {
-            Ok(chunk) => {
+            Ok(event) => {
                 chunk_count += 1;
-                match chunk {
+                match event.chunk {
                     StreamChunk::Delta(content) => {
                         if let Some(text) = content.text() {
                             collected_text.push_str(text);

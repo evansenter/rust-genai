@@ -8,6 +8,7 @@
 //! - Stream content in real-time with functions executing between streaming rounds
 //! - Track function execution events during streaming
 //! - Handle multiple function calling rounds
+//! - Access event_id for potential stream resumption
 //!
 //! # Running
 //!
@@ -99,6 +100,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Response (streaming with auto function execution):\n");
 
     // Use create_stream_with_auto_functions - combines streaming with auto function calling
+    // Returns AutoFunctionStreamEvent which wraps chunk + event_id for resume support
     let mut stream = client
         .interaction()
         .with_model("gemini-3-flash-preview")
@@ -108,70 +110,79 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut function_count = 0;
     let mut delta_count = 0;
+    let mut last_event_id: Option<String> = None;
 
     while let Some(result) = stream.next().await {
         match result {
-            Ok(chunk) => match chunk {
-                AutoFunctionStreamChunk::Delta(content) => {
-                    delta_count += 1;
-                    // Print text content as it arrives
-                    if let Some(t) = content.text() {
-                        print!("{}", t);
-                        stdout().flush()?;
-                    }
-                    // Show thoughts if present
-                    if let Some(t) = content.thought() {
-                        print!("\n[Thinking: {}...]", &t[..t.len().min(50)]);
-                        stdout().flush()?;
-                    }
+            Ok(event) => {
+                // Track event_id for potential resume (only API events have event_id,
+                // client-generated events like ExecutingFunctions have None)
+                if event.event_id.is_some() {
+                    last_event_id = event.event_id.clone();
                 }
-                AutoFunctionStreamChunk::ExecutingFunctions(response) => {
-                    // Notification that functions are about to execute
-                    // Note: In streaming mode, function calls may come via deltas,
-                    // so response.function_calls() may be empty. Check response.status
-                    // to confirm functions are being requested.
-                    println!("\n--- Executing Functions ---");
-                    println!("  Status: {:?}", response.status);
-                    let calls = response.function_calls();
-                    if calls.is_empty() {
-                        println!("  (Function calls received via stream deltas)");
-                    } else {
-                        for call in calls {
-                            function_count += 1;
-                            println!("  [{}] {}({})", function_count, call.name, call.args);
+
+                match &event.chunk {
+                    AutoFunctionStreamChunk::Delta(content) => {
+                        delta_count += 1;
+                        // Print text content as it arrives
+                        if let Some(t) = content.text() {
+                            print!("{}", t);
+                            stdout().flush()?;
+                        }
+                        // Show thoughts if present
+                        if let Some(t) = content.thought() {
+                            print!("\n[Thinking: {}...]", &t[..t.len().min(50)]);
+                            stdout().flush()?;
                         }
                     }
-                    println!("---------------------------");
-                }
-                AutoFunctionStreamChunk::FunctionResults(results) => {
-                    // Function execution completed - includes timing info
-                    println!("--- Function Results ---");
-                    for result in &results {
-                        println!(
-                            "  {} ({:?}) -> {}",
-                            result.name, result.duration, result.result
-                        );
+                    AutoFunctionStreamChunk::ExecutingFunctions(response) => {
+                        // Notification that functions are about to execute
+                        // Note: In streaming mode, function calls may come via deltas,
+                        // so response.function_calls() may be empty. Check response.status
+                        // to confirm functions are being requested.
+                        println!("\n--- Executing Functions ---");
+                        println!("  Status: {:?}", response.status);
+                        let calls = response.function_calls();
+                        if calls.is_empty() {
+                            println!("  (Function calls received via stream deltas)");
+                        } else {
+                            for call in calls {
+                                function_count += 1;
+                                println!("  [{}] {}({})", function_count, call.name, call.args);
+                            }
+                        }
+                        println!("---------------------------");
                     }
-                    println!("------------------------\n");
-                    println!("Continuing response...\n");
-                }
-                AutoFunctionStreamChunk::Complete(response) => {
-                    println!("\n\n--- Stream Complete ---");
-                    println!("Interaction ID: {:?}", response.id);
-                    println!("Status: {:?}", response.status);
-                    if let Some(usage) = &response.usage {
-                        println!(
-                            "Tokens: {} input, {} output",
-                            usage.total_input_tokens.unwrap_or(0),
-                            usage.total_output_tokens.unwrap_or(0)
-                        );
+                    AutoFunctionStreamChunk::FunctionResults(results) => {
+                        // Function execution completed - includes timing info
+                        println!("--- Function Results ---");
+                        for result in results {
+                            println!(
+                                "  {} ({:?}) -> {}",
+                                result.name, result.duration, result.result
+                            );
+                        }
+                        println!("------------------------\n");
+                        println!("Continuing response...\n");
+                    }
+                    AutoFunctionStreamChunk::Complete(response) => {
+                        println!("\n\n--- Stream Complete ---");
+                        println!("Interaction ID: {:?}", response.id);
+                        println!("Status: {:?}", response.status);
+                        if let Some(usage) = &response.usage {
+                            println!(
+                                "Tokens: {} input, {} output",
+                                usage.total_input_tokens.unwrap_or(0),
+                                usage.total_output_tokens.unwrap_or(0)
+                            );
+                        }
+                    }
+                    _ => {
+                        // Handle unknown future variants gracefully
+                        println!("[Unknown event type]");
                     }
                 }
-                _ => {
-                    // Handle unknown future variants gracefully
-                    println!("[Unknown event type]");
-                }
-            },
+            }
             Err(e) => {
                 eprintln!("\nStream error: {e}");
                 break;
@@ -182,6 +193,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- Statistics ---");
     println!("Total delta chunks: {}", delta_count);
     println!("Functions executed: {}", function_count);
+    if let Some(event_id) = &last_event_id {
+        println!("Last event_id: {}", event_id);
+    }
 
     // =========================================================================
     // Summary
@@ -191,7 +205,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("--- Key Takeaways ---");
     println!("• create_stream_with_auto_functions() combines streaming + auto-execution");
-    println!("• AutoFunctionStreamChunk::Delta delivers text as it arrives");
+    println!("• AutoFunctionStreamEvent wraps chunk + event_id for resume support");
+    println!("• Delta events from API have event_id, client events (ExecutingFunctions) don't");
     println!("• ExecutingFunctions/FunctionResults show function lifecycle events");
     println!("• Functions execute between streaming rounds, then response continues\n");
 
