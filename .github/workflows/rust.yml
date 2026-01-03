@@ -212,6 +212,7 @@ jobs:
 
             echo "::group::Running $example"
             # Run with 60s timeout to catch hangs
+            # Most examples complete in <30s; 60s provides margin for API latency variations
             if timeout 60s cargo run --example "$example" 2>&1; then
               echo "| $example | ✅ |" >> $GITHUB_STEP_SUMMARY
               echo "✅ $example passed"
