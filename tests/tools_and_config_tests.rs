@@ -18,7 +18,7 @@
 
 mod common;
 
-use common::{get_client, interaction_builder, stateful_builder};
+use common::{get_client, interaction_builder, retry_on_any_error, stateful_builder};
 use rust_genai::{
     FunctionCallingMode, FunctionDeclaration, GenerationConfig, InteractionStatus, ThinkingLevel,
     ThinkingSummaries, Tool,
@@ -993,29 +993,35 @@ async fn test_structured_output_streaming() {
 // Response Modalities: Image Generation
 // =============================================================================
 
+/// Test image generation using response modalities.
+///
+/// Note: Uses retry logic because the image generation model sometimes returns
+/// text instead of images. See issue #287 for details.
 #[tokio::test]
-#[ignore = "Flaky: API intermittently returns text instead of image - see #287"]
+#[ignore = "Requires API key"]
 async fn test_response_modalities_image() {
-    // Test image generation using response modalities
-    // Note: This requires the gemini-3-pro-image-preview model
-    // Note: Skipped from CI due to flakiness - the image generation model sometimes
-    // returns text content instead of images. See issue #287 for retry logic.
+    use std::time::Duration;
+
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
     };
 
-    let result = client
-        .interaction()
-        .with_model("gemini-3-pro-image-preview")
-        .with_text("Generate a simple image of a red circle on a white background.")
-        .with_response_modalities(vec!["IMAGE".to_string()])
-        .with_store_enabled()
-        .create()
-        .await;
+    // Retry up to 2 times (3 total attempts) because the image generation model
+    // sometimes returns text instead of images (see issue #287)
+    let result = retry_on_any_error(2, Duration::from_secs(3), || {
+        let client = client.clone();
+        async move {
+            let response = client
+                .interaction()
+                .with_model("gemini-3-pro-image-preview")
+                .with_text("Generate a simple image of a red circle on a white background.")
+                .with_response_modalities(vec!["IMAGE".to_string()])
+                .with_store_enabled()
+                .create()
+                .await
+                .map_err(|e| format!("API error: {:?}", e))?;
 
-    match result {
-        Ok(response) => {
             println!("Status: {:?}", response.status);
             println!("Outputs count: {}", response.outputs.len());
 
@@ -1030,27 +1036,22 @@ async fn test_response_modalities_image() {
                 .iter()
                 .any(|o| matches!(o, rust_genai::InteractionContent::Image { .. }));
 
-            println!("Has image output: {}", has_image);
-
-            // Note: This test is flaky because the API intermittently returns text
-            // instead of images. We log rather than assert to avoid CI failures.
-            // See issue #287 for proper retry logic implementation.
-            if !has_image {
-                println!(
-                    "Warning: API returned text instead of image (known flaky behavior - see #287)"
-                );
+            if has_image {
+                println!("Has image output: true");
+                Ok(())
+            } else {
+                // No image found - this is the flaky case we want to retry
+                Err("Response did not contain image data (model returned text instead)".to_string())
             }
         }
+    })
+    .await;
+
+    match result {
+        Ok(()) => println!("\n✓ Response modalities image test passed"),
         Err(e) => {
-            let error_str = format!("{:?}", e);
-            println!("Image generation error (may be expected): {}", error_str);
-            // Image generation model may not be available
-            if error_str.contains("not found")
-                || error_str.contains("not supported")
-                || error_str.contains("model")
-            {
-                println!("Image generation model not available - skipping test");
-            }
+            println!("Image generation error after retries: {}", e);
+            panic!("Image generation failed after retries: {}", e);
         }
     }
 }

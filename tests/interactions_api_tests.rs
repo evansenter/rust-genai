@@ -33,8 +33,8 @@
 mod common;
 
 use common::{
-    EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_stream, interaction_builder, stateful_builder,
-    validate_response_semantically, with_timeout,
+    EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_stream, interaction_builder, retry_on_any_error,
+    stateful_builder, validate_response_semantically, with_timeout,
 };
 use rust_genai::{
     CallableFunction, Client, CreateInteractionRequest, FunctionDeclaration, GenaiError,
@@ -1657,10 +1657,14 @@ async fn test_deep_research_polling() {
 /// - Image output modality can be requested
 /// - Response contains image data
 /// - Image data can be decoded from base64
+///
+/// Note: Uses retry logic because the image generation model sometimes returns
+/// text instead of images. See issue #287 for details.
 #[tokio::test]
-#[ignore = "Requires API key and image generation access"]
+#[ignore = "Requires API key"]
 async fn test_image_generation() {
     use rust_genai::InteractionContent;
+    use std::time::Duration;
 
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
@@ -1674,22 +1678,27 @@ async fn test_image_generation() {
     println!("Generating image with model: {}", model);
     println!("Prompt: {}\n", prompt);
 
-    let result = client
-        .interaction()
-        .with_model(model)
-        .with_text(prompt)
-        .with_response_modalities(vec!["IMAGE".to_string()])
-        .with_store_enabled()
-        .create()
-        .await;
+    // Retry up to 2 times (3 total attempts) because the image generation model
+    // sometimes returns text instead of images (see issue #287)
+    let result = retry_on_any_error(2, Duration::from_secs(3), || {
+        let client = client.clone();
+        async move {
+            let response = client
+                .interaction()
+                .with_model(model)
+                .with_text(prompt)
+                .with_response_modalities(vec!["IMAGE".to_string()])
+                .with_store_enabled()
+                .create()
+                .await
+                .map_err(|e| format!("API error: {:?}", e))?;
 
-    match result {
-        Ok(response) => {
             println!("Status: {:?}", response.status);
-            assert_eq!(response.status, InteractionStatus::Completed);
+            if response.status != InteractionStatus::Completed {
+                return Err(format!("Unexpected status: {:?}", response.status));
+            }
 
             // Check for image content in outputs
-            let mut found_image = false;
             for output in &response.outputs {
                 if let InteractionContent::Image {
                     data: Some(base64_data),
@@ -1697,26 +1706,34 @@ async fn test_image_generation() {
                     ..
                 } = output
                 {
-                    found_image = true;
                     println!("Found image!");
                     println!("  MIME type: {:?}", mime_type);
                     println!("  Base64 length: {} chars", base64_data.len());
 
                     // Verify base64 can be decoded
                     use base64::Engine;
-                    let decoded = base64::engine::general_purpose::STANDARD.decode(base64_data);
-                    assert!(decoded.is_ok(), "Image data should be valid base64");
-                    println!("  Decoded size: {} bytes", decoded.unwrap().len());
+                    let decoded = base64::engine::general_purpose::STANDARD
+                        .decode(base64_data)
+                        .map_err(|e| format!("Base64 decode error: {:?}", e))?;
+                    println!("  Decoded size: {} bytes", decoded.len());
+
+                    return Ok(());
                 }
             }
 
-            assert!(found_image, "Response should contain image data");
-            println!("\n✓ Image generation test passed");
+            // No image found - this is the flaky case we want to retry
+            Err("Response did not contain image data (model returned text instead)".to_string())
         }
+    })
+    .await;
+
+    match result {
+        Ok(()) => println!("\n✓ Image generation test passed"),
         Err(e) => {
-            // Image generation may not be available in all regions
-            println!("Image generation error: {:?}", e);
+            // After all retries failed
+            println!("Image generation error after retries: {}", e);
             println!("Note: Image generation may not be available in your account/region");
+            panic!("Image generation failed after retries: {}", e);
         }
     }
 }
