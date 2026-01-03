@@ -49,6 +49,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             println!("--- End Response ---");
+
+            // Summary
+            println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            println!("✅ Simple Interaction Demo Complete\n");
+
+            println!("--- Key Takeaways ---");
+            println!("• Client::builder(api_key).build() creates the API client");
+            println!("• client.interaction().with_model().with_text().create() sends a request");
+            println!("• response.text() extracts the model's text output");
+            println!("• with_store_enabled() saves the interaction for potential follow-ups\n");
+
+            println!("--- What You'll See with LOUD_WIRE=1 ---");
+            println!("  [REQ#1] POST with input text + model + store:true");
+            println!("  [RES#1] completed: text response with usage stats\n");
+
+            println!("--- Production Considerations ---");
+            println!("• Handle all GenaiError variants for robust error handling");
+            println!("• Monitor token usage for cost tracking");
+            println!("• Use with_store_enabled() only when follow-up turns are needed");
+            println!("• Consider implementing retry logic for transient API errors");
         }
         Err(e) => {
             match &e {

@@ -294,6 +294,30 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Note: For large videos (>20MB), use the Files API to upload first,");
     println!("then reference by URI. This avoids base64 encoding overhead.\n");
 
-    println!("=== Examples Complete ===");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Video Input Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• add_video_data(base64, mime_type) for inline video content");
+    println!("• add_video_file(path) loads and encodes video automatically");
+    println!("• video_from_file() helper for programmatic content building");
+    println!("• Model analyzes both visual content and audio track\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("  [REQ#1] POST with text + inlineData (video base64 truncated)");
+    println!("  [RES#1] completed: scene description or analysis\n");
+    println!("Multi-turn:");
+    println!("  [REQ#2] POST with text + previousInteractionId");
+    println!("  [RES#2] completed: timestamp-specific questions answered\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Supports MP4, MPEG, MOV, AVI, FLV, WEBM, WMV, 3GP");
+    println!("• Maximum video length: ~1 hour");
+    println!("• For files >20MB, use Files API (upload_file)");
+    println!("• Base64 encoding adds ~33% overhead");
+
     Ok(())
 }

@@ -17,17 +17,23 @@
 //!
 //! The `document_from_file()` function supports these text formats:
 //!
-//! | Extension | MIME Type |
-//! |-----------|-----------|
-//! | `.txt` | `text/plain` |
-//! | `.md` | `text/markdown` |
-//! | `.json` | `application/json` |
-//! | `.csv` | `text/csv` |
-//! | `.html` | `text/html` |
-//! | `.xml` | `application/xml` |
+//! | Extension | MIME Type | Notes |
+//! |-----------|-----------|-------|
+//! | `.txt` | `text/plain` | Best for general text |
+//! | `.md` | `text/markdown` | Markdown formatting preserved |
+//! | `.pdf` | `application/pdf` | Native PDF support |
+//!
+//! For JSON, CSV, HTML, and XML files, use `text/plain` as the MIME type
+//! when using `document_data_content()`. The model can still parse the content.
 
+use base64::Engine;
 use rust_genai::{Client, document_data_content, document_from_file, text_content};
 use std::env;
+
+/// Helper to base64-encode text for document_data_content
+fn encode_text(text: &str) -> String {
+    base64::engine::general_purpose::STANDARD.encode(text.as_bytes())
+}
 
 // Sample JSON data for demonstration
 const SAMPLE_JSON: &str = r#"{
@@ -84,7 +90,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_content(vec![
             text_content("Analyze this JSON data. How many users are there and what roles exist?"),
-            document_data_content(SAMPLE_JSON, "application/json"),
+            // Note: Use text/plain for JSON - API doesn't support application/json as document type
+            document_data_content(encode_text(SAMPLE_JSON), "text/plain"),
         ])
         .create()
         .await?;
@@ -103,7 +110,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_content(vec![
             text_content("Parse this CSV and calculate the average age of all employees."),
-            document_data_content(SAMPLE_CSV, "text/csv"),
+            // Note: Use text/plain for CSV - API doesn't support text/csv as document type
+            document_data_content(encode_text(SAMPLE_CSV), "text/plain"),
         ])
         .create()
         .await?;
@@ -122,7 +130,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_model("gemini-3-flash-preview")
         .with_content(vec![
             text_content("Summarize this markdown document in one sentence."),
-            document_data_content(SAMPLE_MARKDOWN, "text/markdown"),
+            // text/markdown is supported for markdown content
+            document_data_content(encode_text(SAMPLE_MARKDOWN), "text/markdown"),
         ])
         .create()
         .await?;
@@ -185,12 +194,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("         .with_text(\"Summarize this\")");
     println!("         .create().await?;");
     println!();
-    println!("  3. For inline data, use document_data_content():");
-    println!("     document_data_content(json_string, \"application/json\")");
+    println!("  3. For inline data, use document_data_content() with base64:");
+    println!("     let encoded = base64::engine::general_purpose::STANDARD.encode(text);");
+    println!("     document_data_content(&encoded, \"text/plain\")");
     println!();
-    println!("Supported formats: .txt, .md, .json, .csv, .html, .xml");
+    println!("Native document types: .txt, .md, .pdf");
+    println!("For JSON/CSV/HTML/XML: use text/plain as MIME type");
 
-    println!("\n=== END EXAMPLE ===");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Text Document Input Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• document_data_content(base64, mime_type) for inline documents");
+    println!("• document_from_file() auto-loads and encodes files");
+    println!("• add_document_file(path) for fluent builder pattern");
+    println!("• Native types: text/plain, text/markdown, application/pdf\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("  [REQ#1] POST with text + inlineData (JSON content)");
+    println!("  [RES#1] completed: data analysis\n");
+    println!("  [REQ#2] POST with text + inlineData (CSV content)");
+    println!("  [RES#2] completed: calculated results\n");
+    println!("File-based:");
+    println!("  [REQ#3] POST with text + inlineData (file content)");
+    println!("  [RES#3] completed: file analysis\n");
+
+    println!("--- Production Considerations ---");
+    println!("• document_data_content requires base64-encoded input");
+    println!("• Use text/plain for JSON, CSV, HTML, XML content");
+    println!("• Model can still parse structured formats from plain text");
+    println!("• For very large text files, use Files API");
 
     Ok(())
 }

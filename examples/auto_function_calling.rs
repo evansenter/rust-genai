@@ -188,7 +188,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("\n=== END EXAMPLE ===");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Auto Function Calling Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• #[tool] macro auto-registers functions for discovery");
+    println!("• create_with_auto_functions() discovers and executes functions automatically");
+    println!("• with_function() limits available functions to a specific subset");
+    println!("• Manual streaming (create_stream) requires you to handle function calls yourself\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("Example 1: Auto-discovery");
+    println!("  [REQ#1] POST with input + auto-discovered tools");
+    println!("  [RES#1] requires_action: get_weather(Tokyo), get_time(JST)");
+    println!("  [REQ#2] POST with function_results + previousInteractionId (no tools)");
+    println!("  [RES#2] completed: text response\n");
+    println!("Example 2: Limited functions");
+    println!("  [REQ#3] POST with input + weather tool only");
+    println!("  [RES#3] requires_action: get_weather(Paris)");
+    println!("  [REQ#4] POST with function_result + previousInteractionId (no tools)");
+    println!("  [RES#4] completed: text response\n");
+    println!("Example 3: Manual streaming");
+    println!("  [REQ#5] POST streaming with input + time tool");
+    println!("  [RES#5] SSE stream: text deltas (no function call for weather-only query)\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Use #[tool] for stateless functions, ToolService for stateful ones");
+    println!("• Limit available functions to reduce model confusion");
+    println!("• Auto-execution handles the loop; manual gives you control over execution");
+    println!("• Function execution times are tracked in result.executions");
 
     Ok(())
 }

@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## External Gemini API Documentation
+
+**Important**: When working on API integration or troubleshooting, consult these authoritative sources:
+
+| Document | URL |
+|----------|-----|
+| Interactions API Reference | https://ai.google.dev/static/api/interactions.md.txt |
+| Interactions API Guide | https://ai.google.dev/static/api/interactions-api.md.txt |
+| Function Calling Guide | https://ai.google.dev/gemini-api/docs/function-calling.md.txt |
+| Thought Signatures | https://ai.google.dev/gemini-api/docs/thought-signatures.md.txt |
+
+These are the canonical references for the Interactions API this library implements.
+
 ## Project Overview
 
 `rust-genai` is a Rust client library for Google's Generative AI (Gemini) API using the **Interactions API** for unified model/agent interactions.

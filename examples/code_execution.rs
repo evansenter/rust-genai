@@ -179,6 +179,31 @@ async fn main() -> Result<(), Box<dyn Error>> {
         println!("Code Output: {output}");
     }
 
-    println!("\n--- End Streaming Response ---");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Code Execution Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• with_code_execution() enables server-side Python execution");
+    println!("• response.code_execution_calls() shows executed code");
+    println!("• response.code_execution_results() shows output/errors");
+    println!("• CodeExecutionOutcome enum: Ok, Failed, DeadlineExceeded\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("Non-streaming:");
+    println!("  [REQ#1] POST with input + codeExecution tool");
+    println!("  [RES#1] completed: text + executableCode + codeExecutionResult\n");
+    println!("Streaming:");
+    println!("  [REQ#2] POST streaming with input + codeExecution tool");
+    println!("  [RES#2] SSE stream: text/code deltas → completed with results\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Code execution has a 30-second timeout (DeadlineExceeded)");
+    println!("• Only Python is supported in the sandboxed environment");
+    println!("• Use successful_code_output() helper for quick result access");
+    println!("• Code execution may not be available in all regions");
+
     Ok(())
 }

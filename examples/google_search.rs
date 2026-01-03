@@ -155,6 +155,31 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("\n--- End Streaming Response ---");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Google Search Grounding Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• with_google_search() enables real-time web search grounding");
+    println!("• response.google_search_metadata() provides source citations");
+    println!("• Grounding chunks include title, domain, and full URI");
+    println!("• Works with both streaming and non-streaming requests\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("Non-streaming:");
+    println!("  [REQ#1] POST with input + googleSearch tool");
+    println!("  [RES#1] completed: text + groundingMetadata with sources\n");
+    println!("Streaming:");
+    println!("  [REQ#2] POST streaming with input + googleSearch tool");
+    println!("  [RES#2] SSE stream: text deltas → completed with groundingMetadata\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Google Search may not be available in all regions/accounts");
+    println!("• Display source citations to users for transparency");
+    println!("• Grounding adds latency - use only when real-time data needed");
+    println!("• Combine with structured output for grounded JSON responses");
+
     Ok(())
 }

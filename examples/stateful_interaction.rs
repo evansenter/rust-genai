@@ -123,5 +123,33 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Interactions can be deleted using client.delete_interaction(id)");
     println!("(Skipped in this example - they will auto-expire based on your API tier)");
 
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Stateful Interaction Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• with_store_enabled() saves interactions server-side for multi-turn conversations");
+    println!("• with_previous_interaction(id) chains turns together for context");
+    println!("• Each turn returns an ID to reference in the next turn");
+    println!("• client.get_interaction(id) retrieves stored interactions\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("  [REQ#1] POST with input + store:true");
+    println!("  [RES#1] completed: text response + interaction ID");
+    println!("  [REQ#2] POST with input + previousInteractionId + store:true");
+    println!("  [RES#2] completed: text response (remembers context)");
+    println!("  [REQ#3] POST with input + previousInteractionId + store:true");
+    println!("  [RES#3] completed: text response (full conversation context)");
+    println!("  [REQ#4] GET interaction by ID");
+    println!("  [RES#4] retrieved: stored interaction with inputs/outputs\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Store only when multi-turn is needed (costs storage)");
+    println!("• Implement conversation cleanup to avoid orphaned interactions");
+    println!("• Handle ID persistence across sessions for resumable conversations");
+    println!("• Consider conversation expiry policies for your API tier");
+
     Ok(())
 }

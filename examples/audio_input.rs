@@ -248,6 +248,30 @@ async fn main() -> Result<(), Box<dyn Error>> {
 "#
     );
 
-    println!("=== Examples Complete ===");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Audio Input Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• add_audio_data(base64, mime_type) for inline audio content");
+    println!("• add_audio_file(path) loads and encodes audio automatically");
+    println!("• audio_from_file() helper for programmatic content building");
+    println!("• Multi-turn conversations remember audio context\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("  [REQ#1] POST with text + inlineData (audio base64 truncated)");
+    println!("  [RES#1] completed: transcription or analysis\n");
+    println!("Multi-turn:");
+    println!("  [REQ#2] POST with text + previousInteractionId");
+    println!("  [RES#2] completed: follow-up using audio context\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Supports WAV, MP3, AIFF, AAC, OGG, FLAC formats");
+    println!("• Maximum audio length: ~9.5 hours");
+    println!("• For files >20MB, use Files API (upload_file)");
+    println!("• MIME type must match actual audio format");
+
     Ok(())
 }

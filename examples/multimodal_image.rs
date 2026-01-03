@@ -107,7 +107,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Assistant: {}", text);
     }
 
-    println!("\n--- End ---");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Multimodal Image Input Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• add_image_data(base64, mime_type) for inline image content");
+    println!("• with_content() accepts mixed text + image vectors");
+    println!("• image_data_content() helper for building content programmatically");
+    println!("• Follow-up questions work with with_previous_interaction()\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("Single image:");
+    println!("  [REQ#1] POST with text + inlineData (base64 truncated in logs)");
+    println!("  [RES#1] completed: text describing the image\n");
+    println!("Multiple images:");
+    println!("  [REQ#2] POST with text + 2x inlineData");
+    println!("  [RES#2] completed: comparison of both images\n");
+    println!("Follow-up:");
+    println!("  [REQ#3] POST with text + previousInteractionId");
+    println!("  [RES#3] completed: answer using image context\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Base64 encoding increases payload size ~33%");
+    println!("• For large/repeated files, use Files API instead (upload_file)");
+    println!("• MIME type must match actual image format");
+    println!("• Model supports PNG, JPEG, GIF, WebP images");
 
     Ok(())
 }

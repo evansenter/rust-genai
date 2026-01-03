@@ -327,13 +327,40 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("\nFinal Response (after {} step chain):", step);
     println!("{}\n", response.text().unwrap_or("(no text)"));
 
-    println!("=== Key Takeaways ===");
-    println!(
-        "1. Parallel calls: Model returns multiple function calls at once for independent operations"
-    );
-    println!("2. Use futures_util::future::join_all() to execute parallel calls concurrently");
-    println!("3. Compositional calls: Model chains functions where output informs next function");
-    println!("4. Function result turns don't need tools resent (model remembers within the chain)");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Parallel and Compositional Function Calling Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• Parallel calls: Model returns multiple function calls at once for independent operations");
+    println!("• Use futures_util::future::join_all() to execute parallel calls concurrently");
+    println!("• Compositional calls: Model chains functions where output informs next function");
+    println!("• Function result turns don't need tools resent (API remembers via previous_interaction_id)\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("Demo 1: Parallel (6 calls at once)");
+    println!("  [REQ#1] POST with input + 4 tools");
+    println!("  [RES#1] requires_action: 6 function_calls (weather + time × 3 cities)");
+    println!("  [REQ#2] POST with 6 function_results + previousInteractionId (no tools)");
+    println!("  [RES#2] completed: text response\n");
+    println!("Demo 2: Compositional (3-step chain)");
+    println!("  [REQ#3] POST with input + 4 tools");
+    println!("  [RES#3] requires_action: get_current_location()");
+    println!("  [REQ#4] function_result + previousInteractionId (no tools)");
+    println!("  [RES#4] requires_action: get_weather(Tokyo)");
+    println!("  [REQ#5] function_result + previousInteractionId (no tools)");
+    println!("  [RES#5] requires_action: get_activities(Tokyo, clear)");
+    println!("  [REQ#6] function_result + previousInteractionId (no tools)");
+    println!("  [RES#6] completed: text response\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Add timeout protection for multi-step chains (see MAX_ITERATIONS)");
+    println!("• Implement retry logic for transient function failures");
+    println!("• Consider rate limiting when executing many parallel calls");
+    println!("• Log function execution times for performance monitoring");
+    println!("• Use structured error responses for better model recovery");
 
     Ok(())
 }

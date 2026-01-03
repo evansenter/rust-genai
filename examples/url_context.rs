@@ -156,6 +156,31 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("\n--- End Streaming Response ---");
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ URL Context Demo Complete\n");
+
+    println!("--- Key Takeaways ---");
+    println!("• with_url_context() enables server-side URL fetching and analysis");
+    println!("• response.url_context_metadata() provides retrieval status per URL");
+    println!("• UrlRetrievalStatus: Success, Error, Unsafe (blocked), Unspecified");
+    println!("• Works with both streaming and non-streaming requests\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("Non-streaming:");
+    println!("  [REQ#1] POST with input + urlContext tool");
+    println!("  [RES#1] completed: text + urlContextMetadata with fetch status\n");
+    println!("Streaming:");
+    println!("  [REQ#2] POST streaming with input + urlContext tool");
+    println!("  [RES#2] SSE stream: text deltas → completed with urlContextMetadata\n");
+
+    println!("--- Production Considerations ---");
+    println!("• URL context may not be available for all models/regions");
+    println!("• Check UrlRetrievalStatus to handle fetch failures gracefully");
+    println!("• Unsafe URLs are blocked for security reasons");
+    println!("• URL content is cached server-side - repeated calls may be faster");
+
     Ok(())
 }
