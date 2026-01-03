@@ -1025,10 +1025,6 @@ async fn test_function_call_complex_args() {
 // =============================================================================
 // Auto Function Calling Tests
 // =============================================================================
-//
-// NOTE: test_auto_function_calling_registered was removed as redundant.
-// It duplicated test_auto_function_calling in interactions_api_tests.rs.
-// See RFC #275 for details.
 
 #[tokio::test]
 #[ignore = "Requires API key"]
