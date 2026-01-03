@@ -5,6 +5,7 @@ A Rust client library for interacting with Google's Generative AI (Gemini) API u
 ## Table of Contents
 
 - [Features](#features)
+- [External Documentation](#external-documentation)
 - [Installation](#installation)
 - [Usage](#usage)
   - [Simple Interaction](#simple-interaction)
@@ -22,7 +23,6 @@ A Rust client library for interacting with Google's Generative AI (Gemini) API u
 - [Logging](#logging)
 - [Troubleshooting](#troubleshooting)
 - [Testing](#testing)
-- [External Documentation](#external-documentation)
 - [License](#license)
 - [Contributing](#contributing)
 
@@ -40,6 +40,17 @@ A Rust client library for interacting with Google's Generative AI (Gemini) API u
 - Async/await support with Tokio
 - Type-safe function argument handling with serde
 - Support for both synchronous and asynchronous functions
+
+## External Documentation
+
+For authoritative Gemini API documentation, consult these sources:
+
+| Document | Description |
+|----------|-------------|
+| [Interactions API Reference](https://ai.google.dev/static/api/interactions.md.txt) | API specification and endpoint details |
+| [Interactions API Guide](https://ai.google.dev/static/api/interactions-api.md.txt) | Usage patterns and best practices |
+| [Function Calling Guide](https://ai.google.dev/gemini-api/docs/function-calling.md.txt) | Function declaration and execution |
+| [Thought Signatures](https://ai.google.dev/gemini-api/docs/thought-signatures.md.txt) | Reasoning and thought content |
 
 ## Installation
 
@@ -69,6 +80,7 @@ Note: `async-trait` and `inventory` are already included as dependencies of `rus
 > - `system_instructions.rs` - Custom system prompts
 > - `stateful_interaction.rs` - Multi-turn conversations
 > - `auto_function_calling.rs` - Automatic function execution
+> - `parallel_and_compositional_functions.rs` - Parallel and chained function execution
 > - `structured_output.rs` - JSON schema enforcement
 > - `google_search.rs` - Web search grounding
 > - `code_execution.rs` - Python code execution
@@ -1009,17 +1021,6 @@ assert!(text.contains("umbrella") || text.contains("rain"));  // Still brittle
 ```
 
 For more details, see the "Test Assertion Strategies" section in [CLAUDE.md](CLAUDE.md).
-
-## External Documentation
-
-For authoritative Gemini API documentation, consult these sources:
-
-| Document | Description |
-|----------|-------------|
-| [Interactions API Reference](https://ai.google.dev/static/api/interactions.md.txt) | API specification and endpoint details |
-| [Interactions API Guide](https://ai.google.dev/static/api/interactions-api.md.txt) | Usage patterns and best practices |
-| [Function Calling Guide](https://ai.google.dev/gemini-api/docs/function-calling.md.txt) | Function declaration and execution |
-| [Thought Signatures](https://ai.google.dev/gemini-api/docs/thought-signatures.md.txt) | Reasoning and thought content |
 
 ## Contributing
 

@@ -64,6 +64,7 @@ cargo run --example stateful_interaction
 **Function Calling:**
 ```bash
 cargo run --example auto_function_calling
+cargo run --example parallel_and_compositional_functions
 cargo run --example streaming_auto_functions
 cargo run --example manual_function_calling
 cargo run --example tool_service
