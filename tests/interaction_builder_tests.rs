@@ -141,6 +141,7 @@ fn test_interaction_builder_with_complex_generation_config() {
         top_p: Some(1.0),              // Max value
         top_k: Some(40),
         thinking_level: None,
+        ..Default::default()
     };
 
     let _builder = client
@@ -202,6 +203,7 @@ fn test_interaction_builder_with_all_features_combined() {
         top_p: Some(0.95),
         top_k: Some(40),
         thinking_level: Some(ThinkingLevel::Low),
+        ..Default::default()
     };
 
     let _builder = client
@@ -924,6 +926,7 @@ fn test_add_methods_combine_with_all_builder_features() {
         top_p: None,
         top_k: None,
         thinking_level: None,
+        ..Default::default()
     };
 
     let builder = client

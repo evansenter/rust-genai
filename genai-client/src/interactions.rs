@@ -345,6 +345,7 @@ mod tests {
             tools: None,
             response_modalities: None,
             response_format: None,
+            response_mime_type: None,
             generation_config: None,
             stream: None,
             background: None,

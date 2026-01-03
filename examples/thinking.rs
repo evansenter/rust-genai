@@ -23,7 +23,7 @@
 //! Higher levels produce more detailed reasoning but consume more tokens.
 
 use futures_util::StreamExt;
-use rust_genai::{Client, StreamChunk, ThinkingLevel};
+use rust_genai::{Client, StreamChunk, ThinkingLevel, ThinkingSummaries};
 use std::env;
 use std::io::{Write, stdout};
 
@@ -92,9 +92,52 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // ==========================================================================
-    // Example 2: Comparing Different Thinking Levels
+    // Example 2: Thinking Summaries
     // ==========================================================================
-    println!("--- Example 2: Comparing Thinking Levels ---\n");
+    println!("\n--- Example 2: Thinking Summaries ---\n");
+
+    let summary_prompt = "Explain the process of photosynthesis step by step.";
+    println!("Prompt: {}\n", summary_prompt);
+
+    let response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text(summary_prompt)
+        .with_thinking_level(ThinkingLevel::Medium)
+        .with_thinking_summaries(ThinkingSummaries::Auto)
+        .with_store_enabled()
+        .create()
+        .await?;
+
+    // ThinkingSummaries::Auto provides summarized reasoning in outputs
+    if response.has_thoughts() {
+        let thought_count = response.thoughts().count();
+        println!(
+            "Received {} thought block(s) with summaries enabled",
+            thought_count
+        );
+    }
+
+    if let Some(text) = response.text() {
+        let preview = if text.len() > 200 {
+            format!("{}...", &text[..200])
+        } else {
+            text.to_string()
+        };
+        println!("Answer: {}\n", preview);
+    }
+
+    // Show reasoning tokens
+    if let Some(usage) = &response.usage {
+        if let Some(reasoning) = usage.total_reasoning_tokens {
+            println!("Reasoning tokens: {}", reasoning);
+        }
+    }
+
+    // ==========================================================================
+    // Example 3: Comparing Different Thinking Levels
+    // ==========================================================================
+    println!("\n--- Example 3: Comparing Thinking Levels ---\n");
 
     let complex_prompt = "What is the probability of getting exactly 3 heads \
                           when flipping a fair coin 5 times?";
@@ -153,9 +196,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // ==========================================================================
-    // Example 3: Streaming with Thinking
+    // Example 4: Streaming with Thinking
     // ==========================================================================
-    println!("--- Example 3: Streaming Thoughts ---\n");
+    println!("--- Example 4: Streaming Thoughts ---\n");
 
     let stream_prompt = "Explain why the sky is blue, showing your reasoning.";
     println!("Prompt: {}\n", stream_prompt);
@@ -232,6 +275,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- Key Takeaways ---");
     println!("• with_thinking_level() exposes model's chain-of-thought reasoning");
     println!("• Levels: minimal, low, medium (default), high (extensive reasoning)");
+    println!("• with_thinking_summaries(Auto) provides summarized reasoning in output");
     println!("• response.thoughts() iterates over reasoning blocks");
     println!("• Higher levels use more tokens but improve complex problem solving\n");
 

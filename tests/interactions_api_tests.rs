@@ -432,6 +432,7 @@ async fn test_streaming_with_raw_request() {
             tools: None,
             response_modalities: None,
             response_format: None,
+            response_mime_type: None,
             generation_config: None,
             stream: Some(true),
             background: None,
@@ -897,6 +898,7 @@ async fn test_generation_config_temperature() {
         top_p: None,
         top_k: None,
         thinking_level: None,
+        ..Default::default()
     };
 
     let response = interaction_builder(&client)
@@ -936,6 +938,7 @@ async fn test_generation_config_max_tokens() {
         top_p: None,
         top_k: None,
         thinking_level: None,
+        ..Default::default()
     };
 
     let response = interaction_builder(&client)

@@ -120,6 +120,7 @@ fn test_interaction_builder_with_generation_config() {
         top_p: Some(0.9),
         top_k: Some(40),
         thinking_level: Some(ThinkingLevel::Medium),
+        ..Default::default()
     };
 
     let builder = client

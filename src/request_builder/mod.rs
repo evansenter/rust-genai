@@ -14,7 +14,8 @@ use std::time::Duration;
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
     self, CreateInteractionRequest, FunctionDeclaration, GenerationConfig, InteractionContent,
-    InteractionInput, InteractionResponse, StreamChunk, ThinkingLevel, Tool as InternalTool,
+    InteractionInput, InteractionResponse, StreamChunk, ThinkingLevel, ThinkingSummaries,
+    Tool as InternalTool,
 };
 
 // ============================================================================
@@ -157,6 +158,7 @@ pub struct InteractionBuilder<'a, State = FirstTurn> {
     tools: Option<Vec<InternalTool>>,
     response_modalities: Option<Vec<String>>,
     response_format: Option<serde_json::Value>,
+    response_mime_type: Option<String>,
     generation_config: Option<GenerationConfig>,
     background: Option<bool>,
     store: Option<bool>,
@@ -181,6 +183,7 @@ impl<State> std::fmt::Debug for InteractionBuilder<'_, State> {
             .field("tools", &self.tools)
             .field("response_modalities", &self.response_modalities)
             .field("response_format", &self.response_format)
+            .field("response_mime_type", &self.response_mime_type)
             .field("generation_config", &self.generation_config)
             .field("background", &self.background)
             .field("store", &self.store)
@@ -208,6 +211,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             tools: None,
             response_modalities: None,
             response_format: None,
+            response_mime_type: None,
             generation_config: None,
             background: None,
             store: None,
@@ -242,6 +246,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             tools: self.tools,
             response_modalities: self.response_modalities,
             response_format: self.response_format,
+            response_mime_type: self.response_mime_type,
             generation_config: self.generation_config,
             background: self.background,
             store: self.store,
@@ -286,6 +291,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             tools: self.tools,
             response_modalities: self.response_modalities,
             response_format: self.response_format,
+            response_mime_type: self.response_mime_type,
             generation_config: self.generation_config,
             background: None, // Reset - can't be true with store disabled
             store: Some(false),
@@ -1185,6 +1191,139 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         self
     }
 
+    /// Controls whether thinking summaries are included in output.
+    ///
+    /// When using `with_thinking_level()`, summaries of the model's reasoning
+    /// process can be included alongside thought signatures. Use `Auto` to
+    /// include summaries, or `None` to exclude them.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use rust_genai::{Client, ThinkingLevel, ThinkingSummaries};
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api-key".to_string()).build()?;
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Solve this step by step: 15 * 23")
+    ///     .with_thinking_level(ThinkingLevel::Medium)
+    ///     .with_thinking_summaries(ThinkingSummaries::Auto)
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_thinking_summaries(mut self, summaries: ThinkingSummaries) -> Self {
+        let config = self
+            .generation_config
+            .get_or_insert_with(GenerationConfig::default);
+        config.thinking_summaries = Some(summaries);
+        self
+    }
+
+    /// Sets a seed for deterministic output generation.
+    ///
+    /// Using the same seed with identical inputs will produce the same output,
+    /// useful for testing and debugging. The exact same seed, model, and input
+    /// should produce reproducible results.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api-key".to_string()).build()?;
+    ///
+    /// // Two requests with the same seed should produce the same output
+    /// let response1 = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Generate a random number")
+    ///     .with_seed(42)
+    ///     .create()
+    ///     .await?;
+    ///
+    /// let response2 = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Generate a random number")
+    ///     .with_seed(42)
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // response1.text() should equal response2.text()
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_seed(mut self, seed: i64) -> Self {
+        let config = self
+            .generation_config
+            .get_or_insert_with(GenerationConfig::default);
+        config.seed = Some(seed);
+        self
+    }
+
+    /// Sets stop sequences that halt generation.
+    ///
+    /// When the model generates any of these sequences, generation stops
+    /// immediately. Useful for controlling output boundaries in chat applications
+    /// or structured generation.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api-key".to_string()).build()?;
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Write a story")
+    ///     .with_stop_sequences(vec!["THE END".to_string(), "---".to_string()])
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_stop_sequences(mut self, sequences: Vec<String>) -> Self {
+        let config = self
+            .generation_config
+            .get_or_insert_with(GenerationConfig::default);
+        config.stop_sequences = Some(sequences);
+        self
+    }
+
+    /// Sets the response MIME type for structured output.
+    ///
+    /// Required when using `with_response_format()` with a JSON schema.
+    /// Typically "application/json" for structured JSON output.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use rust_genai::Client;
+    /// # use serde_json::json;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api-key".to_string()).build()?;
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Generate user data")
+    ///     .with_response_mime_type("application/json")
+    ///     .with_response_format(json!({
+    ///         "type": "object",
+    ///         "properties": {
+    ///             "name": {"type": "string"},
+    ///             "age": {"type": "integer"}
+    ///         }
+    ///     }))
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_response_mime_type(mut self, mime_type: impl Into<String>) -> Self {
+        self.response_mime_type = Some(mime_type.into());
+        self
+    }
+
     /// Explicitly enables storage for this interaction.
     ///
     /// Storage is enabled by default, so this method is typically only needed
@@ -1455,6 +1594,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
             tools: self.tools,
             response_modalities: self.response_modalities,
             response_format: self.response_format,
+            response_mime_type: self.response_mime_type,
             generation_config: self.generation_config,
             stream: None, // Set by create() vs create_stream()
             background: self.background,

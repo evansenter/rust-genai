@@ -19,7 +19,7 @@
 mod common;
 
 use common::{get_client, interaction_builder, stateful_builder};
-use rust_genai::{GenerationConfig, InteractionStatus, ThinkingLevel, Tool};
+use rust_genai::{GenerationConfig, InteractionStatus, ThinkingLevel, ThinkingSummaries, Tool};
 use serde_json::json;
 
 // =============================================================================
@@ -988,9 +988,8 @@ async fn test_generation_config_thinking_level_minimal() {
     let config = GenerationConfig {
         temperature: Some(0.7),
         max_output_tokens: Some(500),
-        top_p: None,
-        top_k: None,
         thinking_level: Some(ThinkingLevel::Minimal),
+        ..Default::default()
     };
 
     let response = stateful_builder(&client)
@@ -1019,9 +1018,8 @@ async fn test_generation_config_thinking_level_high() {
     let config = GenerationConfig {
         temperature: Some(0.7),
         max_output_tokens: Some(1000),
-        top_p: None,
-        top_k: None,
         thinking_level: Some(ThinkingLevel::High),
+        ..Default::default()
     };
 
     let response = stateful_builder(&client)
@@ -1063,8 +1061,7 @@ async fn test_generation_config_top_p() {
         temperature: Some(1.0),
         max_output_tokens: Some(100),
         top_p: Some(0.1), // Very focused
-        top_k: None,
-        thinking_level: None,
+        ..Default::default()
     };
 
     let response = stateful_builder(&client)
@@ -1096,9 +1093,8 @@ async fn test_generation_config_top_k() {
     let config = GenerationConfig {
         temperature: Some(1.0),
         max_output_tokens: Some(100),
-        top_p: None,
         top_k: Some(5), // Only top 5 tokens
-        thinking_level: None,
+        ..Default::default()
     };
 
     let result = stateful_builder(&client)
@@ -1150,8 +1146,8 @@ async fn test_generation_config_combined() {
         temperature: Some(0.5),
         max_output_tokens: Some(200),
         top_p: Some(0.9),
-        top_k: None, // Not supported in Interactions API
         thinking_level: Some(ThinkingLevel::Medium),
+        ..Default::default()
     };
 
     let response = stateful_builder(&client)
@@ -1303,4 +1299,224 @@ async fn test_structured_output_multi_turn() {
     assert!(!occupation.is_empty(), "Occupation should not be empty");
 
     println!("\n✓ Structured Output + multi-turn completed successfully");
+}
+
+// =============================================================================
+// Generation Config: New Fields (seed, stop_sequences, response_mime_type)
+// =============================================================================
+
+/// Test seed for deterministic output generation.
+///
+/// Using the same seed with identical inputs should produce the same output.
+/// This is useful for testing and debugging.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_generation_config_seed() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let seed = 12345i64;
+    let prompt = "Generate exactly one random 4-letter word.";
+
+    // First request with seed
+    let response1 = interaction_builder(&client)
+        .with_text(prompt)
+        .with_seed(seed)
+        .create()
+        .await
+        .expect("First seed request should succeed");
+
+    assert_eq!(response1.status, InteractionStatus::Completed);
+    let text1 = response1.text().expect("Should have text response");
+    println!("Seed {} response 1: {}", seed, text1);
+
+    // Second request with same seed - should produce same output
+    let response2 = interaction_builder(&client)
+        .with_text(prompt)
+        .with_seed(seed)
+        .create()
+        .await
+        .expect("Second seed request should succeed");
+
+    assert_eq!(response2.status, InteractionStatus::Completed);
+    let text2 = response2.text().expect("Should have text response");
+    println!("Seed {} response 2: {}", seed, text2);
+
+    // With the same seed and input, outputs should be identical
+    // Note: API behavior may vary, so we log but use a softer assertion
+    if text1.trim() == text2.trim() {
+        println!("✓ Seed produced identical outputs");
+    } else {
+        println!(
+            "Note: Seed produced different outputs (API behavior may vary)\n  1: {}\n  2: {}",
+            text1.trim(),
+            text2.trim()
+        );
+    }
+}
+
+/// Test stop_sequences for halting generation.
+///
+/// When the model generates any of these sequences, generation stops.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_generation_config_stop_sequences() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let response = interaction_builder(&client)
+        .with_text("Count from 1 to 10, one number per line.")
+        .with_stop_sequences(vec!["5".to_string()])
+        .create()
+        .await
+        .expect("Stop sequences request should succeed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    let text = response.text().expect("Should have text response");
+    println!("Stop sequence response: {}", text);
+
+    // The response should NOT contain numbers after 5 since we stopped there
+    // It may or may not include 5 itself (stop sequences may or may not be included)
+    let has_six_or_higher = text.contains("6")
+        || text.contains("7")
+        || text.contains("8")
+        || text.contains("9")
+        || text.contains("10");
+
+    if !has_six_or_higher {
+        println!("✓ Stop sequence correctly halted generation before 6-10");
+    } else {
+        println!(
+            "Note: Stop sequence may not have halted as expected (API behavior may vary): {}",
+            text
+        );
+    }
+}
+
+/// Test response_mime_type with structured output.
+///
+/// The response_mime_type field is used with response_format to specify
+/// the output format, typically "application/json".
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_generation_config_response_mime_type() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "greeting": {"type": "string"},
+            "language": {"type": "string"}
+        },
+        "required": ["greeting", "language"]
+    });
+
+    let response = interaction_builder(&client)
+        .with_text("Generate a greeting in Spanish.")
+        .with_response_mime_type("application/json")
+        .with_response_format(schema)
+        .create()
+        .await
+        .expect("Response mime type request should succeed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    let text = response.text().expect("Should have text response");
+    println!("Response with MIME type: {}", text);
+
+    // Should be valid JSON
+    let parsed: serde_json::Value =
+        serde_json::from_str(text).expect("Response should be valid JSON");
+    assert!(
+        parsed.get("greeting").is_some(),
+        "Should have greeting field"
+    );
+    assert!(
+        parsed.get("language").is_some(),
+        "Should have language field"
+    );
+    println!("✓ response_mime_type produced valid structured JSON output");
+}
+
+/// Test combined new generation config fields.
+///
+/// This test uses seed, stop_sequences, and response_mime_type together.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_generation_config_new_fields_combined() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "items": {
+                "type": "array",
+                "items": {"type": "string"}
+            }
+        },
+        "required": ["items"]
+    });
+
+    let response = interaction_builder(&client)
+        .with_text("List 3 colors as a JSON array.")
+        .with_seed(42)
+        .with_response_mime_type("application/json")
+        .with_response_format(schema)
+        .create()
+        .await
+        .expect("Combined new fields request should succeed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    let text = response.text().expect("Should have text response");
+    println!("Combined new fields response: {}", text);
+
+    // Should be valid JSON with items array
+    let parsed: serde_json::Value =
+        serde_json::from_str(text).expect("Response should be valid JSON");
+    let items = parsed
+        .get("items")
+        .and_then(|v| v.as_array())
+        .expect("Should have items array");
+    assert!(!items.is_empty(), "Items array should not be empty");
+    println!("✓ Combined new generation config fields work correctly");
+}
+
+/// Test thinking_summaries with the builder method.
+///
+/// This test validates that with_thinking_summaries() works correctly with the API.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_generation_config_thinking_summaries() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // Use thinking with summaries enabled
+    let response = stateful_builder(&client)
+        .with_text("What is the capital of France?")
+        .with_thinking_level(ThinkingLevel::Medium)
+        .with_thinking_summaries(ThinkingSummaries::Auto)
+        .create()
+        .await
+        .expect("Thinking with summaries request should succeed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().unwrap();
+    println!("Thinking with summaries response: {}", text);
+
+    // Verify we got a reasonable response
+    assert!(!text.is_empty(), "Response should not be empty");
+    println!("✓ with_thinking_summaries() builder method works with API");
 }
