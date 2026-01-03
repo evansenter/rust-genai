@@ -77,7 +77,11 @@ impl Endpoint<'_> {
         }
     }
 
-    /// Returns additional query parameters for this endpoint (if any)
+    /// Returns additional query parameters for this endpoint (if any).
+    ///
+    /// Note: `last_event_id` is only included when `stream: true`. Passing
+    /// `last_event_id` with `stream: false` will silently ignore the value,
+    /// since resume is only meaningful for streaming requests.
     fn query_params(&self) -> Option<String> {
         match self {
             Self::GetInteraction {

@@ -200,7 +200,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("• Use buffering strategies for high-frequency deltas");
     println!("• Save event_id to resume streams after network interruptions");
     println!("• StreamChunk::Complete contains the same data as non-streaming response");
-    println!("• Use chunk.interaction_id() to track which interaction events belong to");
+    println!("• Use chunk.interaction_id() to track which interaction events belong to\n");
+
+    println!("--- Resume Pattern ---");
+    println!("  // If connection drops, resume from last_event_id:");
+    println!("  // let resumed_stream = client.get_interaction_stream(");
+    println!("  //     &interaction_id,");
+    println!("  //     Some(&last_event_id),");
+    println!("  // );");
 
     Ok(())
 }
