@@ -1406,6 +1406,7 @@ fn test_interaction_response_complex_roundtrip() {
             total_cached_tokens: Some(50),
             total_reasoning_tokens: Some(30),
             total_tool_use_tokens: Some(20),
+            ..Default::default()
         }),
         tools: Some(vec![crate::Tool::GoogleSearch, crate::Tool::CodeExecution]),
         previous_interaction_id: Some("previous-interaction-abc".to_string()),

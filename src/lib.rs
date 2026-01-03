@@ -60,9 +60,9 @@ pub use genai_client::{
     CodeExecutionCallInfo, CodeExecutionLanguage, CodeExecutionOutcome, CodeExecutionResultInfo,
     ContentSummary, CreateInteractionRequest, FunctionCallInfo, FunctionResultInfo,
     GenerationConfig, GroundingChunk, GroundingMetadata, InteractionContent, InteractionInput,
-    InteractionResponse, InteractionStatus, OwnedFunctionCallInfo, StreamChunk, ThinkingLevel,
-    UrlContextMetadata, UrlContextResultInfo, UrlMetadataEntry, UrlRetrievalStatus, UsageMetadata,
-    WebSource,
+    InteractionResponse, InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, StreamChunk,
+    ThinkingLevel, UrlContextMetadata, UrlContextResultInfo, UrlMetadataEntry, UrlRetrievalStatus,
+    UsageMetadata, WebSource,
 };
 
 // Re-export Files API types for convenient access
