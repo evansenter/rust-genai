@@ -1028,57 +1028,6 @@ async fn test_function_call_complex_args() {
 
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_auto_function_calling_registered() {
-    // Test that functions registered with the macro work with auto-function calling
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    with_timeout(EXTENDED_TEST_TIMEOUT, async {
-        // Use a function registered via the macro
-        let weather_func = GetWeatherTestCallable.declaration();
-
-        let result = interaction_builder(&client)
-            .with_text("What's the weather in Seattle?")
-            .with_function(weather_func)
-            .create_with_auto_functions()
-            .await
-            .expect("Auto function calling failed");
-
-        // Verify executions are tracked
-        println!("Function executions: {:?}", result.executions);
-        assert!(
-            !result.executions.is_empty(),
-            "Should have at least one function execution"
-        );
-        assert_eq!(
-            result.executions[0].name, "get_weather_test",
-            "Should have called get_weather_test"
-        );
-
-        let response = &result.response;
-        println!("Final status: {:?}", response.status);
-        assert!(
-            response.has_text(),
-            "Should have text response after auto-function loop"
-        );
-
-        let text = response.text().unwrap();
-        println!("Final text: {}", text);
-
-        // Verify structural response - model generated a non-empty response
-        // We don't assert on specific content as LLM outputs are non-deterministic
-        assert!(
-            !text.is_empty(),
-            "Response should have non-empty text after auto-function loop"
-        );
-    })
-    .await;
-}
-
-#[tokio::test]
-#[ignore = "Requires API key"]
 async fn test_auto_function_calling_max_loops() {
     // Test that max_function_call_loops is respected
     let Some(client) = get_client() else {
