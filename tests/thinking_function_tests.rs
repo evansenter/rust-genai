@@ -267,18 +267,17 @@ async fn test_thinking_with_function_calling_multi_turn() {
                     iteration, MAX_FUNCTION_ITERATIONS
                 );
 
-                let response =
-                    retry_request!([client, prev_id, get_weather, current_result] => {
-                        stateful_builder(&client)
-                            .with_previous_interaction(&prev_id)
-                            .with_content(vec![current_result])
-                            .with_function(get_weather)
-                            .with_thinking_level(ThinkingLevel::Medium)
-                            .with_store_enabled()
-                            .create()
-                            .await
-                    })
-                    .expect("Turn 3 follow-up failed");
+                let response = retry_request!([client, prev_id, get_weather, current_result] => {
+                    stateful_builder(&client)
+                        .with_previous_interaction(&prev_id)
+                        .with_content(vec![current_result])
+                        .with_function(get_weather)
+                        .with_thinking_level(ThinkingLevel::Medium)
+                        .with_store_enabled()
+                        .create()
+                        .await
+                })
+                .expect("Turn 3 follow-up failed");
 
                 println!("Turn 3 follow-up status: {:?}", response.status);
 
