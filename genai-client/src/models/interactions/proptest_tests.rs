@@ -571,8 +571,7 @@ fn arb_interaction_response() -> impl Strategy<Value = InteractionResponse> {
 fn arb_known_stream_chunk() -> impl Strategy<Value = StreamChunk> {
     prop_oneof![
         // Start variant
-        arb_interaction_response()
-            .prop_map(|interaction| StreamChunk::Start { interaction }),
+        arb_interaction_response().prop_map(|interaction| StreamChunk::Start { interaction }),
         // StatusUpdate variant
         (arb_identifier(), arb_interaction_status()).prop_map(|(interaction_id, status)| {
             StreamChunk::StatusUpdate {
@@ -594,9 +593,8 @@ fn arb_known_stream_chunk() -> impl Strategy<Value = StreamChunk> {
         // Complete variant
         arb_interaction_response().prop_map(StreamChunk::Complete),
         // Error variant
-        (arb_text(), proptest::option::of(arb_identifier())).prop_map(|(message, code)| {
-            StreamChunk::Error { message, code }
-        }),
+        (arb_text(), proptest::option::of(arb_identifier()))
+            .prop_map(|(message, code)| { StreamChunk::Error { message, code } }),
     ]
 }
 
