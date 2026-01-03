@@ -246,6 +246,7 @@ impl Client {
     ///     background: None,
     ///     store: None,
     ///     system_instruction: None,
+    ///     tool_config: None,
     /// };
     ///
     /// let response = client.create_interaction(request).await?;
@@ -304,6 +305,7 @@ impl Client {
     ///     background: None,
     ///     store: None,
     ///     system_instruction: None,
+    ///     tool_config: None,
     /// };
     ///
     /// let mut stream = client.create_interaction_stream(request);

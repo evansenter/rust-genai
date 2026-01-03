@@ -6,7 +6,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
 use super::content::InteractionContent;
-use crate::models::shared::Tool;
+use crate::models::shared::{Tool, ToolConfig};
 
 /// Input for an interaction - can be a simple string or array of content.
 ///
@@ -403,4 +403,11 @@ pub struct CreateInteractionRequest {
     /// System instruction for the model
     #[serde(skip_serializing_if = "Option::is_none")]
     pub system_instruction: Option<InteractionInput>,
+
+    /// Tool configuration for function calling behavior.
+    ///
+    /// Controls how the model uses function calling, including mode
+    /// (`Auto`, `Any`, `None`, `Validated`) and allowed function names.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_config: Option<ToolConfig>,
 }

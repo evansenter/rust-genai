@@ -438,6 +438,7 @@ async fn test_streaming_with_raw_request() {
             background: None,
             store: Some(true),
             system_instruction: None,
+            tool_config: None,
         };
 
         let stream = client.create_interaction_stream(request);
