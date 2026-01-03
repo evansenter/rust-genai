@@ -11,7 +11,7 @@ use super::metadata::{
     WebSource,
 };
 use super::response::{
-    InteractionResponse, InteractionStatus, OwnedFunctionCallInfo, UsageMetadata,
+    InteractionResponse, InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, UsageMetadata,
 };
 use super::streaming::StreamChunk;
 use crate::models::shared::{FunctionParameters, Tool};
@@ -134,6 +134,31 @@ fn arb_code_execution_outcome() -> impl Strategy<Value = CodeExecutionOutcome> {
 }
 
 // =============================================================================
+// ModalityTokens Strategy
+// =============================================================================
+
+/// Strategy for generating a single ModalityTokens value.
+fn arb_modality_tokens() -> impl Strategy<Value = ModalityTokens> {
+    // Use realistic modality names that the API might return
+    (
+        prop_oneof![
+            Just("TEXT".to_string()),
+            Just("IMAGE".to_string()),
+            Just("AUDIO".to_string()),
+            Just("VIDEO".to_string()),
+            arb_identifier(), // For forward compatibility with unknown modalities
+        ],
+        any::<i32>(),
+    )
+        .prop_map(|(modality, tokens)| ModalityTokens { modality, tokens })
+}
+
+/// Strategy for generating an optional Vec of ModalityTokens.
+fn arb_modality_tokens_vec() -> impl Strategy<Value = Option<Vec<ModalityTokens>>> {
+    proptest::option::of(prop::collection::vec(arb_modality_tokens(), 0..4))
+}
+
+// =============================================================================
 // UsageMetadata Strategy
 // =============================================================================
 
@@ -145,6 +170,10 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
         proptest::option::of(any::<i32>()),
         proptest::option::of(any::<i32>()),
         proptest::option::of(any::<i32>()),
+        arb_modality_tokens_vec(),
+        arb_modality_tokens_vec(),
+        arb_modality_tokens_vec(),
+        arb_modality_tokens_vec(),
     )
         .prop_map(
             |(
@@ -154,6 +183,10 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
                 total_cached_tokens,
                 total_reasoning_tokens,
                 total_tool_use_tokens,
+                input_tokens_by_modality,
+                output_tokens_by_modality,
+                cached_tokens_by_modality,
+                tool_use_tokens_by_modality,
             )| {
                 UsageMetadata {
                     total_input_tokens,
@@ -162,7 +195,10 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
                     total_cached_tokens,
                     total_reasoning_tokens,
                     total_tool_use_tokens,
-                    ..Default::default()
+                    input_tokens_by_modality,
+                    output_tokens_by_modality,
+                    cached_tokens_by_modality,
+                    tool_use_tokens_by_modality,
                 }
             },
         )
@@ -503,6 +539,14 @@ fn arb_stream_chunk() -> impl Strategy<Value = StreamChunk> {
 // =============================================================================
 
 proptest! {
+    /// Test that ModalityTokens roundtrips correctly through JSON.
+    #[test]
+    fn modality_tokens_roundtrip(tokens in arb_modality_tokens()) {
+        let json = serde_json::to_string(&tokens).expect("Serialization should succeed");
+        let restored: ModalityTokens = serde_json::from_str(&json).expect("Deserialization should succeed");
+        prop_assert_eq!(tokens, restored);
+    }
+
     /// Test that UsageMetadata roundtrips correctly through JSON.
     #[test]
     fn usage_metadata_roundtrip(usage in arb_usage_metadata()) {
