@@ -13,9 +13,9 @@ use std::time::Duration;
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
-    self, CreateInteractionRequest, FunctionDeclaration, GenerationConfig, InteractionContent,
-    InteractionInput, InteractionResponse, StreamChunk, ThinkingLevel, ThinkingSummaries,
-    Tool as InternalTool,
+    self, CreateInteractionRequest, FunctionCallingMode, FunctionDeclaration, GenerationConfig,
+    InteractionContent, InteractionInput, InteractionResponse, StreamChunk, ThinkingLevel,
+    ThinkingSummaries, Tool as InternalTool,
 };
 
 // ============================================================================
@@ -1288,6 +1288,51 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
             .generation_config
             .get_or_insert_with(GenerationConfig::default);
         config.stop_sequences = Some(sequences);
+        self
+    }
+
+    /// Sets the function calling mode.
+    ///
+    /// Controls how the model uses function calling capabilities.
+    ///
+    /// # Modes
+    ///
+    /// - `Auto` (default): Model decides whether to call functions or respond naturally
+    /// - `Any`: Model must call a function; guarantees schema adherence for calls
+    /// - `None`: Prohibits function calling entirely
+    /// - `Validated` (Preview): Ensures either function calls OR natural language adhere to schema
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use rust_genai::{Client, FunctionCallingMode};
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::builder("api-key".to_string()).build()?;
+    ///
+    /// // Force the model to use a function
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Get weather in Tokyo")
+    ///     .with_function_calling_mode(FunctionCallingMode::Any)
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // Use VALIDATED mode for guaranteed schema adherence
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Get weather in Tokyo")
+    ///     .with_function_calling_mode(FunctionCallingMode::Validated)
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_function_calling_mode(mut self, mode: FunctionCallingMode) -> Self {
+        let config = self
+            .generation_config
+            .get_or_insert_with(GenerationConfig::default);
+        config.tool_choice = Some(mode);
         self
     }
 

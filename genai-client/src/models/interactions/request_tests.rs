@@ -39,6 +39,7 @@ fn test_generation_config_serialization() {
         seed: None,
         stop_sequences: None,
         thinking_summaries: None,
+        tool_choice: None,
     };
 
     let json = serde_json::to_string(&config).expect("Serialization failed");
@@ -60,6 +61,7 @@ fn test_generation_config_new_fields_serialization() {
         seed: Some(42),
         stop_sequences: Some(vec!["END".to_string(), "---".to_string()]),
         thinking_summaries: Some(ThinkingSummaries::Auto),
+        tool_choice: None,
     };
 
     let json = serde_json::to_string(&config).expect("Serialization failed");
@@ -83,6 +85,7 @@ fn test_generation_config_roundtrip() {
         seed: Some(123456789),
         stop_sequences: Some(vec!["STOP".to_string()]),
         thinking_summaries: Some(ThinkingSummaries::None),
+        tool_choice: None,
     };
 
     let json = serde_json::to_string(&config).expect("Serialization failed");
@@ -97,6 +100,7 @@ fn test_generation_config_roundtrip() {
     assert_eq!(deserialized.seed, config.seed);
     assert_eq!(deserialized.stop_sequences, config.stop_sequences);
     assert_eq!(deserialized.thinking_summaries, config.thinking_summaries);
+    assert_eq!(deserialized.tool_choice, config.tool_choice);
 }
 
 #[test]
@@ -245,4 +249,33 @@ fn test_generation_config_partial_fields() {
     assert_eq!(value["stopSequences"][0], "DONE");
     assert!(value.get("temperature").is_none());
     assert!(value.get("thinkingLevel").is_none());
+}
+
+#[test]
+fn test_thinking_level_object_form_deserialization() {
+    // Test that object-form thinking levels are handled (future API compatibility)
+    let json = r#"{"level": "ultra", "budget": 5000}"#;
+    let parsed: ThinkingLevel = serde_json::from_str(json).expect("Deserialization should succeed");
+
+    assert!(parsed.is_unknown());
+    assert_eq!(parsed.unknown_level_type(), Some("ultra"));
+
+    // Verify the full object is preserved
+    let data = parsed.unknown_data().unwrap();
+    assert_eq!(data.get("budget").unwrap(), 5000);
+}
+
+#[test]
+fn test_thinking_summaries_object_form_deserialization() {
+    // Test that object-form thinking summaries are handled (future API compatibility)
+    let json = r#"{"summaries": "detailed", "format": "markdown"}"#;
+    let parsed: ThinkingSummaries =
+        serde_json::from_str(json).expect("Deserialization should succeed");
+
+    assert!(parsed.is_unknown());
+    assert_eq!(parsed.unknown_summaries_type(), Some("detailed"));
+
+    // Verify the full object is preserved
+    let data = parsed.unknown_data().unwrap();
+    assert_eq!(data.get("format").unwrap(), "markdown");
 }

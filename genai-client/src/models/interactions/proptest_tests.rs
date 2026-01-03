@@ -15,7 +15,7 @@ use super::response::{
     InteractionResponse, InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, UsageMetadata,
 };
 use super::streaming::StreamChunk;
-use crate::models::shared::{FunctionParameters, Tool};
+use crate::models::shared::{FunctionCallingMode, FunctionParameters, Tool};
 
 // =============================================================================
 // Strategy Generators for Arbitrary Types
@@ -110,6 +110,39 @@ fn arb_interaction_status() -> impl Strategy<Value = InteractionStatus> {
         arb_identifier().prop_map(|status_type| InteractionStatus::Unknown {
             status_type: status_type.clone(),
             data: serde_json::Value::String(status_type),
+        }),
+    ]
+}
+
+// =============================================================================
+// FunctionCallingMode Strategies
+// =============================================================================
+
+/// Strategy for known FunctionCallingMode variants only.
+/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
+#[cfg(feature = "strict-unknown")]
+fn arb_function_calling_mode() -> impl Strategy<Value = FunctionCallingMode> {
+    prop_oneof![
+        Just(FunctionCallingMode::Auto),
+        Just(FunctionCallingMode::Any),
+        Just(FunctionCallingMode::None),
+        Just(FunctionCallingMode::Validated),
+    ]
+}
+
+/// Strategy for all FunctionCallingMode variants including Unknown.
+/// Used in normal mode (Unknown variants are gracefully handled).
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_function_calling_mode() -> impl Strategy<Value = FunctionCallingMode> {
+    prop_oneof![
+        Just(FunctionCallingMode::Auto),
+        Just(FunctionCallingMode::Any),
+        Just(FunctionCallingMode::None),
+        Just(FunctionCallingMode::Validated),
+        // Unknown variant with preserved data
+        arb_identifier().prop_map(|mode_type| FunctionCallingMode::Unknown {
+            mode_type: mode_type.clone(),
+            data: serde_json::Value::String(mode_type),
         }),
     ]
 }
@@ -668,6 +701,14 @@ proptest! {
         let json = serde_json::to_string(&outcome).expect("Serialization should succeed");
         let restored: CodeExecutionOutcome = serde_json::from_str(&json).expect("Deserialization should succeed");
         prop_assert_eq!(outcome, restored);
+    }
+
+    /// Test that FunctionCallingMode roundtrips correctly through JSON.
+    #[test]
+    fn function_calling_mode_roundtrip(mode in arb_function_calling_mode()) {
+        let json = serde_json::to_string(&mode).expect("Serialization should succeed");
+        let restored: FunctionCallingMode = serde_json::from_str(&json).expect("Deserialization should succeed");
+        prop_assert_eq!(mode, restored);
     }
 
     /// Test that ThinkingLevel roundtrips correctly through JSON.

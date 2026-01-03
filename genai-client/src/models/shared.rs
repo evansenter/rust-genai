@@ -415,13 +415,134 @@ pub struct FunctionCallingConfig {
 ///
 /// This enum is marked `#[non_exhaustive]` for forward compatibility.
 /// New modes may be added in future versions.
-#[derive(Clone, Serialize, Deserialize, Debug)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+///
+/// # Forward Compatibility (Evergreen Philosophy)
+///
+/// When the API returns a mode value that this library doesn't recognize,
+/// it will be captured as `FunctionCallingMode::Unknown` rather than
+/// causing a deserialization error. This follows the
+/// [Evergreen spec](https://github.com/google-deepmind/evergreen-spec)
+/// philosophy of graceful degradation.
+///
+/// # Modes
+///
+/// - `Auto` (default): Model decides whether to call functions or respond naturally
+/// - `Any`: Model must call a function; guarantees schema adherence for calls
+/// - `None`: Prohibits function calling entirely
+/// - `Validated` (Preview): Ensures either function calls OR natural language adhere to schema
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum FunctionCallingMode {
+    /// Model decides whether to call functions or respond with natural language.
     Auto,
+    /// Model must call a function; guarantees schema adherence for calls.
     Any,
+    /// Function calling is disabled.
     None,
+    /// Ensures either function calls OR natural language adhere to schema.
+    ///
+    /// This is a preview mode that provides schema adherence guarantees
+    /// for both function call outputs and natural language responses.
+    Validated,
+    /// Unknown mode (for forward compatibility).
+    ///
+    /// This variant captures any unrecognized mode values from the API,
+    /// allowing the library to handle new modes gracefully.
+    ///
+    /// The `mode_type` field contains the unrecognized mode string,
+    /// and `data` contains the JSON value (typically the same string).
+    Unknown {
+        /// The unrecognized mode string from the API
+        mode_type: String,
+        /// The raw JSON value, preserved for debugging
+        data: serde_json::Value,
+    },
+}
+
+impl FunctionCallingMode {
+    /// Check if this is an unknown mode.
+    #[must_use]
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown { .. })
+    }
+
+    /// Returns the mode type name if this is an unknown mode.
+    ///
+    /// Returns `None` for known modes.
+    #[must_use]
+    pub fn unknown_mode_type(&self) -> Option<&str> {
+        match self {
+            Self::Unknown { mode_type, .. } => Some(mode_type),
+            _ => None,
+        }
+    }
+
+    /// Returns the raw JSON data if this is an unknown mode.
+    ///
+    /// Returns `None` for known modes.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::Unknown { data, .. } => Some(data),
+            _ => None,
+        }
+    }
+}
+
+impl Serialize for FunctionCallingMode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Auto => serializer.serialize_str("AUTO"),
+            Self::Any => serializer.serialize_str("ANY"),
+            Self::None => serializer.serialize_str("NONE"),
+            Self::Validated => serializer.serialize_str("VALIDATED"),
+            Self::Unknown { mode_type, .. } => serializer.serialize_str(mode_type),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for FunctionCallingMode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        match value.as_str() {
+            Some("AUTO") => Ok(Self::Auto),
+            Some("ANY") => Ok(Self::Any),
+            Some("NONE") => Ok(Self::None),
+            Some("VALIDATED") => Ok(Self::Validated),
+            Some(other) => {
+                log::warn!(
+                    "Encountered unknown FunctionCallingMode '{}'. \
+                     This may indicate a new API feature. \
+                     The mode will be preserved in the Unknown variant.",
+                    other
+                );
+                Ok(Self::Unknown {
+                    mode_type: other.to_string(),
+                    data: value,
+                })
+            }
+            Option::None => {
+                // Non-string value - preserve it in Unknown
+                let mode_type = format!("<non-string: {}>", value);
+                log::warn!(
+                    "FunctionCallingMode received non-string value: {}. \
+                     Preserving in Unknown variant.",
+                    value
+                );
+                Ok(Self::Unknown {
+                    mode_type,
+                    data: value,
+                })
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -456,13 +577,70 @@ mod tests {
 
     #[test]
     fn test_function_calling_mode_serialization() {
-        let mode = FunctionCallingMode::Auto;
-        let json = serde_json::to_string(&mode).expect("Serialization failed");
-        assert_eq!(json, "\"AUTO\"");
+        // Test all known modes
+        let test_cases = [
+            (FunctionCallingMode::Auto, "\"AUTO\""),
+            (FunctionCallingMode::Any, "\"ANY\""),
+            (FunctionCallingMode::None, "\"NONE\""),
+            (FunctionCallingMode::Validated, "\"VALIDATED\""),
+        ];
 
+        for (mode, expected_json) in test_cases {
+            let json = serde_json::to_string(&mode).expect("Serialization failed");
+            assert_eq!(json, expected_json);
+
+            let parsed: FunctionCallingMode =
+                serde_json::from_str(&json).expect("Deserialization failed");
+            assert_eq!(parsed, mode);
+        }
+    }
+
+    #[test]
+    fn test_function_calling_mode_unknown_roundtrip() {
+        // Test that unknown modes are preserved
+        let json = "\"FUTURE_MODE\"";
         let parsed: FunctionCallingMode =
-            serde_json::from_str(&json).expect("Deserialization failed");
-        assert!(matches!(parsed, FunctionCallingMode::Auto));
+            serde_json::from_str(json).expect("Deserialization failed");
+
+        assert!(parsed.is_unknown());
+        assert_eq!(parsed.unknown_mode_type(), Some("FUTURE_MODE"));
+
+        // Roundtrip should preserve the mode type
+        let reserialized = serde_json::to_string(&parsed).expect("Serialization failed");
+        assert_eq!(reserialized, json);
+    }
+
+    #[test]
+    fn test_function_calling_mode_helper_methods() {
+        // Known modes should not be unknown
+        assert!(!FunctionCallingMode::Auto.is_unknown());
+        assert!(!FunctionCallingMode::Any.is_unknown());
+        assert!(!FunctionCallingMode::None.is_unknown());
+        assert!(!FunctionCallingMode::Validated.is_unknown());
+
+        assert!(FunctionCallingMode::Auto.unknown_mode_type().is_none());
+        assert!(FunctionCallingMode::Auto.unknown_data().is_none());
+
+        // Unknown mode should report its type
+        let unknown = FunctionCallingMode::Unknown {
+            mode_type: "NEW_MODE".to_string(),
+            data: serde_json::json!("NEW_MODE"),
+        };
+        assert!(unknown.is_unknown());
+        assert_eq!(unknown.unknown_mode_type(), Some("NEW_MODE"));
+        assert!(unknown.unknown_data().is_some());
+    }
+
+    #[test]
+    fn test_function_calling_mode_non_string_value() {
+        // Test that non-string JSON values are handled gracefully
+        let json = "123";
+        let parsed: FunctionCallingMode =
+            serde_json::from_str(json).expect("Deserialization should succeed");
+
+        assert!(parsed.is_unknown());
+        // The mode_type should indicate it was a non-string value
+        assert!(parsed.unknown_mode_type().unwrap().contains("<non-string:"));
     }
 
     #[test]

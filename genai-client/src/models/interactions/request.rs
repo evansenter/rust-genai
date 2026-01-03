@@ -6,7 +6,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
 use super::content::InteractionContent;
-use crate::models::shared::Tool;
+use crate::models::shared::{FunctionCallingMode, Tool};
 
 /// Input for an interaction - can be a simple string or array of content.
 ///
@@ -344,6 +344,15 @@ pub struct GenerationConfig {
     /// Use with `thinking_level` to control reasoning output.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thinking_summaries: Option<ThinkingSummaries>,
+    /// Controls function calling behavior.
+    ///
+    /// This field determines how the model uses declared tools/functions:
+    /// - `Auto` (default): Model decides whether to call functions
+    /// - `Any`: Model must call a function
+    /// - `None`: Function calling is disabled
+    /// - `Validated`: Ensures schema adherence for both function calls and natural language
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<FunctionCallingMode>,
 }
 
 /// Request body for the Interactions API endpoint

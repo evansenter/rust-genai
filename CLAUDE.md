@@ -123,6 +123,22 @@ cargo run --example image_generation
 | `ToolService` | Runtime | Stateful | DB pools, API clients, dynamic config |
 | Manual handling | N/A | Flexible | Custom execution logic, rate limiting |
 
+**Function Calling Modes**:
+| Mode | Behavior | Guarantees |
+|------|----------|------------|
+| Auto (default) | Model decides whether to call functions | None |
+| Any | Model must call a function | Schema adherence for calls |
+| None | Function calling disabled | No function calls |
+| Validated | Either calls OR natural language | Schema adherence for both |
+
+Use `with_function_calling_mode()` to set the mode:
+```rust
+client.interaction()
+    .with_function_calling_mode(FunctionCallingMode::Validated)
+    .with_functions(vec![my_function])
+    // ...
+```
+
 **When You're Blocked - Use ToolService Instead of #[tool]**:
 - **Need database access**: `#[tool]` functions can't access connection pools → Use `ToolService` with `Arc<Pool<...>>`
 - **Need API client**: `#[tool]` functions can't share HTTP clients → Use `ToolService` with `Arc<reqwest::Client>`
@@ -362,6 +378,7 @@ This requires a custom `Deserialize` implementation. See `InteractionContent` in
 - `InteractionStatus` (response.rs): `status_type` field, `unknown_status_type()` helper ✅
 - `StreamChunk` (streaming.rs): `chunk_type` field, `unknown_chunk_type()` helper ✅
 - `AutoFunctionStreamChunk` (streaming.rs): `chunk_type` field, `unknown_chunk_type()` helper ✅
+- `FunctionCallingMode` (shared.rs): `mode_type` field, `unknown_mode_type()` helper ✅
 - `strict-unknown` feature flag: Optional strict mode for development/testing
 
 ## Test Organization

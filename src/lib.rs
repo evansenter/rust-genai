@@ -53,7 +53,9 @@
 //! - [`function_calling`]: Function registration and execution
 
 // Re-export unified function declaration types from genai_client
-pub use genai_client::{FunctionDeclaration, FunctionDeclarationBuilder, FunctionParameters, Tool};
+pub use genai_client::{
+    FunctionCallingMode, FunctionDeclaration, FunctionDeclarationBuilder, FunctionParameters, Tool,
+};
 
 // Re-export Interactions API types for convenient access
 pub use genai_client::{
