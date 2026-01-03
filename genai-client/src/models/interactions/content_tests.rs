@@ -1059,11 +1059,11 @@ fn test_serialize_text_with_annotations() {
     assert_eq!(value["text"], "Hello, world! This is grounded text.");
     assert!(value["annotations"].is_array());
     assert_eq!(value["annotations"].as_array().unwrap().len(), 2);
-    assert_eq!(value["annotations"][0]["startIndex"], 0);
-    assert_eq!(value["annotations"][0]["endIndex"], 5);
+    assert_eq!(value["annotations"][0]["start_index"], 0);
+    assert_eq!(value["annotations"][0]["end_index"], 5);
     assert_eq!(value["annotations"][0]["source"], "https://example.com");
-    assert_eq!(value["annotations"][1]["startIndex"], 10);
-    assert_eq!(value["annotations"][1]["endIndex"], 20);
+    assert_eq!(value["annotations"][1]["start_index"], 10);
+    assert_eq!(value["annotations"][1]["end_index"], 20);
     assert!(value["annotations"][1].get("source").is_none());
 }
 
@@ -1090,8 +1090,8 @@ fn test_deserialize_text_with_annotations() {
         "type": "text",
         "text": "This is grounded text.",
         "annotations": [
-            {"startIndex": 0, "endIndex": 4, "source": "https://example.com"},
-            {"startIndex": 8, "endIndex": 16}
+            {"start_index": 0, "end_index": 4, "source": "https://example.com"},
+            {"start_index": 8, "end_index": 16}
         ]
     }"#;
 

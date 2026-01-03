@@ -58,7 +58,7 @@ use std::fmt;
 /// }
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub struct Annotation {
     /// Start of the segment in the text (byte position, inclusive).
