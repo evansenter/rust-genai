@@ -20,8 +20,8 @@ mod common;
 
 use common::{get_client, interaction_builder, stateful_builder};
 use rust_genai::{
-    FunctionCallingConfig, FunctionCallingMode, FunctionDeclaration, GenerationConfig,
-    InteractionStatus, ThinkingLevel, ThinkingSummaries, Tool, ToolConfig,
+    FunctionCallingMode, FunctionDeclaration, GenerationConfig, InteractionStatus, ThinkingLevel,
+    ThinkingSummaries, Tool,
 };
 use serde_json::json;
 
@@ -1528,91 +1528,57 @@ async fn test_generation_config_thinking_summaries() {
 // Tool Configuration: Function Calling Modes
 // =============================================================================
 
-/// Test with_function_calling_mode() builder method serialization.
+/// Test that FunctionCallingMode serializes correctly in GenerationConfig.
 ///
-/// Validates that the builder correctly serializes tool_config with the
-/// specified function calling mode. Tests each mode variant.
+/// Validates that tool_choice in generation_config serializes correctly
+/// for each function calling mode.
 #[test]
-fn test_tool_config_serialization() {
+fn test_generation_config_tool_choice_serialization() {
     // Test AUTO mode serialization
-    let config = ToolConfig {
-        function_calling_config: Some(FunctionCallingConfig {
-            mode: FunctionCallingMode::Auto,
-            allowed_function_names: None,
-        }),
+    let config = GenerationConfig {
+        tool_choice: Some(FunctionCallingMode::Auto),
+        ..Default::default()
     };
     let json = serde_json::to_value(&config).unwrap();
     assert_eq!(
-        json["function_calling_config"]["mode"],
+        json["toolChoice"],
         serde_json::Value::String("AUTO".to_string())
     );
 
     // Test ANY mode serialization
-    let config = ToolConfig {
-        function_calling_config: Some(FunctionCallingConfig {
-            mode: FunctionCallingMode::Any,
-            allowed_function_names: None,
-        }),
+    let config = GenerationConfig {
+        tool_choice: Some(FunctionCallingMode::Any),
+        ..Default::default()
     };
     let json = serde_json::to_value(&config).unwrap();
     assert_eq!(
-        json["function_calling_config"]["mode"],
+        json["toolChoice"],
         serde_json::Value::String("ANY".to_string())
     );
 
     // Test NONE mode serialization
-    let config = ToolConfig {
-        function_calling_config: Some(FunctionCallingConfig {
-            mode: FunctionCallingMode::None,
-            allowed_function_names: None,
-        }),
+    let config = GenerationConfig {
+        tool_choice: Some(FunctionCallingMode::None),
+        ..Default::default()
     };
     let json = serde_json::to_value(&config).unwrap();
     assert_eq!(
-        json["function_calling_config"]["mode"],
+        json["toolChoice"],
         serde_json::Value::String("NONE".to_string())
     );
 
     // Test VALIDATED mode serialization
-    let config = ToolConfig {
-        function_calling_config: Some(FunctionCallingConfig {
-            mode: FunctionCallingMode::Validated,
-            allowed_function_names: None,
-        }),
+    let config = GenerationConfig {
+        tool_choice: Some(FunctionCallingMode::Validated),
+        ..Default::default()
     };
     let json = serde_json::to_value(&config).unwrap();
     assert_eq!(
-        json["function_calling_config"]["mode"],
+        json["toolChoice"],
         serde_json::Value::String("VALIDATED".to_string())
     );
 
-    println!("✓ All function calling modes serialize correctly");
-}
-
-/// Test with_allowed_tools() builder method.
-///
-/// Validates that specifying allowed function names correctly builds
-/// the tool_config with the function names and defaults to AUTO mode.
-#[test]
-fn test_tool_config_allowed_function_names() {
-    let config = ToolConfig {
-        function_calling_config: Some(FunctionCallingConfig {
-            mode: FunctionCallingMode::Auto,
-            allowed_function_names: Some(vec!["get_weather".to_string(), "get_time".to_string()]),
-        }),
-    };
-
-    let json = serde_json::to_value(&config).unwrap();
-    assert_eq!(
-        json["function_calling_config"]["mode"],
-        serde_json::Value::String("AUTO".to_string())
-    );
-    assert_eq!(
-        json["function_calling_config"]["allowed_function_names"],
-        serde_json::json!(["get_weather", "get_time"])
-    );
-
-    println!("✓ Allowed function names serialize correctly");
+    println!("✓ All function calling modes serialize correctly in GenerationConfig");
 }
 
 /// Test Unknown function calling mode roundtrip.
@@ -1705,13 +1671,14 @@ async fn test_function_calling_validated_mode() {
     }
 }
 
-/// Test with_tool_config() builder method (API integration).
+/// Test with_function_calling_mode() builder method (API integration).
 ///
-/// Verifies that a complete ToolConfig can be passed to the builder
-/// and works correctly with the API.
+/// Verifies that the function calling mode is correctly sent to the API
+/// via generation_config.tool_choice. Uses ANY mode which requires the
+/// model to call a function.
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_with_tool_config_builder() {
+async fn test_with_function_calling_mode_builder() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -1727,21 +1694,14 @@ async fn test_with_tool_config_builder() {
         .required(vec!["name".to_string()])
         .build();
 
-    // Create a complete ToolConfig
-    let tool_config = ToolConfig {
-        function_calling_config: Some(FunctionCallingConfig {
-            mode: FunctionCallingMode::Any,
-            allowed_function_names: Some(vec!["greet_user".to_string()]),
-        }),
-    };
-
+    // Use ANY mode - model MUST call a function
     let response = interaction_builder(&client)
         .with_text("Please greet Alice")
         .with_functions(vec![greet_fn])
-        .with_tool_config(tool_config)
+        .with_function_calling_mode(FunctionCallingMode::Any)
         .create()
         .await
-        .expect("Request with tool_config should succeed");
+        .expect("Request with function_calling_mode should succeed");
 
     println!("Response status: {:?}", response.status);
 
@@ -1753,65 +1713,10 @@ async fn test_with_tool_config_builder() {
         let call = &function_calls[0];
         println!("Called function: {}", call.name);
         assert_eq!(call.name, "greet_user", "Should call greet_user function");
-        println!("✓ with_tool_config() builder method works with API");
+        println!("✓ with_function_calling_mode() builder method works with API");
     } else if response.has_text() {
         // Model may respond with text if function calling fails
         println!("Note: Model responded with text instead of function call");
-        println!("Text: {}", response.text().unwrap());
-    }
-}
-
-/// Test with_allowed_tools() builder method (API integration).
-///
-/// Verifies the convenience method that sets allowed function names
-/// and defaults to AUTO mode.
-#[tokio::test]
-#[ignore = "Requires API key"]
-async fn test_with_allowed_tools_builder() {
-    let Some(client) = get_client() else {
-        println!("Skipping: GEMINI_API_KEY not set");
-        return;
-    };
-
-    // Define two functions
-    let add_fn = FunctionDeclaration::builder("add_numbers")
-        .description("Add two numbers together")
-        .parameter("a", json!({"type": "number"}))
-        .parameter("b", json!({"type": "number"}))
-        .required(vec!["a".to_string(), "b".to_string()])
-        .build();
-
-    let multiply_fn = FunctionDeclaration::builder("multiply_numbers")
-        .description("Multiply two numbers together")
-        .parameter("a", json!({"type": "number"}))
-        .parameter("b", json!({"type": "number"}))
-        .required(vec!["a".to_string(), "b".to_string()])
-        .build();
-
-    // Only allow add_numbers, even though multiply is also available
-    let response = interaction_builder(&client)
-        .with_text("What is 5 plus 3?")
-        .with_functions(vec![add_fn, multiply_fn])
-        .with_allowed_tools(vec!["add_numbers".to_string()])
-        .create()
-        .await
-        .expect("Request with allowed_tools should succeed");
-
-    println!("Response status: {:?}", response.status);
-
-    let function_calls = response.function_calls();
-    if !function_calls.is_empty() {
-        let call = &function_calls[0];
-        println!("Called function: {}", call.name);
-        // Should only call the allowed function
-        assert_eq!(
-            call.name, "add_numbers",
-            "Should only call the allowed add_numbers function"
-        );
-        println!("✓ with_allowed_tools() correctly restricts function calls");
-    } else if response.has_text() {
-        // With AUTO mode, the model may choose not to call a function
-        println!("Note: Model responded with text (AUTO mode allows this)");
         println!("Text: {}", response.text().unwrap());
     }
 }

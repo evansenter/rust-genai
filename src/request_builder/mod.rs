@@ -13,10 +13,9 @@ use std::time::Duration;
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
-    self, CreateInteractionRequest, FunctionCallingConfig, FunctionCallingMode,
-    FunctionDeclaration, GenerationConfig, InteractionContent, InteractionInput,
-    InteractionResponse, StreamChunk, ThinkingLevel, ThinkingSummaries, Tool as InternalTool,
-    ToolConfig,
+    self, CreateInteractionRequest, FunctionCallingMode, FunctionDeclaration, GenerationConfig,
+    InteractionContent, InteractionInput, InteractionResponse, StreamChunk, ThinkingLevel,
+    ThinkingSummaries, Tool as InternalTool,
 };
 
 // ============================================================================
@@ -164,8 +163,6 @@ pub struct InteractionBuilder<'a, State = FirstTurn> {
     background: Option<bool>,
     store: Option<bool>,
     system_instruction: Option<InteractionInput>,
-    /// Tool configuration for function calling behavior
-    tool_config: Option<ToolConfig>,
     /// Maximum iterations for auto function calling loop
     max_function_call_loops: usize,
     /// Tool service for dependency-injected functions
@@ -191,7 +188,6 @@ impl<State> std::fmt::Debug for InteractionBuilder<'_, State> {
             .field("background", &self.background)
             .field("store", &self.store)
             .field("system_instruction", &self.system_instruction)
-            .field("tool_config", &self.tool_config)
             .field("max_function_call_loops", &self.max_function_call_loops)
             .field("tool_service", &self.tool_service.as_ref().map(|_| "..."))
             .field("timeout", &self.timeout)
@@ -220,7 +216,6 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             background: None,
             store: None,
             system_instruction: None,
-            tool_config: None,
             max_function_call_loops: DEFAULT_MAX_FUNCTION_CALL_LOOPS,
             tool_service: None,
             timeout: None,
@@ -256,7 +251,6 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             background: self.background,
             store: self.store,
             system_instruction: self.system_instruction,
-            tool_config: self.tool_config,
             max_function_call_loops: self.max_function_call_loops,
             tool_service: self.tool_service,
             timeout: self.timeout,
@@ -302,7 +296,6 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             background: None, // Reset - can't be true with store disabled
             store: Some(false),
             system_instruction: self.system_instruction,
-            tool_config: self.tool_config,
             max_function_call_loops: self.max_function_call_loops,
             tool_service: self.tool_service,
             timeout: self.timeout,
@@ -1298,38 +1291,6 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         self
     }
 
-    /// Sets the complete tool configuration for function calling.
-    ///
-    /// This is the low-level method that sets the entire `ToolConfig` at once.
-    /// For most use cases, prefer the convenience methods:
-    /// - `with_function_calling_mode()` - Set just the mode
-    /// - `with_allowed_tools()` - Restrict which functions can be called
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use rust_genai::{Client, ToolConfig, FunctionCallingConfig, FunctionCallingMode};
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::builder("api-key".to_string()).build()?;
-    /// let response = client
-    ///     .interaction()
-    ///     .with_model("gemini-3-flash-preview")
-    ///     .with_text("What's the weather?")
-    ///     .with_tool_config(ToolConfig {
-    ///         function_calling_config: Some(FunctionCallingConfig {
-    ///             mode: FunctionCallingMode::Any,
-    ///             allowed_function_names: Some(vec!["get_weather".to_string()]),
-    ///         }),
-    ///     })
-    ///     .create()
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn with_tool_config(mut self, config: ToolConfig) -> Self {
-        self.tool_config = Some(config);
-        self
-    }
-
     /// Sets the function calling mode.
     ///
     /// Controls how the model uses function calling capabilities.
@@ -1368,54 +1329,10 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # }
     /// ```
     pub fn with_function_calling_mode(mut self, mode: FunctionCallingMode) -> Self {
-        let tool_config = self.tool_config.get_or_insert(ToolConfig {
-            function_calling_config: None,
-        });
-        let fc_config = tool_config
-            .function_calling_config
-            .get_or_insert(FunctionCallingConfig {
-                mode: mode.clone(),
-                allowed_function_names: None,
-            });
-        fc_config.mode = mode;
-        self
-    }
-
-    /// Restricts which functions the model can call.
-    ///
-    /// When set, the model will only consider the listed functions, even if
-    /// more functions are provided in the request via `with_tool()` or `#[tool]` macros.
-    ///
-    /// If no function calling mode has been set, this defaults to `Auto` mode.
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use rust_genai::Client;
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::builder("api-key".to_string()).build()?;
-    ///
-    /// // Only allow the model to call get_weather and get_forecast
-    /// let response = client
-    ///     .interaction()
-    ///     .with_model("gemini-3-flash-preview")
-    ///     .with_text("What's the weather like?")
-    ///     .with_allowed_tools(vec!["get_weather".to_string(), "get_forecast".to_string()])
-    ///     .create()
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn with_allowed_tools(mut self, tool_names: Vec<String>) -> Self {
-        let tool_config = self.tool_config.get_or_insert(ToolConfig {
-            function_calling_config: None,
-        });
-        let fc_config = tool_config
-            .function_calling_config
-            .get_or_insert(FunctionCallingConfig {
-                mode: FunctionCallingMode::Auto,
-                allowed_function_names: None,
-            });
-        fc_config.allowed_function_names = Some(tool_names);
+        let config = self
+            .generation_config
+            .get_or_insert_with(GenerationConfig::default);
+        config.tool_choice = Some(mode);
         self
     }
 
@@ -1728,7 +1645,6 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
             background: self.background,
             store: self.store,
             system_instruction: self.system_instruction,
-            tool_config: self.tool_config,
         })
     }
 }

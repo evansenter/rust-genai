@@ -54,8 +54,7 @@
 
 // Re-export unified function declaration types from genai_client
 pub use genai_client::{
-    FunctionCallingConfig, FunctionCallingMode, FunctionDeclaration, FunctionDeclarationBuilder,
-    FunctionParameters, Tool, ToolConfig,
+    FunctionCallingMode, FunctionDeclaration, FunctionDeclarationBuilder, FunctionParameters, Tool,
 };
 
 // Re-export Interactions API types for convenient access

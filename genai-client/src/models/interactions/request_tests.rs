@@ -18,7 +18,6 @@ fn test_serialize_create_interaction_request_with_model() {
         background: None,
         store: None,
         system_instruction: None,
-        tool_config: None,
     };
 
     let json = serde_json::to_string(&request).expect("Serialization failed");
@@ -40,6 +39,7 @@ fn test_generation_config_serialization() {
         seed: None,
         stop_sequences: None,
         thinking_summaries: None,
+        tool_choice: None,
     };
 
     let json = serde_json::to_string(&config).expect("Serialization failed");
@@ -61,6 +61,7 @@ fn test_generation_config_new_fields_serialization() {
         seed: Some(42),
         stop_sequences: Some(vec!["END".to_string(), "---".to_string()]),
         thinking_summaries: Some(ThinkingSummaries::Auto),
+        tool_choice: None,
     };
 
     let json = serde_json::to_string(&config).expect("Serialization failed");
@@ -84,6 +85,7 @@ fn test_generation_config_roundtrip() {
         seed: Some(123456789),
         stop_sequences: Some(vec!["STOP".to_string()]),
         thinking_summaries: Some(ThinkingSummaries::None),
+        tool_choice: None,
     };
 
     let json = serde_json::to_string(&config).expect("Serialization failed");
@@ -98,6 +100,7 @@ fn test_generation_config_roundtrip() {
     assert_eq!(deserialized.seed, config.seed);
     assert_eq!(deserialized.stop_sequences, config.stop_sequences);
     assert_eq!(deserialized.thinking_summaries, config.thinking_summaries);
+    assert_eq!(deserialized.tool_choice, config.tool_choice);
 }
 
 #[test]

@@ -31,13 +31,11 @@ pub(crate) mod sse_parser;
 // Import and selectively re-export the necessary structs from the models module
 
 // Shared types for the Interactions API
-pub use models::shared::FunctionCallingConfig;
 pub use models::shared::FunctionCallingMode;
 pub use models::shared::FunctionDeclaration;
 pub use models::shared::FunctionDeclarationBuilder;
 pub use models::shared::FunctionParameters;
 pub use models::shared::Tool;
-pub use models::shared::ToolConfig;
 
 // Interactions API types
 pub use models::interactions::CodeExecutionCallInfo;

@@ -351,7 +351,6 @@ mod tests {
             background: None,
             store: None,
             system_instruction: None,
-            tool_config: None,
         };
 
         let json = serde_json::to_string(&request).expect("Serialization should work");
