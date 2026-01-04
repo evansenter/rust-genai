@@ -57,7 +57,7 @@ See `examples/` for full list (multimodal, thinking, files API, image generation
 
 ### Layered Design
 
-1. **Public API** (`src/lib.rs`, `src/client.rs`, `src/request_builder.rs`): User-facing `Client`, `InteractionBuilder`
+1. **Public API** (`src/lib.rs`, `src/client.rs`, `src/request_builder/`): User-facing `Client`, `InteractionBuilder`
 2. **Internal Logic** (`src/function_calling.rs`, `src/interactions_api.rs`, `src/multimodal.rs`): Function registry, content builders
 3. **HTTP Client** (`genai-client/`): Raw API requests, JSON models, SSE streaming
 4. **Macros** (`rust-genai-macros/`): `#[tool]` macro with `inventory` registration
