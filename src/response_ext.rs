@@ -275,6 +275,8 @@ mod tests {
             grounding_metadata: None,
             url_context_metadata: None,
             previous_interaction_id: None,
+            created: None,
+            updated: None,
         }
     }
 
@@ -294,6 +296,8 @@ mod tests {
             grounding_metadata: None,
             url_context_metadata: None,
             previous_interaction_id: None,
+            created: None,
+            updated: None,
         }
     }
 
@@ -359,6 +363,8 @@ mod tests {
             grounding_metadata: None,
             url_context_metadata: None,
             previous_interaction_id: None,
+            created: None,
+            updated: None,
         };
 
         let images: Vec<_> = response.images().collect();

@@ -21,6 +21,7 @@
 //!
 //! Base64-encoded media content is truncated to keep output readable.
 
+use chrono::Utc;
 use colored::Colorize;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -89,60 +90,9 @@ fn colorize_json(value: &serde_json::Value) -> Option<String> {
     colored_json::to_colored_json_auto(value).ok()
 }
 
-/// Format the current timestamp for log output.
+/// Format the current timestamp for log output (ISO 8601 UTC).
 fn timestamp() -> String {
-    // Use a simple format that works without chrono
-    let now = std::time::SystemTime::now();
-    let duration = now
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
-    let secs = duration.as_secs();
-
-    // Convert to human-readable format (simplified UTC)
-    let days_since_epoch = secs / 86400;
-    let secs_today = secs % 86400;
-    let hours = secs_today / 3600;
-    let minutes = (secs_today % 3600) / 60;
-    let seconds = secs_today % 60;
-
-    // Calculate year/month/day from days since epoch (1970-01-01)
-    // This is a simplified calculation that works for dates after 2000
-    let mut remaining_days = days_since_epoch as i64;
-    let mut year = 1970;
-
-    loop {
-        let days_in_year = if is_leap_year(year) { 366 } else { 365 };
-        if remaining_days < days_in_year {
-            break;
-        }
-        remaining_days -= days_in_year;
-        year += 1;
-    }
-
-    let (month, day) = day_of_year_to_month_day(remaining_days as u32 + 1, is_leap_year(year));
-
-    format!("{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z")
-}
-
-fn is_leap_year(year: i64) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
-}
-
-fn day_of_year_to_month_day(day_of_year: u32, leap: bool) -> (u32, u32) {
-    let days_in_months: [u32; 12] = if leap {
-        [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    } else {
-        [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    };
-
-    let mut remaining = day_of_year;
-    for (i, &days) in days_in_months.iter().enumerate() {
-        if remaining <= days {
-            return (i as u32 + 1, remaining);
-        }
-        remaining -= days;
-    }
-    (12, 31) // Fallback
+    Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
 /// Log prefix with timestamp and request ID (for outgoing requests).

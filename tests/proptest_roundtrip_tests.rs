@@ -219,6 +219,8 @@ fn arb_interaction_response() -> impl Strategy<Value = InteractionResponse> {
                     grounding_metadata: None,
                     url_context_metadata: None,
                     previous_interaction_id,
+                    created: None,
+                    updated: None,
                 }
             },
         )

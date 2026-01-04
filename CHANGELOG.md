@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING CHANGES
 
+#### Timestamp Fields Use chrono::DateTime<Utc> (#273)
+- **`FileMetadata.create_time`**: Changed from `Option<String>` to `Option<DateTime<Utc>>`
+- **`FileMetadata.expiration_time`**: Changed from `Option<String>` to `Option<DateTime<Utc>>`
+- **`InteractionResponse`**: Added `created: Option<DateTime<Utc>>` and `updated: Option<DateTime<Utc>>` fields
+- **New dependency**: `chrono` crate with serde support
+- Internal `loud_wire.rs` timestamp generation simplified to use chrono
+
+**Migration guide:**
+```rust
+// Before (FileMetadata timestamps were strings):
+if let Some(created) = file.create_time {
+    println!("Created: {}", created);  // String
+}
+
+// After (timestamps are DateTime<Utc>):
+use chrono::{DateTime, Utc};
+if let Some(created) = file.create_time {
+    println!("Created: {}", created.to_rfc3339());  // DateTime<Utc>
+    // Or use chrono's formatting:
+    println!("Created: {}", created.format("%Y-%m-%d %H:%M:%S"));
+}
+
+// InteractionResponse now has created/updated fields:
+if let Some(created) = response.created {
+    println!("Interaction created at: {}", created);
+}
+```
+
 #### Streaming Returns StreamEvent Wrapper (#262)
 - **`create_stream()`** now returns `Stream<Item = Result<StreamEvent, GenaiError>>` instead of `Stream<Item = Result<StreamChunk, GenaiError>>`
 - **`create_stream_with_auto_functions()`** now returns `Stream<Item = Result<AutoFunctionStreamEvent, GenaiError>>` instead of `Stream<Item = Result<AutoFunctionStreamChunk, GenaiError>>`

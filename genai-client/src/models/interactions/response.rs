@@ -3,6 +3,7 @@
 //! This module contains `InteractionResponse` and related types for handling
 //! API responses, including helper methods for extracting content.
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeSet;
 use std::fmt;
@@ -634,6 +635,14 @@ pub struct InteractionResponse {
     /// Previous interaction ID if this was a follow-up
     #[serde(skip_serializing_if = "Option::is_none")]
     pub previous_interaction_id: Option<String>,
+
+    /// Timestamp when the interaction was created (ISO 8601 UTC)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created: Option<DateTime<Utc>>,
+
+    /// Timestamp when the interaction was last updated (ISO 8601 UTC)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated: Option<DateTime<Utc>>,
 }
 
 impl InteractionResponse {
@@ -1623,6 +1632,48 @@ impl InteractionResponse {
     pub fn tool_use_tokens(&self) -> Option<u32> {
         self.usage.as_ref().and_then(|u| u.total_tool_use_tokens)
     }
+
+    // =========================================================================
+    // Timestamp Helpers
+    // =========================================================================
+
+    /// Get the timestamp when this interaction was created.
+    ///
+    /// Returns `None` if the interaction was created with `store=false` or
+    /// if the API didn't include timestamp information.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(created) = response.created() {
+    ///     println!("Created at: {}", created.to_rfc3339());
+    /// }
+    /// ```
+    #[must_use]
+    pub fn created(&self) -> Option<DateTime<Utc>> {
+        self.created
+    }
+
+    /// Get the timestamp when this interaction was last updated.
+    ///
+    /// Returns `None` if the interaction was created with `store=false` or
+    /// if the API didn't include timestamp information.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if let Some(updated) = response.updated() {
+    ///     println!("Last updated: {}", updated.to_rfc3339());
+    /// }
+    /// ```
+    #[must_use]
+    pub fn updated(&self) -> Option<DateTime<Utc>> {
+        self.updated
+    }
 }
 
 /// Summary of content types present in an interaction response.
@@ -1780,6 +1831,8 @@ mod tests {
             grounding_metadata: None,
             url_context_metadata: None,
             previous_interaction_id: None,
+            created: None,
+            updated: None,
         }
     }
 

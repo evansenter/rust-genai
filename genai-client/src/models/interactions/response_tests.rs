@@ -107,6 +107,8 @@ fn test_interaction_response_text() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert_eq!(response.text(), Some("Hello"));
@@ -142,6 +144,8 @@ fn test_interaction_response_thoughts() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_thoughts());
@@ -172,6 +176,8 @@ fn test_interaction_response_no_thoughts() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(!response.has_thoughts());
@@ -206,6 +212,8 @@ fn test_interaction_response_function_calls() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     let calls = response.function_calls();
@@ -244,6 +252,8 @@ fn test_function_call_missing_id() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     let calls = response.function_calls();
@@ -287,6 +297,8 @@ fn test_interaction_response_mixed_content() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert_eq!(response.text(), Some("Let me check"));
@@ -310,6 +322,8 @@ fn test_interaction_response_empty_outputs() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert_eq!(response.text(), None);
@@ -348,6 +362,8 @@ fn test_interaction_response_has_unknown() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_unknown());
@@ -376,6 +392,8 @@ fn test_interaction_response_no_unknown() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(!response.has_unknown());
@@ -428,6 +446,8 @@ fn test_content_summary() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     let summary = response.content_summary();
@@ -455,6 +475,8 @@ fn test_content_summary_empty() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     let summary = response.content_summary();
@@ -548,6 +570,8 @@ fn test_content_summary_with_built_in_tools() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     let summary = response.content_summary();
@@ -592,6 +616,8 @@ fn test_interaction_response_code_execution_helpers() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_code_execution_calls());
@@ -641,6 +667,8 @@ fn test_interaction_response_google_search_helpers() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_google_search_results());
@@ -668,6 +696,8 @@ fn test_interaction_response_url_context_helpers() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_url_context_results());
@@ -794,6 +824,8 @@ fn test_interaction_response_function_results() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_function_results());
@@ -825,6 +857,8 @@ fn test_interaction_response_no_function_results() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(!response.has_function_results());
@@ -860,6 +894,8 @@ fn test_interaction_response_google_search_call_helpers() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_google_search_calls());
@@ -894,6 +930,8 @@ fn test_interaction_response_no_google_search_calls() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(!response.has_google_search_calls());
@@ -924,6 +962,8 @@ fn test_interaction_response_url_context_call_helpers() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_url_context_calls());
@@ -952,6 +992,8 @@ fn test_interaction_response_no_url_context_calls() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(!response.has_url_context_calls());
@@ -986,6 +1028,8 @@ fn test_interaction_response_code_execution_call_singular() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     // Test code_execution_call() - returns first one
@@ -1014,6 +1058,8 @@ fn test_interaction_response_no_code_execution_call() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.code_execution_call().is_none());
@@ -1043,6 +1089,8 @@ fn test_interaction_response_google_search_metadata_helpers() {
             grounding_chunks: vec![],
         }),
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_google_search_metadata());
@@ -1067,6 +1115,8 @@ fn test_interaction_response_no_google_search_metadata() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(!response.has_google_search_metadata());
@@ -1092,6 +1142,8 @@ fn test_interaction_response_url_context_metadata_helpers() {
                 url_retrieval_status: UrlRetrievalStatus::UrlRetrievalStatusSuccess,
             }],
         }),
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_url_context_metadata());
@@ -1124,6 +1176,8 @@ fn test_interaction_response_no_url_context_metadata() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(!response.has_url_context_metadata());
@@ -1159,6 +1213,8 @@ fn test_interaction_response_code_execution_calls_plural() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_code_execution_calls());
@@ -1198,6 +1254,8 @@ fn test_interaction_response_code_execution_results() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_code_execution_results());
@@ -1233,6 +1291,8 @@ fn test_interaction_response_no_code_execution_results() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(!response.has_code_execution_results());
@@ -1271,6 +1331,8 @@ fn test_interaction_response_google_search_results() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_google_search_results());
@@ -1295,6 +1357,8 @@ fn test_interaction_response_no_google_search_results() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(!response.has_google_search_results());
@@ -1328,6 +1392,8 @@ fn test_interaction_response_url_context_results() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_url_context_results());
@@ -1356,6 +1422,8 @@ fn test_interaction_response_no_url_context_results() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(!response.has_url_context_results());
@@ -1472,6 +1540,8 @@ fn test_interaction_response_complex_roundtrip() {
                 url_retrieval_status: UrlRetrievalStatus::UrlRetrievalStatusSuccess,
             }],
         }),
+        created: None,
+        updated: None,
     };
 
     // Serialize to JSON
@@ -1734,6 +1804,8 @@ fn test_interaction_response_serialize_without_id() {
         grounding_metadata: None,
         url_context_metadata: None,
         previous_interaction_id: None,
+        created: None,
+        updated: None,
     };
 
     let json = serde_json::to_string(&response).expect("Serialization should succeed");
@@ -1763,6 +1835,8 @@ fn test_interaction_response_roundtrip_without_id() {
         grounding_metadata: None,
         url_context_metadata: None,
         previous_interaction_id: None,
+        created: None,
+        updated: None,
     };
 
     let json = serde_json::to_string(&original).expect("Serialization should succeed");
@@ -1795,6 +1869,8 @@ fn test_function_call_info_to_owned() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     let calls = response.function_calls();
@@ -1830,6 +1906,8 @@ fn test_function_call_info_to_owned_none_fields() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     let calls = response.function_calls();
@@ -1870,6 +1948,8 @@ fn test_owned_function_call_info_outlives_response() {
             previous_interaction_id: None,
             grounding_metadata: None,
             url_context_metadata: None,
+            created: None,
+            updated: None,
         };
 
         // Convert to owned before response goes out of scope
@@ -1983,6 +2063,8 @@ fn test_interaction_response_has_annotations() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(response.has_annotations());
@@ -2006,6 +2088,8 @@ fn test_interaction_response_no_annotations() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(!response.has_annotations());
@@ -2029,6 +2113,8 @@ fn test_interaction_response_empty_annotations_not_counted() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     assert!(!response.has_annotations());
@@ -2080,6 +2166,8 @@ fn test_interaction_response_all_annotations() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     let annotations: Vec<_> = response.all_annotations().collect();
@@ -2126,6 +2214,8 @@ fn test_interaction_response_all_annotations_empty() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     let count = response.all_annotations().count();
@@ -2166,6 +2256,8 @@ fn test_interaction_response_all_annotations_skips_non_text() {
         previous_interaction_id: None,
         grounding_metadata: None,
         url_context_metadata: None,
+        created: None,
+        updated: None,
     };
 
     let annotations: Vec<_> = response.all_annotations().collect();

@@ -942,6 +942,8 @@ mod tests {
                 grounding_metadata: None,
                 url_context_metadata: None,
                 previous_interaction_id: Some("prev-interaction-xyz".to_string()),
+                created: None,
+                updated: None,
             },
             executions: vec![
                 FunctionExecutionResult::new(
@@ -1055,6 +1057,8 @@ mod tests {
                 grounding_metadata: None,
                 url_context_metadata: None,
                 previous_interaction_id: None,
+                created: None,
+                updated: None,
             },
             executions: vec![FunctionExecutionResult::new(
                 "get_weather",
@@ -1132,6 +1136,8 @@ mod tests {
             grounding_metadata: None,
             url_context_metadata: None,
             previous_interaction_id: None,
+            created: None,
+            updated: None,
         };
 
         let chunk = AutoFunctionStreamChunk::MaxLoopsReached(response);
@@ -1194,6 +1200,8 @@ mod tests {
             grounding_metadata: None,
             url_context_metadata: None,
             previous_interaction_id: None,
+            created: None,
+            updated: None,
         };
 
         let max_loops_chunk = AutoFunctionStreamChunk::MaxLoopsReached(response);
