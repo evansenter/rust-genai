@@ -1123,6 +1123,62 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         self
     }
 
+    /// Adds an MCP (Model Context Protocol) server as a tool.
+    ///
+    /// MCP servers provide a standardized way to expose external tools and
+    /// capabilities to the model. When configured, the model can call tools
+    /// exposed by the MCP server to access external data, services, or actions.
+    ///
+    /// This method can be called multiple times to add multiple MCP servers.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What files are in my project?")
+    ///     .with_mcp_server("filesystem", "https://mcp.example.com/fs")
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Multiple Servers
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Search the database and format the results")
+    ///     .with_mcp_server("database", "https://mcp.example.com/db")
+    ///     .with_mcp_server("formatter", "https://mcp.example.com/fmt")
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_mcp_server(mut self, name: impl Into<String>, url: impl Into<String>) -> Self {
+        self.add_tool(InternalTool::McpServer {
+            name: name.into(),
+            url: url.into(),
+        });
+        self
+    }
+
     /// Sets response modalities (e.g., ["IMAGE"]).
     pub fn with_response_modalities(mut self, modalities: Vec<String>) -> Self {
         self.response_modalities = Some(modalities);
