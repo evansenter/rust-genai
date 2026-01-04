@@ -18,8 +18,6 @@
 //!
 //! Run with: cargo run --example deep_research
 
-// DeepResearchConfig and ThinkingSummaries are imported for documentation - see commented usage below
-#[allow(unused_imports)]
 use rust_genai::{Client, DeepResearchConfig, GenaiError, InteractionStatus, ThinkingSummaries};
 use std::env;
 use std::error::Error;
@@ -83,14 +81,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // 3. Start the research in background mode (required for agent interactions)
     //    We also configure agent-specific settings using DeepResearchConfig.
-    //    Note: agent_config support may vary by API version and agent availability.
     let result = client
         .interaction()
         .with_agent(agent_name)
         .with_text(prompt)
-        // Optional: Configure agent-specific settings when supported
-        // .with_agent_config(DeepResearchConfig::new()
-        //     .with_thinking_summaries(ThinkingSummaries::Auto))
+        // Optional: Configure agent-specific settings
+        .with_agent_config(
+            DeepResearchConfig::new().with_thinking_summaries(ThinkingSummaries::Auto),
+        )
         .with_background(true) // Required for agent interactions
         .with_store_enabled() // Required to retrieve results by interaction ID
         .create()

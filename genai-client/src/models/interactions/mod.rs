@@ -3,6 +3,7 @@
 //! This module provides all types needed for working with the Gemini Interactions API,
 //! including request/response structures, content types, and streaming support.
 
+mod agent_config;
 mod content;
 mod metadata;
 mod request;
@@ -22,6 +23,7 @@ mod streaming_tests;
 mod proptest_tests;
 
 // Re-export all public types at module root for backwards compatibility
+pub use agent_config::{AgentConfig, DeepResearchConfig, DynamicConfig, ThinkingSummaries};
 pub use content::{
     Annotation, CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem,
     InteractionContent,
@@ -30,10 +32,7 @@ pub use metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
     WebSource,
 };
-pub use request::{
-    AgentConfig, CreateInteractionRequest, DeepResearchConfig, DynamicConfig, GenerationConfig,
-    InteractionInput, ThinkingLevel, ThinkingSummaries,
-};
+pub use request::{CreateInteractionRequest, GenerationConfig, InteractionInput, ThinkingLevel};
 pub use response::{
     CodeExecutionCallInfo, CodeExecutionResultInfo, ContentSummary, FunctionCallInfo,
     FunctionResultInfo, InteractionResponse, InteractionStatus, ModalityTokens,

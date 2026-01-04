@@ -6,6 +6,7 @@
 use chrono::{DateTime, TimeZone, Utc};
 use proptest::prelude::*;
 
+use super::agent_config::{AgentConfig, DeepResearchConfig, DynamicConfig, ThinkingSummaries};
 use super::content::{
     Annotation, CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem,
     InteractionContent,
@@ -14,9 +15,7 @@ use super::metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
     WebSource,
 };
-use super::request::{
-    AgentConfig, DeepResearchConfig, DynamicConfig, ThinkingLevel, ThinkingSummaries,
-};
+use super::request::ThinkingLevel;
 use super::response::{
     InteractionResponse, InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, UsageMetadata,
 };

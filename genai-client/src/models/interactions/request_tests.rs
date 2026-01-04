@@ -71,7 +71,7 @@ fn test_generation_config_new_fields_serialization() {
     assert_eq!(value["seed"], 42);
     assert_eq!(value["stopSequences"][0], "END");
     assert_eq!(value["stopSequences"][1], "---");
-    assert_eq!(value["thinkingSummaries"], "auto");
+    assert_eq!(value["thinkingSummaries"], "THINKING_SUMMARIES_AUTO");
     assert_eq!(value["thinkingLevel"], "high");
 }
 
@@ -106,22 +106,31 @@ fn test_generation_config_roundtrip() {
 
 #[test]
 fn test_thinking_summaries_serialization() {
-    // Test Auto variant
+    // Wire format uses THINKING_SUMMARIES_* prefix
     assert_eq!(
         serde_json::to_string(&ThinkingSummaries::Auto).unwrap(),
-        "\"auto\""
+        "\"THINKING_SUMMARIES_AUTO\""
     );
 
-    // Test None variant
     assert_eq!(
         serde_json::to_string(&ThinkingSummaries::None).unwrap(),
-        "\"none\""
+        "\"THINKING_SUMMARIES_NONE\""
     );
 }
 
 #[test]
 fn test_thinking_summaries_deserialization() {
-    // Test known values
+    // Test wire format (THINKING_SUMMARIES_*)
+    assert_eq!(
+        serde_json::from_str::<ThinkingSummaries>("\"THINKING_SUMMARIES_AUTO\"").unwrap(),
+        ThinkingSummaries::Auto
+    );
+    assert_eq!(
+        serde_json::from_str::<ThinkingSummaries>("\"THINKING_SUMMARIES_NONE\"").unwrap(),
+        ThinkingSummaries::None
+    );
+
+    // Also accept lowercase for flexibility
     assert_eq!(
         serde_json::from_str::<ThinkingSummaries>("\"auto\"").unwrap(),
         ThinkingSummaries::Auto
@@ -295,7 +304,7 @@ fn test_deep_research_config_serialization() {
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
     assert_eq!(value["type"], "deep-research");
-    assert_eq!(value["thinkingSummaries"], "auto");
+    assert_eq!(value["thinkingSummaries"], "THINKING_SUMMARIES_AUTO");
 }
 
 #[test]
@@ -393,7 +402,10 @@ fn test_agent_config_helper_methods() {
         .into();
     let value = config.as_value();
     assert_eq!(value.get("type").unwrap(), "deep-research");
-    assert_eq!(value.get("thinkingSummaries").unwrap(), "auto");
+    assert_eq!(
+        value.get("thinkingSummaries").unwrap(),
+        "THINKING_SUMMARIES_AUTO"
+    );
 }
 
 #[test]
@@ -424,7 +436,10 @@ fn test_create_interaction_request_with_agent_config() {
 
     assert_eq!(value["agent"], "deep-research-pro-preview-12-2025");
     assert_eq!(value["agent_config"]["type"], "deep-research");
-    assert_eq!(value["agent_config"]["thinkingSummaries"], "auto");
+    assert_eq!(
+        value["agent_config"]["thinkingSummaries"],
+        "THINKING_SUMMARIES_AUTO"
+    );
     assert_eq!(value["background"], true);
     assert_eq!(value["store"], true);
 }
@@ -447,7 +462,7 @@ fn test_agent_config_field_naming_conventions() {
 
     let json = serde_json::to_string(&config).expect("Serialization failed");
 
-    // Expected: {"type":"deep-research","thinkingSummaries":"auto"}
+    // Expected: {"type":"deep-research","thinkingSummaries":"THINKING_SUMMARIES_AUTO"}
     // NOT: {"type":"deep-research","thinking_summaries":"auto"}
     assert!(
         json.contains("thinkingSummaries"),
@@ -460,10 +475,10 @@ fn test_agent_config_field_naming_conventions() {
         json
     );
 
-    // Verify value is lowercase
+    // Verify value uses wire format THINKING_SUMMARIES_*
     assert!(
-        json.contains(r#""auto""#),
-        "ThinkingSummaries::Auto should serialize to 'auto', got: {}",
+        json.contains(r#""THINKING_SUMMARIES_AUTO""#),
+        "ThinkingSummaries::Auto should serialize to 'THINKING_SUMMARIES_AUTO', got: {}",
         json
     );
 }
