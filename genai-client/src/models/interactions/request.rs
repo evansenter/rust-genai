@@ -315,162 +315,133 @@ impl<'de> Visitor<'de> for ThinkingSummariesVisitor {
 
 /// Agent-specific configuration for specialized agents.
 ///
-/// When using specialized agents like Deep Research or Dynamic agents,
-/// this configuration controls agent-specific behavior.
+/// This is a thin wrapper around JSON that provides full forward compatibility.
+/// Use typed config structs like [`DeepResearchConfig`] for compile-time guidance,
+/// or construct directly from JSON for unknown/future agent types.
 ///
-/// # Forward Compatibility (Evergreen Philosophy)
+/// # Usage
 ///
-/// This enum is marked `#[non_exhaustive]`, which means:
-/// - Match statements must include a wildcard arm (`_ => ...`)
-/// - New variants may be added in minor version updates without breaking your code
+/// ## Typed configs (recommended for known agents)
+/// ```
+/// use genai_client::models::interactions::{AgentConfig, DeepResearchConfig, ThinkingSummaries};
 ///
-/// When the API returns an agent config type that this library doesn't recognize,
-/// it will be captured as `AgentConfig::Unknown` rather than causing a
-/// deserialization error.
-#[derive(Clone, Debug, PartialEq)]
-#[non_exhaustive]
-pub enum AgentConfig {
-    /// Configuration for Deep Research agent.
-    ///
-    /// Deep Research agent performs comprehensive research tasks
-    /// and can optionally include thinking summaries.
-    DeepResearch {
-        /// Controls whether thinking summaries are included in output
-        thinking_summaries: Option<ThinkingSummaries>,
-    },
-    /// Configuration for Dynamic agent.
-    ///
-    /// Dynamic agents adapt their behavior based on the task.
-    Dynamic,
-    /// Unknown agent configuration for forward compatibility.
-    ///
-    /// This variant captures agent config types that the library doesn't recognize yet.
-    Unknown {
-        /// The unrecognized config type name from the API
-        config_type: String,
-        /// The full JSON data for this config, preserved for debugging
-        data: serde_json::Value,
-    },
-}
+/// let config: AgentConfig = DeepResearchConfig::new()
+///     .with_thinking_summaries(ThinkingSummaries::Auto)
+///     .into();
+/// ```
+///
+/// ## Raw JSON (for unknown/future agents)
+/// ```
+/// use genai_client::models::interactions::AgentConfig;
+///
+/// let config = AgentConfig::from_value(serde_json::json!({
+///     "type": "future-agent",
+///     "newOption": true
+/// }));
+/// ```
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct AgentConfig(serde_json::Value);
 
 impl AgentConfig {
-    /// Check if this is an unknown agent config type.
+    /// Create an agent config from a raw JSON value.
+    ///
+    /// Use this for unknown or future agent types that don't have typed config structs.
     #[must_use]
-    pub const fn is_unknown(&self) -> bool {
-        matches!(self, Self::Unknown { .. })
+    pub fn from_value(value: serde_json::Value) -> Self {
+        Self(value)
     }
 
-    /// Returns the config type name if this is an unknown config.
-    ///
-    /// Returns `None` for known config types.
+    /// Access the underlying JSON value.
     #[must_use]
-    pub fn unknown_config_type(&self) -> Option<&str> {
-        match self {
-            Self::Unknown { config_type, .. } => Some(config_type),
-            _ => None,
-        }
+    pub fn as_value(&self) -> &serde_json::Value {
+        &self.0
     }
 
-    /// Returns the raw JSON data if this is an unknown config.
-    ///
-    /// Returns `None` for known config types.
+    /// Get the agent config type (e.g., "deep-research", "dynamic").
     #[must_use]
-    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
-        match self {
-            Self::Unknown { data, .. } => Some(data),
-            _ => None,
-        }
+    pub fn config_type(&self) -> Option<&str> {
+        self.0.get("type").and_then(|v| v.as_str())
     }
 }
 
-impl Serialize for AgentConfig {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut map = serializer.serialize_map(None)?;
+/// Configuration for Deep Research agent.
+///
+/// Deep Research agent performs comprehensive research tasks
+/// and can optionally include thinking summaries.
+///
+/// # Example
+///
+/// ```
+/// use genai_client::models::interactions::{AgentConfig, DeepResearchConfig, ThinkingSummaries};
+///
+/// let config: AgentConfig = DeepResearchConfig::new()
+///     .with_thinking_summaries(ThinkingSummaries::Auto)
+///     .into();
+/// ```
+#[derive(Clone, Debug, Default)]
+pub struct DeepResearchConfig {
+    thinking_summaries: Option<ThinkingSummaries>,
+}
 
-        match self {
-            Self::DeepResearch { thinking_summaries } => {
-                map.serialize_entry("type", "deep-research")?;
-                if let Some(ts) = thinking_summaries {
-                    map.serialize_entry("thinkingSummaries", ts)?;
-                }
-            }
-            Self::Dynamic => {
-                map.serialize_entry("type", "dynamic")?;
-            }
-            Self::Unknown { config_type, data } => {
-                map.serialize_entry("type", config_type)?;
-                // Flatten the data fields into the map if it's an object
-                if let serde_json::Value::Object(obj) = data {
-                    for (key, value) in obj {
-                        if key != "type" {
-                            map.serialize_entry(key, value)?;
-                        }
-                    }
-                } else if !data.is_null() {
-                    map.serialize_entry("data", data)?;
-                }
-            }
-        }
+impl DeepResearchConfig {
+    /// Create a new Deep Research configuration with default settings.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-        map.end()
+    /// Set thinking summaries mode.
+    ///
+    /// Controls whether the agent's reasoning process is summarized in output.
+    #[must_use]
+    pub fn with_thinking_summaries(mut self, summaries: ThinkingSummaries) -> Self {
+        self.thinking_summaries = Some(summaries);
+        self
     }
 }
 
-impl<'de> Deserialize<'de> for AgentConfig {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        // First, deserialize into a raw JSON value
-        let value = serde_json::Value::deserialize(deserializer)?;
-
-        // Helper enum for deserializing known types
-        #[derive(Deserialize)]
-        #[serde(tag = "type", rename_all = "kebab-case")]
-        enum KnownAgentConfig {
-            #[serde(rename = "deep-research")]
-            DeepResearch {
-                #[serde(rename = "thinkingSummaries")]
-                thinking_summaries: Option<ThinkingSummaries>,
-            },
-            #[serde(rename = "dynamic")]
-            Dynamic,
+impl From<DeepResearchConfig> for AgentConfig {
+    fn from(config: DeepResearchConfig) -> Self {
+        let mut map = serde_json::Map::new();
+        map.insert(
+            "type".into(),
+            serde_json::Value::String("deep-research".into()),
+        );
+        if let Some(ts) = config.thinking_summaries {
+            let ts_value = serde_json::to_value(ts).unwrap_or(serde_json::Value::Null);
+            map.insert("thinkingSummaries".into(), ts_value);
         }
+        AgentConfig(serde_json::Value::Object(map))
+    }
+}
 
-        // Try to deserialize as a known type
-        match serde_json::from_value::<KnownAgentConfig>(value.clone()) {
-            Ok(known) => Ok(match known {
-                KnownAgentConfig::DeepResearch { thinking_summaries } => {
-                    AgentConfig::DeepResearch { thinking_summaries }
-                }
-                KnownAgentConfig::Dynamic => AgentConfig::Dynamic,
-            }),
-            Err(parse_error) => {
-                // Unknown type - extract type name and preserve data
-                let config_type = value
-                    .get("type")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("<missing type>")
-                    .to_string();
+/// Configuration for Dynamic agent.
+///
+/// Dynamic agents adapt their behavior based on the task.
+/// Currently has no configurable options.
+///
+/// # Example
+///
+/// ```
+/// use genai_client::models::interactions::{AgentConfig, DynamicConfig};
+///
+/// let config: AgentConfig = DynamicConfig::new().into();
+/// ```
+#[derive(Clone, Debug, Default)]
+pub struct DynamicConfig;
 
-                log::warn!(
-                    "Encountered unknown AgentConfig type '{}'. \
-                     Parse error: {}. \
-                     This may indicate a new API feature or a malformed response. \
-                     The config will be preserved in the Unknown variant.",
-                    config_type,
-                    parse_error
-                );
+impl DynamicConfig {
+    /// Create a new Dynamic agent configuration.
+    #[must_use]
+    pub fn new() -> Self {
+        Self
+    }
+}
 
-                Ok(AgentConfig::Unknown {
-                    config_type,
-                    data: value,
-                })
-            }
-        }
+impl From<DynamicConfig> for AgentConfig {
+    fn from(_: DynamicConfig) -> Self {
+        AgentConfig(serde_json::json!({"type": "dynamic"}))
     }
 }
 

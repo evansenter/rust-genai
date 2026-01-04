@@ -14,7 +14,9 @@ use super::metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
     WebSource,
 };
-use super::request::{AgentConfig, ThinkingLevel, ThinkingSummaries};
+use super::request::{
+    AgentConfig, DeepResearchConfig, DynamicConfig, ThinkingLevel, ThinkingSummaries,
+};
 use super::response::{
     InteractionResponse, InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, UsageMetadata,
 };
@@ -256,32 +258,28 @@ fn arb_thinking_summaries() -> impl Strategy<Value = ThinkingSummaries> {
 // AgentConfig Strategies
 // =============================================================================
 
-/// Strategy for known AgentConfig variants only.
-/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
-#[cfg(feature = "strict-unknown")]
+/// Strategy for AgentConfig using typed config structs.
+/// Since AgentConfig is now a thin wrapper around serde_json::Value,
+/// we generate configs via the typed structs (DeepResearchConfig, DynamicConfig)
+/// and the raw from_value() method for arbitrary configs.
 fn arb_agent_config() -> impl Strategy<Value = AgentConfig> {
     prop_oneof![
-        proptest::option::of(arb_thinking_summaries())
-            .prop_map(|thinking_summaries| { AgentConfig::DeepResearch { thinking_summaries } }),
-        Just(AgentConfig::Dynamic),
-    ]
-}
-
-/// Strategy for all AgentConfig variants including Unknown.
-/// Used in normal mode (Unknown variants are gracefully handled).
-#[cfg(not(feature = "strict-unknown"))]
-fn arb_agent_config() -> impl Strategy<Value = AgentConfig> {
-    prop_oneof![
-        proptest::option::of(arb_thinking_summaries())
-            .prop_map(|thinking_summaries| { AgentConfig::DeepResearch { thinking_summaries } }),
-        Just(AgentConfig::Dynamic),
-        // Unknown variant with preserved data
-        arb_identifier().prop_map(|config_type| AgentConfig::Unknown {
-            config_type: config_type.clone(),
-            data: serde_json::json!({
+        // DeepResearch config with optional thinking summaries
+        proptest::option::of(arb_thinking_summaries()).prop_map(|thinking_summaries| {
+            let mut config = DeepResearchConfig::new();
+            if let Some(ts) = thinking_summaries {
+                config = config.with_thinking_summaries(ts);
+            }
+            config.into()
+        }),
+        // Dynamic config
+        Just(DynamicConfig::new().into()),
+        // Arbitrary config via from_value (for future agent types)
+        arb_identifier().prop_map(|config_type| {
+            AgentConfig::from_value(serde_json::json!({
                 "type": config_type,
                 "customField": 42
-            }),
+            }))
         }),
     ]
 }

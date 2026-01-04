@@ -13,9 +13,9 @@ use std::time::Duration;
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
-    self, AgentConfig, CreateInteractionRequest, FunctionCallingMode, FunctionDeclaration,
-    GenerationConfig, InteractionContent, InteractionInput, InteractionResponse, StreamEvent,
-    ThinkingLevel, ThinkingSummaries, Tool as InternalTool,
+    self, AgentConfig, CreateInteractionRequest, DeepResearchConfig, FunctionCallingMode,
+    FunctionDeclaration, GenerationConfig, InteractionContent, InteractionInput,
+    InteractionResponse, StreamEvent, ThinkingLevel, ThinkingSummaries, Tool as InternalTool,
 };
 
 // ============================================================================
@@ -373,10 +373,12 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// This configures agent-specific behavior. Only applicable when using
     /// `with_agent()` with specialized agents like Deep Research or Dynamic.
     ///
-    /// # Example
+    /// Accepts typed config structs (recommended) or raw `AgentConfig`.
+    ///
+    /// # Example with typed config (recommended)
     ///
     /// ```no_run
-    /// use rust_genai::{Client, AgentConfig, ThinkingSummaries};
+    /// use rust_genai::{Client, DeepResearchConfig, ThinkingSummaries};
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -386,17 +388,39 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .interaction()
     ///     .with_agent("deep-research-pro-preview-12-2025")
     ///     .with_text("Research the history of quantum computing")
-    ///     .with_agent_config(AgentConfig::DeepResearch {
-    ///         thinking_summaries: Some(ThinkingSummaries::Auto),
-    ///     })
+    ///     .with_agent_config(DeepResearchConfig::new()
+    ///         .with_thinking_summaries(ThinkingSummaries::Auto))
     ///     .with_background(true)
     ///     .create()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn with_agent_config(mut self, config: AgentConfig) -> Self {
-        self.agent_config = Some(config);
+    ///
+    /// # Example with raw JSON (for unknown/future agents)
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, AgentConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_agent("future-agent-2026")
+    ///     .with_text("Do something new")
+    ///     .with_agent_config(AgentConfig::from_value(serde_json::json!({
+    ///         "type": "future-agent",
+    ///         "newOption": true
+    ///     })))
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_agent_config(mut self, config: impl Into<AgentConfig>) -> Self {
+        self.agent_config = Some(config.into());
         self
     }
 
@@ -404,9 +428,8 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// This is a convenience method equivalent to:
     /// ```ignore
-    /// .with_agent_config(AgentConfig::DeepResearch {
-    ///     thinking_summaries: Some(summaries),
-    /// })
+    /// .with_agent_config(DeepResearchConfig::new()
+    ///     .with_thinking_summaries(summaries))
     /// ```
     ///
     /// Only applicable when using `with_agent("deep-research-pro-preview-12-2025")`.
@@ -432,9 +455,11 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # }
     /// ```
     pub fn with_deep_research_config(mut self, thinking_summaries: ThinkingSummaries) -> Self {
-        self.agent_config = Some(AgentConfig::DeepResearch {
-            thinking_summaries: Some(thinking_summaries),
-        });
+        self.agent_config = Some(
+            DeepResearchConfig::new()
+                .with_thinking_summaries(thinking_summaries)
+                .into(),
+        );
         self
     }
 

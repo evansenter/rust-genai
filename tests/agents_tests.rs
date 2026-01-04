@@ -18,7 +18,7 @@
 mod common;
 
 use common::{PollError, get_client, poll_until_complete};
-use rust_genai::{AgentConfig, InteractionStatus, ThinkingSummaries};
+use rust_genai::{DeepResearchConfig, InteractionStatus, ThinkingSummaries};
 use std::time::Duration;
 
 /// Maximum time to wait for background tasks to complete.
@@ -220,9 +220,9 @@ async fn test_deep_research_with_agent_config() {
         .interaction()
         .with_agent("deep-research-pro-preview-12-2025")
         .with_text("What is Rust programming language?")
-        .with_agent_config(AgentConfig::DeepResearch {
-            thinking_summaries: Some(ThinkingSummaries::Auto),
-        })
+        .with_agent_config(
+            DeepResearchConfig::new().with_thinking_summaries(ThinkingSummaries::Auto),
+        )
         .with_background(true)
         .with_store_enabled()
         .create()

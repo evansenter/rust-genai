@@ -286,10 +286,10 @@ fn test_thinking_summaries_object_form_deserialization() {
 // =============================================================================
 
 #[test]
-fn test_agent_config_deep_research_serialization() {
-    let config = AgentConfig::DeepResearch {
-        thinking_summaries: Some(ThinkingSummaries::Auto),
-    };
+fn test_deep_research_config_serialization() {
+    let config: AgentConfig = DeepResearchConfig::new()
+        .with_thinking_summaries(ThinkingSummaries::Auto)
+        .into();
 
     let json = serde_json::to_string(&config).expect("Serialization failed");
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -299,10 +299,8 @@ fn test_agent_config_deep_research_serialization() {
 }
 
 #[test]
-fn test_agent_config_deep_research_without_thinking_summaries() {
-    let config = AgentConfig::DeepResearch {
-        thinking_summaries: None,
-    };
+fn test_deep_research_config_without_thinking_summaries() {
+    let config: AgentConfig = DeepResearchConfig::new().into();
 
     let json = serde_json::to_string(&config).expect("Serialization failed");
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -312,8 +310,8 @@ fn test_agent_config_deep_research_without_thinking_summaries() {
 }
 
 #[test]
-fn test_agent_config_dynamic_serialization() {
-    let config = AgentConfig::Dynamic;
+fn test_dynamic_config_serialization() {
+    let config: AgentConfig = DynamicConfig::new().into();
 
     let json = serde_json::to_string(&config).expect("Serialization failed");
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -322,95 +320,92 @@ fn test_agent_config_dynamic_serialization() {
 }
 
 #[test]
-fn test_agent_config_deep_research_deserialization() {
+fn test_agent_config_deserialization_deep_research() {
     let json = r#"{"type": "deep-research", "thinkingSummaries": "auto"}"#;
     let parsed: AgentConfig = serde_json::from_str(json).expect("Deserialization should succeed");
 
-    match parsed {
-        AgentConfig::DeepResearch { thinking_summaries } => {
-            assert_eq!(thinking_summaries, Some(ThinkingSummaries::Auto));
-        }
-        _ => panic!("Expected DeepResearch variant"),
-    }
+    assert_eq!(parsed.config_type(), Some("deep-research"));
+    assert_eq!(
+        parsed
+            .as_value()
+            .get("thinkingSummaries")
+            .and_then(|v| v.as_str()),
+        Some("auto")
+    );
 }
 
 #[test]
-fn test_agent_config_dynamic_deserialization() {
+fn test_agent_config_deserialization_dynamic() {
     let json = r#"{"type": "dynamic"}"#;
     let parsed: AgentConfig = serde_json::from_str(json).expect("Deserialization should succeed");
 
-    assert!(matches!(parsed, AgentConfig::Dynamic));
+    assert_eq!(parsed.config_type(), Some("dynamic"));
 }
 
 #[test]
-fn test_agent_config_unknown_deserialization() {
-    // Test that unknown agent config types deserialize to Unknown (Evergreen principle)
+fn test_agent_config_deserialization_unknown() {
+    // Test that unknown agent config types deserialize successfully (Evergreen principle)
     let json = r#"{"type": "future-agent", "customField": 42}"#;
     let parsed: AgentConfig = serde_json::from_str(json).expect("Deserialization should succeed");
 
-    assert!(parsed.is_unknown());
-    assert_eq!(parsed.unknown_config_type(), Some("future-agent"));
+    assert_eq!(parsed.config_type(), Some("future-agent"));
 
     // Verify the full object is preserved
-    let data = parsed.unknown_data().unwrap();
-    assert_eq!(data.get("customField").unwrap(), 42);
+    let value = parsed.as_value();
+    assert_eq!(value.get("customField").unwrap(), 42);
 }
 
 #[test]
-fn test_agent_config_unknown_roundtrip() {
-    // Test that unknown values roundtrip correctly
-    let unknown = AgentConfig::Unknown {
-        config_type: "future-agent".to_string(),
-        data: serde_json::json!({
-            "type": "future-agent",
-            "customField": 42
-        }),
-    };
+fn test_agent_config_roundtrip() {
+    // Test that values roundtrip correctly
+    let config = AgentConfig::from_value(serde_json::json!({
+        "type": "future-agent",
+        "customField": 42
+    }));
 
-    let json = serde_json::to_string(&unknown).expect("Serialization failed");
+    let json = serde_json::to_string(&config).expect("Serialization failed");
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-    // Should preserve the type and flatten the data
+    // Should preserve the type and data
     assert_eq!(value["type"], "future-agent");
     assert_eq!(value["customField"], 42);
 
-    // Should roundtrip back to Unknown
+    // Should roundtrip back correctly
     let deserialized: AgentConfig = serde_json::from_str(&json).unwrap();
-    assert!(deserialized.is_unknown());
-    assert_eq!(deserialized.unknown_config_type(), Some("future-agent"));
+    assert_eq!(deserialized.config_type(), Some("future-agent"));
 }
 
 #[test]
 fn test_agent_config_helper_methods() {
-    // Known variants
-    let deep_research = AgentConfig::DeepResearch {
-        thinking_summaries: None,
-    };
-    assert!(!deep_research.is_unknown());
-    assert_eq!(deep_research.unknown_config_type(), None);
-    assert_eq!(deep_research.unknown_data(), None);
+    // Test config_type() method
+    let deep_research: AgentConfig = DeepResearchConfig::new().into();
+    assert_eq!(deep_research.config_type(), Some("deep-research"));
 
-    let dynamic = AgentConfig::Dynamic;
-    assert!(!dynamic.is_unknown());
+    let dynamic: AgentConfig = DynamicConfig::new().into();
+    assert_eq!(dynamic.config_type(), Some("dynamic"));
 
-    // Unknown variant
-    let unknown = AgentConfig::Unknown {
-        config_type: "test".to_string(),
-        data: serde_json::json!({}),
-    };
-    assert!(unknown.is_unknown());
-    assert_eq!(unknown.unknown_config_type(), Some("test"));
-    assert!(unknown.unknown_data().is_some());
+    let custom = AgentConfig::from_value(serde_json::json!({"type": "custom"}));
+    assert_eq!(custom.config_type(), Some("custom"));
+
+    // Test as_value() method
+    let config: AgentConfig = DeepResearchConfig::new()
+        .with_thinking_summaries(ThinkingSummaries::Auto)
+        .into();
+    let value = config.as_value();
+    assert_eq!(value.get("type").unwrap(), "deep-research");
+    assert_eq!(value.get("thinkingSummaries").unwrap(), "auto");
 }
 
 #[test]
 fn test_create_interaction_request_with_agent_config() {
+    let config: AgentConfig = DeepResearchConfig::new()
+        .with_thinking_summaries(ThinkingSummaries::Auto)
+        .into();
+
     let request = CreateInteractionRequest {
         model: None,
         agent: Some("deep-research-pro-preview-12-2025".to_string()),
-        agent_config: Some(AgentConfig::DeepResearch {
-            thinking_summaries: Some(ThinkingSummaries::Auto),
-        }),
+        agent_config: Some(config),
         input: InteractionInput::Text("Research question".to_string()),
         previous_interaction_id: None,
         tools: None,
@@ -446,9 +441,9 @@ fn test_create_interaction_request_with_agent_config() {
 #[test]
 fn test_agent_config_field_naming_conventions() {
     // Verify the exact JSON structure matches API expectations
-    let config = AgentConfig::DeepResearch {
-        thinking_summaries: Some(ThinkingSummaries::Auto),
-    };
+    let config: AgentConfig = DeepResearchConfig::new()
+        .with_thinking_summaries(ThinkingSummaries::Auto)
+        .into();
 
     let json = serde_json::to_string(&config).expect("Serialization failed");
 

@@ -18,9 +18,9 @@
 //!
 //! Run with: cargo run --example deep_research
 
-// AgentConfig and ThinkingSummaries are imported for documentation - see commented usage below
+// DeepResearchConfig and ThinkingSummaries are imported for documentation - see commented usage below
 #[allow(unused_imports)]
-use rust_genai::{AgentConfig, Client, GenaiError, InteractionStatus, ThinkingSummaries};
+use rust_genai::{Client, DeepResearchConfig, GenaiError, InteractionStatus, ThinkingSummaries};
 use std::env;
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -82,16 +82,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Starting deep research (this may take 30-120 seconds)...\n");
 
     // 3. Start the research in background mode (required for agent interactions)
-    //    We also configure agent-specific settings using the typed AgentConfig.
+    //    We also configure agent-specific settings using DeepResearchConfig.
     //    Note: agent_config support may vary by API version and agent availability.
     let result = client
         .interaction()
         .with_agent(agent_name)
         .with_text(prompt)
         // Optional: Configure agent-specific settings when supported
-        // .with_agent_config(AgentConfig::DeepResearch {
-        //     thinking_summaries: Some(ThinkingSummaries::Auto),
-        // })
+        // .with_agent_config(DeepResearchConfig::new()
+        //     .with_thinking_summaries(ThinkingSummaries::Auto))
         .with_background(true) // Required for agent interactions
         .with_store_enabled() // Required to retrieve results by interaction ID
         .create()
@@ -322,7 +321,7 @@ fn handle_research_error(e: &GenaiError) {
 //
 // --- Key Takeaways ---
 // • with_agent("deep-research-pro-preview-12-2025") uses the research agent
-// • with_agent_config(AgentConfig::DeepResearch {...}) for agent-specific settings
+// • with_agent_config(DeepResearchConfig::new()...) for agent-specific settings
 // • with_background(true) is required for agent interactions
 // • Poll for completion using client.get_interaction(id)
 // • Research typically takes 30-120 seconds
