@@ -430,6 +430,7 @@ async fn test_streaming_with_raw_request() {
         let request = CreateInteractionRequest {
             model: Some("gemini-3-flash-preview".to_string()),
             agent: None,
+            agent_config: None,
             input: InteractionInput::Text("Count from 1 to 5.".to_string()),
             previous_interaction_id: None,
             tools: None,

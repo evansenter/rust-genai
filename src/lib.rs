@@ -59,13 +59,13 @@ pub use genai_client::{
 
 // Re-export Interactions API types for convenient access
 pub use genai_client::{
-    Annotation, CodeExecutionCallInfo, CodeExecutionLanguage, CodeExecutionOutcome,
-    CodeExecutionResultInfo, ContentSummary, CreateInteractionRequest, FunctionCallInfo,
-    FunctionResultInfo, GenerationConfig, GroundingChunk, GroundingMetadata, InteractionContent,
-    InteractionInput, InteractionResponse, InteractionStatus, ModalityTokens,
-    OwnedFunctionCallInfo, StreamChunk, StreamEvent, ThinkingLevel, ThinkingSummaries,
-    UrlContextMetadata, UrlContextResultInfo, UrlMetadataEntry, UrlRetrievalStatus, UsageMetadata,
-    WebSource,
+    AgentConfig, Annotation, CodeExecutionCallInfo, CodeExecutionLanguage, CodeExecutionOutcome,
+    CodeExecutionResultInfo, ContentSummary, CreateInteractionRequest, DeepResearchConfig,
+    DynamicConfig, FunctionCallInfo, FunctionResultInfo, GenerationConfig, GroundingChunk,
+    GroundingMetadata, InteractionContent, InteractionInput, InteractionResponse,
+    InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, StreamChunk, StreamEvent,
+    ThinkingLevel, ThinkingSummaries, UrlContextMetadata, UrlContextResultInfo, UrlMetadataEntry,
+    UrlRetrievalStatus, UsageMetadata, WebSource,
 };
 
 // Re-export Files API types for convenient access

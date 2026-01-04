@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **ThinkingSummaries wire format** (#272): Fixed serialization to use `THINKING_SUMMARIES_AUTO` and `THINKING_SUMMARIES_NONE` (API's actual wire format) instead of `auto`/`none` (what the documentation claims). This enables `agent_config` with `thinking_summaries` to work correctly with the Deep Research agent.
+
 ### BREAKING CHANGES
 
 #### Timestamp Fields Use chrono::DateTime<Utc> (#273)
