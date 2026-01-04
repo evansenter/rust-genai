@@ -29,7 +29,7 @@ use crate::models::shared::{FunctionCallingMode, Tool};
 /// let role = Role::User;
 /// assert!(matches!(role, Role::User));
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Role {
     /// Content from the user
@@ -40,6 +40,8 @@ pub enum Role {
     Unknown {
         /// The unrecognized role type from the API
         role_type: String,
+        /// The raw JSON value, preserved for debugging and roundtrip
+        data: serde_json::Value,
     },
 }
 
@@ -54,7 +56,16 @@ impl Role {
     #[must_use]
     pub fn unknown_role_type(&self) -> Option<&str> {
         match self {
-            Self::Unknown { role_type } => Some(role_type),
+            Self::Unknown { role_type, .. } => Some(role_type),
+            _ => None,
+        }
+    }
+
+    /// Returns the preserved data if this is an unknown role.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::Unknown { data, .. } => Some(data),
             _ => None,
         }
     }
@@ -65,7 +76,7 @@ impl fmt::Display for Role {
         match self {
             Self::User => write!(f, "user"),
             Self::Model => write!(f, "model"),
-            Self::Unknown { role_type } => write!(f, "{}", role_type),
+            Self::Unknown { role_type, .. } => write!(f, "{}", role_type),
         }
     }
 }
@@ -78,7 +89,7 @@ impl Serialize for Role {
         match self {
             Role::User => serializer.serialize_str("user"),
             Role::Model => serializer.serialize_str("model"),
-            Role::Unknown { role_type } => serializer.serialize_str(role_type),
+            Role::Unknown { role_type, .. } => serializer.serialize_str(role_type),
         }
     }
 }
@@ -99,6 +110,7 @@ impl<'de> Deserialize<'de> for Role {
                 );
                 Ok(Role::Unknown {
                     role_type: other.to_string(),
+                    data: serde_json::Value::String(other.to_string()),
                 })
             }
         }

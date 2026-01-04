@@ -245,8 +245,11 @@ fn arb_role() -> impl Strategy<Value = Role> {
     prop_oneof![
         Just(Role::User),
         Just(Role::Model),
-        // Unknown variant with preserved data
-        arb_identifier().prop_map(|role_type| Role::Unknown { role_type }),
+        // Unknown variant with preserved data (role_type and data fields per Evergreen pattern)
+        arb_identifier().prop_map(|role_type| Role::Unknown {
+            data: serde_json::Value::String(role_type.clone()),
+            role_type,
+        }),
     ]
 }
 
