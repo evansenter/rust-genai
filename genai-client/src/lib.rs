@@ -38,6 +38,7 @@ pub use models::shared::FunctionParameters;
 pub use models::shared::Tool;
 
 // Interactions API types
+pub use models::interactions::AgentConfig;
 pub use models::interactions::Annotation;
 pub use models::interactions::CodeExecutionCallInfo;
 pub use models::interactions::CodeExecutionLanguage;
@@ -45,6 +46,8 @@ pub use models::interactions::CodeExecutionOutcome;
 pub use models::interactions::CodeExecutionResultInfo;
 pub use models::interactions::ContentSummary;
 pub use models::interactions::CreateInteractionRequest;
+pub use models::interactions::DeepResearchConfig;
+pub use models::interactions::DynamicConfig;
 pub use models::interactions::FunctionCallInfo;
 pub use models::interactions::FunctionResultInfo;
 pub use models::interactions::GenerationConfig;

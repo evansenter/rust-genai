@@ -6,6 +6,7 @@
 use chrono::{DateTime, TimeZone, Utc};
 use proptest::prelude::*;
 
+use super::agent_config::{AgentConfig, DeepResearchConfig, DynamicConfig, ThinkingSummaries};
 use super::content::{
     Annotation, CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem,
     InteractionContent,
@@ -14,7 +15,7 @@ use super::metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
     WebSource,
 };
-use super::request::{ThinkingLevel, ThinkingSummaries};
+use super::request::ThinkingLevel;
 use super::response::{
     InteractionResponse, InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, UsageMetadata,
 };
@@ -248,6 +249,36 @@ fn arb_thinking_summaries() -> impl Strategy<Value = ThinkingSummaries> {
         arb_identifier().prop_map(|summaries_type| ThinkingSummaries::Unknown {
             summaries_type: summaries_type.clone(),
             data: serde_json::Value::String(summaries_type),
+        }),
+    ]
+}
+
+// =============================================================================
+// AgentConfig Strategies
+// =============================================================================
+
+/// Strategy for AgentConfig using typed config structs.
+/// Since AgentConfig is now a thin wrapper around serde_json::Value,
+/// we generate configs via the typed structs (DeepResearchConfig, DynamicConfig)
+/// and the raw from_value() method for arbitrary configs.
+fn arb_agent_config() -> impl Strategy<Value = AgentConfig> {
+    prop_oneof![
+        // DeepResearch config with optional thinking summaries
+        proptest::option::of(arb_thinking_summaries()).prop_map(|thinking_summaries| {
+            let mut config = DeepResearchConfig::new();
+            if let Some(ts) = thinking_summaries {
+                config = config.with_thinking_summaries(ts);
+            }
+            config.into()
+        }),
+        // Dynamic config
+        Just(DynamicConfig::new().into()),
+        // Arbitrary config via from_value (for future agent types)
+        arb_identifier().prop_map(|config_type| {
+            AgentConfig::from_value(serde_json::json!({
+                "type": config_type,
+                "customField": 42
+            }))
         }),
     ]
 }
@@ -795,6 +826,16 @@ proptest! {
         // ThinkingSummaries doesn't derive PartialEq, so we verify roundtrip by comparing JSON strings
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
         prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test that AgentConfig roundtrips correctly through JSON.
+    #[test]
+    fn agent_config_roundtrip(config in arb_agent_config()) {
+        let json = serde_json::to_string(&config).expect("Serialization should succeed");
+        let restored: AgentConfig = serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        // AgentConfig derives PartialEq, so we can compare directly
+        prop_assert_eq!(config, restored);
     }
 
     /// Test that UrlRetrievalStatus roundtrips correctly through JSON.

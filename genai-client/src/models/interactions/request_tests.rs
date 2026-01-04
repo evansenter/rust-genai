@@ -7,6 +7,7 @@ fn test_serialize_create_interaction_request_with_model() {
     let request = CreateInteractionRequest {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
+        agent_config: None,
         input: InteractionInput::Text("Hello, world!".to_string()),
         previous_interaction_id: None,
         tools: None,
@@ -70,6 +71,7 @@ fn test_generation_config_new_fields_serialization() {
     assert_eq!(value["seed"], 42);
     assert_eq!(value["stopSequences"][0], "END");
     assert_eq!(value["stopSequences"][1], "---");
+    // GenerationConfig uses lowercase format for thinkingSummaries
     assert_eq!(value["thinkingSummaries"], "auto");
     assert_eq!(value["thinkingLevel"], "high");
 }
@@ -105,13 +107,13 @@ fn test_generation_config_roundtrip() {
 
 #[test]
 fn test_thinking_summaries_serialization() {
-    // Test Auto variant
+    // GenerationConfig wire format uses lowercase (auto/none)
+    // Note: AgentConfig uses THINKING_SUMMARIES_* via to_agent_config_value() - see agent_config.rs tests
     assert_eq!(
         serde_json::to_string(&ThinkingSummaries::Auto).unwrap(),
         "\"auto\""
     );
 
-    // Test None variant
     assert_eq!(
         serde_json::to_string(&ThinkingSummaries::None).unwrap(),
         "\"none\""
@@ -120,7 +122,17 @@ fn test_thinking_summaries_serialization() {
 
 #[test]
 fn test_thinking_summaries_deserialization() {
-    // Test known values
+    // Test wire format (THINKING_SUMMARIES_*)
+    assert_eq!(
+        serde_json::from_str::<ThinkingSummaries>("\"THINKING_SUMMARIES_AUTO\"").unwrap(),
+        ThinkingSummaries::Auto
+    );
+    assert_eq!(
+        serde_json::from_str::<ThinkingSummaries>("\"THINKING_SUMMARIES_NONE\"").unwrap(),
+        ThinkingSummaries::None
+    );
+
+    // Also accept lowercase for flexibility
     assert_eq!(
         serde_json::from_str::<ThinkingSummaries>("\"auto\"").unwrap(),
         ThinkingSummaries::Auto
@@ -278,4 +290,197 @@ fn test_thinking_summaries_object_form_deserialization() {
     // Verify the full object is preserved
     let data = parsed.unknown_data().unwrap();
     assert_eq!(data.get("format").unwrap(), "markdown");
+}
+
+// =============================================================================
+// AgentConfig Tests
+// =============================================================================
+
+#[test]
+fn test_deep_research_config_serialization() {
+    let config: AgentConfig = DeepResearchConfig::new()
+        .with_thinking_summaries(ThinkingSummaries::Auto)
+        .into();
+
+    let json = serde_json::to_string(&config).expect("Serialization failed");
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(value["type"], "deep-research");
+    assert_eq!(value["thinkingSummaries"], "THINKING_SUMMARIES_AUTO");
+}
+
+#[test]
+fn test_deep_research_config_without_thinking_summaries() {
+    let config: AgentConfig = DeepResearchConfig::new().into();
+
+    let json = serde_json::to_string(&config).expect("Serialization failed");
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(value["type"], "deep-research");
+    assert!(value.get("thinkingSummaries").is_none());
+}
+
+#[test]
+fn test_dynamic_config_serialization() {
+    let config: AgentConfig = DynamicConfig::new().into();
+
+    let json = serde_json::to_string(&config).expect("Serialization failed");
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(value["type"], "dynamic");
+}
+
+#[test]
+fn test_agent_config_deserialization_deep_research() {
+    let json = r#"{"type": "deep-research", "thinkingSummaries": "auto"}"#;
+    let parsed: AgentConfig = serde_json::from_str(json).expect("Deserialization should succeed");
+
+    assert_eq!(parsed.config_type(), Some("deep-research"));
+    assert_eq!(
+        parsed
+            .as_value()
+            .get("thinkingSummaries")
+            .and_then(|v| v.as_str()),
+        Some("auto")
+    );
+}
+
+#[test]
+fn test_agent_config_deserialization_dynamic() {
+    let json = r#"{"type": "dynamic"}"#;
+    let parsed: AgentConfig = serde_json::from_str(json).expect("Deserialization should succeed");
+
+    assert_eq!(parsed.config_type(), Some("dynamic"));
+}
+
+#[test]
+fn test_agent_config_deserialization_unknown() {
+    // Test that unknown agent config types deserialize successfully (Evergreen principle)
+    let json = r#"{"type": "future-agent", "customField": 42}"#;
+    let parsed: AgentConfig = serde_json::from_str(json).expect("Deserialization should succeed");
+
+    assert_eq!(parsed.config_type(), Some("future-agent"));
+
+    // Verify the full object is preserved
+    let value = parsed.as_value();
+    assert_eq!(value.get("customField").unwrap(), 42);
+}
+
+#[test]
+fn test_agent_config_roundtrip() {
+    // Test that values roundtrip correctly
+    let config = AgentConfig::from_value(serde_json::json!({
+        "type": "future-agent",
+        "customField": 42
+    }));
+
+    let json = serde_json::to_string(&config).expect("Serialization failed");
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    // Should preserve the type and data
+    assert_eq!(value["type"], "future-agent");
+    assert_eq!(value["customField"], 42);
+
+    // Should roundtrip back correctly
+    let deserialized: AgentConfig = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized.config_type(), Some("future-agent"));
+}
+
+#[test]
+fn test_agent_config_helper_methods() {
+    // Test config_type() method
+    let deep_research: AgentConfig = DeepResearchConfig::new().into();
+    assert_eq!(deep_research.config_type(), Some("deep-research"));
+
+    let dynamic: AgentConfig = DynamicConfig::new().into();
+    assert_eq!(dynamic.config_type(), Some("dynamic"));
+
+    let custom = AgentConfig::from_value(serde_json::json!({"type": "custom"}));
+    assert_eq!(custom.config_type(), Some("custom"));
+
+    // Test as_value() method
+    let config: AgentConfig = DeepResearchConfig::new()
+        .with_thinking_summaries(ThinkingSummaries::Auto)
+        .into();
+    let value = config.as_value();
+    assert_eq!(value.get("type").unwrap(), "deep-research");
+    assert_eq!(
+        value.get("thinkingSummaries").unwrap(),
+        "THINKING_SUMMARIES_AUTO"
+    );
+}
+
+#[test]
+fn test_create_interaction_request_with_agent_config() {
+    let config: AgentConfig = DeepResearchConfig::new()
+        .with_thinking_summaries(ThinkingSummaries::Auto)
+        .into();
+
+    let request = CreateInteractionRequest {
+        model: None,
+        agent: Some("deep-research-pro-preview-12-2025".to_string()),
+        agent_config: Some(config),
+        input: InteractionInput::Text("Research question".to_string()),
+        previous_interaction_id: None,
+        tools: None,
+        response_modalities: None,
+        response_format: None,
+        response_mime_type: None,
+        generation_config: None,
+        stream: None,
+        background: Some(true),
+        store: Some(true),
+        system_instruction: None,
+    };
+
+    let json = serde_json::to_string(&request).expect("Serialization failed");
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(value["agent"], "deep-research-pro-preview-12-2025");
+    assert_eq!(value["agent_config"]["type"], "deep-research");
+    assert_eq!(
+        value["agent_config"]["thinkingSummaries"],
+        "THINKING_SUMMARIES_AUTO"
+    );
+    assert_eq!(value["background"], true);
+    assert_eq!(value["store"], true);
+}
+
+/// Test that verifies the field naming conventions used in AgentConfig serialization.
+///
+/// This test explicitly documents the casing decisions:
+/// - `type` key uses kebab-case for values: "deep-research", "dynamic"
+/// - `thinkingSummaries` key uses camelCase (consistent with other Gemini API fields like
+///   `maxOutputTokens`, `topP`, `topK` in GenerationConfig)
+///
+/// The outer `agent_config` field is snake_case per API documentation, while inner
+/// fields follow the camelCase convention used throughout the Gemini Interactions API.
+#[test]
+fn test_agent_config_field_naming_conventions() {
+    // Verify the exact JSON structure matches API expectations
+    let config: AgentConfig = DeepResearchConfig::new()
+        .with_thinking_summaries(ThinkingSummaries::Auto)
+        .into();
+
+    let json = serde_json::to_string(&config).expect("Serialization failed");
+
+    // Expected: {"type":"deep-research","thinkingSummaries":"THINKING_SUMMARIES_AUTO"}
+    // NOT: {"type":"deep-research","thinking_summaries":"auto"}
+    assert!(
+        json.contains("thinkingSummaries"),
+        "Field should be camelCase 'thinkingSummaries', got: {}",
+        json
+    );
+    assert!(
+        !json.contains("thinking_summaries"),
+        "Field should NOT be snake_case 'thinking_summaries', got: {}",
+        json
+    );
+
+    // Verify value uses wire format THINKING_SUMMARIES_*
+    assert!(
+        json.contains(r#""THINKING_SUMMARIES_AUTO""#),
+        "ThinkingSummaries::Auto should serialize to 'THINKING_SUMMARIES_AUTO', got: {}",
+        json
+    );
 }
