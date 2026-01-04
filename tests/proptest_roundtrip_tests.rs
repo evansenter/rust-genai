@@ -6,6 +6,7 @@
 //! Note: Since `AutoFunctionResult` is `#[non_exhaustive]`, we can't construct it directly
 //! from integration tests. Instead, we deserialize from JSON and verify roundtrip stability.
 
+use chrono::{DateTime, TimeZone, Utc};
 use proptest::prelude::*;
 use rust_genai::{AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionResult};
 use std::time::Duration;
@@ -46,6 +47,18 @@ fn arb_identifier() -> impl Strategy<Value = String> {
 /// Strategy for generating text
 fn arb_text() -> impl Strategy<Value = String> {
     ".{0,500}"
+}
+
+/// Strategy for generating DateTime<Utc> values.
+/// Uses second precision to ensure reliable roundtrip (avoiding nanosecond precision issues).
+fn arb_datetime() -> impl Strategy<Value = DateTime<Utc>> {
+    // Generate timestamps between 2020-01-01 and 2030-01-01 (reasonable range)
+    (0i64..315_360_000).prop_map(|offset_secs| {
+        // Base: 2020-01-01 00:00:00 UTC (timestamp 1577836800)
+        Utc.timestamp_opt(1_577_836_800 + offset_secs, 0)
+            .single()
+            .expect("valid timestamp")
+    })
 }
 
 // =============================================================================
@@ -204,9 +217,22 @@ fn arb_interaction_response() -> impl Strategy<Value = InteractionResponse> {
         arb_interaction_status(),                               // status
         proptest::option::of(arb_usage_metadata()),             // usage
         proptest::option::of(arb_identifier()),                 // previous_interaction_id
+        proptest::option::of(arb_datetime()),                   // created
+        proptest::option::of(arb_datetime()),                   // updated
     )
         .prop_map(
-            |(id, model, agent, input, outputs, status, usage, previous_interaction_id)| {
+            |(
+                id,
+                model,
+                agent,
+                input,
+                outputs,
+                status,
+                usage,
+                previous_interaction_id,
+                created,
+                updated,
+            )| {
                 InteractionResponse {
                     id,
                     model,
@@ -219,8 +245,8 @@ fn arb_interaction_response() -> impl Strategy<Value = InteractionResponse> {
                     grounding_metadata: None,
                     url_context_metadata: None,
                     previous_interaction_id,
-                    created: None,
-                    updated: None,
+                    created,
+                    updated,
                 }
             },
         )
