@@ -71,7 +71,8 @@ fn test_generation_config_new_fields_serialization() {
     assert_eq!(value["seed"], 42);
     assert_eq!(value["stopSequences"][0], "END");
     assert_eq!(value["stopSequences"][1], "---");
-    assert_eq!(value["thinkingSummaries"], "THINKING_SUMMARIES_AUTO");
+    // GenerationConfig uses lowercase format for thinkingSummaries
+    assert_eq!(value["thinkingSummaries"], "auto");
     assert_eq!(value["thinkingLevel"], "high");
 }
 
@@ -106,15 +107,16 @@ fn test_generation_config_roundtrip() {
 
 #[test]
 fn test_thinking_summaries_serialization() {
-    // Wire format uses THINKING_SUMMARIES_* prefix
+    // GenerationConfig wire format uses lowercase (auto/none)
+    // Note: AgentConfig uses THINKING_SUMMARIES_* via to_agent_config_value() - see agent_config.rs tests
     assert_eq!(
         serde_json::to_string(&ThinkingSummaries::Auto).unwrap(),
-        "\"THINKING_SUMMARIES_AUTO\""
+        "\"auto\""
     );
 
     assert_eq!(
         serde_json::to_string(&ThinkingSummaries::None).unwrap(),
-        "\"THINKING_SUMMARIES_NONE\""
+        "\"none\""
     );
 }
 

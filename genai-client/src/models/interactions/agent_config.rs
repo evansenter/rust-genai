@@ -64,9 +64,11 @@ impl Serialize for ThinkingSummaries {
     where
         S: Serializer,
     {
+        // Note: GenerationConfig uses lowercase ("auto"/"none")
+        // For AgentConfig, use to_agent_config_value() instead
         match self {
-            ThinkingSummaries::Auto => serializer.serialize_str("THINKING_SUMMARIES_AUTO"),
-            ThinkingSummaries::None => serializer.serialize_str("THINKING_SUMMARIES_NONE"),
+            ThinkingSummaries::Auto => serializer.serialize_str("auto"),
+            ThinkingSummaries::None => serializer.serialize_str("none"),
             ThinkingSummaries::Unknown {
                 summaries_type,
                 data,
@@ -81,6 +83,29 @@ impl Serialize for ThinkingSummaries {
                     map.serialize_entry("data", data)?;
                     map.end()
                 }
+            }
+        }
+    }
+}
+
+impl ThinkingSummaries {
+    /// Convert to the agent_config wire format (THINKING_SUMMARIES_*).
+    ///
+    /// AgentConfig uses a different wire format than GenerationConfig:
+    /// - GenerationConfig: lowercase ("auto", "none")
+    /// - AgentConfig: SCREAMING_CASE ("THINKING_SUMMARIES_AUTO", "THINKING_SUMMARIES_NONE")
+    #[must_use]
+    pub fn to_agent_config_value(&self) -> serde_json::Value {
+        match self {
+            ThinkingSummaries::Auto => {
+                serde_json::Value::String("THINKING_SUMMARIES_AUTO".to_string())
+            }
+            ThinkingSummaries::None => {
+                serde_json::Value::String("THINKING_SUMMARIES_NONE".to_string())
+            }
+            ThinkingSummaries::Unknown { summaries_type, .. } => {
+                // For unknown values, preserve the original format
+                serde_json::Value::String(summaries_type.clone())
             }
         }
     }
@@ -245,8 +270,8 @@ impl From<DeepResearchConfig> for AgentConfig {
             serde_json::Value::String("deep-research".into()),
         );
         if let Some(ts) = config.thinking_summaries {
-            let ts_value = serde_json::to_value(ts).unwrap_or(serde_json::Value::Null);
-            map.insert("thinkingSummaries".into(), ts_value);
+            // Use agent_config format (THINKING_SUMMARIES_*), not generation_config format (auto/none)
+            map.insert("thinkingSummaries".into(), ts.to_agent_config_value());
         }
         AgentConfig(serde_json::Value::Object(map))
     }
@@ -287,15 +312,29 @@ mod tests {
 
     #[test]
     fn test_thinking_summaries_serialization() {
-        // Wire format uses THINKING_SUMMARIES_* prefix
+        // GenerationConfig wire format uses lowercase
         assert_eq!(
             serde_json::to_string(&ThinkingSummaries::Auto).unwrap(),
-            "\"THINKING_SUMMARIES_AUTO\""
+            "\"auto\""
         );
 
         assert_eq!(
             serde_json::to_string(&ThinkingSummaries::None).unwrap(),
-            "\"THINKING_SUMMARIES_NONE\""
+            "\"none\""
+        );
+    }
+
+    #[test]
+    fn test_thinking_summaries_agent_config_format() {
+        // AgentConfig uses THINKING_SUMMARIES_* format via to_agent_config_value()
+        assert_eq!(
+            ThinkingSummaries::Auto.to_agent_config_value(),
+            serde_json::Value::String("THINKING_SUMMARIES_AUTO".to_string())
+        );
+
+        assert_eq!(
+            ThinkingSummaries::None.to_agent_config_value(),
+            serde_json::Value::String("THINKING_SUMMARIES_NONE".to_string())
         );
     }
 
