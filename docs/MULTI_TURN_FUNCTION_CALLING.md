@@ -470,10 +470,10 @@ Thought signatures are cryptographic proofs that the model's thinking wasn't mod
 
 **For standard function calling, you can ignore thought signatures entirely.** They're just metadata on the response - you don't need to capture, store, or return them.
 
-> **Verified behavior**: See `tests/thinking_function_tests.rs` for comprehensive tests covering:
-> - `test_thought_signature_parallel_only_first` - Only first parallel call has signature
-> - `test_thought_signature_sequential_each_step` - Each sequential call has its own signature
-> - `test_function_calling_without_thinking` - No signatures without thinking mode
+> **Verified behavior**: See tests covering thought signatures:
+> - `test_thought_signature_parallel_only_first` in `tests/advanced_function_calling_tests.rs` - Only first parallel call has signature
+> - `test_thought_signature_sequential_each_step` in `tests/advanced_function_calling_tests.rs` - Each sequential call has its own signature
+> - `test_function_calling_without_thinking` in `tests/thinking_function_tests.rs` - No signatures without thinking mode
 > - `test_thought_echo_manual_history` in `tests/interactions_api_tests.rs` - Echoing thoughts
 
 ## Design Patterns
