@@ -15,7 +15,8 @@ use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
     self, AgentConfig, CreateInteractionRequest, DeepResearchConfig, FunctionCallingMode,
     FunctionDeclaration, GenerationConfig, InteractionContent, InteractionInput,
-    InteractionResponse, StreamEvent, ThinkingLevel, ThinkingSummaries, Tool as InternalTool,
+    InteractionResponse, Role, StreamEvent, ThinkingLevel, ThinkingSummaries, Tool as InternalTool,
+    Turn, TurnContent,
 };
 
 // ============================================================================
@@ -504,6 +505,88 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     pub fn with_content(mut self, content: Vec<InteractionContent>) -> Self {
         self.input = Some(InteractionInput::Content(content));
         self
+    }
+
+    /// Sets the input from an explicit array of conversation turns.
+    ///
+    /// This enables multi-turn conversations without relying on server-side
+    /// storage via `previous_interaction_id`. Useful for:
+    /// - Stateless deployments
+    /// - Migrating conversations from other providers
+    /// - Custom history management (e.g., sliding window, summarization)
+    /// - Testing with controlled conversation states
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, Turn};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let history = vec![
+    ///     Turn::user("What is 2+2?"),
+    ///     Turn::model("2+2 equals 4."),
+    ///     Turn::user("And what's that times 3?"),
+    /// ];
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_turns(history)
+    ///     .create()
+    ///     .await?;
+    ///
+    /// println!("{}", response.text().unwrap_or("No response"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_turns(mut self, turns: Vec<Turn>) -> Self {
+        self.input = Some(InteractionInput::Turns(turns));
+        self
+    }
+
+    /// Starts building a conversation with a fluent API.
+    ///
+    /// Returns a [`ConversationBuilder`] that allows chaining `.user()` and `.model()`
+    /// calls to construct a multi-turn conversation. Call `.done()` to return to
+    /// the [`InteractionBuilder`].
+    ///
+    /// This is an alternative to [`with_turns()`] that provides a more readable
+    /// syntax for constructing conversations inline.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .conversation()
+    ///         .user("What is 2+2?")
+    ///         .model("2+2 equals 4.")
+    ///         .user("And what's that times 3?")
+    ///         .done()
+    ///     .create()
+    ///     .await?;
+    ///
+    /// println!("{}", response.text().unwrap_or("No response"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`with_turns()`]: InteractionBuilder::with_turns
+    pub fn conversation(self) -> ConversationBuilder<'a, State> {
+        ConversationBuilder {
+            parent: self,
+            turns: Vec::new(),
+        }
     }
 
     // =========================================================================
@@ -1807,6 +1890,174 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
             store: self.store,
             system_instruction: self.system_instruction,
         })
+    }
+}
+
+// ============================================================================
+// ConversationBuilder - Fluent API for building multi-turn conversations
+// ============================================================================
+
+/// Builder for constructing multi-turn conversations with a fluent API.
+///
+/// Created via [`InteractionBuilder::conversation()`]. Allows chaining `.user()` and
+/// `.model()` calls to build a conversation history, then `.done()` to return to
+/// the parent builder.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_genai::Client;
+///
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let client = Client::new("api-key".to_string());
+///
+/// let response = client
+///     .interaction()
+///     .with_model("gemini-3-flash-preview")
+///     .conversation()
+///         .user("What is the capital of France?")
+///         .model("The capital of France is Paris.")
+///         .user("What's the population?")
+///         .done()
+///     .create()
+///     .await?;
+/// # Ok(())
+/// # }
+/// ```
+pub struct ConversationBuilder<'a, State> {
+    parent: InteractionBuilder<'a, State>,
+    turns: Vec<Turn>,
+}
+
+impl<'a, State: Send + 'a> ConversationBuilder<'a, State> {
+    /// Adds a user message to the conversation.
+    ///
+    /// Accepts any type that can be converted to [`TurnContent`], including:
+    /// - `&str` or `String` for text content
+    /// - `Vec<InteractionContent>` for multimodal content
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .conversation()
+    ///         .user("Hello!")
+    ///         .done()
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn user(mut self, content: impl Into<TurnContent>) -> Self {
+        self.turns.push(Turn::user(content));
+        self
+    }
+
+    /// Adds a model message to the conversation.
+    ///
+    /// Use this to include previous model responses in the conversation history.
+    /// The model will use this context when generating its next response.
+    ///
+    /// Accepts any type that can be converted to [`TurnContent`], including:
+    /// - `&str` or `String` for text content
+    /// - `Vec<InteractionContent>` for multimodal content
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .conversation()
+    ///         .user("What is 2+2?")
+    ///         .model("2+2 equals 4.")
+    ///         .user("Multiply that by 3")
+    ///         .done()
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn model(mut self, content: impl Into<TurnContent>) -> Self {
+        self.turns.push(Turn::model(content));
+        self
+    }
+
+    /// Adds a turn with an explicit role.
+    ///
+    /// This is useful when you need to dynamically construct conversations
+    /// where the role is determined at runtime.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, Role};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let role = Role::User; // Determined at runtime
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .conversation()
+    ///         .turn(role, "Dynamic message")
+    ///         .done()
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn turn(mut self, role: Role, content: impl Into<TurnContent>) -> Self {
+        self.turns.push(Turn::new(role, content));
+        self
+    }
+
+    /// Finishes building the conversation and returns to the parent [`InteractionBuilder`].
+    ///
+    /// The accumulated turns are set as the input for the interaction.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .conversation()
+    ///         .user("Hello!")
+    ///         .done()  // Returns to InteractionBuilder
+    ///     .create()    // Now we can call create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn done(self) -> InteractionBuilder<'a, State> {
+        let mut parent = self.parent;
+        parent.input = Some(InteractionInput::Turns(self.turns));
+        parent
     }
 }
 

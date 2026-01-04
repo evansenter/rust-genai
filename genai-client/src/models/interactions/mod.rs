@@ -32,7 +32,10 @@ pub use metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
     WebSource,
 };
-pub use request::{CreateInteractionRequest, GenerationConfig, InteractionInput, ThinkingLevel};
+pub use request::{
+    CreateInteractionRequest, GenerationConfig, InteractionInput, Role, ThinkingLevel, Turn,
+    TurnContent,
+};
 pub use response::{
     CodeExecutionCallInfo, CodeExecutionResultInfo, ContentSummary, FunctionCallInfo,
     FunctionResultInfo, InteractionResponse, InteractionStatus, ModalityTokens,

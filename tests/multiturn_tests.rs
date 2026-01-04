@@ -466,3 +466,154 @@ async fn test_usage_longer_response() {
         println!("Token counts not available for comparison");
     }
 }
+
+// =============================================================================
+// Explicit Turn Array Tests (Issue #271)
+// =============================================================================
+
+use common::interaction_builder;
+use rust_genai::Turn;
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_explicit_turns_basic() {
+    // Test basic multi-turn conversation using explicit Turn array
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let turns = vec![
+        Turn::user("What is 2+2?"),
+        Turn::model("2+2 equals 4."),
+        Turn::user("And what's that times 3?"),
+    ];
+
+    let response = interaction_builder(&client)
+        .with_turns(turns)
+        .create()
+        .await
+        .expect("Request failed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().unwrap().to_lowercase();
+    println!("Response: {}", text);
+
+    // Model should compute 4 * 3 = 12
+    assert!(
+        text.contains("12") || text.contains("twelve"),
+        "Response should contain the answer 12"
+    );
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_conversation_builder_fluent_api() {
+    // Test the ConversationBuilder fluent API
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .conversation()
+        .user("My name is Alice and I love hiking.")
+        .model("Nice to meet you, Alice! Hiking is a wonderful outdoor activity.")
+        .user("What's my name and what do I enjoy doing?")
+        .done()
+        .create()
+        .await
+        .expect("Request failed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().unwrap().to_lowercase();
+    println!("Response: {}", text);
+
+    // Model should remember both facts
+    assert!(text.contains("alice"), "Response should mention Alice");
+    assert!(
+        text.contains("hik"),
+        "Response should mention hiking (or hiking-related word)"
+    );
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_explicit_turns_context_preservation() {
+    // Test that context is properly preserved across explicit turns
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let turns = vec![
+        Turn::user("I'm planning a trip to Tokyo next month."),
+        Turn::model(
+            "Tokyo is an amazing destination! It offers incredible food, \
+             ancient temples, modern technology, and beautiful cherry blossoms. \
+             What aspects of the city are you most excited to explore?",
+        ),
+        Turn::user("I love trying local cuisine."),
+        Turn::model(
+            "Great choice! Tokyo has some of the best food in the world. \
+             Try ramen in a local shop, fresh sushi at Tsukiji Outer Market, \
+             and don't miss Japanese convenience store food - it's surprisingly excellent!",
+        ),
+        Turn::user("Where am I going and what do I enjoy?"),
+    ];
+
+    let response = interaction_builder(&client)
+        .with_turns(turns)
+        .create()
+        .await
+        .expect("Request failed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+
+    let text = response.text().unwrap().to_lowercase();
+    println!("Response: {}", text);
+
+    // Should remember both destination and interest
+    assert!(
+        text.contains("tokyo") || text.contains("japan"),
+        "Response should mention Tokyo/Japan"
+    );
+    assert!(
+        text.contains("food") || text.contains("cuisine") || text.contains("eat"),
+        "Response should mention food/cuisine"
+    );
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_explicit_turns_single_user_message() {
+    // Test that a single user turn works (equivalent to with_text)
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let turns = vec![Turn::user(
+        "What is the capital of France? Reply in one word.",
+    )];
+
+    let response = interaction_builder(&client)
+        .with_turns(turns)
+        .create()
+        .await
+        .expect("Request failed");
+
+    assert_eq!(response.status, InteractionStatus::Completed);
+    assert!(response.has_text(), "Should have text response");
+
+    let text = response.text().unwrap().to_lowercase();
+    println!("Response: {}", text);
+
+    assert!(text.contains("paris"), "Response should contain Paris");
+}

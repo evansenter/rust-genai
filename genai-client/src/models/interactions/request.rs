@@ -9,10 +9,298 @@ use super::agent_config::{AgentConfig, ThinkingSummaries};
 use super::content::InteractionContent;
 use crate::models::shared::{FunctionCallingMode, Tool};
 
-/// Input for an interaction - can be a simple string or array of content.
+/// Role in a conversation turn.
+///
+/// Indicates whether the content came from the user or the model.
+///
+/// This enum is marked `#[non_exhaustive]` for forward compatibility.
+/// New roles may be added in future API versions.
+///
+/// # Evergreen Pattern
+///
+/// Unknown values from the API deserialize into the `Unknown` variant, preserving
+/// the original data for debugging and roundtrip serialization.
+///
+/// # Example
+///
+/// ```
+/// use genai_client::Role;
+///
+/// let role = Role::User;
+/// assert!(matches!(role, Role::User));
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Role {
+    /// Content from the user
+    User,
+    /// Content from the model
+    Model,
+    /// Unknown variant for forward compatibility (Evergreen pattern)
+    Unknown {
+        /// The unrecognized role type from the API
+        role_type: String,
+    },
+}
+
+impl Role {
+    /// Returns true if this is an unknown role.
+    #[must_use]
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown { .. })
+    }
+
+    /// Returns the role type name if this is an unknown role.
+    #[must_use]
+    pub fn unknown_role_type(&self) -> Option<&str> {
+        match self {
+            Self::Unknown { role_type } => Some(role_type),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for Role {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::User => write!(f, "user"),
+            Self::Model => write!(f, "model"),
+            Self::Unknown { role_type } => write!(f, "{}", role_type),
+        }
+    }
+}
+
+impl Serialize for Role {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Role::User => serializer.serialize_str("user"),
+            Role::Model => serializer.serialize_str("model"),
+            Role::Unknown { role_type } => serializer.serialize_str(role_type),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Role {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.as_str() {
+            "user" => Ok(Role::User),
+            "model" => Ok(Role::Model),
+            other => {
+                log::warn!(
+                    "Encountered unknown Role '{}' - using Unknown variant (Evergreen)",
+                    other
+                );
+                Ok(Role::Unknown {
+                    role_type: other.to_string(),
+                })
+            }
+        }
+    }
+}
+
+/// Content for a conversation turn.
+///
+/// Can be simple text or an array of content parts for multimodal turns.
+///
+/// # Example
+///
+/// ```
+/// use genai_client::TurnContent;
+///
+/// // Simple text
+/// let content = TurnContent::Text("Hello!".to_string());
+///
+/// // From string reference
+/// let content: TurnContent = "Hello!".into();
+/// ```
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TurnContent {
+    /// Simple text content
+    Text(String),
+    /// Array of content parts (for multimodal content)
+    Parts(Vec<InteractionContent>),
+}
+
+impl From<String> for TurnContent {
+    fn from(s: String) -> Self {
+        Self::Text(s)
+    }
+}
+
+impl From<&str> for TurnContent {
+    fn from(s: &str) -> Self {
+        Self::Text(s.to_string())
+    }
+}
+
+impl From<Vec<InteractionContent>> for TurnContent {
+    fn from(parts: Vec<InteractionContent>) -> Self {
+        Self::Parts(parts)
+    }
+}
+
+impl TurnContent {
+    /// Returns the text content if this is a `Text` variant.
+    #[must_use]
+    pub fn text(&self) -> Option<&str> {
+        match self {
+            Self::Text(t) => Some(t),
+            Self::Parts(_) => None,
+        }
+    }
+
+    /// Returns the content parts if this is a `Parts` variant.
+    #[must_use]
+    pub fn parts(&self) -> Option<&[InteractionContent]> {
+        match self {
+            Self::Parts(p) => Some(p),
+            Self::Text(_) => None,
+        }
+    }
+
+    /// Returns `true` if this is text content.
+    #[must_use]
+    pub const fn is_text(&self) -> bool {
+        matches!(self, Self::Text(_))
+    }
+
+    /// Returns `true` if this is parts content.
+    #[must_use]
+    pub const fn is_parts(&self) -> bool {
+        matches!(self, Self::Parts(_))
+    }
+}
+
+/// A single turn in a multi-turn conversation.
+///
+/// Represents one message in a conversation, containing the role (who sent it)
+/// and the content of the message.
+///
+/// # Example
+///
+/// ```
+/// use genai_client::{Turn, Role, TurnContent};
+///
+/// // Create a user turn with text
+/// let user_turn = Turn::user("What is 2+2?");
+///
+/// // Create a model turn with text
+/// let model_turn = Turn::model("2+2 equals 4.");
+///
+/// // Create a turn with explicit role and content
+/// let turn = Turn::new(Role::User, "Hello!");
+///
+/// // Access via getters
+/// assert!(matches!(turn.role(), &Role::User));
+/// assert_eq!(turn.content().text(), Some("Hello!"));
+/// ```
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Turn {
+    role: Role,
+    content: TurnContent,
+}
+
+impl Turn {
+    /// Creates a new turn with the given role and content.
+    pub fn new(role: Role, content: impl Into<TurnContent>) -> Self {
+        Self {
+            role,
+            content: content.into(),
+        }
+    }
+
+    /// Returns a reference to the role of this turn.
+    #[must_use]
+    pub fn role(&self) -> &Role {
+        &self.role
+    }
+
+    /// Returns a reference to the content of this turn.
+    #[must_use]
+    pub fn content(&self) -> &TurnContent {
+        &self.content
+    }
+
+    /// Creates a user turn with the given content.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use genai_client::Turn;
+    ///
+    /// let turn = Turn::user("What is the capital of France?");
+    /// ```
+    pub fn user(content: impl Into<TurnContent>) -> Self {
+        Self::new(Role::User, content)
+    }
+
+    /// Creates a model turn with the given content.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use genai_client::Turn;
+    ///
+    /// let turn = Turn::model("The capital of France is Paris.");
+    /// ```
+    pub fn model(content: impl Into<TurnContent>) -> Self {
+        Self::new(Role::Model, content)
+    }
+
+    /// Returns `true` if this is a user turn.
+    #[must_use]
+    pub fn is_user(&self) -> bool {
+        *self.role() == Role::User
+    }
+
+    /// Returns `true` if this is a model turn.
+    #[must_use]
+    pub fn is_model(&self) -> bool {
+        *self.role() == Role::Model
+    }
+
+    /// Returns the text content if this turn contains text.
+    #[must_use]
+    pub fn text(&self) -> Option<&str> {
+        self.content().text()
+    }
+}
+
+/// Input for an interaction - can be a simple string, array of content, or turns.
 ///
 /// This enum is marked `#[non_exhaustive]` for forward compatibility.
 /// New input types may be added in future versions.
+///
+/// # Variants
+///
+/// - `Text`: Simple text input for single-turn conversations
+/// - `Content`: Array of content objects for multimodal input
+/// - `Turns`: Array of turns for explicit multi-turn conversations
+///
+/// # Example
+///
+/// ```
+/// use genai_client::{InteractionInput, Turn};
+///
+/// // Simple text
+/// let input = InteractionInput::Text("Hello!".to_string());
+///
+/// // Multi-turn conversation
+/// let turns = vec![
+///     Turn::user("What is 2+2?"),
+///     Turn::model("2+2 equals 4."),
+///     Turn::user("And what's that times 3?"),
+/// ];
+/// let input = InteractionInput::Turns(turns);
+/// ```
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 #[non_exhaustive]
@@ -21,6 +309,8 @@ pub enum InteractionInput {
     Text(String),
     /// Array of content objects
     Content(Vec<InteractionContent>),
+    /// Array of turns for multi-turn conversations
+    Turns(Vec<Turn>),
 }
 
 /// Thinking level for chain-of-thought reasoning.
