@@ -9,6 +9,7 @@ This directory contains comprehensive example applications demonstrating practic
 | [RAG System](./rag_system/) | Document Q&A with retrieval | Context injection, source attribution |
 | [Multi-Turn Agent (Auto)](./multi_turn_agent_auto/) | Customer support bot | `create_with_auto_functions()`, stateful conversations |
 | [Multi-Turn Agent (Manual)](./multi_turn_agent_manual/) | Customer support bot | Manual function loop, full control |
+| [Multi-Turn Agent (Stateless)](./multi_turn_agent_manual_stateless/) | Customer support bot | `store: false`, manual history |
 | [Code Assistant](./code_assistant/) | Code analysis tool | Structured output, multi-task analysis |
 | [Data Analysis](./data_analysis/) | CSV analysis with NL queries | Function calling, data operations |
 | [Web Scraper Agent](./web_scraper_agent/) | Web research assistant | Google Search grounding, streaming |
@@ -28,6 +29,7 @@ Run any example with:
 cargo run --example rag_system
 cargo run --example multi_turn_agent_auto
 cargo run --example multi_turn_agent_manual
+cargo run --example multi_turn_agent_manual_stateless
 cargo run --example code_assistant
 cargo run --example data_analysis
 cargo run --example web_scraper_agent
@@ -47,10 +49,10 @@ cargo run --example testing_assistant
 
 | Feature | Examples |
 |---------|----------|
-| Function Calling | Multi-Turn Agent, Data Analysis |
+| Function Calling | Multi-Turn Agent (all variants), Data Analysis |
 | Structured Output | Code Assistant, Testing Assistant |
 | Google Search Grounding | Web Scraper Agent |
-| Auto Function Execution | Multi-Turn Agent, Data Analysis |
+| Auto Function Execution | Multi-Turn Agent (Auto), Data Analysis |
 | System Instructions | All examples |
 
 ### Production Patterns
@@ -103,6 +105,18 @@ Same bot with manual control over function execution:
 let response = client.interaction()
     .with_previous_interaction(&last_id)
     .with_content(function_results)
+    .create().await?;
+```
+
+### Multi-Turn Agent (Stateless)
+
+Stateless conversations with client-side history management:
+
+```rust
+// No server state - maintain history locally
+let response = client.interaction()
+    .with_input(InteractionInput::Content(history.clone()))
+    .with_store_disabled()  // No previous_interaction_id
     .create().await?;
 ```
 
