@@ -18,7 +18,7 @@
 mod common;
 
 use common::{PollError, get_client, poll_until_complete};
-use rust_genai::InteractionStatus;
+use rust_genai::{AgentConfig, InteractionStatus, ThinkingSummaries};
 use std::time::Duration;
 
 /// Maximum time to wait for background tasks to complete.
@@ -197,6 +197,143 @@ async fn test_background_mode_polling() {
                 || error_str.contains("background")
             {
                 println!("Background mode not available - skipping test");
+            }
+        }
+    }
+}
+
+// =============================================================================
+// Agents: Agent Configuration
+// =============================================================================
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_deep_research_with_agent_config() {
+    // Test the deep research agent with typed AgentConfig
+    // This exercises the new agent_config field and serialization
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let result = client
+        .interaction()
+        .with_agent("deep-research-pro-preview-12-2025")
+        .with_text("What is Rust programming language?")
+        .with_agent_config(AgentConfig::DeepResearch {
+            thinking_summaries: Some(ThinkingSummaries::Auto),
+        })
+        .with_background(true)
+        .with_store_enabled()
+        .create()
+        .await;
+
+    match result {
+        Ok(initial_response) => {
+            println!("Initial status: {:?}", initial_response.status);
+            println!("Interaction ID: {:?}", initial_response.id);
+
+            // If already completed, check the response
+            if initial_response.status == InteractionStatus::Completed {
+                println!("Task completed immediately with AgentConfig");
+                if initial_response.has_text() {
+                    let text = initial_response.text().unwrap();
+                    println!(
+                        "Research response (truncated): {}...",
+                        &text[..text.len().min(500)]
+                    );
+                }
+                return;
+            }
+
+            // Poll for completion
+            match poll_until_complete(
+                &client,
+                initial_response.id.as_ref().expect("id should exist"),
+                BACKGROUND_TASK_TIMEOUT,
+            )
+            .await
+            {
+                Ok(response) => {
+                    println!("Deep research with AgentConfig completed!");
+                    if response.has_text() {
+                        let text = response.text().unwrap();
+                        println!(
+                            "Research response (truncated): {}...",
+                            &text[..text.len().min(500)]
+                        );
+                    }
+                }
+                Err(PollError::Timeout) => {
+                    println!(
+                        "Polling timed out after {:?} - task may still be running",
+                        BACKGROUND_TASK_TIMEOUT
+                    );
+                }
+                Err(PollError::Failed) => {
+                    println!("Deep research task failed");
+                }
+                Err(PollError::Api(e)) => {
+                    println!("Poll error: {:?}", e);
+                }
+            }
+        }
+        Err(e) => {
+            let error_str = format!("{:?}", e);
+            println!("Deep research with AgentConfig error: {}", error_str);
+            if error_str.contains("not found")
+                || error_str.contains("not available")
+                || error_str.contains("agent")
+            {
+                println!("Deep research agent not available - skipping test");
+            }
+        }
+    }
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_deep_research_config_convenience_method() {
+    // Test the convenience method with_deep_research_config
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let result = client
+        .interaction()
+        .with_agent("deep-research-pro-preview-12-2025")
+        .with_text("What is Rust?")
+        .with_deep_research_config(ThinkingSummaries::Auto) // Convenience method
+        .with_background(true)
+        .with_store_enabled()
+        .create()
+        .await;
+
+    match result {
+        Ok(initial_response) => {
+            println!("Initial status: {:?}", initial_response.status);
+            println!("Interaction ID: {:?}", initial_response.id);
+
+            // Just verify the request was accepted - we don't need to poll for completion
+            // as that's covered by other tests
+            if initial_response.status == InteractionStatus::Completed {
+                println!("Task completed immediately with convenience method");
+            } else {
+                println!(
+                    "Task started with convenience method (status: {:?})",
+                    initial_response.status
+                );
+            }
+        }
+        Err(e) => {
+            let error_str = format!("{:?}", e);
+            println!("Convenience method test error: {}", error_str);
+            if error_str.contains("not found")
+                || error_str.contains("not available")
+                || error_str.contains("agent")
+            {
+                println!("Deep research agent not available - skipping test");
             }
         }
     }

@@ -235,6 +235,7 @@ impl Client {
     /// let request = CreateInteractionRequest {
     ///     model: Some("gemini-3-flash-preview".to_string()),
     ///     agent: None,
+    ///     agent_config: None,
     ///     input: InteractionInput::Text("Hello, world!".to_string()),
     ///     previous_interaction_id: None,
     ///     tools: None,
@@ -293,6 +294,7 @@ impl Client {
     /// let request = CreateInteractionRequest {
     ///     model: Some("gemini-3-flash-preview".to_string()),
     ///     agent: None,
+    ///     agent_config: None,
     ///     input: InteractionInput::Text("Count to 5".to_string()),
     ///     previous_interaction_id: None,
     ///     tools: None,

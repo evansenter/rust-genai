@@ -31,7 +31,8 @@ pub use metadata::{
     WebSource,
 };
 pub use request::{
-    CreateInteractionRequest, GenerationConfig, InteractionInput, ThinkingLevel, ThinkingSummaries,
+    AgentConfig, CreateInteractionRequest, GenerationConfig, InteractionInput, ThinkingLevel,
+    ThinkingSummaries,
 };
 pub use response::{
     CodeExecutionCallInfo, CodeExecutionResultInfo, ContentSummary, FunctionCallInfo,

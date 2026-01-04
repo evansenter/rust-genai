@@ -13,9 +13,9 @@ use std::time::Duration;
 
 use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
-    self, CreateInteractionRequest, FunctionCallingMode, FunctionDeclaration, GenerationConfig,
-    InteractionContent, InteractionInput, InteractionResponse, StreamEvent, ThinkingLevel,
-    ThinkingSummaries, Tool as InternalTool,
+    self, AgentConfig, CreateInteractionRequest, FunctionCallingMode, FunctionDeclaration,
+    GenerationConfig, InteractionContent, InteractionInput, InteractionResponse, StreamEvent,
+    ThinkingLevel, ThinkingSummaries, Tool as InternalTool,
 };
 
 // ============================================================================
@@ -155,6 +155,7 @@ pub struct InteractionBuilder<'a, State = FirstTurn> {
     client: &'a Client,
     model: Option<String>,
     agent: Option<String>,
+    agent_config: Option<AgentConfig>,
     input: Option<InteractionInput>,
     previous_interaction_id: Option<String>,
     tools: Option<Vec<InternalTool>>,
@@ -180,6 +181,7 @@ impl<State> std::fmt::Debug for InteractionBuilder<'_, State> {
         f.debug_struct("InteractionBuilder")
             .field("model", &self.model)
             .field("agent", &self.agent)
+            .field("agent_config", &self.agent_config)
             .field("input", &self.input)
             .field("previous_interaction_id", &self.previous_interaction_id)
             .field("tools", &self.tools)
@@ -208,6 +210,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             client,
             model: None,
             agent: None,
+            agent_config: None,
             input: None,
             previous_interaction_id: None,
             tools: None,
@@ -243,6 +246,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             client: self.client,
             model: self.model,
             agent: self.agent,
+            agent_config: self.agent_config,
             input: self.input,
             previous_interaction_id: Some(id.into()),
             tools: self.tools,
@@ -288,6 +292,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             client: self.client,
             model: self.model,
             agent: self.agent,
+            agent_config: self.agent_config,
             input: self.input,
             previous_interaction_id: None, // Explicitly None
             tools: self.tools,
@@ -360,6 +365,76 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// Note: Mutually exclusive with `with_model()`.
     pub fn with_agent(mut self, agent: impl Into<String>) -> Self {
         self.agent = Some(agent.into());
+        self
+    }
+
+    /// Sets the agent configuration for specialized agents.
+    ///
+    /// This configures agent-specific behavior. Only applicable when using
+    /// `with_agent()` with specialized agents like Deep Research or Dynamic.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, AgentConfig, ThinkingSummaries};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_agent("deep-research-pro-preview-12-2025")
+    ///     .with_text("Research the history of quantum computing")
+    ///     .with_agent_config(AgentConfig::DeepResearch {
+    ///         thinking_summaries: Some(ThinkingSummaries::Auto),
+    ///     })
+    ///     .with_background(true)
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_agent_config(mut self, config: AgentConfig) -> Self {
+        self.agent_config = Some(config);
+        self
+    }
+
+    /// Configures the Deep Research agent with thinking summaries.
+    ///
+    /// This is a convenience method equivalent to:
+    /// ```ignore
+    /// .with_agent_config(AgentConfig::DeepResearch {
+    ///     thinking_summaries: Some(summaries),
+    /// })
+    /// ```
+    ///
+    /// Only applicable when using `with_agent("deep-research-pro-preview-12-2025")`.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, ThinkingSummaries};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_agent("deep-research-pro-preview-12-2025")
+    ///     .with_text("Research the history of quantum computing")
+    ///     .with_deep_research_config(ThinkingSummaries::Auto)
+    ///     .with_background(true)
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_deep_research_config(mut self, thinking_summaries: ThinkingSummaries) -> Self {
+        self.agent_config = Some(AgentConfig::DeepResearch {
+            thinking_summaries: Some(thinking_summaries),
+        });
         self
     }
 
@@ -1638,6 +1713,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         Ok(CreateInteractionRequest {
             model: self.model,
             agent: self.agent,
+            agent_config: self.agent_config,
             input,
             previous_interaction_id: self.previous_interaction_id,
             tools: self.tools,

@@ -59,7 +59,7 @@ pub use genai_client::{
 
 // Re-export Interactions API types for convenient access
 pub use genai_client::{
-    Annotation, CodeExecutionCallInfo, CodeExecutionLanguage, CodeExecutionOutcome,
+    AgentConfig, Annotation, CodeExecutionCallInfo, CodeExecutionLanguage, CodeExecutionOutcome,
     CodeExecutionResultInfo, ContentSummary, CreateInteractionRequest, FunctionCallInfo,
     FunctionResultInfo, GenerationConfig, GroundingChunk, GroundingMetadata, InteractionContent,
     InteractionInput, InteractionResponse, InteractionStatus, ModalityTokens,

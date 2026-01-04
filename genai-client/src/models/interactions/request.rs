@@ -313,6 +313,167 @@ impl<'de> Visitor<'de> for ThinkingSummariesVisitor {
     }
 }
 
+/// Agent-specific configuration for specialized agents.
+///
+/// When using specialized agents like Deep Research or Dynamic agents,
+/// this configuration controls agent-specific behavior.
+///
+/// # Forward Compatibility (Evergreen Philosophy)
+///
+/// This enum is marked `#[non_exhaustive]`, which means:
+/// - Match statements must include a wildcard arm (`_ => ...`)
+/// - New variants may be added in minor version updates without breaking your code
+///
+/// When the API returns an agent config type that this library doesn't recognize,
+/// it will be captured as `AgentConfig::Unknown` rather than causing a
+/// deserialization error.
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub enum AgentConfig {
+    /// Configuration for Deep Research agent.
+    ///
+    /// Deep Research agent performs comprehensive research tasks
+    /// and can optionally include thinking summaries.
+    DeepResearch {
+        /// Controls whether thinking summaries are included in output
+        thinking_summaries: Option<ThinkingSummaries>,
+    },
+    /// Configuration for Dynamic agent.
+    ///
+    /// Dynamic agents adapt their behavior based on the task.
+    Dynamic,
+    /// Unknown agent configuration for forward compatibility.
+    ///
+    /// This variant captures agent config types that the library doesn't recognize yet.
+    Unknown {
+        /// The unrecognized config type name from the API
+        config_type: String,
+        /// The full JSON data for this config, preserved for debugging
+        data: serde_json::Value,
+    },
+}
+
+impl AgentConfig {
+    /// Check if this is an unknown agent config type.
+    #[must_use]
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown { .. })
+    }
+
+    /// Returns the config type name if this is an unknown config.
+    ///
+    /// Returns `None` for known config types.
+    #[must_use]
+    pub fn unknown_config_type(&self) -> Option<&str> {
+        match self {
+            Self::Unknown { config_type, .. } => Some(config_type),
+            _ => None,
+        }
+    }
+
+    /// Returns the raw JSON data if this is an unknown config.
+    ///
+    /// Returns `None` for known config types.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::Unknown { data, .. } => Some(data),
+            _ => None,
+        }
+    }
+}
+
+impl Serialize for AgentConfig {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(None)?;
+
+        match self {
+            Self::DeepResearch { thinking_summaries } => {
+                map.serialize_entry("type", "deep-research")?;
+                if let Some(ts) = thinking_summaries {
+                    map.serialize_entry("thinkingSummaries", ts)?;
+                }
+            }
+            Self::Dynamic => {
+                map.serialize_entry("type", "dynamic")?;
+            }
+            Self::Unknown { config_type, data } => {
+                map.serialize_entry("type", config_type)?;
+                // Flatten the data fields into the map if it's an object
+                if let serde_json::Value::Object(obj) = data {
+                    for (key, value) in obj {
+                        if key != "type" {
+                            map.serialize_entry(key, value)?;
+                        }
+                    }
+                } else if !data.is_null() {
+                    map.serialize_entry("data", data)?;
+                }
+            }
+        }
+
+        map.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for AgentConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // First, deserialize into a raw JSON value
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        // Helper enum for deserializing known types
+        #[derive(Deserialize)]
+        #[serde(tag = "type", rename_all = "kebab-case")]
+        enum KnownAgentConfig {
+            #[serde(rename = "deep-research")]
+            DeepResearch {
+                #[serde(rename = "thinkingSummaries")]
+                thinking_summaries: Option<ThinkingSummaries>,
+            },
+            #[serde(rename = "dynamic")]
+            Dynamic,
+        }
+
+        // Try to deserialize as a known type
+        match serde_json::from_value::<KnownAgentConfig>(value.clone()) {
+            Ok(known) => Ok(match known {
+                KnownAgentConfig::DeepResearch { thinking_summaries } => {
+                    AgentConfig::DeepResearch { thinking_summaries }
+                }
+                KnownAgentConfig::Dynamic => AgentConfig::Dynamic,
+            }),
+            Err(parse_error) => {
+                // Unknown type - extract type name and preserve data
+                let config_type = value
+                    .get("type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("<missing type>")
+                    .to_string();
+
+                log::warn!(
+                    "Encountered unknown AgentConfig type '{}'. \
+                     Parse error: {}. \
+                     This may indicate a new API feature or a malformed response. \
+                     The config will be preserved in the Unknown variant.",
+                    config_type,
+                    parse_error
+                );
+
+                Ok(AgentConfig::Unknown {
+                    config_type,
+                    data: value,
+                })
+            }
+        }
+    }
+}
+
 /// Generation configuration for model behavior
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
@@ -366,6 +527,10 @@ pub struct CreateInteractionRequest {
     /// Agent name (e.g., "deep-research-pro-preview-12-2025") - mutually exclusive with model
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent: Option<String>,
+
+    /// Agent-specific configuration (e.g., Deep Research thinking summaries)
+    #[serde(rename = "agent_config", skip_serializing_if = "Option::is_none")]
+    pub agent_config: Option<AgentConfig>,
 
     /// The input for this interaction
     pub input: InteractionInput,
