@@ -156,6 +156,63 @@ fn test_interaction_builder_with_function() {
 }
 
 #[test]
+fn test_interaction_builder_with_mcp_server() {
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Use MCP server")
+        .with_mcp_server("my-server", "https://mcp.example.com/api");
+
+    assert!(builder.tools.is_some());
+    let tools = builder.tools.as_ref().unwrap();
+    assert_eq!(tools.len(), 1);
+
+    match &tools[0] {
+        Tool::McpServer { name, url } => {
+            assert_eq!(name, "my-server");
+            assert_eq!(url, "https://mcp.example.com/api");
+        }
+        _ => panic!("Expected Tool::McpServer variant"),
+    }
+}
+
+#[test]
+fn test_interaction_builder_with_multiple_mcp_servers() {
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Use multiple MCP servers")
+        .with_mcp_server("server-1", "https://mcp1.example.com")
+        .with_mcp_server("server-2", "https://mcp2.example.com");
+
+    assert!(builder.tools.is_some());
+    let tools = builder.tools.as_ref().unwrap();
+    assert_eq!(tools.len(), 2);
+}
+
+#[test]
+fn test_interaction_builder_with_mcp_server_and_other_tools() {
+    let client = create_test_client();
+    let func = FunctionDeclaration::builder("test_func")
+        .description("Test function")
+        .build();
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Use MCP and other tools")
+        .with_mcp_server("my-server", "https://mcp.example.com")
+        .with_google_search()
+        .with_function(func);
+
+    assert!(builder.tools.is_some());
+    let tools = builder.tools.as_ref().unwrap();
+    assert_eq!(tools.len(), 3);
+}
+
+#[test]
 fn test_interaction_builder_with_background() {
     let client = create_test_client();
     let builder = client
