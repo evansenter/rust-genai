@@ -14,7 +14,7 @@ use super::metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
     WebSource,
 };
-use super::request::{ThinkingLevel, ThinkingSummaries};
+use super::request::{AgentConfig, ThinkingLevel, ThinkingSummaries};
 use super::response::{
     InteractionResponse, InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, UsageMetadata,
 };
@@ -248,6 +248,40 @@ fn arb_thinking_summaries() -> impl Strategy<Value = ThinkingSummaries> {
         arb_identifier().prop_map(|summaries_type| ThinkingSummaries::Unknown {
             summaries_type: summaries_type.clone(),
             data: serde_json::Value::String(summaries_type),
+        }),
+    ]
+}
+
+// =============================================================================
+// AgentConfig Strategies
+// =============================================================================
+
+/// Strategy for known AgentConfig variants only.
+/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
+#[cfg(feature = "strict-unknown")]
+fn arb_agent_config() -> impl Strategy<Value = AgentConfig> {
+    prop_oneof![
+        proptest::option::of(arb_thinking_summaries())
+            .prop_map(|thinking_summaries| { AgentConfig::DeepResearch { thinking_summaries } }),
+        Just(AgentConfig::Dynamic),
+    ]
+}
+
+/// Strategy for all AgentConfig variants including Unknown.
+/// Used in normal mode (Unknown variants are gracefully handled).
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_agent_config() -> impl Strategy<Value = AgentConfig> {
+    prop_oneof![
+        proptest::option::of(arb_thinking_summaries())
+            .prop_map(|thinking_summaries| { AgentConfig::DeepResearch { thinking_summaries } }),
+        Just(AgentConfig::Dynamic),
+        // Unknown variant with preserved data
+        arb_identifier().prop_map(|config_type| AgentConfig::Unknown {
+            config_type: config_type.clone(),
+            data: serde_json::json!({
+                "type": config_type,
+                "customField": 42
+            }),
         }),
     ]
 }
@@ -795,6 +829,16 @@ proptest! {
         // ThinkingSummaries doesn't derive PartialEq, so we verify roundtrip by comparing JSON strings
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
         prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test that AgentConfig roundtrips correctly through JSON.
+    #[test]
+    fn agent_config_roundtrip(config in arb_agent_config()) {
+        let json = serde_json::to_string(&config).expect("Serialization should succeed");
+        let restored: AgentConfig = serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        // AgentConfig derives PartialEq, so we can compare directly
+        prop_assert_eq!(config, restored);
     }
 
     /// Test that UrlRetrievalStatus roundtrips correctly through JSON.

@@ -433,3 +433,42 @@ fn test_create_interaction_request_with_agent_config() {
     assert_eq!(value["background"], true);
     assert_eq!(value["store"], true);
 }
+
+/// Test that verifies the field naming conventions used in AgentConfig serialization.
+///
+/// This test explicitly documents the casing decisions:
+/// - `type` key uses kebab-case for values: "deep-research", "dynamic"
+/// - `thinkingSummaries` key uses camelCase (consistent with other Gemini API fields like
+///   `maxOutputTokens`, `topP`, `topK` in GenerationConfig)
+///
+/// The outer `agent_config` field is snake_case per API documentation, while inner
+/// fields follow the camelCase convention used throughout the Gemini Interactions API.
+#[test]
+fn test_agent_config_field_naming_conventions() {
+    // Verify the exact JSON structure matches API expectations
+    let config = AgentConfig::DeepResearch {
+        thinking_summaries: Some(ThinkingSummaries::Auto),
+    };
+
+    let json = serde_json::to_string(&config).expect("Serialization failed");
+
+    // Expected: {"type":"deep-research","thinkingSummaries":"auto"}
+    // NOT: {"type":"deep-research","thinking_summaries":"auto"}
+    assert!(
+        json.contains("thinkingSummaries"),
+        "Field should be camelCase 'thinkingSummaries', got: {}",
+        json
+    );
+    assert!(
+        !json.contains("thinking_summaries"),
+        "Field should NOT be snake_case 'thinking_summaries', got: {}",
+        json
+    );
+
+    // Verify value is lowercase
+    assert!(
+        json.contains(r#""auto""#),
+        "ThinkingSummaries::Auto should serialize to 'auto', got: {}",
+        json
+    );
+}

@@ -327,7 +327,7 @@ impl<'de> Visitor<'de> for ThinkingSummariesVisitor {
 /// When the API returns an agent config type that this library doesn't recognize,
 /// it will be captured as `AgentConfig::Unknown` rather than causing a
 /// deserialization error.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum AgentConfig {
     /// Configuration for Deep Research agent.
