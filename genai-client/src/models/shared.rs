@@ -395,22 +395,6 @@ impl FunctionDeclarationBuilder {
     }
 }
 
-/// Represents tool configuration for function calling.
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct ToolConfig {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_calling_config: Option<FunctionCallingConfig>,
-}
-
-/// Configuration for how the model should use function calling.
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct FunctionCallingConfig {
-    #[serde(rename = "mode")]
-    pub mode: FunctionCallingMode,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub allowed_function_names: Option<Vec<String>>,
-}
-
 /// Modes for function calling behavior.
 ///
 /// This enum is marked `#[non_exhaustive]` for forward compatibility.

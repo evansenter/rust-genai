@@ -549,6 +549,7 @@ mod tests {
         let request = CreateInteractionRequest {
             model: Some("gemini-3-flash-preview".to_string()),
             agent: None,
+            agent_config: None,
             input: InteractionInput::Text("Hello".to_string()),
             previous_interaction_id: None,
             tools: None,
