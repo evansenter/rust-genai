@@ -804,6 +804,8 @@ mod tests {
             grounding_metadata: None,
             url_context_metadata: None,
             previous_interaction_id: None,
+            created: None,
+            updated: None,
         };
 
         let chunk = StreamChunk::Complete(response);
@@ -886,6 +888,8 @@ mod tests {
             grounding_metadata: None,
             url_context_metadata: None,
             previous_interaction_id: None,
+            created: None,
+            updated: None,
         };
 
         let chunk = StreamChunk::Start {
@@ -1060,6 +1064,8 @@ mod tests {
                 grounding_metadata: None,
                 url_context_metadata: None,
                 previous_interaction_id: None,
+                created: None,
+                updated: None,
             },
         };
         assert_eq!(start_chunk.interaction_id(), Some("start-id"));
@@ -1089,6 +1095,8 @@ mod tests {
             grounding_metadata: None,
             url_context_metadata: None,
             previous_interaction_id: None,
+            created: None,
+            updated: None,
         });
         assert!(complete_chunk.is_terminal());
 
@@ -1150,6 +1158,8 @@ mod tests {
                 grounding_metadata: None,
                 url_context_metadata: None,
                 previous_interaction_id: None,
+                created: None,
+                updated: None,
             }),
             None,
         );

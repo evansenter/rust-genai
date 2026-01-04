@@ -3,6 +3,7 @@
 //! These tests verify that `deserialize(serialize(x)) == x` for all key types,
 //! catching edge cases that hand-written tests might miss.
 
+use chrono::{DateTime, TimeZone, Utc};
 use proptest::prelude::*;
 
 use super::content::{
@@ -80,6 +81,18 @@ fn arb_identifier() -> impl Strategy<Value = String> {
 /// Strategy for generating text strings up to 500 characters (may be empty).
 fn arb_text() -> impl Strategy<Value = String> {
     ".{0,500}"
+}
+
+/// Strategy for generating DateTime<Utc> values.
+/// Uses second precision to ensure reliable roundtrip (avoiding nanosecond precision issues).
+fn arb_datetime() -> impl Strategy<Value = DateTime<Utc>> {
+    // Generate timestamps between 2020-01-01 and 2030-01-01 (reasonable range)
+    (0i64..315_360_000).prop_map(|offset_secs| {
+        // Base: 2020-01-01 00:00:00 UTC (timestamp 1577836800)
+        Utc.timestamp_opt(1_577_836_800 + offset_secs, 0)
+            .single()
+            .expect("valid timestamp")
+    })
 }
 
 // =============================================================================
@@ -597,7 +610,8 @@ fn arb_tool() -> impl Strategy<Value = Tool> {
 // =============================================================================
 
 fn arb_interaction_response() -> impl Strategy<Value = InteractionResponse> {
-    (
+    // Split into two tuples to avoid proptest's 12-element limit
+    let part1 = (
         proptest::option::of(arb_identifier()),                 // id
         proptest::option::of(arb_identifier()),                 // model
         proptest::option::of(arb_identifier()),                 // agent
@@ -605,13 +619,29 @@ fn arb_interaction_response() -> impl Strategy<Value = InteractionResponse> {
         prop::collection::vec(arb_interaction_content(), 0..5), // outputs
         arb_interaction_status(),                               // status
         proptest::option::of(arb_usage_metadata()),             // usage
+    );
+    let part2 = (
         proptest::option::of(prop::collection::vec(arb_tool(), 0..3)), // tools
-        proptest::option::of(arb_grounding_metadata()),         // grounding_metadata
-        proptest::option::of(arb_url_context_metadata()),       // url_context_metadata
-        proptest::option::of(arb_identifier()),                 // previous_interaction_id
-    )
-        .prop_map(
-            |(
+        proptest::option::of(arb_grounding_metadata()),                // grounding_metadata
+        proptest::option::of(arb_url_context_metadata()),              // url_context_metadata
+        proptest::option::of(arb_identifier()),                        // previous_interaction_id
+        proptest::option::of(arb_datetime()),                          // created
+        proptest::option::of(arb_datetime()),                          // updated
+    );
+
+    (part1, part2).prop_map(
+        |(
+            (id, model, agent, input, outputs, status, usage),
+            (
+                tools,
+                grounding_metadata,
+                url_context_metadata,
+                previous_interaction_id,
+                created,
+                updated,
+            ),
+        )| {
+            InteractionResponse {
                 id,
                 model,
                 agent,
@@ -623,22 +653,11 @@ fn arb_interaction_response() -> impl Strategy<Value = InteractionResponse> {
                 grounding_metadata,
                 url_context_metadata,
                 previous_interaction_id,
-            )| {
-                InteractionResponse {
-                    id,
-                    model,
-                    agent,
-                    input,
-                    outputs,
-                    status,
-                    usage,
-                    tools,
-                    grounding_metadata,
-                    url_context_metadata,
-                    previous_interaction_id,
-                }
-            },
-        )
+                created,
+                updated,
+            }
+        },
+    )
 }
 
 // =============================================================================
@@ -857,6 +876,10 @@ proptest! {
 
         // Verify url_context_metadata if present
         prop_assert_eq!(&response.url_context_metadata, &restored.url_context_metadata);
+
+        // Verify timestamps
+        prop_assert_eq!(&response.created, &restored.created);
+        prop_assert_eq!(&response.updated, &restored.updated);
 
         // Verify the full JSON roundtrip is stable
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");

@@ -53,6 +53,7 @@ use crate::common::API_KEY_HEADER;
 use crate::error_helpers::{check_response, deserialize_with_context};
 use crate::errors::GenaiError;
 use crate::loud_wire;
+use chrono::{DateTime, Utc};
 use reqwest::Client as ReqwestClient;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -80,13 +81,13 @@ pub struct FileMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size_bytes: Option<String>,
 
-    /// Timestamp when the file was created
+    /// Timestamp when the file was created (ISO 8601 UTC)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub create_time: Option<String>,
+    pub create_time: Option<DateTime<Utc>>,
 
-    /// Timestamp when the file will be automatically deleted
+    /// Timestamp when the file will be automatically deleted (ISO 8601 UTC)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expiration_time: Option<String>,
+    pub expiration_time: Option<DateTime<Utc>>,
 
     /// SHA256 hash of the file contents
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1268,7 +1269,19 @@ mod tests {
 #[cfg(test)]
 mod proptest_tests {
     use super::*;
+    use chrono::TimeZone;
     use proptest::prelude::*;
+
+    /// Strategy for generating DateTime<Utc> values.
+    /// Uses second precision to ensure reliable roundtrip.
+    fn arb_datetime() -> impl Strategy<Value = DateTime<Utc>> {
+        // Generate timestamps between 2020-01-01 and 2030-01-01
+        (0i64..315_360_000).prop_map(|offset_secs| {
+            Utc.timestamp_opt(1_577_836_800 + offset_secs, 0)
+                .single()
+                .expect("valid timestamp")
+        })
+    }
 
     /// Strategy for generating FileState variants.
     #[cfg(not(feature = "strict-unknown"))]
@@ -1313,14 +1326,14 @@ mod proptest_tests {
     /// Strategy for generating FileMetadata.
     fn arb_file_metadata() -> impl Strategy<Value = FileMetadata> {
         (
-            "files/[a-zA-Z0-9_]+",       // name
-            prop::option::of(".{1,50}"), // display_name
-            "[a-z]+/[a-z0-9+-]+",        // mime_type
-            prop::option::of("[0-9]+"),  // size_bytes
-            prop::option::of("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"), // create_time
-            prop::option::of("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"), // expiration_time
-            prop::option::of("[a-f0-9]{64}"), // sha256_hash (API returns raw hash, no prefix)
-            "https?://[a-z]+\\.[a-z]+/[a-z]+", // uri
+            "files/[a-zA-Z0-9_]+",              // name
+            prop::option::of(".{1,50}"),        // display_name
+            "[a-z]+/[a-z0-9+-]+",               // mime_type
+            prop::option::of("[0-9]+"),         // size_bytes
+            prop::option::of(arb_datetime()),   // create_time
+            prop::option::of(arb_datetime()),   // expiration_time
+            prop::option::of("[a-f0-9]{64}"),   // sha256_hash (API returns raw hash, no prefix)
+            "https?://[a-z]+\\.[a-z]+/[a-z]+",  // uri
             prop::option::of(arb_file_state()), // state is Option<FileState>
             prop::option::of(arb_file_error()),
             prop::option::of(arb_video_metadata()),
