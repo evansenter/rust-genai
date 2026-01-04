@@ -674,6 +674,27 @@ mod tests {
     }
 
     #[test]
+    fn test_tool_mcp_server_roundtrip() {
+        let tool = Tool::McpServer {
+            name: "my-server".to_string(),
+            url: "https://mcp.example.com/api".to_string(),
+        };
+        let json = serde_json::to_string(&tool).expect("Serialization failed");
+        assert!(json.contains("\"type\":\"mcp_server\""));
+        assert!(json.contains("\"name\":\"my-server\""));
+        assert!(json.contains("\"url\":\"https://mcp.example.com/api\""));
+
+        let parsed: Tool = serde_json::from_str(&json).expect("Deserialization failed");
+        match parsed {
+            Tool::McpServer { name, url } => {
+                assert_eq!(name, "my-server");
+                assert_eq!(url, "https://mcp.example.com/api");
+            }
+            other => panic!("Expected McpServer variant, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn test_tool_unknown_deserialization() {
         // Simulate an unknown tool type from the API
         let json = r#"{"type": "future_tool", "some_field": "value", "number": 42}"#;
