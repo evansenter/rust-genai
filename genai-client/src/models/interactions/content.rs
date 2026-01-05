@@ -316,6 +316,18 @@ impl fmt::Display for CodeExecutionLanguage {
 /// | High | Higher | Fine details visible |
 /// | UltraHigh | Highest | Maximum fidelity |
 ///
+/// # Forward Compatibility (Evergreen Philosophy)
+///
+/// This enum is marked `#[non_exhaustive]`, which means:
+/// - Match statements must include a wildcard arm (`_ => ...`)
+/// - New variants may be added in minor version updates without breaking your code
+///
+/// When the API returns a resolution value that this library doesn't recognize,
+/// it will be captured as `Resolution::Unknown` rather than causing a
+/// deserialization error. This follows the
+/// [Evergreen spec](https://github.com/google-deepmind/evergreen-spec)
+/// philosophy of graceful degradation.
+///
 /// # Example
 ///
 /// ```
@@ -330,8 +342,7 @@ impl fmt::Display for CodeExecutionLanguage {
 /// // Default is Medium
 /// assert_eq!(Resolution::default(), Resolution::Medium);
 /// ```
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Resolution {
     /// Lowest token cost, basic shapes and colors
@@ -343,6 +354,109 @@ pub enum Resolution {
     High,
     /// Highest token cost, maximum fidelity
     UltraHigh,
+    /// Unknown resolution (for forward compatibility).
+    ///
+    /// This variant captures any unrecognized resolution values from the API,
+    /// allowing the library to handle new resolutions gracefully.
+    ///
+    /// The `resolution_type` field contains the unrecognized resolution string,
+    /// and `data` contains the JSON value (typically the same string).
+    Unknown {
+        /// The unrecognized resolution string from the API
+        resolution_type: String,
+        /// The raw JSON value, preserved for debugging
+        data: serde_json::Value,
+    },
+}
+
+impl Resolution {
+    /// Check if this is an unknown resolution.
+    #[must_use]
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown { .. })
+    }
+
+    /// Returns the resolution type name if this is an unknown resolution.
+    ///
+    /// Returns `None` for known resolutions.
+    #[must_use]
+    pub fn unknown_resolution_type(&self) -> Option<&str> {
+        match self {
+            Self::Unknown {
+                resolution_type, ..
+            } => Some(resolution_type),
+            _ => None,
+        }
+    }
+
+    /// Returns the raw JSON data if this is an unknown resolution.
+    ///
+    /// Returns `None` for known resolutions.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::Unknown { data, .. } => Some(data),
+            _ => None,
+        }
+    }
+}
+
+impl Serialize for Resolution {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Low => serializer.serialize_str("low"),
+            Self::Medium => serializer.serialize_str("medium"),
+            Self::High => serializer.serialize_str("high"),
+            Self::UltraHigh => serializer.serialize_str("ultra_high"),
+            Self::Unknown {
+                resolution_type, ..
+            } => serializer.serialize_str(resolution_type),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Resolution {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        match value.as_str() {
+            Some("low") => Ok(Self::Low),
+            Some("medium") => Ok(Self::Medium),
+            Some("high") => Ok(Self::High),
+            Some("ultra_high") => Ok(Self::UltraHigh),
+            Some(other) => {
+                log::warn!(
+                    "Encountered unknown Resolution '{}'. \
+                     This may indicate a new API feature. \
+                     The resolution will be preserved in the Unknown variant.",
+                    other
+                );
+                Ok(Self::Unknown {
+                    resolution_type: other.to_string(),
+                    data: value,
+                })
+            }
+            None => {
+                // Non-string value - preserve it in Unknown
+                let resolution_type = format!("<non-string: {}>", value);
+                log::warn!(
+                    "Resolution received non-string value: {}. \
+                     Preserving in Unknown variant.",
+                    value
+                );
+                Ok(Self::Unknown {
+                    resolution_type,
+                    data: value,
+                })
+            }
+        }
+    }
 }
 
 impl fmt::Display for Resolution {
@@ -352,6 +466,9 @@ impl fmt::Display for Resolution {
             Self::Medium => write!(f, "medium"),
             Self::High => write!(f, "high"),
             Self::UltraHigh => write!(f, "ultra_high"),
+            Self::Unknown {
+                resolution_type, ..
+            } => write!(f, "{}", resolution_type),
         }
     }
 }

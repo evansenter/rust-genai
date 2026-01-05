@@ -239,6 +239,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
     /// After calling this method:
     /// - `with_system_instruction()` is no longer available (system instructions are inherited)
     /// - `with_store_disabled()` is no longer available (chained interactions require storage)
+    #[must_use]
     pub fn with_previous_interaction(
         self,
         id: impl Into<String>,
@@ -272,6 +273,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
     /// This method is only available on [`FirstTurn`] builders. After calling
     /// `with_previous_interaction()`, system instructions are inherited from the
     /// previous interaction and cannot be changed.
+    #[must_use]
     pub fn with_system_instruction(mut self, instruction: impl Into<String>) -> Self {
         self.system_instruction = Some(InteractionInput::Text(instruction.into()));
         self
@@ -288,6 +290,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
     /// After calling this method:
     /// - `with_previous_interaction()` is no longer available (requires storage)
     /// - `with_background(true)` is no longer available (requires storage)
+    #[must_use]
     pub fn with_store_disabled(self) -> InteractionBuilder<'a, StoreDisabled> {
         InteractionBuilder {
             client: self.client,
@@ -321,6 +324,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
     /// This method is available on [`FirstTurn`] and [`Chained`] builders.
     /// It is NOT available after calling `with_store_disabled()` because
     /// background execution requires storage.
+    #[must_use]
     pub fn with_background(mut self, background: bool) -> Self {
         self.background = Some(background);
         self
@@ -342,6 +346,7 @@ impl<'a> InteractionBuilder<'a, Chained> {
     /// This method is available on [`FirstTurn`] and [`Chained`] builders.
     /// It is NOT available after calling `with_store_disabled()` because
     /// background execution requires storage.
+    #[must_use]
     pub fn with_background(mut self, background: bool) -> Self {
         self.background = Some(background);
         self
@@ -356,6 +361,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// Sets the model to use for this interaction (e.g., "gemini-3-flash-preview").
     ///
     /// Note: Mutually exclusive with `with_agent()`.
+    #[must_use]
     pub fn with_model(mut self, model: impl Into<String>) -> Self {
         self.model = Some(model.into());
         self
@@ -364,6 +370,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// Sets the agent to use for this interaction (e.g., "deep-research-pro-preview-12-2025").
     ///
     /// Note: Mutually exclusive with `with_model()`.
+    #[must_use]
     pub fn with_agent(mut self, agent: impl Into<String>) -> Self {
         self.agent = Some(agent.into());
         self
@@ -420,6 +427,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_agent_config(mut self, config: impl Into<AgentConfig>) -> Self {
         self.agent_config = Some(config.into());
         self
@@ -455,6 +463,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_deep_research_config(mut self, thinking_summaries: ThinkingSummaries) -> Self {
         self.agent_config = Some(
             DeepResearchConfig::new()
@@ -467,6 +476,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// Sets the input for this interaction from an `InteractionInput`.
     ///
     /// For simple text input, prefer `with_text()`.
+    #[must_use]
     pub fn with_input(mut self, input: InteractionInput) -> Self {
         self.input = Some(input);
         self
@@ -475,6 +485,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// Sets a simple text input for this interaction.
     ///
     /// This is a convenience method that creates an `InteractionInput::Text`.
+    #[must_use]
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
         self.input = Some(InteractionInput::Text(text.into()));
         self
@@ -502,6 +513,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_content(mut self, content: Vec<InteractionContent>) -> Self {
         self.input = Some(InteractionInput::Content(content));
         self
@@ -542,6 +554,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_turns(mut self, turns: Vec<Turn>) -> Self {
         self.input = Some(InteractionInput::Turns(turns));
         self
@@ -582,6 +595,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// ```
     ///
     /// [`with_turns()`]: InteractionBuilder::with_turns
+    #[must_use]
     pub fn conversation(self) -> ConversationBuilder<'a, State> {
         ConversationBuilder {
             parent: self,
@@ -686,6 +700,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// Adds an image from base64-encoded data to the content.
     ///
     /// This method accumulates content - it can be called multiple times.
+    #[must_use]
     pub fn add_image_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content = crate::interactions_api::image_data_content(data, mime_type);
         self.add_content_item(content);
@@ -693,6 +708,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     }
 
     /// Adds an image from base64-encoded data with specified resolution.
+    #[must_use]
     pub fn add_image_data_with_resolution(
         mut self,
         data: impl Into<String>,
@@ -735,12 +751,14 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn add_image_bytes(self, data: &[u8], mime_type: impl Into<String>) -> Self {
         let encoded = base64::engine::general_purpose::STANDARD.encode(data);
         self.add_image_data(encoded, mime_type)
     }
 
     /// Adds an image from raw bytes with specified resolution.
+    #[must_use]
     pub fn add_image_bytes_with_resolution(
         self,
         data: &[u8],
@@ -754,6 +772,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// Adds an image from a URI to the content.
     ///
     /// This method accumulates content - it can be called multiple times.
+    #[must_use]
     pub fn add_image_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content = crate::interactions_api::image_uri_content(uri, mime_type);
         self.add_content_item(content);
@@ -761,6 +780,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     }
 
     /// Adds an image from a URI with specified resolution.
+    #[must_use]
     pub fn add_image_uri_with_resolution(
         mut self,
         uri: impl Into<String>,
@@ -786,6 +806,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     }
 
     /// Adds audio from base64-encoded data to the content.
+    #[must_use]
     pub fn add_audio_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content = crate::interactions_api::audio_data_content(data, mime_type);
         self.add_content_item(content);
@@ -819,12 +840,14 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn add_audio_bytes(self, data: &[u8], mime_type: impl Into<String>) -> Self {
         let encoded = base64::engine::general_purpose::STANDARD.encode(data);
         self.add_audio_data(encoded, mime_type)
     }
 
     /// Adds audio from a URI to the content.
+    #[must_use]
     pub fn add_audio_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content = crate::interactions_api::audio_uri_content(uri, mime_type);
         self.add_content_item(content);
@@ -862,6 +885,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     }
 
     /// Adds video from base64-encoded data to the content.
+    #[must_use]
     pub fn add_video_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content = crate::interactions_api::video_data_content(data, mime_type);
         self.add_content_item(content);
@@ -869,6 +893,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     }
 
     /// Adds video from base64-encoded data with specified resolution.
+    #[must_use]
     pub fn add_video_data_with_resolution(
         mut self,
         data: impl Into<String>,
@@ -909,12 +934,14 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn add_video_bytes(self, data: &[u8], mime_type: impl Into<String>) -> Self {
         let encoded = base64::engine::general_purpose::STANDARD.encode(data);
         self.add_video_data(encoded, mime_type)
     }
 
     /// Adds video from raw bytes with specified resolution.
+    #[must_use]
     pub fn add_video_bytes_with_resolution(
         self,
         data: &[u8],
@@ -926,6 +953,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     }
 
     /// Adds video from a URI to the content.
+    #[must_use]
     pub fn add_video_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content = crate::interactions_api::video_uri_content(uri, mime_type);
         self.add_content_item(content);
@@ -933,6 +961,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     }
 
     /// Adds video from a URI with specified resolution.
+    #[must_use]
     pub fn add_video_uri_with_resolution(
         mut self,
         uri: impl Into<String>,
@@ -958,6 +987,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     }
 
     /// Adds a document from base64-encoded data to the content.
+    #[must_use]
     pub fn add_document_data(
         mut self,
         data: impl Into<String>,
@@ -995,12 +1025,14 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn add_document_bytes(self, data: &[u8], mime_type: impl Into<String>) -> Self {
         let encoded = base64::engine::general_purpose::STANDARD.encode(data);
         self.add_document_data(encoded, mime_type)
     }
 
     /// Adds a document from a URI to the content.
+    #[must_use]
     pub fn add_document_uri(
         mut self,
         uri: impl Into<String>,
@@ -1040,6 +1072,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_file(mut self, file: &genai_client::FileMetadata) -> Self {
         let content = crate::interactions_api::file_uri_content(file);
         self.add_content_item(content);
@@ -1073,6 +1106,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_file_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content =
             crate::interactions_api::content_from_uri_and_mime(uri.into(), mime_type.into());
@@ -1111,6 +1145,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     }
 
     /// Adds tools for function calling.
+    #[must_use]
     pub fn with_tools(mut self, tools: Vec<InternalTool>) -> Self {
         self.tools = Some(tools);
         self
@@ -1141,6 +1176,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .with_text("What's the temperature in Paris?")
     ///     .with_function(func);
     /// ```
+    #[must_use]
     pub fn with_function(mut self, function: FunctionDeclaration) -> Self {
         self.add_tool(function.into_tool());
         self
@@ -1170,6 +1206,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// ```
     ///
     /// [`with_function`]: InteractionBuilder::with_function
+    #[must_use]
     pub fn with_functions(mut self, functions: Vec<FunctionDeclaration>) -> Self {
         for func in functions {
             self.add_tool(func.into_tool());
@@ -1209,6 +1246,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .create_with_auto_functions()
     ///     .await?;
     /// ```
+    #[must_use]
     pub fn with_tool_service(mut self, service: Arc<dyn ToolService>) -> Self {
         self.tool_service = Some(service);
         self
@@ -1250,6 +1288,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// ```
     ///
     /// [`InteractionResponse::google_search_metadata`]: crate::InteractionResponse::google_search_metadata
+    #[must_use]
     pub fn with_google_search(mut self) -> Self {
         self.add_tool(InternalTool::GoogleSearch);
         self
@@ -1295,6 +1334,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_code_execution(mut self) -> Self {
         self.add_tool(InternalTool::CodeExecution);
         self
@@ -1344,6 +1384,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// ```
     ///
     /// [`InteractionResponse::url_context_metadata`]: crate::InteractionResponse::url_context_metadata
+    #[must_use]
     pub fn with_url_context(mut self) -> Self {
         self.add_tool(InternalTool::UrlContext);
         self
@@ -1397,6 +1438,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_mcp_server(mut self, name: impl Into<String>, url: impl Into<String>) -> Self {
         self.add_tool(InternalTool::McpServer {
             name: name.into(),
@@ -1406,6 +1448,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     }
 
     /// Sets response modalities (e.g., ["IMAGE"]).
+    #[must_use]
     pub fn with_response_modalities(mut self, modalities: Vec<String>) -> Self {
         self.response_modalities = Some(modalities);
         self
@@ -1445,6 +1488,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_image_output(self) -> Self {
         self.with_response_modalities(vec!["IMAGE".to_string()])
     }
@@ -1528,12 +1572,14 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_response_format(mut self, format: serde_json::Value) -> Self {
         self.response_format = Some(format);
         self
     }
 
     /// Sets generation configuration (temperature, max tokens, etc.).
+    #[must_use]
     pub fn with_generation_config(mut self, config: GenerationConfig) -> Self {
         self.generation_config = Some(config);
         self
@@ -1567,6 +1613,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_thinking_level(mut self, level: ThinkingLevel) -> Self {
         let config = self
             .generation_config
@@ -1597,6 +1644,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_thinking_summaries(mut self, summaries: ThinkingSummaries) -> Self {
         let config = self
             .generation_config
@@ -1638,6 +1686,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_seed(mut self, seed: i64) -> Self {
         let config = self
             .generation_config
@@ -1667,6 +1716,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_stop_sequences(mut self, sequences: Vec<String>) -> Self {
         let config = self
             .generation_config
@@ -1712,6 +1762,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_function_calling_mode(mut self, mode: FunctionCallingMode) -> Self {
         let config = self
             .generation_config
@@ -1748,6 +1799,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_response_mime_type(mut self, mime_type: impl Into<String>) -> Self {
         self.response_mime_type = Some(mime_type.into());
         self
@@ -1767,6 +1819,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # See Also
     ///
     /// Use `with_store_disabled()` (only available on [`FirstTurn`] builders) to disable storage.
+    #[must_use]
     pub fn with_store_enabled(mut self) -> Self {
         self.store = Some(true);
         self
@@ -1793,6 +1846,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_max_function_call_loops(mut self, max_loops: usize) -> Self {
         if max_loops == 0 {
             log::warn!(
@@ -1845,6 +1899,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// ```
     ///
     /// [`GenaiError::Timeout`]: crate::GenaiError::Timeout
+    #[must_use]
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
@@ -2100,6 +2155,7 @@ impl<'a, State: Send + 'a> ConversationBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn user(mut self, content: impl Into<TurnContent>) -> Self {
         self.turns.push(Turn::user(content));
         self
@@ -2136,6 +2192,7 @@ impl<'a, State: Send + 'a> ConversationBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn model(mut self, content: impl Into<TurnContent>) -> Self {
         self.turns.push(Turn::model(content));
         self
@@ -2168,6 +2225,7 @@ impl<'a, State: Send + 'a> ConversationBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn turn(mut self, role: Role, content: impl Into<TurnContent>) -> Self {
         self.turns.push(Turn::new(role, content));
         self
@@ -2197,6 +2255,7 @@ impl<'a, State: Send + 'a> ConversationBuilder<'a, State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn done(self) -> InteractionBuilder<'a, State> {
         let mut parent = self.parent;
         parent.input = Some(InteractionInput::Turns(self.turns));
