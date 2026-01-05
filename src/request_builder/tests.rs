@@ -689,3 +689,82 @@ fn test_conversation_builder_preserves_system_instruction() {
     // System instruction should be preserved through conversation builder
     assert!(builder.system_instruction.is_some());
 }
+
+#[test]
+fn test_with_computer_use() {
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Navigate to example.com")
+        .with_computer_use();
+
+    // Tool should be added with browser environment and no exclusions
+    let tools = builder.tools.as_ref().expect("tools should be set");
+    let has_computer_use = tools.iter().any(|t| {
+        matches!(
+            t,
+            Tool::ComputerUse {
+                environment,
+                excluded_predefined_functions
+            } if environment == "browser" && excluded_predefined_functions.is_empty()
+        )
+    });
+    assert!(
+        has_computer_use,
+        "ComputerUse tool should be present with browser environment and no exclusions"
+    );
+}
+
+#[test]
+fn test_with_computer_use_excluding() {
+    let client = create_test_client();
+    let exclusions = vec!["submit_form".to_string(), "download_file".to_string()];
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Browse safely")
+        .with_computer_use_excluding(exclusions.clone());
+
+    // Tool should be added with specified exclusions
+    let tools = builder.tools.as_ref().expect("tools should be set");
+    let has_computer_use_with_exclusions = tools.iter().any(|t| {
+        matches!(
+            t,
+            Tool::ComputerUse {
+                environment,
+                excluded_predefined_functions
+            } if environment == "browser" && *excluded_predefined_functions == exclusions
+        )
+    });
+    assert!(
+        has_computer_use_with_exclusions,
+        "ComputerUse tool should have specified exclusions"
+    );
+}
+
+#[test]
+fn test_with_computer_use_excluding_empty() {
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Browse")
+        .with_computer_use_excluding(vec![]);
+
+    // Tool should be added with empty exclusions (equivalent to with_computer_use)
+    let tools = builder.tools.as_ref().expect("tools should be set");
+    let has_computer_use = tools.iter().any(|t| {
+        matches!(
+            t,
+            Tool::ComputerUse {
+                excluded_predefined_functions,
+                ..
+            } if excluded_predefined_functions.is_empty()
+        )
+    });
+    assert!(
+        has_computer_use,
+        "ComputerUse tool should be present with empty exclusions"
+    );
+}

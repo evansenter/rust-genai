@@ -1586,3 +1586,196 @@ fn test_resolution_unknown_object_form() {
     assert_eq!(data.get("level").unwrap(), "ultra_ultra_high");
     assert_eq!(data.get("tokens").unwrap(), 5000);
 }
+
+// --- Computer Use Tests ---
+
+#[test]
+fn test_serialize_computer_use_call() {
+    let content = InteractionContent::ComputerUseCall {
+        id: "call_123".to_string(),
+        action: "navigate".to_string(),
+        parameters: serde_json::json!({"url": "https://example.com"}),
+    };
+
+    let json = serde_json::to_string(&content).expect("Serialization failed");
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(value["type"], "computer_use_call");
+    assert_eq!(value["id"], "call_123");
+    assert_eq!(value["action"], "navigate");
+    assert_eq!(value["parameters"]["url"], "https://example.com");
+
+    assert!(content.is_computer_use_call());
+    assert!(!content.is_unknown());
+}
+
+#[test]
+fn test_deserialize_computer_use_call() {
+    let json = r##"{"type": "computer_use_call", "id": "call_456", "action": "click", "parameters": {"selector": "#button"}}"##;
+    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+    match &content {
+        InteractionContent::ComputerUseCall {
+            id,
+            action,
+            parameters,
+        } => {
+            assert_eq!(id, "call_456");
+            assert_eq!(action, "click");
+            assert_eq!(parameters["selector"], "#button");
+        }
+        _ => panic!("Expected ComputerUseCall variant, got {:?}", content),
+    }
+
+    assert!(content.is_computer_use_call());
+    assert!(!content.is_unknown());
+}
+
+#[test]
+fn test_deserialize_computer_use_call_no_parameters() {
+    // Parameters might be missing in some API responses
+    let json = r#"{"type": "computer_use_call", "id": "call_789", "action": "screenshot"}"#;
+    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+    match &content {
+        InteractionContent::ComputerUseCall {
+            id,
+            action,
+            parameters,
+        } => {
+            assert_eq!(id, "call_789");
+            assert_eq!(action, "screenshot");
+            // Should default to null when missing
+            assert!(parameters.is_null());
+        }
+        _ => panic!("Expected ComputerUseCall variant, got {:?}", content),
+    }
+}
+
+#[test]
+fn test_serialize_computer_use_result_success() {
+    let content = InteractionContent::ComputerUseResult {
+        call_id: "call_123".to_string(),
+        success: true,
+        output: Some(serde_json::json!({"title": "Example Domain"})),
+        error: None,
+        screenshot: Some("base64-screenshot-data".to_string()),
+    };
+
+    let json = serde_json::to_string(&content).expect("Serialization failed");
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(value["type"], "computer_use_result");
+    assert_eq!(value["call_id"], "call_123");
+    assert_eq!(value["success"], true);
+    assert_eq!(value["output"]["title"], "Example Domain");
+    assert_eq!(value["screenshot"], "base64-screenshot-data");
+    assert!(value.get("error").is_none());
+
+    assert!(content.is_computer_use_result());
+    assert!(!content.is_unknown());
+}
+
+#[test]
+fn test_serialize_computer_use_result_error() {
+    let content = InteractionContent::ComputerUseResult {
+        call_id: "call_456".to_string(),
+        success: false,
+        output: None,
+        error: Some("Element not found".to_string()),
+        screenshot: None,
+    };
+
+    let json = serde_json::to_string(&content).expect("Serialization failed");
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(value["type"], "computer_use_result");
+    assert_eq!(value["call_id"], "call_456");
+    assert_eq!(value["success"], false);
+    assert_eq!(value["error"], "Element not found");
+    assert!(value.get("output").is_none());
+    assert!(value.get("screenshot").is_none());
+
+    assert!(content.is_computer_use_result());
+}
+
+#[test]
+fn test_deserialize_computer_use_result() {
+    let json = r#"{"type": "computer_use_result", "call_id": "call_789", "success": true, "output": {"url": "https://example.com"}, "screenshot": "base64data"}"#;
+    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+
+    match &content {
+        InteractionContent::ComputerUseResult {
+            call_id,
+            success,
+            output,
+            error,
+            screenshot,
+        } => {
+            assert_eq!(call_id, "call_789");
+            assert!(*success);
+            assert!(output.is_some());
+            assert_eq!(output.as_ref().unwrap()["url"], "https://example.com");
+            assert!(error.is_none());
+            assert_eq!(screenshot.as_ref().unwrap(), "base64data");
+        }
+        _ => panic!("Expected ComputerUseResult variant, got {:?}", content),
+    }
+}
+
+#[test]
+fn test_computer_use_call_roundtrip() {
+    let original = InteractionContent::ComputerUseCall {
+        id: "roundtrip_test".to_string(),
+        action: "type".to_string(),
+        parameters: serde_json::json!({"text": "Hello, World!", "element": "#input"}),
+    };
+
+    let json = serde_json::to_string(&original).expect("Serialization failed");
+    let parsed: InteractionContent = serde_json::from_str(&json).expect("Deserialization failed");
+
+    match parsed {
+        InteractionContent::ComputerUseCall {
+            id,
+            action,
+            parameters,
+        } => {
+            assert_eq!(id, "roundtrip_test");
+            assert_eq!(action, "type");
+            assert_eq!(parameters["text"], "Hello, World!");
+            assert_eq!(parameters["element"], "#input");
+        }
+        _ => panic!("Expected ComputerUseCall variant"),
+    }
+}
+
+#[test]
+fn test_computer_use_result_roundtrip() {
+    let original = InteractionContent::ComputerUseResult {
+        call_id: "roundtrip_test".to_string(),
+        success: true,
+        output: Some(serde_json::json!({"result": "success"})),
+        error: None,
+        screenshot: Some("screenshot_data".to_string()),
+    };
+
+    let json = serde_json::to_string(&original).expect("Serialization failed");
+    let parsed: InteractionContent = serde_json::from_str(&json).expect("Deserialization failed");
+
+    match parsed {
+        InteractionContent::ComputerUseResult {
+            call_id,
+            success,
+            output,
+            error,
+            screenshot,
+        } => {
+            assert_eq!(call_id, "roundtrip_test");
+            assert!(success);
+            assert!(output.is_some());
+            assert!(error.is_none());
+            assert_eq!(screenshot.as_ref().unwrap(), "screenshot_data");
+        }
+        _ => panic!("Expected ComputerUseResult variant"),
+    }
+}

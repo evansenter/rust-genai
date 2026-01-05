@@ -32,6 +32,21 @@ pub enum Tool {
     CodeExecution,
     /// Built-in URL context tool
     UrlContext,
+    /// Built-in computer use tool for browser automation.
+    ///
+    /// **Security Warning**: This tool allows the model to interact with web browsers
+    /// on your behalf. Only use with trusted models and carefully review excluded functions.
+    ///
+    /// # Fields
+    ///
+    /// - `environment`: The operating environment (currently only "browser" supported)
+    /// - `excluded_predefined_functions`: List of predefined functions to exclude from model access
+    ComputerUse {
+        /// The environment being operated (currently only "browser" supported)
+        environment: String,
+        /// List of predefined functions to exclude from model access
+        excluded_predefined_functions: Vec<String>,
+    },
     /// Model Context Protocol (MCP) server
     McpServer { name: String, url: String },
     /// Unknown tool type for forward compatibility.
@@ -87,6 +102,21 @@ impl Serialize for Tool {
                 map.serialize_entry("type", "url_context")?;
                 map.end()
             }
+            Self::ComputerUse {
+                environment,
+                excluded_predefined_functions,
+            } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "computer_use")?;
+                map.serialize_entry("environment", environment)?;
+                if !excluded_predefined_functions.is_empty() {
+                    map.serialize_entry(
+                        "excludedPredefinedFunctions",
+                        excluded_predefined_functions,
+                    )?;
+                }
+                map.end()
+            }
             Self::McpServer { name, url } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "mcp_server")?;
@@ -139,6 +169,12 @@ impl<'de> Deserialize<'de> for Tool {
             CodeExecution,
             #[serde(rename = "url_context")]
             UrlContext,
+            #[serde(rename = "computer_use")]
+            ComputerUse {
+                environment: String,
+                #[serde(rename = "excludedPredefinedFunctions", default)]
+                excluded_predefined_functions: Vec<String>,
+            },
             #[serde(rename = "mcp_server")]
             McpServer { name: String, url: String },
         }
@@ -158,6 +194,13 @@ impl<'de> Deserialize<'de> for Tool {
                 KnownTool::GoogleSearch => Tool::GoogleSearch,
                 KnownTool::CodeExecution => Tool::CodeExecution,
                 KnownTool::UrlContext => Tool::UrlContext,
+                KnownTool::ComputerUse {
+                    environment,
+                    excluded_predefined_functions,
+                } => Tool::ComputerUse {
+                    environment,
+                    excluded_predefined_functions,
+                },
                 KnownTool::McpServer { name, url } => Tool::McpServer { name, url },
             }),
             Err(parse_error) => {
@@ -728,6 +771,55 @@ mod tests {
     }
 
     #[test]
+    fn test_tool_computer_use_roundtrip() {
+        let tool = Tool::ComputerUse {
+            environment: "browser".to_string(),
+            excluded_predefined_functions: vec!["submit_form".to_string(), "download".to_string()],
+        };
+        let json = serde_json::to_string(&tool).expect("Serialization failed");
+        assert!(json.contains("\"type\":\"computer_use\""));
+        assert!(json.contains("\"environment\":\"browser\""));
+        assert!(json.contains("\"excludedPredefinedFunctions\""));
+
+        let parsed: Tool = serde_json::from_str(&json).expect("Deserialization failed");
+        match parsed {
+            Tool::ComputerUse {
+                environment,
+                excluded_predefined_functions,
+            } => {
+                assert_eq!(environment, "browser");
+                assert_eq!(excluded_predefined_functions.len(), 2);
+                assert!(excluded_predefined_functions.contains(&"submit_form".to_string()));
+            }
+            other => panic!("Expected ComputerUse variant, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_tool_computer_use_empty_exclusions() {
+        // Test that empty exclusions don't serialize the field
+        let tool = Tool::ComputerUse {
+            environment: "browser".to_string(),
+            excluded_predefined_functions: vec![],
+        };
+        let json = serde_json::to_string(&tool).expect("Serialization failed");
+        assert!(json.contains("\"type\":\"computer_use\""));
+        assert!(json.contains("\"environment\":\"browser\""));
+        assert!(!json.contains("excludedPredefinedFunctions"));
+
+        let parsed: Tool = serde_json::from_str(&json).expect("Deserialization failed");
+        match parsed {
+            Tool::ComputerUse {
+                excluded_predefined_functions,
+                ..
+            } => {
+                assert!(excluded_predefined_functions.is_empty());
+            }
+            other => panic!("Expected ComputerUse variant, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn test_tool_known_types_helper_methods() {
         // Test known types return None for unknown helpers
         let google_search = Tool::GoogleSearch;
@@ -744,6 +836,14 @@ mod tests {
         assert!(!url_context.is_unknown());
         assert_eq!(url_context.unknown_tool_type(), None);
         assert_eq!(url_context.unknown_data(), None);
+
+        let computer_use = Tool::ComputerUse {
+            environment: "browser".to_string(),
+            excluded_predefined_functions: vec![],
+        };
+        assert!(!computer_use.is_unknown());
+        assert_eq!(computer_use.unknown_tool_type(), None);
+        assert_eq!(computer_use.unknown_data(), None);
 
         let function = Tool::Function {
             name: "test".to_string(),

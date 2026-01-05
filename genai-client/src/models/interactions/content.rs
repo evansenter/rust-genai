@@ -675,6 +675,74 @@ pub enum InteractionContent {
         /// The fetched content, or `None` if the fetch failed
         content: Option<String>,
     },
+    /// Computer use call (model requesting browser interaction)
+    ///
+    /// Appears when the model initiates browser automation via the `ComputerUse` tool.
+    ///
+    /// # Security Considerations
+    ///
+    /// Computer use calls allow the model to interact with web browsers on your behalf.
+    /// Always review calls before execution in production environments, especially when:
+    /// - Accessing sensitive websites (banking, admin panels)
+    /// - Performing state-changing operations (form submissions, purchases)
+    /// - Working with untrusted user input
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionContent;
+    /// # let content: InteractionContent = todo!();
+    /// if let InteractionContent::ComputerUseCall { id, action, parameters } = content {
+    ///     println!("Browser action '{}' requested (id: {})", action, id);
+    ///     println!("Parameters: {:?}", parameters);
+    /// }
+    /// ```
+    ComputerUseCall {
+        /// Unique identifier for this computer use call
+        id: String,
+        /// The browser action to perform (e.g., "navigate", "click", "type")
+        action: String,
+        /// Action-specific parameters
+        parameters: serde_json::Value,
+    },
+    /// Computer use result (returned after browser interaction)
+    ///
+    /// Contains the outcome of a browser action executed via the `ComputerUse` tool.
+    ///
+    /// # Security Note
+    ///
+    /// Results may contain sensitive information like:
+    /// - Screenshots of the current page
+    /// - DOM content from visited pages
+    /// - Cookie or session data
+    ///
+    /// Sanitize output before displaying to end users.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionContent;
+    /// # let content: InteractionContent = todo!();
+    /// if let InteractionContent::ComputerUseResult { success, output, error, .. } = content {
+    ///     if success {
+    ///         println!("Action succeeded: {:?}", output);
+    ///     } else {
+    ///         eprintln!("Action failed: {:?}", error);
+    ///     }
+    /// }
+    /// ```
+    ComputerUseResult {
+        /// The call_id matching the ComputerUseCall this result is for
+        call_id: String,
+        /// Whether the action succeeded
+        success: bool,
+        /// Action output data (may include page content, extracted data, etc.)
+        output: Option<serde_json::Value>,
+        /// Error message if action failed
+        error: Option<String>,
+        /// Optional screenshot data (base64-encoded image)
+        screenshot: Option<String>,
+    },
     /// Unknown content type for forward compatibility.
     ///
     /// This variant captures content types that the library doesn't recognize yet.
@@ -982,6 +1050,40 @@ impl Serialize for InteractionContent {
                 }
                 map.end()
             }
+            Self::ComputerUseCall {
+                id,
+                action,
+                parameters,
+            } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "computer_use_call")?;
+                map.serialize_entry("id", id)?;
+                map.serialize_entry("action", action)?;
+                map.serialize_entry("parameters", parameters)?;
+                map.end()
+            }
+            Self::ComputerUseResult {
+                call_id,
+                success,
+                output,
+                error,
+                screenshot,
+            } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "computer_use_result")?;
+                map.serialize_entry("call_id", call_id)?;
+                map.serialize_entry("success", success)?;
+                if let Some(out) = output {
+                    map.serialize_entry("output", out)?;
+                }
+                if let Some(err) = error {
+                    map.serialize_entry("error", err)?;
+                }
+                if let Some(ss) = screenshot {
+                    map.serialize_entry("screenshot", ss)?;
+                }
+                map.end()
+            }
             Self::Unknown { content_type, data } => {
                 // For Unknown, merge the content_type into the data object
                 let mut map = serializer.serialize_map(None)?;
@@ -1135,6 +1237,18 @@ impl InteractionContent {
         matches!(self, Self::UrlContextResult { .. })
     }
 
+    /// Check if this is a ComputerUseCall content type.
+    #[must_use]
+    pub const fn is_computer_use_call(&self) -> bool {
+        matches!(self, Self::ComputerUseCall { .. })
+    }
+
+    /// Check if this is a ComputerUseResult content type.
+    #[must_use]
+    pub const fn is_computer_use_result(&self) -> bool {
+        matches!(self, Self::ComputerUseResult { .. })
+    }
+
     /// Returns the content type name if this is an unknown content type.
     ///
     /// Returns `None` for known content types.
@@ -1266,6 +1380,22 @@ impl<'de> Deserialize<'de> for InteractionContent {
             UrlContextResult {
                 url: String,
                 content: Option<String>,
+            },
+            ComputerUseCall {
+                id: String,
+                action: String,
+                #[serde(default)]
+                parameters: Option<serde_json::Value>,
+            },
+            ComputerUseResult {
+                call_id: String,
+                success: bool,
+                #[serde(default)]
+                output: Option<serde_json::Value>,
+                #[serde(default)]
+                error: Option<String>,
+                #[serde(default)]
+                screenshot: Option<String>,
             },
         }
 
@@ -1458,6 +1588,28 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 KnownContent::UrlContextResult { url, content } => {
                     InteractionContent::UrlContextResult { url, content }
                 }
+                KnownContent::ComputerUseCall {
+                    id,
+                    action,
+                    parameters,
+                } => InteractionContent::ComputerUseCall {
+                    id,
+                    action,
+                    parameters: parameters.unwrap_or(serde_json::Value::Null),
+                },
+                KnownContent::ComputerUseResult {
+                    call_id,
+                    success,
+                    output,
+                    error,
+                    screenshot,
+                } => InteractionContent::ComputerUseResult {
+                    call_id,
+                    success,
+                    output,
+                    error,
+                    screenshot,
+                },
             }),
             Err(parse_error) => {
                 // Unknown type - extract type name and preserve data
