@@ -732,7 +732,7 @@ pub enum InteractionContent {
     /// }
     /// ```
     ComputerUseResult {
-        /// The call_id matching the ComputerUseCall this result is for
+        /// References the `id` field from the corresponding `ComputerUseCall` variant.
         call_id: String,
         /// Whether the action succeeded
         success: bool,

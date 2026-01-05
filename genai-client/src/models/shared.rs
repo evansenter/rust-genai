@@ -44,7 +44,9 @@ pub enum Tool {
     ComputerUse {
         /// The environment being operated (currently only "browser" supported)
         environment: String,
-        /// List of predefined functions to exclude from model access
+        /// List of predefined functions to exclude from model access.
+        ///
+        /// Note: This field name follows the API's `excludedPredefinedFunctions` camelCase naming.
         excluded_predefined_functions: Vec<String>,
     },
     /// Model Context Protocol (MCP) server
