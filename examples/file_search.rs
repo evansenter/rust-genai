@@ -100,7 +100,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Ok(response) => {
             println!("Status: {:?}", response.status);
             if let Some(text) = response.text() {
-                println!("Response: {}\n", &text[..text.len().min(200)]);
+                let preview: String = text.chars().take(200).collect();
+                println!("Response: {preview}\n");
             }
         }
         Err(e) => {
@@ -133,7 +134,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             );
 
             if let Some(text) = response.text() {
-                println!("Response preview: {}...", &text[..text.len().min(300)]);
+                let preview: String = text.chars().take(300).collect();
+                println!("Response preview: {preview}...");
             }
         }
         Err(e) => {
