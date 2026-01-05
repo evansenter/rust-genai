@@ -134,7 +134,9 @@ Helper methods: `is_unknown()`, `unknown_<context>_type()`, `unknown_data()`
 
 See `InteractionContent` in `genai-client/src/models/interactions/content.rs` for reference implementation.
 
-**Implementation status** (all ✅): `InteractionContent`, `Tool`, `InteractionStatus`, `StreamChunk`, `AutoFunctionStreamChunk`, `FunctionCallingMode`
+**Implementation status** (all ✅): `InteractionContent`, `Tool`, `InteractionStatus`, `StreamChunk`, `AutoFunctionStreamChunk`, `FunctionCallingMode`, `Resolution`
+
+**When adding/updating enums**: Always update `docs/ENUM_WIRE_FORMATS.md` with verified wire format. Test with `LOUD_WIRE=1` to confirm actual API format.
 
 ## Test Organization
 

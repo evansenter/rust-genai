@@ -10,6 +10,7 @@ This document captures the actual wire formats for enums in the Gemini Interacti
 | `ThinkingLevel` | lowercase | `"low"`, `"medium"`, `"high"` | Docs are correct |
 | `FunctionCallingMode` | SCREAMING_CASE | `"AUTO"`, `"ANY"`, `"NONE"`, `"VALIDATED"` | |
 | `InteractionStatus` | snake_case | `"in_progress"`, `"requires_action"` | Response-only |
+| `Resolution` | snake_case | `"low"`, `"medium"`, `"high"`, `"ultra_high"` | Image/video content |
 
 ## Details
 
@@ -82,6 +83,30 @@ Returned in API responses - we only deserialize, never serialize.
 | `InteractionStatus::RequiresAction` | `"requires_action"` |
 | `InteractionStatus::Failed` | `"failed"` |
 | `InteractionStatus::Cancelled` | `"cancelled"` |
+
+### Resolution (content)
+
+Used in image and video content for quality vs. token cost trade-off.
+
+```json
+{
+  "input": [{
+    "type": "image",
+    "data": "base64...",
+    "mime_type": "image/png",
+    "resolution": "low"
+  }]
+}
+```
+
+| Rust Enum | Wire Value |
+|-----------|------------|
+| `Resolution::Low` | `"low"` |
+| `Resolution::Medium` | `"medium"` |
+| `Resolution::High` | `"high"` |
+| `Resolution::UltraHigh` | `"ultra_high"` |
+
+**Verified**: 2026-01-05 - Tested with `LOUD_WIRE=1 cargo run --example multimodal_image`.
 
 ## Testing New Enums
 
