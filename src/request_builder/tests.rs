@@ -503,3 +503,189 @@ async fn test_auto_functions_allows_store_default() {
         err
     );
 }
+
+// --- Turn Array Input Tests ---
+
+#[test]
+fn test_interaction_builder_with_turns() {
+    use crate::Turn;
+
+    let client = create_test_client();
+    let turns = vec![
+        Turn::user("What is 2+2?"),
+        Turn::model("2+2 equals 4."),
+        Turn::user("And what's that times 3?"),
+    ];
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_turns(turns);
+
+    assert!(matches!(
+        builder.input,
+        Some(genai_client::InteractionInput::Turns(_))
+    ));
+}
+
+#[test]
+fn test_interaction_builder_build_request_with_turns() {
+    use crate::Turn;
+
+    let client = create_test_client();
+    let turns = vec![
+        Turn::user("Hello"),
+        Turn::model("Hi there!"),
+        Turn::user("How are you?"),
+    ];
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_turns(turns);
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+
+    let request = result.unwrap();
+    assert_eq!(request.model.as_deref(), Some("gemini-3-flash-preview"));
+    assert!(matches!(
+        request.input,
+        genai_client::InteractionInput::Turns(_)
+    ));
+}
+
+#[test]
+fn test_interaction_builder_with_single_turn() {
+    use crate::Turn;
+
+    let client = create_test_client();
+    let turns = vec![Turn::user("Hello")];
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_turns(turns);
+
+    let result = builder.build_request();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_conversation_builder_fluent_api() {
+    use crate::Role;
+
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .conversation()
+        .user("What is 2+2?")
+        .model("2+2 equals 4.")
+        .user("And what's that times 3?")
+        .done();
+
+    assert!(matches!(
+        builder.input,
+        Some(genai_client::InteractionInput::Turns(ref turns)) if turns.len() == 3
+    ));
+
+    // Verify the turns have correct roles
+    if let Some(genai_client::InteractionInput::Turns(ref turns)) = builder.input {
+        assert_eq!(*turns[0].role(), Role::User);
+        assert_eq!(*turns[1].role(), Role::Model);
+        assert_eq!(*turns[2].role(), Role::User);
+    }
+}
+
+#[test]
+fn test_conversation_builder_with_parts_content() {
+    use crate::{InteractionContent, TurnContent};
+
+    let client = create_test_client();
+    let parts = vec![InteractionContent::Text {
+        text: Some("What is in this image?".to_string()),
+        annotations: None,
+    }];
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .conversation()
+        .user(TurnContent::Parts(parts))
+        .done();
+
+    assert!(matches!(
+        builder.input,
+        Some(genai_client::InteractionInput::Turns(ref turns)) if turns.len() == 1
+    ));
+
+    // Verify the turn has parts content
+    if let Some(genai_client::InteractionInput::Turns(ref turns)) = builder.input {
+        assert!(turns[0].content().is_parts());
+    }
+}
+
+#[test]
+fn test_conversation_builder_with_turn_method() {
+    use crate::Role;
+
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .conversation()
+        .turn(Role::User, "Hello")
+        .turn(Role::Model, "Hi!")
+        .done();
+
+    assert!(matches!(
+        builder.input,
+        Some(genai_client::InteractionInput::Turns(ref turns)) if turns.len() == 2
+    ));
+}
+
+#[test]
+fn test_conversation_builder_empty() {
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .conversation()
+        .done();
+
+    // Empty conversation results in empty turns array
+    assert!(matches!(
+        builder.input,
+        Some(genai_client::InteractionInput::Turns(ref turns)) if turns.is_empty()
+    ));
+}
+
+#[test]
+fn test_conversation_builder_preserves_model() {
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .conversation()
+        .user("Hello")
+        .done();
+
+    // Model should be preserved through conversation builder
+    assert_eq!(builder.model.as_deref(), Some("gemini-3-flash-preview"));
+}
+
+#[test]
+fn test_conversation_builder_preserves_system_instruction() {
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_system_instruction("Be helpful")
+        .conversation()
+        .user("Hello")
+        .done();
+
+    // System instruction should be preserved through conversation builder
+    assert!(builder.system_instruction.is_some());
+}

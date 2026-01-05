@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 393d4b6171ebaa5c4f2c2bd9bc6358fc10a07fe0dc484f158014e31f21a2d602 # shrinks to content = Parts([Unknown { content_type: "a", data: Null }])
+cc edeb21cb890c1ac562a5f0489eeebaafd648d07330418416e6f2b7c04539aa85 # shrinks to turn = Turn { role: User, content: Parts([Unknown { content_type: "A", data: Null }]) }

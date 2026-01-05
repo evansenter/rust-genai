@@ -341,7 +341,7 @@ impl fmt::Display for CodeExecutionLanguage {
 ///     }
 /// }
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum InteractionContent {
     /// Text content with optional source annotations.

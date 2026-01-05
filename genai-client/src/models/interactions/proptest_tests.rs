@@ -15,7 +15,7 @@ use super::metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
     WebSource,
 };
-use super::request::ThinkingLevel;
+use super::request::{Role, ThinkingLevel, Turn, TurnContent};
 use super::response::{
     InteractionResponse, InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, UsageMetadata,
 };
@@ -225,6 +225,57 @@ fn arb_thinking_level() -> impl Strategy<Value = ThinkingLevel> {
             data: serde_json::Value::String(level_type),
         }),
     ]
+}
+
+// =============================================================================
+// Role Strategies
+// =============================================================================
+
+/// Strategy for known Role variants only.
+/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
+#[cfg(feature = "strict-unknown")]
+fn arb_role() -> impl Strategy<Value = Role> {
+    prop_oneof![Just(Role::User), Just(Role::Model),]
+}
+
+/// Strategy for all Role variants including Unknown.
+/// Used in normal mode (Unknown variants are gracefully handled).
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_role() -> impl Strategy<Value = Role> {
+    prop_oneof![
+        Just(Role::User),
+        Just(Role::Model),
+        // Unknown variant with preserved data (role_type and data fields per Evergreen pattern)
+        arb_identifier().prop_map(|role_type| Role::Unknown {
+            data: serde_json::Value::String(role_type.clone()),
+            role_type,
+        }),
+    ]
+}
+
+// =============================================================================
+// TurnContent Strategies
+// =============================================================================
+
+/// Strategy for TurnContent.
+/// Generates either text or parts content.
+fn arb_turn_content() -> impl Strategy<Value = TurnContent> {
+    prop_oneof![
+        // Text content
+        arb_text().prop_map(TurnContent::Text),
+        // Parts content with interaction content
+        prop::collection::vec(arb_interaction_content(), 0..3).prop_map(TurnContent::Parts),
+    ]
+}
+
+// =============================================================================
+// Turn Strategies
+// =============================================================================
+
+/// Strategy for Turn.
+/// Generates a turn with a role and content.
+fn arb_turn() -> impl Strategy<Value = Turn> {
+    (arb_role(), arb_turn_content()).prop_map(|(role, content)| Turn::new(role, content))
 }
 
 // =============================================================================
@@ -813,6 +864,42 @@ proptest! {
         let restored: ThinkingLevel = serde_json::from_str(&json).expect("Deserialization should succeed");
 
         // ThinkingLevel doesn't derive PartialEq, so we verify roundtrip by comparing JSON strings
+        let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test that Role roundtrips correctly through JSON.
+    #[test]
+    fn role_roundtrip(role in arb_role()) {
+        let json = serde_json::to_string(&role).expect("Serialization should succeed");
+        let restored: Role = serde_json::from_str(&json).expect("Deserialization should succeed");
+        prop_assert_eq!(role, restored);
+    }
+
+    /// Test that TurnContent roundtrips correctly through JSON.
+    ///
+    /// Note: Uses JSON comparison since TurnContent can contain InteractionContent::Unknown
+    /// which doesn't preserve exact data structure through roundtrip.
+    #[test]
+    fn turn_content_roundtrip(content in arb_turn_content()) {
+        let json = serde_json::to_string(&content).expect("Serialization should succeed");
+        let restored: TurnContent = serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        // Use JSON comparison since InteractionContent::Unknown doesn't roundtrip exactly
+        let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test that Turn roundtrips correctly through JSON.
+    ///
+    /// Note: Uses JSON comparison since Turn can contain InteractionContent::Unknown
+    /// which doesn't preserve exact data structure through roundtrip.
+    #[test]
+    fn turn_roundtrip(turn in arb_turn()) {
+        let json = serde_json::to_string(&turn).expect("Serialization should succeed");
+        let restored: Turn = serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        // Use JSON comparison since InteractionContent::Unknown doesn't roundtrip exactly
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
         prop_assert_eq!(json, restored_json);
     }
