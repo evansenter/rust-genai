@@ -1505,6 +1505,10 @@ impl InteractionResponse {
                 InteractionContent::UrlContextResult { .. } => {
                     summary.url_context_result_count += 1
                 }
+                InteractionContent::ComputerUseCall { .. } => summary.computer_use_call_count += 1,
+                InteractionContent::ComputerUseResult { .. } => {
+                    summary.computer_use_result_count += 1
+                }
                 InteractionContent::Unknown { content_type, .. } => {
                     summary.unknown_count += 1;
                     unknown_types_set.insert(content_type.clone());
@@ -1735,6 +1739,10 @@ pub struct ContentSummary {
     pub url_context_call_count: usize,
     /// Number of URL context result content items
     pub url_context_result_count: usize,
+    /// Number of computer use call content items
+    pub computer_use_call_count: usize,
+    /// Number of computer use result content items
+    pub computer_use_result_count: usize,
     /// Number of unknown content items
     pub unknown_count: usize,
     /// List of unique unknown type names encountered (sorted alphabetically)
@@ -1797,6 +1805,18 @@ impl fmt::Display for ContentSummary {
             parts.push(format!(
                 "{} url_context_result",
                 self.url_context_result_count
+            ));
+        }
+        if self.computer_use_call_count > 0 {
+            parts.push(format!(
+                "{} computer_use_call",
+                self.computer_use_call_count
+            ));
+        }
+        if self.computer_use_result_count > 0 {
+            parts.push(format!(
+                "{} computer_use_result",
+                self.computer_use_result_count
             ));
         }
         if self.unknown_count > 0 {

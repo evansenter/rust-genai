@@ -582,6 +582,36 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
         // UrlContextResult content
         (arb_text(), proptest::option::of(arb_text()))
             .prop_map(|(url, content)| InteractionContent::UrlContextResult { url, content }),
+        // ComputerUseCall content
+        (arb_identifier(), arb_identifier(), arb_json_value()).prop_map(
+            |(id, action, parameters)| InteractionContent::ComputerUseCall {
+                id,
+                action,
+                parameters,
+            }
+        ),
+        // ComputerUseResult content
+        // Note: output uses prop_filter_map to avoid Some(Value::Null) which doesn't roundtrip
+        // (JSON `null` deserializes as None for Option<Value>, not Some(Null))
+        (
+            arb_identifier(),
+            any::<bool>(),
+            proptest::option::of(arb_json_value()).prop_map(|opt| {
+                // Convert Some(Null) to None for proper roundtrip
+                opt.filter(|v| !v.is_null())
+            }),
+            proptest::option::of(arb_text()),
+            proptest::option::of(arb_text()),
+        )
+            .prop_map(|(call_id, success, output, error, screenshot)| {
+                InteractionContent::ComputerUseResult {
+                    call_id,
+                    success,
+                    output,
+                    error,
+                    screenshot,
+                }
+            }),
     ]
 }
 
@@ -688,6 +718,17 @@ fn arb_known_tool() -> impl Strategy<Value = Tool> {
         Just(Tool::UrlContext),
         // MCP Server
         (arb_identifier(), arb_text()).prop_map(|(name, url)| Tool::McpServer { name, url }),
+        // Computer Use
+        (
+            arb_identifier(),
+            prop::collection::vec(arb_identifier(), 0..5)
+        )
+            .prop_map(
+                |(environment, excluded_predefined_functions)| Tool::ComputerUse {
+                    environment,
+                    excluded_predefined_functions,
+                }
+            ),
     ]
 }
 

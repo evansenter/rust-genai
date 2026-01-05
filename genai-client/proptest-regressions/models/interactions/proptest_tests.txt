@@ -6,3 +6,7 @@
 # everyone who runs the test benefits from these saved cases.
 cc 393d4b6171ebaa5c4f2c2bd9bc6358fc10a07fe0dc484f158014e31f21a2d602 # shrinks to content = Parts([Unknown { content_type: "a", data: Null }])
 cc edeb21cb890c1ac562a5f0489eeebaafd648d07330418416e6f2b7c04539aa85 # shrinks to turn = Turn { role: User, content: Parts([Unknown { content_type: "A", data: Null }]) }
+cc 6b8ea52e1cd54c568aab6b3f25f9a3feee9eeaf7f01b034f7151fe01c05434c9 # shrinks to content = ComputerUseCall { id: "A", action: "A", parameters: Null }
+cc 54788deee11790040a07dbec1cda0ac70f657a41a6042636748efbd865d12a87 # shrinks to content = Parts([ComputerUseCall { id: "A", action: "a", parameters: Null }])
+cc e2ab0d9ad1f01e9a208e0471dc862eed86624d2665f8fe986618650d0b74022c # shrinks to response = InteractionResponse { id: None, model: None, agent: None, input: [], outputs: [ComputerUseCall { id: "a", action: "_", parameters: Null }], status: Completed, usage: None, tools: None, grounding_metadata: None, url_context_metadata: None, previous_interaction_id: None, created: None, updated: None }
+cc ab7602e1cec3fa3c66d7097e4552a5a080db05f09b71c5056019fd906f1a3a63 # shrinks to chunk = Complete(InteractionResponse { id: None, model: None, agent: None, input: [], outputs: [ComputerUseResult { call_id: "A", success: false, output: Some(Null), error: None, screenshot: None }], status: Completed, usage: None, tools: None, grounding_metadata: None, url_context_metadata: None, previous_interaction_id: None, created: None, updated: None })

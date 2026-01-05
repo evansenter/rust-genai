@@ -1390,6 +1390,109 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         self
     }
 
+    /// Enables computer use (browser automation) for this interaction.
+    ///
+    /// Computer use allows the model to control a browser environment to complete
+    /// tasks. The model can navigate pages, click elements, type text, take
+    /// screenshots, and perform other browser actions.
+    ///
+    /// # Security Warning
+    ///
+    /// **Browser automation is a powerful capability that requires careful consideration:**
+    ///
+    /// - The model will have access to a real browser environment
+    /// - Actions are executed server-side by the API, not in your application
+    /// - Consider using [`with_computer_use_excluding`] to restrict dangerous actions
+    /// - Monitor and log computer use activities for audit purposes
+    /// - Never expose to untrusted user input without safeguards
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Go to example.com and take a screenshot")
+    ///     .with_computer_use()
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // Check for computer use results in the response
+    /// for content in &response.outputs {
+    ///     if content.is_computer_use_result() {
+    ///         println!("Computer use action completed");
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`with_computer_use_excluding`]: Self::with_computer_use_excluding
+    #[must_use]
+    pub fn with_computer_use(mut self) -> Self {
+        self.add_tool(InternalTool::ComputerUse {
+            environment: "browser".to_string(),
+            excluded_predefined_functions: Vec::new(),
+        });
+        self
+    }
+
+    /// Enables computer use (browser automation) with specific functions excluded.
+    ///
+    /// This method allows you to restrict which browser actions the model can perform.
+    /// Use this to prevent potentially dangerous or unwanted operations.
+    ///
+    /// # Security Warning
+    ///
+    /// **Browser automation is a powerful capability that requires careful consideration:**
+    ///
+    /// - Review the available actions and exclude any that pose risks for your use case
+    /// - Common exclusions: `"submit_form"`, `"download_file"`, `"execute_script"`
+    /// - Consider logging all computer use calls for security audits
+    /// - Test thoroughly with exclusions before production use
+    ///
+    /// # Arguments
+    ///
+    /// * `excluded_functions` - List of function names to exclude from computer use
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// // Restrict computer use to prevent form submissions and downloads
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Navigate to example.com and describe what you see")
+    ///     .with_computer_use_excluding(vec![
+    ///         "submit_form".to_string(),
+    ///         "download_file".to_string(),
+    ///     ])
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn with_computer_use_excluding(mut self, excluded_functions: Vec<String>) -> Self {
+        self.add_tool(InternalTool::ComputerUse {
+            environment: "browser".to_string(),
+            excluded_predefined_functions: excluded_functions,
+        });
+        self
+    }
+
     /// Adds an MCP (Model Context Protocol) server as a tool.
     ///
     /// MCP servers provide a standardized way to expose external tools and
