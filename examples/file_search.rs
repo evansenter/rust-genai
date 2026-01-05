@@ -66,7 +66,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 for (i, item) in results.iter().enumerate() {
                     println!("{}. {}", i + 1, item.title);
                     println!("   Store: {}", item.file_search_store);
-                    println!("   Preview: {}...", &item.text[..item.text.len().min(100)]);
+                    let preview: String = item.text.chars().take(100).collect();
+                    println!("   Preview: {preview}...");
                     println!();
                 }
             } else {
