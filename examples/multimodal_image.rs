@@ -1,8 +1,9 @@
 //! Multimodal Image Input Example
 //!
 //! This example demonstrates sending images to the Gemini API for analysis
-//! using base64-encoded image data. It shows both the fluent builder pattern
-//! and the manual content vector approach.
+//! using base64-encoded image data. It shows the fluent builder pattern,
+//! manual content vector approach, and resolution control for managing
+//! token costs vs. image quality trade-offs.
 //!
 //! # Running
 //!
@@ -14,7 +15,9 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use rust_genai::{Client, image_data_content, text_content};
+use rust_genai::{
+    Client, Resolution, image_data_content, image_data_content_with_resolution, text_content,
+};
 use std::env;
 
 // A tiny red PNG image (1x1 pixel) encoded as base64
@@ -85,6 +88,66 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Comparison: {}", text);
     }
 
+    // Method 3: Resolution control for cost vs. quality trade-off
+    // Use Low resolution for simple tasks (fewer tokens = lower cost)
+    // Use High/UltraHigh for detailed analysis
+    println!("\n=== RESOLUTION CONTROL ===\n");
+
+    // Low resolution - good for simple color/shape detection, costs fewer tokens
+    let low_res_response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What color is this image?")
+        .add_image_data_with_resolution(TINY_RED_PNG_BASE64, "image/png", Resolution::Low)
+        .create()
+        .await?;
+
+    println!("Low resolution analysis:");
+    if let Some(text) = low_res_response.text() {
+        println!("  {}", text);
+    }
+    if let Some(usage) = &low_res_response.usage {
+        println!("  Tokens used: {:?}", usage.total_tokens);
+    }
+
+    // High resolution - for detailed analysis of complex images
+    let high_res_response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What color is this image?")
+        .add_image_data_with_resolution(TINY_RED_PNG_BASE64, "image/png", Resolution::High)
+        .create()
+        .await?;
+
+    println!("\nHigh resolution analysis:");
+    if let Some(text) = high_res_response.text() {
+        println!("  {}", text);
+    }
+    if let Some(usage) = &high_res_response.usage {
+        println!("  Tokens used: {:?}", usage.total_tokens);
+    }
+
+    // Using the helper function with resolution
+    println!("\nUsing image_data_content_with_resolution() helper:");
+    let content_with_res = image_data_content_with_resolution(
+        TINY_BLUE_PNG_BASE64,
+        "image/png",
+        Resolution::Medium, // Default balance of cost and quality
+    );
+    let helper_response = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_content(vec![
+            text_content("Describe this image briefly."),
+            content_with_res,
+        ])
+        .create()
+        .await?;
+
+    if let Some(text) = helper_response.text() {
+        println!("  {}", text);
+    }
+
     // Demonstrate a follow-up question using conversation context
     println!("\n=== FOLLOW-UP QUESTION ===\n");
     println!("User: Which of those colors is warmer?\n");
@@ -115,8 +178,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("--- Key Takeaways ---");
     println!("• add_image_data(base64, mime_type) for inline image content");
+    println!("• add_image_data_with_resolution() to control quality vs. cost");
+    println!("• Resolution levels: Low, Medium (default), High, UltraHigh");
     println!("• with_content() accepts mixed text + image vectors");
-    println!("• image_data_content() helper for building content programmatically");
+    println!("• image_data_content_with_resolution() helper with resolution support");
     println!("• Follow-up questions work with with_previous_interaction()\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");
@@ -126,11 +191,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Multiple images:");
     println!("  [REQ#2] POST with text + 2x inlineData");
     println!("  [RES#2] completed: comparison of both images\n");
+    println!("Resolution control:");
+    println!("  [REQ#3-5] POST with text + inlineData + resolution field");
+    println!("  Note: resolution field appears in wire format when set\n");
     println!("Follow-up:");
-    println!("  [REQ#3] POST with text + previousInteractionId");
-    println!("  [RES#3] completed: answer using image context\n");
+    println!("  [REQ#6] POST with text + previousInteractionId");
+    println!("  [RES#6] completed: answer using image context\n");
 
     println!("--- Production Considerations ---");
+    println!("• Resolution::Low uses fewer tokens - ideal for simple tasks");
+    println!("• Resolution::High/UltraHigh for detailed image analysis");
+    println!("• Default (no resolution) or Medium balances cost and quality");
     println!("• Base64 encoding increases payload size ~33%");
     println!("• For large/repeated files, use Files API instead (upload_file)");
     println!("• MIME type must match actual image format");

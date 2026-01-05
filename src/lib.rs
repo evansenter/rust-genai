@@ -94,8 +94,10 @@ pub mod interactions_api;
 pub use interactions_api::{
     audio_data_content, audio_uri_content, document_data_content, document_uri_content,
     file_uri_content, function_call_content, function_call_content_with_signature,
-    function_result_content, image_data_content, image_uri_content, text_content, thought_content,
-    video_data_content, video_uri_content,
+    function_result_content, image_data_content, image_data_content_with_resolution,
+    image_uri_content, image_uri_content_with_resolution, text_content, thought_content,
+    video_data_content, video_data_content_with_resolution, video_uri_content,
+    video_uri_content_with_resolution,
 };
 
 // Multimodal file loading utilities
