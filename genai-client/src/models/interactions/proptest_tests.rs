@@ -103,6 +103,11 @@ fn arb_resolution() -> impl Strategy<Value = Resolution> {
         Just(Resolution::Medium),
         Just(Resolution::High),
         Just(Resolution::UltraHigh),
+        // Unknown variant with arbitrary string value
+        "[a-z_]{1,20}".prop_map(|s| Resolution::Unknown {
+            resolution_type: s.clone(),
+            data: serde_json::Value::String(s),
+        }),
     ]
 }
 

@@ -541,7 +541,6 @@ pub enum InteractionContent {
         data: Option<String>,
         uri: Option<String>,
         mime_type: Option<String>,
-        /// Resolution for processing (affects token cost)
         resolution: Option<Resolution>,
     },
     /// Audio content
@@ -555,7 +554,6 @@ pub enum InteractionContent {
         data: Option<String>,
         uri: Option<String>,
         mime_type: Option<String>,
-        /// Resolution for processing (affects token cost)
         resolution: Option<Resolution>,
     },
     /// Document content for file-based inputs.

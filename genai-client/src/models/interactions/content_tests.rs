@@ -1502,3 +1502,87 @@ fn test_video_with_resolution_roundtrip() {
         _ => panic!("Expected Video variant"),
     }
 }
+
+// --- Resolution Unknown Tests ---
+
+#[test]
+fn test_resolution_unknown_deserialization() {
+    // Test that unrecognized resolution strings deserialize to Unknown
+    let json = r#""super_high""#;
+    let resolution: Resolution = serde_json::from_str(json).unwrap();
+
+    assert!(resolution.is_unknown());
+    assert_eq!(resolution.unknown_resolution_type(), Some("super_high"));
+}
+
+#[test]
+fn test_resolution_unknown_roundtrip() {
+    // Test that Unknown variant roundtrips correctly
+    let unknown = Resolution::Unknown {
+        resolution_type: "extreme".to_string(),
+        data: serde_json::Value::String("extreme".to_string()),
+    };
+
+    let json = serde_json::to_string(&unknown).expect("Serialization failed");
+    assert_eq!(json, "\"extreme\"");
+
+    let deserialized: Resolution = serde_json::from_str(&json).unwrap();
+    assert!(deserialized.is_unknown());
+    assert_eq!(deserialized.unknown_resolution_type(), Some("extreme"));
+}
+
+#[test]
+fn test_resolution_unknown_helper_methods() {
+    let known = Resolution::High;
+    assert!(!known.is_unknown());
+    assert_eq!(known.unknown_resolution_type(), None);
+    assert!(known.unknown_data().is_none());
+
+    let unknown = Resolution::Unknown {
+        resolution_type: "future_res".to_string(),
+        data: serde_json::json!({"level": "future_res", "extra": true}),
+    };
+    assert!(unknown.is_unknown());
+    assert_eq!(unknown.unknown_resolution_type(), Some("future_res"));
+    let data = unknown.unknown_data().unwrap();
+    assert_eq!(data.get("extra").unwrap(), true);
+}
+
+#[test]
+fn test_resolution_unknown_in_image_content() {
+    // Test that unknown resolution works within Image content
+    let json =
+        r#"{"type": "image", "data": "base64", "mime_type": "image/png", "resolution": "auto"}"#;
+    let content: InteractionContent = serde_json::from_str(json).unwrap();
+
+    match content {
+        InteractionContent::Image { resolution, .. } => {
+            let res = resolution.expect("resolution should be present");
+            assert!(res.is_unknown());
+            assert_eq!(res.unknown_resolution_type(), Some("auto"));
+        }
+        _ => panic!("Expected Image variant"),
+    }
+}
+
+#[test]
+fn test_resolution_unknown_object_form() {
+    // Test that object-form resolution values are handled (future API compatibility)
+    // Non-string values get "<non-string: ...>" as the resolution_type
+    let json = r#"{"level": "ultra_ultra_high", "tokens": 5000}"#;
+    let resolution: Resolution = serde_json::from_str(json).expect("Should deserialize");
+
+    assert!(resolution.is_unknown());
+    // Object form gets formatted as "<non-string: ...>" in resolution_type
+    assert!(
+        resolution
+            .unknown_resolution_type()
+            .unwrap()
+            .starts_with("<non-string:")
+    );
+
+    // Verify the full object is preserved in data
+    let data = resolution.unknown_data().unwrap();
+    assert_eq!(data.get("level").unwrap(), "ultra_ultra_high");
+    assert_eq!(data.get("tokens").unwrap(), 5000);
+}
