@@ -2288,7 +2288,7 @@ fn test_interaction_response_has_file_search_results() {
             result: vec![FileSearchResultItem {
                 title: "Technical Doc".to_string(),
                 text: "Relevant content...".to_string(),
-                file_search_store: "stores/my-store".to_string(),
+                store: "stores/my-store".to_string(),
             }],
         }],
         status: InteractionStatus::Completed,
@@ -2342,12 +2342,12 @@ fn test_interaction_response_file_search_results_extraction() {
                     FileSearchResultItem {
                         title: "Doc 1".to_string(),
                         text: "Content from doc 1".to_string(),
-                        file_search_store: "stores/store-a".to_string(),
+                        store: "stores/store-a".to_string(),
                     },
                     FileSearchResultItem {
                         title: "Doc 2".to_string(),
                         text: "Content from doc 2".to_string(),
-                        file_search_store: "stores/store-a".to_string(),
+                        store: "stores/store-a".to_string(),
                     },
                 ],
             },
@@ -2360,7 +2360,7 @@ fn test_interaction_response_file_search_results_extraction() {
                 result: vec![FileSearchResultItem {
                     title: "Doc 3".to_string(),
                     text: "Content from doc 3".to_string(),
-                    file_search_store: "stores/store-b".to_string(),
+                    store: "stores/store-b".to_string(),
                 }],
             },
         ],
@@ -2382,8 +2382,8 @@ fn test_interaction_response_file_search_results_extraction() {
     assert_eq!(results[0].title, "Doc 1");
     assert_eq!(results[1].title, "Doc 2");
     assert_eq!(results[2].title, "Doc 3");
-    assert_eq!(results[0].file_search_store, "stores/store-a");
-    assert_eq!(results[2].file_search_store, "stores/store-b");
+    assert_eq!(results[0].store, "stores/store-a");
+    assert_eq!(results[2].store, "stores/store-b");
 }
 
 #[test]

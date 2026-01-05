@@ -1601,7 +1601,7 @@ fn test_deserialize_file_search_result() {
             assert_eq!(result.len(), 1);
             assert_eq!(result[0].title, "Document.pdf");
             assert_eq!(result[0].text, "Relevant content");
-            assert_eq!(result[0].file_search_store, "store-1");
+            assert_eq!(result[0].store, "store-1");
         }
         _ => panic!("Expected FileSearchResult variant, got {:?}", content),
     }
@@ -1640,7 +1640,7 @@ fn test_serialize_file_search_result() {
         result: vec![FileSearchResultItem {
             title: "Results.pdf".to_string(),
             text: "Found text".to_string(),
-            file_search_store: "my-store".to_string(),
+            store: "my-store".to_string(),
         }],
     };
 
@@ -1663,12 +1663,12 @@ fn test_file_search_result_roundtrip() {
             FileSearchResultItem {
                 title: "Doc1.pdf".to_string(),
                 text: "Content one".to_string(),
-                file_search_store: "store-1".to_string(),
+                store: "store-1".to_string(),
             },
             FileSearchResultItem {
                 title: "Doc2.pdf".to_string(),
                 text: "Content two".to_string(),
-                file_search_store: "store-2".to_string(),
+                store: "store-2".to_string(),
             },
         ],
     };
@@ -1713,5 +1713,5 @@ fn test_file_search_result_item_default() {
     let item = FileSearchResultItem::default();
     assert!(item.title.is_empty());
     assert!(item.text.is_empty());
-    assert!(item.file_search_store.is_empty());
+    assert!(item.store.is_empty());
 }

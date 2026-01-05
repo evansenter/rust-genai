@@ -1588,7 +1588,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     #[must_use]
     pub fn with_file_search(mut self, store_names: Vec<String>) -> Self {
         self.add_tool(InternalTool::FileSearch {
-            file_search_store_names: store_names,
+            store_names,
             top_k: None,
             metadata_filter: None,
         });
@@ -1637,7 +1637,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         metadata_filter: Option<String>,
     ) -> Self {
         self.add_tool(InternalTool::FileSearch {
-            file_search_store_names: store_names,
+            store_names,
             top_k,
             metadata_filter,
         });

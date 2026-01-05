@@ -53,8 +53,8 @@ pub enum Tool {
     McpServer { name: String, url: String },
     /// Built-in file search tool for semantic retrieval over document stores
     FileSearch {
-        /// Names of file search stores to query
-        file_search_store_names: Vec<String>,
+        /// Names of file search stores to query (wire: `file_search_store_names`)
+        store_names: Vec<String>,
         /// Number of semantic retrieval chunks to retrieve
         top_k: Option<i32>,
         /// Metadata filter for documents and chunks
@@ -136,13 +136,13 @@ impl Serialize for Tool {
                 map.end()
             }
             Self::FileSearch {
-                file_search_store_names,
+                store_names,
                 top_k,
                 metadata_filter,
             } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "file_search")?;
-                map.serialize_entry("file_search_store_names", file_search_store_names)?;
+                map.serialize_entry("file_search_store_names", store_names)?;
                 if let Some(k) = top_k {
                     map.serialize_entry("top_k", k)?;
                 }
@@ -206,7 +206,8 @@ impl<'de> Deserialize<'de> for Tool {
             McpServer { name: String, url: String },
             #[serde(rename = "file_search")]
             FileSearch {
-                file_search_store_names: Vec<String>,
+                #[serde(rename = "file_search_store_names")]
+                store_names: Vec<String>,
                 #[serde(default)]
                 top_k: Option<i32>,
                 #[serde(default)]
@@ -238,11 +239,11 @@ impl<'de> Deserialize<'de> for Tool {
                 },
                 KnownTool::McpServer { name, url } => Tool::McpServer { name, url },
                 KnownTool::FileSearch {
-                    file_search_store_names,
+                    store_names,
                     top_k,
                     metadata_filter,
                 } => Tool::FileSearch {
-                    file_search_store_names,
+                    store_names,
                     top_k,
                     metadata_filter,
                 },
@@ -906,24 +907,24 @@ mod tests {
     #[test]
     fn test_tool_file_search_roundtrip() {
         let tool = Tool::FileSearch {
-            file_search_store_names: vec!["store1".to_string(), "store2".to_string()],
+            store_names: vec!["store1".to_string(), "store2".to_string()],
             top_k: Some(5),
             metadata_filter: Some("category:technical".to_string()),
         };
         let json = serde_json::to_string(&tool).expect("Serialization failed");
         assert!(json.contains("\"type\":\"file_search\""));
-        assert!(json.contains("\"file_search_store_names\""));
+        assert!(json.contains("\"file_search_store_names\"")); // Wire format uses full name
         assert!(json.contains("\"top_k\":5"));
         assert!(json.contains("\"metadata_filter\":\"category:technical\""));
 
         let parsed: Tool = serde_json::from_str(&json).expect("Deserialization failed");
         match parsed {
             Tool::FileSearch {
-                file_search_store_names,
+                store_names,
                 top_k,
                 metadata_filter,
             } => {
-                assert_eq!(file_search_store_names, vec!["store1", "store2"]);
+                assert_eq!(store_names, vec!["store1", "store2"]);
                 assert_eq!(top_k, Some(5));
                 assert_eq!(metadata_filter, Some("category:technical".to_string()));
             }
@@ -935,13 +936,13 @@ mod tests {
     fn test_tool_file_search_minimal() {
         // Test with only required field (store names)
         let tool = Tool::FileSearch {
-            file_search_store_names: vec!["my-store".to_string()],
+            store_names: vec!["my-store".to_string()],
             top_k: None,
             metadata_filter: None,
         };
         let json = serde_json::to_string(&tool).expect("Serialization failed");
         assert!(json.contains("\"type\":\"file_search\""));
-        assert!(json.contains("\"file_search_store_names\""));
+        assert!(json.contains("\"file_search_store_names\"")); // Wire format uses full name
         // Optional fields should not appear
         assert!(!json.contains("\"top_k\""));
         assert!(!json.contains("\"metadata_filter\""));
@@ -949,11 +950,11 @@ mod tests {
         let parsed: Tool = serde_json::from_str(&json).expect("Deserialization failed");
         match parsed {
             Tool::FileSearch {
-                file_search_store_names,
+                store_names,
                 top_k,
                 metadata_filter,
             } => {
-                assert_eq!(file_search_store_names, vec!["my-store"]);
+                assert_eq!(store_names, vec!["my-store"]);
                 assert_eq!(top_k, None);
                 assert_eq!(metadata_filter, None);
             }
@@ -964,7 +965,7 @@ mod tests {
     #[test]
     fn test_tool_file_search_helper_methods() {
         let file_search = Tool::FileSearch {
-            file_search_store_names: vec!["store".to_string()],
+            store_names: vec!["store".to_string()],
             top_k: None,
             metadata_filter: None,
         };

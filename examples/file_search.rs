@@ -65,7 +65,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("--- Retrieved Documents ({}) ---", results.len());
                 for (i, item) in results.iter().enumerate() {
                     println!("{}. {}", i + 1, item.title);
-                    println!("   Store: {}", item.file_search_store);
+                    println!("   Store: {}", item.store);
                     let preview: String = item.text.chars().take(100).collect();
                     println!("   Preview: {preview}...");
                     println!();

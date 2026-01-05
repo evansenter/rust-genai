@@ -783,7 +783,7 @@ pub fn google_search_result_content(
 ///     FileSearchResultItem {
 ///         title: "Document".into(),
 ///         text: "Content".into(),
-///         file_search_store: "store-1".into(),
+///         store: "store-1".into(),
 ///     },
 /// ]);
 /// ```

@@ -217,7 +217,7 @@ impl GoogleSearchResultItem {
 /// # let content: InteractionContent = todo!();
 /// if let InteractionContent::FileSearchResult { result, .. } = content {
 ///     for item in result {
-///         println!("Match from '{}': {}", item.file_search_store, item.text);
+///         println!("Match from '{}': {}", item.store, item.text);
 ///     }
 /// }
 /// ```
@@ -228,8 +228,9 @@ pub struct FileSearchResultItem {
     pub title: String,
     /// Extracted text content from the semantic match
     pub text: String,
-    /// Name of the file search store containing this result
-    pub file_search_store: String,
+    /// Name of the file search store containing this result (wire: `fileSearchStore`)
+    #[serde(rename = "fileSearchStore")]
+    pub store: String,
 }
 
 impl FileSearchResultItem {
@@ -238,12 +239,12 @@ impl FileSearchResultItem {
     pub fn new(
         title: impl Into<String>,
         text: impl Into<String>,
-        file_search_store: impl Into<String>,
+        store: impl Into<String>,
     ) -> Self {
         Self {
             title: title.into(),
             text: text.into(),
-            file_search_store: file_search_store.into(),
+            store: store.into(),
         }
     }
 

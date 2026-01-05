@@ -143,12 +143,10 @@ fn arb_google_search_result_item() -> impl Strategy<Value = GoogleSearchResultIt
 
 /// Strategy for generating FileSearchResultItem objects.
 fn arb_file_search_result_item() -> impl Strategy<Value = FileSearchResultItem> {
-    (arb_text(), arb_text(), arb_text()).prop_map(|(title, text, file_search_store)| {
-        FileSearchResultItem {
-            title,
-            text,
-            file_search_store,
-        }
+    (arb_text(), arb_text(), arb_text()).prop_map(|(title, text, store)| FileSearchResultItem {
+        title,
+        text,
+        store,
     })
 }
 
@@ -709,9 +707,9 @@ fn arb_known_tool() -> impl Strategy<Value = Tool> {
             proptest::option::of(any::<i32>()),
             proptest::option::of(arb_text())
         )
-            .prop_map(|(file_search_store_names, top_k, metadata_filter)| {
+            .prop_map(|(store_names, top_k, metadata_filter)| {
                 Tool::FileSearch {
-                    file_search_store_names,
+                    store_names,
                     top_k,
                     metadata_filter,
                 }

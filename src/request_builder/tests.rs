@@ -710,14 +710,11 @@ fn test_interaction_builder_with_file_search() {
 
     match &tools[0] {
         Tool::FileSearch {
-            file_search_store_names,
+            store_names,
             top_k,
             metadata_filter,
         } => {
-            assert_eq!(
-                file_search_store_names,
-                &vec!["stores/store-123", "stores/store-456"]
-            );
+            assert_eq!(store_names, &vec!["stores/store-123", "stores/store-456"]);
             assert_eq!(*top_k, None);
             assert_eq!(*metadata_filter, None);
         }
@@ -744,11 +741,11 @@ fn test_interaction_builder_with_file_search_config() {
 
     match &tools[0] {
         Tool::FileSearch {
-            file_search_store_names,
+            store_names,
             top_k,
             metadata_filter,
         } => {
-            assert_eq!(file_search_store_names, &vec!["stores/my-docs"]);
+            assert_eq!(store_names, &vec!["stores/my-docs"]);
             assert_eq!(*top_k, Some(10));
             assert_eq!(*metadata_filter, Some("category = 'technical'".to_string()));
         }
@@ -794,12 +791,9 @@ fn test_interaction_builder_with_file_search_single_store() {
 
     let tools = builder.tools.as_ref().unwrap();
     match &tools[0] {
-        Tool::FileSearch {
-            file_search_store_names,
-            ..
-        } => {
-            assert_eq!(file_search_store_names.len(), 1);
-            assert_eq!(file_search_store_names[0], "stores/single");
+        Tool::FileSearch { store_names, .. } => {
+            assert_eq!(store_names.len(), 1);
+            assert_eq!(store_names[0], "stores/single");
         }
         _ => panic!("Expected Tool::FileSearch variant"),
     }
