@@ -1550,6 +1550,100 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         self
     }
 
+    /// Enables file search for semantic retrieval over document stores.
+    ///
+    /// This adds the built-in `FileSearch` tool which allows the model to
+    /// query file search stores for semantically relevant content from uploaded
+    /// documents. Results are available via [`InteractionResponse::file_search_results`].
+    ///
+    /// # Arguments
+    ///
+    /// * `store_names` - Names of the file search stores to query
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What does the documentation say about authentication?")
+    ///     .with_file_search(vec!["my-docs-store".to_string()])
+    ///     .create()
+    ///     .await?;
+    ///
+    /// for result in response.file_search_results() {
+    ///     println!("{}: {}", result.title, result.text);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`InteractionResponse::file_search_results`]: crate::InteractionResponse::file_search_results
+    #[must_use]
+    pub fn with_file_search(mut self, store_names: Vec<String>) -> Self {
+        self.add_tool(InternalTool::FileSearch {
+            file_search_store_names: store_names,
+            top_k: None,
+            metadata_filter: None,
+        });
+        self
+    }
+
+    /// Enables file search with full configuration options.
+    ///
+    /// This is the extended version of [`with_file_search`](Self::with_file_search)
+    /// that allows specifying result count and metadata filtering.
+    ///
+    /// # Arguments
+    ///
+    /// * `store_names` - Names of the file search stores to query
+    /// * `top_k` - Maximum number of semantic retrieval chunks to return
+    /// * `metadata_filter` - Metadata filter string for document filtering
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Find technical documentation about APIs")
+    ///     .with_file_search_config(
+    ///         vec!["docs-store".to_string()],
+    ///         Some(10),  // Return up to 10 results
+    ///         Some("category:technical".to_string()),  // Only technical docs
+    ///     )
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn with_file_search_config(
+        mut self,
+        store_names: Vec<String>,
+        top_k: Option<i32>,
+        metadata_filter: Option<String>,
+    ) -> Self {
+        self.add_tool(InternalTool::FileSearch {
+            file_search_store_names: store_names,
+            top_k,
+            metadata_filter,
+        });
+        self
+    }
+
     /// Sets response modalities (e.g., ["IMAGE"]).
     #[must_use]
     pub fn with_response_modalities(mut self, modalities: Vec<String>) -> Self {

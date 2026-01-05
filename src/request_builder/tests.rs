@@ -690,81 +690,117 @@ fn test_conversation_builder_preserves_system_instruction() {
     assert!(builder.system_instruction.is_some());
 }
 
+// --- File Search Builder Tests ---
+
 #[test]
-fn test_with_computer_use() {
+fn test_interaction_builder_with_file_search() {
     let client = create_test_client();
     let builder = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("Navigate to example.com")
-        .with_computer_use();
+        .with_text("Search my documents")
+        .with_file_search(vec![
+            "stores/store-123".to_string(),
+            "stores/store-456".to_string(),
+        ]);
 
-    // Tool should be added with browser environment and no exclusions
-    let tools = builder.tools.as_ref().expect("tools should be set");
-    let has_computer_use = tools.iter().any(|t| {
-        matches!(
-            t,
-            Tool::ComputerUse {
-                environment,
-                excluded_predefined_functions
-            } if environment == "browser" && excluded_predefined_functions.is_empty()
-        )
-    });
-    assert!(
-        has_computer_use,
-        "ComputerUse tool should be present with browser environment and no exclusions"
-    );
+    assert!(builder.tools.is_some());
+    let tools = builder.tools.as_ref().unwrap();
+    assert_eq!(tools.len(), 1);
+
+    match &tools[0] {
+        Tool::FileSearch {
+            file_search_store_names,
+            top_k,
+            metadata_filter,
+        } => {
+            assert_eq!(
+                file_search_store_names,
+                &vec!["stores/store-123", "stores/store-456"]
+            );
+            assert_eq!(*top_k, None);
+            assert_eq!(*metadata_filter, None);
+        }
+        _ => panic!("Expected Tool::FileSearch variant"),
+    }
 }
 
 #[test]
-fn test_with_computer_use_excluding() {
+fn test_interaction_builder_with_file_search_config() {
     let client = create_test_client();
-    let exclusions = vec!["submit_form".to_string(), "download_file".to_string()];
     let builder = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("Browse safely")
-        .with_computer_use_excluding(exclusions.clone());
+        .with_text("Search with config")
+        .with_file_search_config(
+            vec!["stores/my-docs".to_string()],
+            Some(10),
+            Some("category = 'technical'".to_string()),
+        );
 
-    // Tool should be added with specified exclusions
-    let tools = builder.tools.as_ref().expect("tools should be set");
-    let has_computer_use_with_exclusions = tools.iter().any(|t| {
-        matches!(
-            t,
-            Tool::ComputerUse {
-                environment,
-                excluded_predefined_functions
-            } if environment == "browser" && *excluded_predefined_functions == exclusions
-        )
-    });
-    assert!(
-        has_computer_use_with_exclusions,
-        "ComputerUse tool should have specified exclusions"
-    );
+    assert!(builder.tools.is_some());
+    let tools = builder.tools.as_ref().unwrap();
+    assert_eq!(tools.len(), 1);
+
+    match &tools[0] {
+        Tool::FileSearch {
+            file_search_store_names,
+            top_k,
+            metadata_filter,
+        } => {
+            assert_eq!(file_search_store_names, &vec!["stores/my-docs"]);
+            assert_eq!(*top_k, Some(10));
+            assert_eq!(*metadata_filter, Some("category = 'technical'".to_string()));
+        }
+        _ => panic!("Expected Tool::FileSearch variant"),
+    }
 }
 
 #[test]
-fn test_with_computer_use_excluding_empty() {
+fn test_interaction_builder_with_file_search_and_other_tools() {
+    let client = create_test_client();
+    let func = FunctionDeclaration::builder("process_result")
+        .description("Process search result")
+        .build();
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Search and process")
+        .with_file_search(vec!["stores/docs".to_string()])
+        .with_google_search()
+        .with_function(func);
+
+    assert!(builder.tools.is_some());
+    let tools = builder.tools.as_ref().unwrap();
+    assert_eq!(tools.len(), 3);
+
+    // Verify FileSearch is present
+    assert!(tools.iter().any(|t| matches!(t, Tool::FileSearch { .. })));
+    // Verify GoogleSearch is present
+    assert!(tools.iter().any(|t| matches!(t, Tool::GoogleSearch)));
+    // Verify Function is present
+    assert!(tools.iter().any(|t| matches!(t, Tool::Function { .. })));
+}
+
+#[test]
+fn test_interaction_builder_with_file_search_single_store() {
     let client = create_test_client();
     let builder = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("Browse")
-        .with_computer_use_excluding(vec![]);
+        .with_text("Search single store")
+        .with_file_search(vec!["stores/single".to_string()]);
 
-    // Tool should be added with empty exclusions (equivalent to with_computer_use)
-    let tools = builder.tools.as_ref().expect("tools should be set");
-    let has_computer_use = tools.iter().any(|t| {
-        matches!(
-            t,
-            Tool::ComputerUse {
-                excluded_predefined_functions,
-                ..
-            } if excluded_predefined_functions.is_empty()
-        )
-    });
-    assert!(
-        has_computer_use,
-        "ComputerUse tool should be present with empty exclusions"
-    );
+    let tools = builder.tools.as_ref().unwrap();
+    match &tools[0] {
+        Tool::FileSearch {
+            file_search_store_names,
+            ..
+        } => {
+            assert_eq!(file_search_store_names.len(), 1);
+            assert_eq!(file_search_store_names[0], "stores/single");
+        }
+        _ => panic!("Expected Tool::FileSearch variant"),
+    }
 }

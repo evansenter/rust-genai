@@ -2271,3 +2271,146 @@ fn test_interaction_response_all_annotations_skips_non_text() {
         Some("https://example.com")
     );
 }
+
+// --- File Search Result Helper Tests ---
+
+use super::content::FileSearchResultItem;
+
+#[test]
+fn test_interaction_response_has_file_search_results() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::FileSearchResult {
+            call_id: "call_123".to_string(),
+            result: vec![FileSearchResultItem {
+                title: "Technical Doc".to_string(),
+                text: "Relevant content...".to_string(),
+                file_search_store: "stores/my-store".to_string(),
+            }],
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    assert!(response.has_file_search_results());
+}
+
+#[test]
+fn test_interaction_response_no_file_search_results() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("No file search here".to_string()),
+            annotations: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    assert!(!response.has_file_search_results());
+}
+
+#[test]
+fn test_interaction_response_file_search_results_extraction() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::FileSearchResult {
+                call_id: "call_1".to_string(),
+                result: vec![
+                    FileSearchResultItem {
+                        title: "Doc 1".to_string(),
+                        text: "Content from doc 1".to_string(),
+                        file_search_store: "stores/store-a".to_string(),
+                    },
+                    FileSearchResultItem {
+                        title: "Doc 2".to_string(),
+                        text: "Content from doc 2".to_string(),
+                        file_search_store: "stores/store-a".to_string(),
+                    },
+                ],
+            },
+            InteractionContent::Text {
+                text: Some("Summary of search results".to_string()),
+                annotations: None,
+            },
+            InteractionContent::FileSearchResult {
+                call_id: "call_2".to_string(),
+                result: vec![FileSearchResultItem {
+                    title: "Doc 3".to_string(),
+                    text: "Content from doc 3".to_string(),
+                    file_search_store: "stores/store-b".to_string(),
+                }],
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    assert!(response.has_file_search_results());
+
+    let results = response.file_search_results();
+    // Should collect all items from both FileSearchResult outputs
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0].title, "Doc 1");
+    assert_eq!(results[1].title, "Doc 2");
+    assert_eq!(results[2].title, "Doc 3");
+    assert_eq!(results[0].file_search_store, "stores/store-a");
+    assert_eq!(results[2].file_search_store, "stores/store-b");
+}
+
+#[test]
+fn test_interaction_response_file_search_results_empty_results() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::FileSearchResult {
+            call_id: "call_empty".to_string(),
+            result: vec![], // Empty results array
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    // has_file_search_results returns true if the content type exists
+    assert!(response.has_file_search_results());
+
+    // But file_search_results returns empty vec since result array is empty
+    let results = response.file_search_results();
+    assert!(results.is_empty());
+}

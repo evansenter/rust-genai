@@ -11,6 +11,8 @@ This document captures the actual wire formats for enums in the Gemini Interacti
 | `FunctionCallingMode` | SCREAMING_CASE | `"AUTO"`, `"ANY"`, `"NONE"`, `"VALIDATED"` | |
 | `InteractionStatus` | snake_case | `"in_progress"`, `"requires_action"` | Response-only |
 | `Resolution` | snake_case | `"low"`, `"medium"`, `"high"`, `"ultra_high"` | Image/video content |
+| `Tool::FileSearch` | snake_case object | `{"type": "file_search", ...}` | Rust: `store_names`, Wire: `file_search_store_names` |
+| `FileSearchResult` | camelCase fields | `{"type": "file_search_result", "callId": ...}` | Rust: `store`, Wire: `fileSearchStore` |
 | `Tool::ComputerUse` | snake_case | `"computer_use"` | **UNVERIFIED** - from docs |
 | `InteractionContent::ComputerUseCall` | snake_case | `"computer_use_call"` | **UNVERIFIED** - from docs |
 | `InteractionContent::ComputerUseResult` | snake_case | `"computer_use_result"` | **UNVERIFIED** - from docs |
@@ -110,6 +112,59 @@ Used in image and video content for quality vs. token cost trade-off.
 | `Resolution::UltraHigh` | `"ultra_high"` |
 
 **Verified**: 2026-01-05 - Tested with `LOUD_WIRE=1 cargo run --example multimodal_image`.
+
+### Tool::FileSearch (request)
+
+Used to enable semantic document retrieval from file search stores.
+
+```json
+{
+  "tools": [{
+    "type": "file_search",
+    "file_search_store_names": ["stores/my-store-123"],
+    "top_k": 10,
+    "metadata_filter": "category = 'technical'"
+  }]
+}
+```
+
+| Rust Field | Wire Name | Required | Notes |
+|------------|-----------|----------|-------|
+| `store_names` | `file_search_store_names` | Yes | Array of store identifiers |
+| `top_k` | `top_k` | No | Number of results to return |
+| `metadata_filter` | `metadata_filter` | No | Filter expression |
+
+**Note**: The RFC proposed `file_ids` but the actual API uses `file_search_store_names` (stores, not individual files).
+
+**Verified**: 2026-01-05 - Request format tested with `LOUD_WIRE=1 cargo run --example file_search`.
+
+### FileSearchResult (response content)
+
+Returned when the model retrieves documents from file search stores.
+
+```json
+{
+  "type": "file_search_result",
+  "callId": "call_abc123",
+  "result": [
+    {
+      "title": "Document.pdf",
+      "text": "Relevant content from the document...",
+      "fileSearchStore": "stores/my-store-123"
+    }
+  ]
+}
+```
+
+| Rust Field | Wire Name | Notes |
+|------------|-----------|-------|
+| `call_id` | `callId` | camelCase in JSON |
+| `result` | `result` | Array of FileSearchResultItem |
+| `result[].title` | `title` | Document title |
+| `result[].text` | `text` | Retrieved text snippet |
+| `result[].store` | `fileSearchStore` | camelCase in JSON |
+
+**Added**: 2026-01-05 - Response format based on API documentation. Response cannot be verified without configured file search stores.
 
 ### Computer Use (tool and content types)
 
