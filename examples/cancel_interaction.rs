@@ -102,25 +102,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
         println!("(This can happen if the task completed very quickly)");
     }
 
-    println!("\n=== Example Complete ===");
+    println!("\n=== Example Complete ===\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("  [REQ#1] POST with agent + background:true + store:true");
+    println!("  [RES#1] in_progress: interaction_id returned");
+    println!("  [REQ#2] POST to cancel endpoint with interaction_id");
+    println!("  [RES#2] cancelled: status update");
+    println!("  [REQ#3] GET interaction by id");
+    println!("  [RES#3] cancelled: full interaction details\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Only background interactions can be cancelled");
+    println!("• Only InProgress interactions can be cancelled");
+    println!("• Cancelling an already completed/failed interaction returns an error");
+    println!("• Consider implementing retry logic for the cancel call itself");
+    println!("• The cancel endpoint may not yet be deployed to production API");
+
     Ok(())
 }
-
-// =============================================================================
-// Summary
-// =============================================================================
-//
-// Key points demonstrated:
-// - Use with_background(true) for long-running agent interactions
-// - Use with_store_enabled() to be able to retrieve/cancel by ID
-// - Call client.cancel_interaction(id) to halt an in-progress interaction
-// - The cancelled interaction can still be retrieved (status: Cancelled)
-//
-// Production considerations:
-// - Only background interactions can be cancelled
-// - Only InProgress interactions can be cancelled
-// - Cancelling an already completed/failed interaction returns an error
-// - Consider implementing retry logic for the cancel call itself
-//
-// Note: The cancel endpoint is documented but may not yet be deployed to the
-// production API. The implementation is ready and will work once available.
