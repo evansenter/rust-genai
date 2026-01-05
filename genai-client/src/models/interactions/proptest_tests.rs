@@ -9,7 +9,7 @@ use proptest::prelude::*;
 use super::agent_config::{AgentConfig, DeepResearchConfig, DynamicConfig, ThinkingSummaries};
 use super::content::{
     Annotation, CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem,
-    InteractionContent,
+    InteractionContent, Resolution,
 };
 use super::metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
@@ -94,6 +94,21 @@ fn arb_datetime() -> impl Strategy<Value = DateTime<Utc>> {
             .single()
             .expect("valid timestamp")
     })
+}
+
+/// Strategy for generating arbitrary Resolution values
+fn arb_resolution() -> impl Strategy<Value = Resolution> {
+    prop_oneof![
+        Just(Resolution::Low),
+        Just(Resolution::Medium),
+        Just(Resolution::High),
+        Just(Resolution::UltraHigh),
+        // Unknown variant with arbitrary string value
+        "[a-z_]{1,20}".prop_map(|s| Resolution::Unknown {
+            resolution_type: s.clone(),
+            data: serde_json::Value::String(s),
+        }),
+    ]
 }
 
 // =============================================================================
@@ -467,13 +482,17 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
         (
             proptest::option::of(arb_text()),
             proptest::option::of(arb_text()),
-            proptest::option::of(arb_text())
+            proptest::option::of(arb_text()),
+            proptest::option::of(arb_resolution())
         )
-            .prop_map(|(data, uri, mime_type)| InteractionContent::Image {
-                data,
-                uri,
-                mime_type
-            }),
+            .prop_map(
+                |(data, uri, mime_type, resolution)| InteractionContent::Image {
+                    data,
+                    uri,
+                    mime_type,
+                    resolution
+                }
+            ),
         // Audio content
         (
             proptest::option::of(arb_text()),
@@ -489,13 +508,17 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
         (
             proptest::option::of(arb_text()),
             proptest::option::of(arb_text()),
-            proptest::option::of(arb_text())
+            proptest::option::of(arb_text()),
+            proptest::option::of(arb_resolution())
         )
-            .prop_map(|(data, uri, mime_type)| InteractionContent::Video {
-                data,
-                uri,
-                mime_type
-            }),
+            .prop_map(
+                |(data, uri, mime_type, resolution)| InteractionContent::Video {
+                    data,
+                    uri,
+                    mime_type,
+                    resolution
+                }
+            ),
         // Document content
         (
             proptest::option::of(arb_text()),

@@ -41,6 +41,7 @@
 /// [`function_call_content_with_signature`] to include the signature when echoing function calls.
 use genai_client::{
     CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem, InteractionContent,
+    Resolution,
 };
 use serde_json::Value;
 
@@ -222,6 +223,42 @@ pub fn image_data_content(
         data: Some(data.into()),
         uri: None,
         mime_type: Some(mime_type.into()),
+        resolution: None,
+    }
+}
+
+/// Creates image content from base64-encoded data with specified resolution
+///
+/// # Resolution Trade-offs
+///
+/// | Level | Token Cost | Detail |
+/// |-------|-----------|--------|
+/// | Low | Lowest | Basic shapes and colors |
+/// | Medium | Moderate | Standard detail |
+/// | High | Higher | Fine details visible |
+/// | UltraHigh | Highest | Maximum fidelity |
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::image_data_content_with_resolution;
+/// use rust_genai::Resolution;
+///
+/// let image = image_data_content_with_resolution(
+///     "base64encodeddata...",
+///     "image/png",
+///     Resolution::High
+/// );
+/// ```
+pub fn image_data_content_with_resolution(
+    data: impl Into<String>,
+    mime_type: impl Into<String>,
+    resolution: Resolution,
+) -> InteractionContent {
+    InteractionContent::Image {
+        data: Some(data.into()),
+        uri: None,
+        mime_type: Some(mime_type.into()),
+        resolution: Some(resolution),
     }
 }
 
@@ -249,6 +286,39 @@ pub fn image_uri_content(
         data: None,
         uri: Some(uri.into()),
         mime_type: Some(mime_type.into()),
+        resolution: None,
+    }
+}
+
+/// Creates image content from a URI with specified resolution
+///
+/// # Arguments
+///
+/// * `uri` - The URI of the image
+/// * `mime_type` - The MIME type (required by the API for URI-based content)
+/// * `resolution` - Resolution level for processing
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::image_uri_content_with_resolution;
+/// use rust_genai::Resolution;
+///
+/// let image = image_uri_content_with_resolution(
+///     "https://example.com/image.png",
+///     "image/png",
+///     Resolution::Low  // Use low resolution to reduce token cost
+/// );
+/// ```
+pub fn image_uri_content_with_resolution(
+    uri: impl Into<String>,
+    mime_type: impl Into<String>,
+    resolution: Resolution,
+) -> InteractionContent {
+    InteractionContent::Image {
+        data: None,
+        uri: Some(uri.into()),
+        mime_type: Some(mime_type.into()),
+        resolution: Some(resolution),
     }
 }
 
@@ -320,6 +390,42 @@ pub fn video_data_content(
         data: Some(data.into()),
         uri: None,
         mime_type: Some(mime_type.into()),
+        resolution: None,
+    }
+}
+
+/// Creates video content from base64-encoded data with specified resolution
+///
+/// # Resolution Trade-offs
+///
+/// | Level | Token Cost | Detail |
+/// |-------|-----------|--------|
+/// | Low | Lowest | Basic shapes and colors |
+/// | Medium | Moderate | Standard detail |
+/// | High | Higher | Fine details visible |
+/// | UltraHigh | Highest | Maximum fidelity |
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::video_data_content_with_resolution;
+/// use rust_genai::Resolution;
+///
+/// let video = video_data_content_with_resolution(
+///     "base64encodeddata...",
+///     "video/mp4",
+///     Resolution::Low  // Use low resolution to reduce token cost for long videos
+/// );
+/// ```
+pub fn video_data_content_with_resolution(
+    data: impl Into<String>,
+    mime_type: impl Into<String>,
+    resolution: Resolution,
+) -> InteractionContent {
+    InteractionContent::Video {
+        data: Some(data.into()),
+        uri: None,
+        mime_type: Some(mime_type.into()),
+        resolution: Some(resolution),
     }
 }
 
@@ -347,6 +453,39 @@ pub fn video_uri_content(
         data: None,
         uri: Some(uri.into()),
         mime_type: Some(mime_type.into()),
+        resolution: None,
+    }
+}
+
+/// Creates video content from a URI with specified resolution
+///
+/// # Arguments
+///
+/// * `uri` - The URI of the video file
+/// * `mime_type` - The MIME type (required by the API for URI-based content)
+/// * `resolution` - Resolution level for processing
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::video_uri_content_with_resolution;
+/// use rust_genai::Resolution;
+///
+/// let video = video_uri_content_with_resolution(
+///     "https://example.com/video.mp4",
+///     "video/mp4",
+///     Resolution::Medium
+/// );
+/// ```
+pub fn video_uri_content_with_resolution(
+    uri: impl Into<String>,
+    mime_type: impl Into<String>,
+    resolution: Resolution,
+) -> InteractionContent {
+    InteractionContent::Video {
+        data: None,
+        uri: Some(uri.into()),
+        mime_type: Some(mime_type.into()),
+        resolution: Some(resolution),
     }
 }
 
@@ -460,6 +599,7 @@ pub fn content_from_uri_and_mime(uri: String, mime_type: String) -> InteractionC
             data: None,
             uri: Some(uri),
             mime_type: Some(mime_type),
+            resolution: None,
         }
     } else if mime_type.starts_with("audio/") {
         InteractionContent::Audio {
@@ -472,6 +612,7 @@ pub fn content_from_uri_and_mime(uri: String, mime_type: String) -> InteractionC
             data: None,
             uri: Some(uri),
             mime_type: Some(mime_type),
+            resolution: None,
         }
     } else {
         // Default to document for PDFs, text files, and other types
@@ -764,10 +905,31 @@ mod tests {
                 data,
                 uri,
                 mime_type,
+                resolution,
             } => {
                 assert_eq!(data, Some("data123".to_string()));
                 assert_eq!(uri, None);
                 assert_eq!(mime_type, Some("image/png".to_string()));
+                assert_eq!(resolution, None);
+            }
+            _ => panic!("Expected Image variant"),
+        }
+    }
+
+    #[test]
+    fn test_image_data_content_with_resolution() {
+        let content = image_data_content_with_resolution("data123", "image/png", Resolution::High);
+        match content {
+            InteractionContent::Image {
+                data,
+                uri,
+                mime_type,
+                resolution,
+            } => {
+                assert_eq!(data, Some("data123".to_string()));
+                assert_eq!(uri, None);
+                assert_eq!(mime_type, Some("image/png".to_string()));
+                assert_eq!(resolution, Some(Resolution::High));
             }
             _ => panic!("Expected Image variant"),
         }
@@ -781,10 +943,35 @@ mod tests {
                 data,
                 uri,
                 mime_type,
+                resolution,
             } => {
                 assert_eq!(data, None);
                 assert_eq!(uri, Some("http://example.com/img.png".to_string()));
                 assert_eq!(mime_type, Some("image/png".to_string()));
+                assert_eq!(resolution, None);
+            }
+            _ => panic!("Expected Image variant"),
+        }
+    }
+
+    #[test]
+    fn test_image_uri_content_with_resolution() {
+        let content = image_uri_content_with_resolution(
+            "http://example.com/img.png",
+            "image/png",
+            Resolution::Low,
+        );
+        match content {
+            InteractionContent::Image {
+                data,
+                uri,
+                mime_type,
+                resolution,
+            } => {
+                assert_eq!(data, None);
+                assert_eq!(uri, Some("http://example.com/img.png".to_string()));
+                assert_eq!(mime_type, Some("image/png".to_string()));
+                assert_eq!(resolution, Some(Resolution::Low));
             }
             _ => panic!("Expected Image variant"),
         }
@@ -873,10 +1060,32 @@ mod tests {
                 data,
                 uri,
                 mime_type,
+                resolution,
             } => {
                 assert_eq!(data, Some("video_base64_data".to_string()));
                 assert_eq!(uri, None);
                 assert_eq!(mime_type, Some("video/mp4".to_string()));
+                assert_eq!(resolution, None);
+            }
+            _ => panic!("Expected Video variant"),
+        }
+    }
+
+    #[test]
+    fn test_video_data_content_with_resolution() {
+        let content =
+            video_data_content_with_resolution("video_base64_data", "video/mp4", Resolution::Low);
+        match content {
+            InteractionContent::Video {
+                data,
+                uri,
+                mime_type,
+                resolution,
+            } => {
+                assert_eq!(data, Some("video_base64_data".to_string()));
+                assert_eq!(uri, None);
+                assert_eq!(mime_type, Some("video/mp4".to_string()));
+                assert_eq!(resolution, Some(Resolution::Low));
             }
             _ => panic!("Expected Video variant"),
         }
@@ -890,10 +1099,35 @@ mod tests {
                 data,
                 uri,
                 mime_type,
+                resolution,
             } => {
                 assert_eq!(data, None);
                 assert_eq!(uri, Some("https://example.com/video.mp4".to_string()));
                 assert_eq!(mime_type, Some("video/mp4".to_string()));
+                assert_eq!(resolution, None);
+            }
+            _ => panic!("Expected Video variant"),
+        }
+    }
+
+    #[test]
+    fn test_video_uri_content_with_resolution() {
+        let content = video_uri_content_with_resolution(
+            "https://example.com/video.mp4",
+            "video/mp4",
+            Resolution::UltraHigh,
+        );
+        match content {
+            InteractionContent::Video {
+                data,
+                uri,
+                mime_type,
+                resolution,
+            } => {
+                assert_eq!(data, None);
+                assert_eq!(uri, Some("https://example.com/video.mp4".to_string()));
+                assert_eq!(mime_type, Some("video/mp4".to_string()));
+                assert_eq!(resolution, Some(Resolution::UltraHigh));
             }
             _ => panic!("Expected Video variant"),
         }

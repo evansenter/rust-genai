@@ -63,9 +63,9 @@ pub use genai_client::{
     CodeExecutionResultInfo, ContentSummary, CreateInteractionRequest, DeepResearchConfig,
     DynamicConfig, FunctionCallInfo, FunctionResultInfo, GenerationConfig, GroundingChunk,
     GroundingMetadata, InteractionContent, InteractionInput, InteractionResponse,
-    InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, Role, StreamChunk, StreamEvent,
-    ThinkingLevel, ThinkingSummaries, Turn, TurnContent, UrlContextMetadata, UrlContextResultInfo,
-    UrlMetadataEntry, UrlRetrievalStatus, UsageMetadata, WebSource,
+    InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, Resolution, Role, StreamChunk,
+    StreamEvent, ThinkingLevel, ThinkingSummaries, Turn, TurnContent, UrlContextMetadata,
+    UrlContextResultInfo, UrlMetadataEntry, UrlRetrievalStatus, UsageMetadata, WebSource,
 };
 
 // Re-export Files API types for convenient access
@@ -94,8 +94,10 @@ pub mod interactions_api;
 pub use interactions_api::{
     audio_data_content, audio_uri_content, document_data_content, document_uri_content,
     file_uri_content, function_call_content, function_call_content_with_signature,
-    function_result_content, image_data_content, image_uri_content, text_content, thought_content,
-    video_data_content, video_uri_content,
+    function_result_content, image_data_content, image_data_content_with_resolution,
+    image_uri_content, image_uri_content_with_resolution, text_content, thought_content,
+    video_data_content, video_data_content_with_resolution, video_uri_content,
+    video_uri_content_with_resolution,
 };
 
 // Multimodal file loading utilities

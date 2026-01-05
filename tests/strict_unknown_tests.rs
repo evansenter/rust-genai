@@ -424,6 +424,7 @@ mod common {
             data: Some("b64".to_string()),
             uri: None,
             mime_type: Some("image/png".to_string()),
+            resolution: None,
         };
         let json = serde_json::to_value(&image).unwrap();
         assert_eq!(json["type"], "image");

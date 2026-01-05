@@ -1451,6 +1451,7 @@ fn test_interaction_response_complex_roundtrip() {
                 mime_type: Some("image/png".to_string()),
                 data: Some("base64encodeddata".to_string()),
                 uri: None,
+                resolution: None,
             },
         ],
         outputs: vec![
@@ -2235,6 +2236,7 @@ fn test_interaction_response_all_annotations_skips_non_text() {
                 data: Some("base64".to_string()),
                 uri: None,
                 mime_type: Some("image/png".to_string()),
+                resolution: None,
             },
             InteractionContent::CodeExecutionResult {
                 call_id: "call_1".to_string(),

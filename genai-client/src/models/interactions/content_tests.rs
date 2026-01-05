@@ -190,6 +190,7 @@ fn test_serialize_known_variant_with_none_fields() {
         data: Some("base64data".to_string()),
         uri: None,
         mime_type: None,
+        resolution: None,
     };
     let json = serde_json::to_string(&image).unwrap();
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -197,6 +198,7 @@ fn test_serialize_known_variant_with_none_fields() {
     assert_eq!(value["data"], "base64data");
     assert!(value.get("uri").is_none());
     assert!(value.get("mime_type").is_none());
+    assert!(value.get("resolution").is_none());
 
     let fc = InteractionContent::FunctionCall {
         id: None,
@@ -1289,4 +1291,298 @@ fn test_annotation_extract_span_mid_utf8_boundary() {
         Some("世界"),
         "Valid CJK character slice should work"
     );
+}
+
+// --- Resolution Tests ---
+
+#[test]
+fn test_resolution_enum_serialization() {
+    // Test that Resolution serializes to snake_case
+    assert_eq!(serde_json::to_string(&Resolution::Low).unwrap(), "\"low\"");
+    assert_eq!(
+        serde_json::to_string(&Resolution::Medium).unwrap(),
+        "\"medium\""
+    );
+    assert_eq!(
+        serde_json::to_string(&Resolution::High).unwrap(),
+        "\"high\""
+    );
+    assert_eq!(
+        serde_json::to_string(&Resolution::UltraHigh).unwrap(),
+        "\"ultra_high\""
+    );
+}
+
+#[test]
+fn test_resolution_enum_deserialization() {
+    assert_eq!(
+        serde_json::from_str::<Resolution>("\"low\"").unwrap(),
+        Resolution::Low
+    );
+    assert_eq!(
+        serde_json::from_str::<Resolution>("\"medium\"").unwrap(),
+        Resolution::Medium
+    );
+    assert_eq!(
+        serde_json::from_str::<Resolution>("\"high\"").unwrap(),
+        Resolution::High
+    );
+    assert_eq!(
+        serde_json::from_str::<Resolution>("\"ultra_high\"").unwrap(),
+        Resolution::UltraHigh
+    );
+}
+
+#[test]
+fn test_resolution_default_is_medium() {
+    assert_eq!(Resolution::default(), Resolution::Medium);
+}
+
+#[test]
+fn test_image_with_resolution_serialization() {
+    let image = InteractionContent::Image {
+        data: Some("base64data".to_string()),
+        uri: None,
+        mime_type: Some("image/png".to_string()),
+        resolution: Some(Resolution::High),
+    };
+
+    let json = serde_json::to_string(&image).unwrap();
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(value["type"], "image");
+    assert_eq!(value["data"], "base64data");
+    assert_eq!(value["mime_type"], "image/png");
+    assert_eq!(value["resolution"], "high");
+}
+
+#[test]
+fn test_image_with_ultra_high_resolution_serialization() {
+    let image = InteractionContent::Image {
+        data: None,
+        uri: Some("https://example.com/image.png".to_string()),
+        mime_type: Some("image/png".to_string()),
+        resolution: Some(Resolution::UltraHigh),
+    };
+
+    let json = serde_json::to_string(&image).unwrap();
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(value["type"], "image");
+    assert_eq!(value["uri"], "https://example.com/image.png");
+    assert_eq!(value["resolution"], "ultra_high");
+}
+
+#[test]
+fn test_video_with_resolution_serialization() {
+    let video = InteractionContent::Video {
+        data: Some("videobytes".to_string()),
+        uri: None,
+        mime_type: Some("video/mp4".to_string()),
+        resolution: Some(Resolution::Low),
+    };
+
+    let json = serde_json::to_string(&video).unwrap();
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(value["type"], "video");
+    assert_eq!(value["data"], "videobytes");
+    assert_eq!(value["mime_type"], "video/mp4");
+    assert_eq!(value["resolution"], "low");
+}
+
+#[test]
+fn test_image_with_resolution_deserialization() {
+    let json = r#"{"type": "image", "data": "base64data", "mime_type": "image/png", "resolution": "high"}"#;
+    let content: InteractionContent = serde_json::from_str(json).unwrap();
+
+    match content {
+        InteractionContent::Image {
+            data,
+            uri,
+            mime_type,
+            resolution,
+        } => {
+            assert_eq!(data, Some("base64data".to_string()));
+            assert_eq!(uri, None);
+            assert_eq!(mime_type, Some("image/png".to_string()));
+            assert_eq!(resolution, Some(Resolution::High));
+        }
+        _ => panic!("Expected Image variant"),
+    }
+}
+
+#[test]
+fn test_video_with_resolution_deserialization() {
+    let json = r#"{"type": "video", "uri": "https://example.com/video.mp4", "mime_type": "video/mp4", "resolution": "ultra_high"}"#;
+    let content: InteractionContent = serde_json::from_str(json).unwrap();
+
+    match content {
+        InteractionContent::Video {
+            data,
+            uri,
+            mime_type,
+            resolution,
+        } => {
+            assert_eq!(data, None);
+            assert_eq!(uri, Some("https://example.com/video.mp4".to_string()));
+            assert_eq!(mime_type, Some("video/mp4".to_string()));
+            assert_eq!(resolution, Some(Resolution::UltraHigh));
+        }
+        _ => panic!("Expected Video variant"),
+    }
+}
+
+#[test]
+fn test_image_without_resolution_deserialization() {
+    // Verify backward compatibility: images without resolution field should work
+    let json = r#"{"type": "image", "data": "base64data", "mime_type": "image/png"}"#;
+    let content: InteractionContent = serde_json::from_str(json).unwrap();
+
+    match content {
+        InteractionContent::Image { resolution, .. } => {
+            assert_eq!(resolution, None);
+        }
+        _ => panic!("Expected Image variant"),
+    }
+}
+
+#[test]
+fn test_image_with_resolution_roundtrip() {
+    let original = InteractionContent::Image {
+        data: Some("testdata".to_string()),
+        uri: None,
+        mime_type: Some("image/jpeg".to_string()),
+        resolution: Some(Resolution::Medium),
+    };
+
+    let json = serde_json::to_string(&original).unwrap();
+    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+
+    match restored {
+        InteractionContent::Image {
+            data,
+            uri,
+            mime_type,
+            resolution,
+        } => {
+            assert_eq!(data, Some("testdata".to_string()));
+            assert_eq!(uri, None);
+            assert_eq!(mime_type, Some("image/jpeg".to_string()));
+            assert_eq!(resolution, Some(Resolution::Medium));
+        }
+        _ => panic!("Expected Image variant"),
+    }
+}
+
+#[test]
+fn test_video_with_resolution_roundtrip() {
+    let original = InteractionContent::Video {
+        data: None,
+        uri: Some("gs://bucket/video.mp4".to_string()),
+        mime_type: Some("video/mp4".to_string()),
+        resolution: Some(Resolution::High),
+    };
+
+    let json = serde_json::to_string(&original).unwrap();
+    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+
+    match restored {
+        InteractionContent::Video {
+            data,
+            uri,
+            mime_type,
+            resolution,
+        } => {
+            assert_eq!(data, None);
+            assert_eq!(uri, Some("gs://bucket/video.mp4".to_string()));
+            assert_eq!(mime_type, Some("video/mp4".to_string()));
+            assert_eq!(resolution, Some(Resolution::High));
+        }
+        _ => panic!("Expected Video variant"),
+    }
+}
+
+// --- Resolution Unknown Tests ---
+
+#[test]
+fn test_resolution_unknown_deserialization() {
+    // Test that unrecognized resolution strings deserialize to Unknown
+    let json = r#""super_high""#;
+    let resolution: Resolution = serde_json::from_str(json).unwrap();
+
+    assert!(resolution.is_unknown());
+    assert_eq!(resolution.unknown_resolution_type(), Some("super_high"));
+}
+
+#[test]
+fn test_resolution_unknown_roundtrip() {
+    // Test that Unknown variant roundtrips correctly
+    let unknown = Resolution::Unknown {
+        resolution_type: "extreme".to_string(),
+        data: serde_json::Value::String("extreme".to_string()),
+    };
+
+    let json = serde_json::to_string(&unknown).expect("Serialization failed");
+    assert_eq!(json, "\"extreme\"");
+
+    let deserialized: Resolution = serde_json::from_str(&json).unwrap();
+    assert!(deserialized.is_unknown());
+    assert_eq!(deserialized.unknown_resolution_type(), Some("extreme"));
+}
+
+#[test]
+fn test_resolution_unknown_helper_methods() {
+    let known = Resolution::High;
+    assert!(!known.is_unknown());
+    assert_eq!(known.unknown_resolution_type(), None);
+    assert!(known.unknown_data().is_none());
+
+    let unknown = Resolution::Unknown {
+        resolution_type: "future_res".to_string(),
+        data: serde_json::json!({"level": "future_res", "extra": true}),
+    };
+    assert!(unknown.is_unknown());
+    assert_eq!(unknown.unknown_resolution_type(), Some("future_res"));
+    let data = unknown.unknown_data().unwrap();
+    assert_eq!(data.get("extra").unwrap(), true);
+}
+
+#[test]
+fn test_resolution_unknown_in_image_content() {
+    // Test that unknown resolution works within Image content
+    let json =
+        r#"{"type": "image", "data": "base64", "mime_type": "image/png", "resolution": "auto"}"#;
+    let content: InteractionContent = serde_json::from_str(json).unwrap();
+
+    match content {
+        InteractionContent::Image { resolution, .. } => {
+            let res = resolution.expect("resolution should be present");
+            assert!(res.is_unknown());
+            assert_eq!(res.unknown_resolution_type(), Some("auto"));
+        }
+        _ => panic!("Expected Image variant"),
+    }
+}
+
+#[test]
+fn test_resolution_unknown_object_form() {
+    // Test that object-form resolution values are handled (future API compatibility)
+    // Non-string values get "<non-string: ...>" as the resolution_type
+    let json = r#"{"level": "ultra_ultra_high", "tokens": 5000}"#;
+    let resolution: Resolution = serde_json::from_str(json).expect("Should deserialize");
+
+    assert!(resolution.is_unknown());
+    // Object form gets formatted as "<non-string: ...>" in resolution_type
+    assert!(
+        resolution
+            .unknown_resolution_type()
+            .unwrap()
+            .starts_with("<non-string:")
+    );
+
+    // Verify the full object is preserved in data
+    let data = resolution.unknown_data().unwrap();
+    assert_eq!(data.get("level").unwrap(), "ultra_ultra_high");
+    assert_eq!(data.get("tokens").unwrap(), 5000);
 }

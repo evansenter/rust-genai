@@ -301,6 +301,178 @@ impl fmt::Display for CodeExecutionLanguage {
     }
 }
 
+/// Resolution level for image and video content processing.
+///
+/// Controls the quality vs. token cost trade-off when processing images and videos.
+/// Lower resolution uses fewer tokens (lower cost), while higher resolution provides
+/// more detail for the model to analyze.
+///
+/// # Token Cost Trade-offs
+///
+/// | Resolution | Token Cost | Detail Level |
+/// |------------|------------|--------------|
+/// | Low | Lowest | Basic shapes and colors |
+/// | Medium | Moderate | Standard detail |
+/// | High | Higher | Fine details visible |
+/// | UltraHigh | Highest | Maximum fidelity |
+///
+/// # Forward Compatibility (Evergreen Philosophy)
+///
+/// This enum is marked `#[non_exhaustive]`, which means:
+/// - Match statements must include a wildcard arm (`_ => ...`)
+/// - New variants may be added in minor version updates without breaking your code
+///
+/// When the API returns a resolution value that this library doesn't recognize,
+/// it will be captured as `Resolution::Unknown` rather than causing a
+/// deserialization error. This follows the
+/// [Evergreen spec](https://github.com/google-deepmind/evergreen-spec)
+/// philosophy of graceful degradation.
+///
+/// # Example
+///
+/// ```
+/// use genai_client::models::interactions::Resolution;
+///
+/// // Use Low for cheap, basic analysis
+/// let low_cost = Resolution::Low;
+///
+/// // Use High for detailed analysis
+/// let detailed = Resolution::High;
+///
+/// // Default is Medium
+/// assert_eq!(Resolution::default(), Resolution::Medium);
+/// ```
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Resolution {
+    /// Lowest token cost, basic shapes and colors
+    Low,
+    /// Moderate token cost, standard detail (default)
+    #[default]
+    Medium,
+    /// Higher token cost, fine details visible
+    High,
+    /// Highest token cost, maximum fidelity
+    UltraHigh,
+    /// Unknown resolution (for forward compatibility).
+    ///
+    /// This variant captures any unrecognized resolution values from the API,
+    /// allowing the library to handle new resolutions gracefully.
+    ///
+    /// The `resolution_type` field contains the unrecognized resolution string,
+    /// and `data` contains the JSON value (typically the same string).
+    Unknown {
+        /// The unrecognized resolution string from the API
+        resolution_type: String,
+        /// The raw JSON value, preserved for debugging
+        data: serde_json::Value,
+    },
+}
+
+impl Resolution {
+    /// Check if this is an unknown resolution.
+    #[must_use]
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown { .. })
+    }
+
+    /// Returns the resolution type name if this is an unknown resolution.
+    ///
+    /// Returns `None` for known resolutions.
+    #[must_use]
+    pub fn unknown_resolution_type(&self) -> Option<&str> {
+        match self {
+            Self::Unknown {
+                resolution_type, ..
+            } => Some(resolution_type),
+            _ => None,
+        }
+    }
+
+    /// Returns the raw JSON data if this is an unknown resolution.
+    ///
+    /// Returns `None` for known resolutions.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::Unknown { data, .. } => Some(data),
+            _ => None,
+        }
+    }
+}
+
+impl Serialize for Resolution {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Low => serializer.serialize_str("low"),
+            Self::Medium => serializer.serialize_str("medium"),
+            Self::High => serializer.serialize_str("high"),
+            Self::UltraHigh => serializer.serialize_str("ultra_high"),
+            Self::Unknown {
+                resolution_type, ..
+            } => serializer.serialize_str(resolution_type),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Resolution {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        match value.as_str() {
+            Some("low") => Ok(Self::Low),
+            Some("medium") => Ok(Self::Medium),
+            Some("high") => Ok(Self::High),
+            Some("ultra_high") => Ok(Self::UltraHigh),
+            Some(other) => {
+                log::warn!(
+                    "Encountered unknown Resolution '{}'. \
+                     This may indicate a new API feature. \
+                     The resolution will be preserved in the Unknown variant.",
+                    other
+                );
+                Ok(Self::Unknown {
+                    resolution_type: other.to_string(),
+                    data: value,
+                })
+            }
+            None => {
+                // Non-string value - preserve it in Unknown
+                let resolution_type = format!("<non-string: {}>", value);
+                log::warn!(
+                    "Resolution received non-string value: {}. \
+                     Preserving in Unknown variant.",
+                    value
+                );
+                Ok(Self::Unknown {
+                    resolution_type,
+                    data: value,
+                })
+            }
+        }
+    }
+}
+
+impl fmt::Display for Resolution {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::UltraHigh => write!(f, "ultra_high"),
+            Self::Unknown {
+                resolution_type, ..
+            } => write!(f, "{}", resolution_type),
+        }
+    }
+}
+
 /// Content object for Interactions API - uses flat structure with type field.
 ///
 /// This enum represents all content types that can appear in API requests and responses.
@@ -369,6 +541,7 @@ pub enum InteractionContent {
         data: Option<String>,
         uri: Option<String>,
         mime_type: Option<String>,
+        resolution: Option<Resolution>,
     },
     /// Audio content
     Audio {
@@ -381,6 +554,7 @@ pub enum InteractionContent {
         data: Option<String>,
         uri: Option<String>,
         mime_type: Option<String>,
+        resolution: Option<Resolution>,
     },
     /// Document content for file-based inputs.
     ///
@@ -651,6 +825,7 @@ impl Serialize for InteractionContent {
                 data,
                 uri,
                 mime_type,
+                resolution,
             } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "image")?;
@@ -662,6 +837,9 @@ impl Serialize for InteractionContent {
                 }
                 if let Some(m) = mime_type {
                     map.serialize_entry("mime_type", m)?;
+                }
+                if let Some(r) = resolution {
+                    map.serialize_entry("resolution", r)?;
                 }
                 map.end()
             }
@@ -687,6 +865,7 @@ impl Serialize for InteractionContent {
                 data,
                 uri,
                 mime_type,
+                resolution,
             } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "video")?;
@@ -698,6 +877,9 @@ impl Serialize for InteractionContent {
                 }
                 if let Some(m) = mime_type {
                     map.serialize_entry("mime_type", m)?;
+                }
+                if let Some(r) = resolution {
+                    map.serialize_entry("resolution", r)?;
                 }
                 map.end()
             }
@@ -1012,6 +1194,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 data: Option<String>,
                 uri: Option<String>,
                 mime_type: Option<String>,
+                resolution: Option<Resolution>,
             },
             Audio {
                 data: Option<String>,
@@ -1022,6 +1205,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 data: Option<String>,
                 uri: Option<String>,
                 mime_type: Option<String>,
+                resolution: Option<Resolution>,
             },
             Document {
                 data: Option<String>,
@@ -1099,10 +1283,12 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     data,
                     uri,
                     mime_type,
+                    resolution,
                 } => InteractionContent::Image {
                     data,
                     uri,
                     mime_type,
+                    resolution,
                 },
                 KnownContent::Audio {
                     data,
@@ -1117,10 +1303,12 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     data,
                     uri,
                     mime_type,
+                    resolution,
                 } => InteractionContent::Video {
                     data,
                     uri,
                     mime_type,
+                    resolution,
                 },
                 KnownContent::Document {
                     data,

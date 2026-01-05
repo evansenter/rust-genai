@@ -268,6 +268,7 @@ mod tests {
                 data: Some(base64_data.to_string()),
                 mime_type: mime_type.map(String::from),
                 uri: None,
+                resolution: None,
             }],
             status: InteractionStatus::Completed,
             usage: None,
@@ -346,6 +347,7 @@ mod tests {
                     data: Some("dGVzdDE=".to_string()), // "test1"
                     mime_type: Some("image/png".to_string()),
                     uri: None,
+                    resolution: None,
                 },
                 InteractionContent::Text {
                     text: Some("text between".to_string()),
@@ -355,6 +357,7 @@ mod tests {
                     data: Some("dGVzdDI=".to_string()), // "test2"
                     mime_type: Some("image/jpeg".to_string()),
                     uri: None,
+                    resolution: None,
                 },
             ],
             status: InteractionStatus::Completed,

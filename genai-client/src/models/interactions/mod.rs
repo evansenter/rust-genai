@@ -26,7 +26,7 @@ mod proptest_tests;
 pub use agent_config::{AgentConfig, DeepResearchConfig, DynamicConfig, ThinkingSummaries};
 pub use content::{
     Annotation, CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem,
-    InteractionContent,
+    InteractionContent, Resolution,
 };
 pub use metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
