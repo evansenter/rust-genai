@@ -101,7 +101,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         history.push(Turn::model(model_response));
     }
 
-    println!("=== Done ===");
+    println!("=== Done ===\n");
+
+    println!("--- What You'll See with LOUD_WIRE=1 ---");
+    println!("Example 1: ConversationBuilder");
+    println!("  [REQ#1] POST with input as turns array [{{user, model, user}}]");
+    println!("  [RES#1] completed: text response\n");
+    println!("Example 2: with_turns()");
+    println!("  [REQ#2] POST with input as turns array [{{user, model, user, model, user}}]");
+    println!("  [RES#2] completed: text response\n");
+    println!("Example 3: Dynamic history loop");
+    println!("  [REQ#3] POST with input as turns array [{{user}}]");
+    println!("  [RES#3] completed: text response");
+    println!("  [REQ#4] POST with input as turns array [{{user, model, user}}]");
+    println!("  [RES#4] completed: text response");
+    println!("  [REQ#5] POST with input as turns array [{{user, model, user, model, user}}]");
+    println!("  [RES#5] completed: text response\n");
+
+    println!("--- Production Considerations ---");
+    println!("• Use with_turns() for stateless deployments or custom history management");
+    println!("• ConversationBuilder is syntactic sugar - both produce the same wire format");
+    println!("• Clone history before passing to with_turns() if you need to reuse it");
+    println!("• No validation of turn alternation - API handles invalid sequences");
+    println!("• For very long conversations, consider sliding window or summarization");
+    println!("• Turn arrays work with all features: streaming, function calling, thinking");
 
     Ok(())
 }
