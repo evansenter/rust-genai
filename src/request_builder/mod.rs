@@ -15,8 +15,8 @@ use futures_util::{StreamExt, stream::BoxStream};
 use genai_client::{
     self, AgentConfig, CreateInteractionRequest, DeepResearchConfig, FunctionCallingMode,
     FunctionDeclaration, GenerationConfig, InteractionContent, InteractionInput,
-    InteractionResponse, Role, StreamEvent, ThinkingLevel, ThinkingSummaries, Tool as InternalTool,
-    Turn, TurnContent,
+    InteractionResponse, Resolution, Role, StreamEvent, ThinkingLevel, ThinkingSummaries,
+    Tool as InternalTool, Turn, TurnContent,
 };
 
 // ============================================================================
@@ -634,11 +634,74 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         Ok(self)
     }
 
+    /// Adds an image from a file to the content with specified resolution.
+    ///
+    /// Controls the quality vs. token cost trade-off when processing the image.
+    ///
+    /// # Resolution Trade-offs
+    ///
+    /// | Level | Token Cost | Detail |
+    /// |-------|-----------|--------|
+    /// | Low | Lowest | Basic shapes and colors |
+    /// | Medium | Moderate | Standard detail |
+    /// | High | Higher | Fine details visible |
+    /// | UltraHigh | Highest | Maximum fidelity |
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, Resolution};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("What's in this image?")
+    ///     .add_image_file_with_resolution("photo.jpg", Resolution::Low).await?  // Save tokens
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn add_image_file_with_resolution(
+        mut self,
+        path: impl AsRef<std::path::Path>,
+        resolution: Resolution,
+    ) -> Result<Self, GenaiError> {
+        let mut content = crate::multimodal::image_from_file(path).await?;
+        if let InteractionContent::Image {
+            resolution: ref mut res,
+            ..
+        } = content
+        {
+            *res = Some(resolution);
+        }
+        self.add_content_item(content);
+        Ok(self)
+    }
+
     /// Adds an image from base64-encoded data to the content.
     ///
     /// This method accumulates content - it can be called multiple times.
     pub fn add_image_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content = crate::interactions_api::image_data_content(data, mime_type);
+        self.add_content_item(content);
+        self
+    }
+
+    /// Adds an image from base64-encoded data with specified resolution.
+    pub fn add_image_data_with_resolution(
+        mut self,
+        data: impl Into<String>,
+        mime_type: impl Into<String>,
+        resolution: Resolution,
+    ) -> Self {
+        let content = crate::interactions_api::image_data_content_with_resolution(
+            data, mime_type, resolution,
+        );
         self.add_content_item(content);
         self
     }
@@ -677,11 +740,35 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         self.add_image_data(encoded, mime_type)
     }
 
+    /// Adds an image from raw bytes with specified resolution.
+    pub fn add_image_bytes_with_resolution(
+        self,
+        data: &[u8],
+        mime_type: impl Into<String>,
+        resolution: Resolution,
+    ) -> Self {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(data);
+        self.add_image_data_with_resolution(encoded, mime_type, resolution)
+    }
+
     /// Adds an image from a URI to the content.
     ///
     /// This method accumulates content - it can be called multiple times.
     pub fn add_image_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content = crate::interactions_api::image_uri_content(uri, mime_type);
+        self.add_content_item(content);
+        self
+    }
+
+    /// Adds an image from a URI with specified resolution.
+    pub fn add_image_uri_with_resolution(
+        mut self,
+        uri: impl Into<String>,
+        mime_type: impl Into<String>,
+        resolution: Resolution,
+    ) -> Self {
+        let content =
+            crate::interactions_api::image_uri_content_with_resolution(uri, mime_type, resolution);
         self.add_content_item(content);
         self
     }
@@ -756,9 +843,41 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         Ok(self)
     }
 
+    /// Adds a video file with specified resolution.
+    pub async fn add_video_file_with_resolution(
+        mut self,
+        path: impl AsRef<std::path::Path>,
+        resolution: Resolution,
+    ) -> Result<Self, GenaiError> {
+        let mut content = crate::multimodal::video_from_file(path).await?;
+        if let InteractionContent::Video {
+            resolution: ref mut res,
+            ..
+        } = content
+        {
+            *res = Some(resolution);
+        }
+        self.add_content_item(content);
+        Ok(self)
+    }
+
     /// Adds video from base64-encoded data to the content.
     pub fn add_video_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content = crate::interactions_api::video_data_content(data, mime_type);
+        self.add_content_item(content);
+        self
+    }
+
+    /// Adds video from base64-encoded data with specified resolution.
+    pub fn add_video_data_with_resolution(
+        mut self,
+        data: impl Into<String>,
+        mime_type: impl Into<String>,
+        resolution: Resolution,
+    ) -> Self {
+        let content = crate::interactions_api::video_data_content_with_resolution(
+            data, mime_type, resolution,
+        );
         self.add_content_item(content);
         self
     }
@@ -795,9 +914,33 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         self.add_video_data(encoded, mime_type)
     }
 
+    /// Adds video from raw bytes with specified resolution.
+    pub fn add_video_bytes_with_resolution(
+        self,
+        data: &[u8],
+        mime_type: impl Into<String>,
+        resolution: Resolution,
+    ) -> Self {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(data);
+        self.add_video_data_with_resolution(encoded, mime_type, resolution)
+    }
+
     /// Adds video from a URI to the content.
     pub fn add_video_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content = crate::interactions_api::video_uri_content(uri, mime_type);
+        self.add_content_item(content);
+        self
+    }
+
+    /// Adds video from a URI with specified resolution.
+    pub fn add_video_uri_with_resolution(
+        mut self,
+        uri: impl Into<String>,
+        mime_type: impl Into<String>,
+        resolution: Resolution,
+    ) -> Self {
+        let content =
+            crate::interactions_api::video_uri_content_with_resolution(uri, mime_type, resolution);
         self.add_content_item(content);
         self
     }

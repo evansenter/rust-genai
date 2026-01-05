@@ -60,6 +60,7 @@ pub use models::interactions::InteractionResponse;
 pub use models::interactions::InteractionStatus;
 pub use models::interactions::ModalityTokens;
 pub use models::interactions::OwnedFunctionCallInfo;
+pub use models::interactions::Resolution;
 pub use models::interactions::Role;
 pub use models::interactions::StreamChunk;
 pub use models::interactions::StreamEvent;

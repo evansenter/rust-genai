@@ -301,6 +301,61 @@ impl fmt::Display for CodeExecutionLanguage {
     }
 }
 
+/// Resolution level for image and video content processing.
+///
+/// Controls the quality vs. token cost trade-off when processing images and videos.
+/// Lower resolution uses fewer tokens (lower cost), while higher resolution provides
+/// more detail for the model to analyze.
+///
+/// # Token Cost Trade-offs
+///
+/// | Resolution | Token Cost | Detail Level |
+/// |------------|------------|--------------|
+/// | Low | Lowest | Basic shapes and colors |
+/// | Medium | Moderate | Standard detail |
+/// | High | Higher | Fine details visible |
+/// | UltraHigh | Highest | Maximum fidelity |
+///
+/// # Example
+///
+/// ```
+/// use genai_client::models::interactions::Resolution;
+///
+/// // Use Low for cheap, basic analysis
+/// let low_cost = Resolution::Low;
+///
+/// // Use High for detailed analysis
+/// let detailed = Resolution::High;
+///
+/// // Default is Medium
+/// assert_eq!(Resolution::default(), Resolution::Medium);
+/// ```
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum Resolution {
+    /// Lowest token cost, basic shapes and colors
+    Low,
+    /// Moderate token cost, standard detail (default)
+    #[default]
+    Medium,
+    /// Higher token cost, fine details visible
+    High,
+    /// Highest token cost, maximum fidelity
+    UltraHigh,
+}
+
+impl fmt::Display for Resolution {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::UltraHigh => write!(f, "ultra_high"),
+        }
+    }
+}
+
 /// Content object for Interactions API - uses flat structure with type field.
 ///
 /// This enum represents all content types that can appear in API requests and responses.
@@ -369,6 +424,8 @@ pub enum InteractionContent {
         data: Option<String>,
         uri: Option<String>,
         mime_type: Option<String>,
+        /// Resolution for processing (affects token cost)
+        resolution: Option<Resolution>,
     },
     /// Audio content
     Audio {
@@ -381,6 +438,8 @@ pub enum InteractionContent {
         data: Option<String>,
         uri: Option<String>,
         mime_type: Option<String>,
+        /// Resolution for processing (affects token cost)
+        resolution: Option<Resolution>,
     },
     /// Document content for file-based inputs.
     ///
@@ -651,6 +710,7 @@ impl Serialize for InteractionContent {
                 data,
                 uri,
                 mime_type,
+                resolution,
             } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "image")?;
@@ -662,6 +722,9 @@ impl Serialize for InteractionContent {
                 }
                 if let Some(m) = mime_type {
                     map.serialize_entry("mime_type", m)?;
+                }
+                if let Some(r) = resolution {
+                    map.serialize_entry("resolution", r)?;
                 }
                 map.end()
             }
@@ -687,6 +750,7 @@ impl Serialize for InteractionContent {
                 data,
                 uri,
                 mime_type,
+                resolution,
             } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "video")?;
@@ -698,6 +762,9 @@ impl Serialize for InteractionContent {
                 }
                 if let Some(m) = mime_type {
                     map.serialize_entry("mime_type", m)?;
+                }
+                if let Some(r) = resolution {
+                    map.serialize_entry("resolution", r)?;
                 }
                 map.end()
             }
@@ -1012,6 +1079,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 data: Option<String>,
                 uri: Option<String>,
                 mime_type: Option<String>,
+                resolution: Option<Resolution>,
             },
             Audio {
                 data: Option<String>,
@@ -1022,6 +1090,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 data: Option<String>,
                 uri: Option<String>,
                 mime_type: Option<String>,
+                resolution: Option<Resolution>,
             },
             Document {
                 data: Option<String>,
@@ -1099,10 +1168,12 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     data,
                     uri,
                     mime_type,
+                    resolution,
                 } => InteractionContent::Image {
                     data,
                     uri,
                     mime_type,
+                    resolution,
                 },
                 KnownContent::Audio {
                     data,
@@ -1117,10 +1188,12 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     data,
                     uri,
                     mime_type,
+                    resolution,
                 } => InteractionContent::Video {
                     data,
                     uri,
                     mime_type,
+                    resolution,
                 },
                 KnownContent::Document {
                     data,
