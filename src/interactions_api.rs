@@ -40,8 +40,8 @@
 /// For manual conversation construction (without `previous_interaction_id`), use
 /// [`function_call_content_with_signature`] to include the signature when echoing function calls.
 use genai_client::{
-    CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem, InteractionContent,
-    Resolution,
+    CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem, GoogleSearchResultItem,
+    InteractionContent, Resolution,
 };
 use serde_json::Value;
 
@@ -761,6 +761,37 @@ pub fn google_search_result_content(
     result: Vec<GoogleSearchResultItem>,
 ) -> InteractionContent {
     InteractionContent::GoogleSearchResult {
+        call_id: call_id.into(),
+        result,
+    }
+}
+
+// ----------------------------------------------------------------------------
+// File Search (built-in tool output)
+// ----------------------------------------------------------------------------
+
+/// Creates file search result content
+///
+/// Returned when the model retrieves documents from file search stores.
+///
+/// # Example
+/// ```
+/// use rust_genai::interactions_api::file_search_result_content;
+/// use genai_client::FileSearchResultItem;
+///
+/// let results = file_search_result_content("call-123", vec![
+///     FileSearchResultItem {
+///         title: "Document".into(),
+///         text: "Content".into(),
+///         store: "store-1".into(),
+///     },
+/// ]);
+/// ```
+pub fn file_search_result_content(
+    call_id: impl Into<String>,
+    result: Vec<FileSearchResultItem>,
+) -> InteractionContent {
+    InteractionContent::FileSearchResult {
         call_id: call_id.into(),
         result,
     }

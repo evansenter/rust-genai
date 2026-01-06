@@ -25,8 +25,8 @@ mod proptest_tests;
 // Re-export all public types at module root for backwards compatibility
 pub use agent_config::{AgentConfig, DeepResearchConfig, DynamicConfig, ThinkingSummaries};
 pub use content::{
-    Annotation, CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem,
-    InteractionContent, Resolution,
+    Annotation, CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem,
+    GoogleSearchResultItem, InteractionContent, Resolution,
 };
 pub use metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,

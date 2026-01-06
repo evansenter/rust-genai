@@ -48,6 +48,7 @@ pub use models::interactions::ContentSummary;
 pub use models::interactions::CreateInteractionRequest;
 pub use models::interactions::DeepResearchConfig;
 pub use models::interactions::DynamicConfig;
+pub use models::interactions::FileSearchResultItem;
 pub use models::interactions::FunctionCallInfo;
 pub use models::interactions::FunctionResultInfo;
 pub use models::interactions::GenerationConfig;

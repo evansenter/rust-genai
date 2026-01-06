@@ -9,8 +9,8 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use super::content::{
-    Annotation, CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem,
-    InteractionContent,
+    Annotation, CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem,
+    GoogleSearchResultItem, InteractionContent,
 };
 use super::metadata::{GroundingMetadata, UrlContextMetadata};
 use crate::models::shared::Tool;
@@ -1449,6 +1449,58 @@ impl InteractionResponse {
     }
 
     // =========================================================================
+    // File Search Output Content Helpers
+    // =========================================================================
+
+    /// Check if response contains file search results
+    ///
+    /// Returns true if the model returned any file search results from semantic retrieval.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// if response.has_file_search_results() {
+    ///     println!("Found {} search matches", response.file_search_results().len());
+    /// }
+    /// ```
+    #[must_use]
+    pub fn has_file_search_results(&self) -> bool {
+        self.outputs
+            .iter()
+            .any(|c| matches!(c, InteractionContent::FileSearchResult { .. }))
+    }
+
+    /// Extract file search result items from outputs
+    ///
+    /// Returns a vector of references to the file search result items with title/text/store info.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # let response: InteractionResponse = todo!();
+    /// for result in response.file_search_results() {
+    ///     println!("{}: {}", result.title, result.text);
+    /// }
+    /// ```
+    #[must_use]
+    pub fn file_search_results(&self) -> Vec<&FileSearchResultItem> {
+        self.outputs
+            .iter()
+            .filter_map(|content| {
+                if let InteractionContent::FileSearchResult { result, .. } = content {
+                    Some(result.iter())
+                } else {
+                    None
+                }
+            })
+            .flatten()
+            .collect()
+    }
+
+    // =========================================================================
     // Summary and Diagnostics
     // =========================================================================
 
@@ -1504,6 +1556,9 @@ impl InteractionResponse {
                 InteractionContent::UrlContextCall { .. } => summary.url_context_call_count += 1,
                 InteractionContent::UrlContextResult { .. } => {
                     summary.url_context_result_count += 1
+                }
+                InteractionContent::FileSearchResult { .. } => {
+                    summary.file_search_result_count += 1
                 }
                 InteractionContent::ComputerUseCall { .. } => summary.computer_use_call_count += 1,
                 InteractionContent::ComputerUseResult { .. } => {
@@ -1739,6 +1794,8 @@ pub struct ContentSummary {
     pub url_context_call_count: usize,
     /// Number of URL context result content items
     pub url_context_result_count: usize,
+    /// Number of file search result content items
+    pub file_search_result_count: usize,
     /// Number of computer use call content items
     pub computer_use_call_count: usize,
     /// Number of computer use result content items
@@ -1805,6 +1862,12 @@ impl fmt::Display for ContentSummary {
             parts.push(format!(
                 "{} url_context_result",
                 self.url_context_result_count
+            ));
+        }
+        if self.file_search_result_count > 0 {
+            parts.push(format!(
+                "{} file_search_result",
+                self.file_search_result_count
             ));
         }
         if self.computer_use_call_count > 0 {

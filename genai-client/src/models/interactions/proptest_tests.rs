@@ -8,8 +8,8 @@ use proptest::prelude::*;
 
 use super::agent_config::{AgentConfig, DeepResearchConfig, DynamicConfig, ThinkingSummaries};
 use super::content::{
-    Annotation, CodeExecutionLanguage, CodeExecutionOutcome, GoogleSearchResultItem,
-    InteractionContent, Resolution,
+    Annotation, CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem,
+    GoogleSearchResultItem, InteractionContent, Resolution,
 };
 use super::metadata::{
     GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
@@ -139,6 +139,15 @@ fn arb_google_search_result_item() -> impl Strategy<Value = GoogleSearchResultIt
             rendered_content,
         },
     )
+}
+
+/// Strategy for generating FileSearchResultItem objects.
+fn arb_file_search_result_item() -> impl Strategy<Value = FileSearchResultItem> {
+    (arb_text(), arb_text(), arb_text()).prop_map(|(title, text, store)| FileSearchResultItem {
+        title,
+        text,
+        store,
+    })
 }
 
 // =============================================================================
@@ -582,36 +591,12 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
         // UrlContextResult content
         (arb_text(), proptest::option::of(arb_text()))
             .prop_map(|(url, content)| InteractionContent::UrlContextResult { url, content }),
-        // ComputerUseCall content
-        (arb_identifier(), arb_identifier(), arb_json_value()).prop_map(
-            |(id, action, parameters)| InteractionContent::ComputerUseCall {
-                id,
-                action,
-                parameters,
-            }
-        ),
-        // ComputerUseResult content
-        // Note: output uses prop_filter_map to avoid Some(Value::Null) which doesn't roundtrip
-        // (JSON `null` deserializes as None for Option<Value>, not Some(Null))
+        // FileSearchResult content
         (
-            arb_identifier(),
-            any::<bool>(),
-            proptest::option::of(arb_json_value()).prop_map(|opt| {
-                // Convert Some(Null) to None for proper roundtrip
-                opt.filter(|v| !v.is_null())
-            }),
-            proptest::option::of(arb_text()),
-            proptest::option::of(arb_text()),
+            arb_text(),
+            proptest::collection::vec(arb_file_search_result_item(), 0..3)
         )
-            .prop_map(|(call_id, success, output, error, screenshot)| {
-                InteractionContent::ComputerUseResult {
-                    call_id,
-                    success,
-                    output,
-                    error,
-                    screenshot,
-                }
-            }),
+            .prop_map(|(call_id, result)| InteractionContent::FileSearchResult { call_id, result }),
     ]
 }
 
@@ -716,19 +701,21 @@ fn arb_known_tool() -> impl Strategy<Value = Tool> {
         Just(Tool::GoogleSearch),
         Just(Tool::CodeExecution),
         Just(Tool::UrlContext),
+        // FileSearch tool
+        (
+            proptest::collection::vec(arb_identifier(), 1..4),
+            proptest::option::of(any::<i32>()),
+            proptest::option::of(arb_text())
+        )
+            .prop_map(|(store_names, top_k, metadata_filter)| {
+                Tool::FileSearch {
+                    store_names,
+                    top_k,
+                    metadata_filter,
+                }
+            }),
         // MCP Server
         (arb_identifier(), arb_text()).prop_map(|(name, url)| Tool::McpServer { name, url }),
-        // Computer Use
-        (
-            arb_identifier(),
-            prop::collection::vec(arb_identifier(), 0..5)
-        )
-            .prop_map(
-                |(environment, excluded_predefined_functions)| Tool::ComputerUse {
-                    environment,
-                    excluded_predefined_functions,
-                }
-            ),
     ]
 }
 

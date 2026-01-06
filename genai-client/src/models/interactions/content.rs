@@ -201,6 +201,60 @@ impl GoogleSearchResultItem {
     }
 }
 
+// =============================================================================
+// File Search Result Item
+// =============================================================================
+
+/// A single result from a File Search.
+///
+/// Contains the extracted text from a semantic search match, including the title,
+/// text content, and the source file search store.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_client::models::interactions::{InteractionContent, FileSearchResultItem};
+/// # let content: InteractionContent = todo!();
+/// if let InteractionContent::FileSearchResult { result, .. } = content {
+///     for item in result {
+///         println!("Match from '{}': {}", item.store, item.text);
+///     }
+/// }
+/// ```
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct FileSearchResultItem {
+    /// Title of the matched document
+    pub title: String,
+    /// Extracted text content from the semantic match
+    pub text: String,
+    /// Name of the file search store containing this result (wire: `fileSearchStore`)
+    #[serde(rename = "fileSearchStore")]
+    pub store: String,
+}
+
+impl FileSearchResultItem {
+    /// Creates a new FileSearchResultItem.
+    #[must_use]
+    pub fn new(
+        title: impl Into<String>,
+        text: impl Into<String>,
+        store: impl Into<String>,
+    ) -> Self {
+        Self {
+            title: title.into(),
+            text: text.into(),
+            store: store.into(),
+        }
+    }
+
+    /// Returns `true` if this result has any text content.
+    #[must_use]
+    pub fn has_text(&self) -> bool {
+        !self.text.is_empty()
+    }
+}
+
 /// Outcome of a code execution operation.
 ///
 /// This enum represents the result status of code executed via the CodeExecution tool.
@@ -675,6 +729,29 @@ pub enum InteractionContent {
         /// The fetched content, or `None` if the fetch failed
         content: Option<String>,
     },
+    /// File Search result (semantic search results from document stores)
+    ///
+    /// Contains the results returned by the `FileSearch` built-in tool.
+    /// Each result includes the title, extracted text, and source store name.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_client::models::interactions::{InteractionContent, FileSearchResultItem};
+    /// # let content: InteractionContent = todo!();
+    /// if let InteractionContent::FileSearchResult { call_id, result } = content {
+    ///     println!("Results for call {}: {} matches", call_id, result.len());
+    ///     for item in result {
+    ///         println!("  {}: {}", item.title, item.text);
+    ///     }
+    /// }
+    /// ```
+    FileSearchResult {
+        /// ID of the corresponding file search call
+        call_id: String,
+        /// Search results with extracted text and source information
+        result: Vec<FileSearchResultItem>,
+    },
     /// Computer use call (model requesting browser interaction)
     ///
     /// Appears when the model initiates browser automation via the `ComputerUse` tool.
@@ -1050,6 +1127,13 @@ impl Serialize for InteractionContent {
                 }
                 map.end()
             }
+            Self::FileSearchResult { call_id, result } => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "file_search_result")?;
+                map.serialize_entry("callId", call_id)?;
+                map.serialize_entry("result", result)?;
+                map.end()
+            }
             Self::ComputerUseCall {
                 id,
                 action,
@@ -1225,6 +1309,12 @@ impl InteractionContent {
         matches!(self, Self::GoogleSearchResult { .. })
     }
 
+    /// Check if this is a FileSearchResult content type.
+    #[must_use]
+    pub const fn is_file_search_result(&self) -> bool {
+        matches!(self, Self::FileSearchResult { .. })
+    }
+
     /// Check if this is a UrlContextCall content type.
     #[must_use]
     pub const fn is_url_context_call(&self) -> bool {
@@ -1380,6 +1470,12 @@ impl<'de> Deserialize<'de> for InteractionContent {
             UrlContextResult {
                 url: String,
                 content: Option<String>,
+            },
+            FileSearchResult {
+                #[serde(rename = "callId")]
+                call_id: String,
+                #[serde(default)]
+                result: Vec<FileSearchResultItem>,
             },
             ComputerUseCall {
                 id: String,
@@ -1587,6 +1683,9 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 KnownContent::UrlContextCall { url } => InteractionContent::UrlContextCall { url },
                 KnownContent::UrlContextResult { url, content } => {
                     InteractionContent::UrlContextResult { url, content }
+                }
+                KnownContent::FileSearchResult { call_id, result } => {
+                    InteractionContent::FileSearchResult { call_id, result }
                 }
                 KnownContent::ComputerUseCall {
                     id,
