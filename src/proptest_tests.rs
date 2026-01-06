@@ -6,21 +6,21 @@
 use chrono::{DateTime, TimeZone, Utc};
 use proptest::prelude::*;
 
-use super::agent_config::{AgentConfig, DeepResearchConfig, DynamicConfig, ThinkingSummaries};
 use super::content::{
     Annotation, CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem,
     GoogleSearchResultItem, InteractionContent, Resolution,
 };
-use super::metadata::{
-    GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
+use super::request::{
+    AgentConfig, DeepResearchConfig, DynamicConfig, Role, ThinkingLevel, ThinkingSummaries, Turn,
+    TurnContent,
+};
+use super::response::{
+    GroundingChunk, GroundingMetadata, InteractionResponse, InteractionStatus, ModalityTokens,
+    OwnedFunctionCallInfo, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus, UsageMetadata,
     WebSource,
 };
-use super::request::{Role, ThinkingLevel, Turn, TurnContent};
-use super::response::{
-    InteractionResponse, InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, UsageMetadata,
-};
-use super::streaming::StreamChunk;
-use crate::models::shared::{FunctionCallingMode, FunctionParameters, Tool};
+use super::tools::{FunctionCallingMode, FunctionParameters, Tool};
+use super::wire_streaming::StreamChunk;
 
 // =============================================================================
 // Strategy Generators for Arbitrary Types

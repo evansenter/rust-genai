@@ -1069,7 +1069,7 @@ fn test_interaction_response_no_code_execution_call() {
 
 #[test]
 fn test_interaction_response_google_search_metadata_helpers() {
-    use crate::models::interactions::GroundingMetadata;
+    use super::GroundingMetadata;
 
     let response = InteractionResponse {
         id: Some("test_id".to_string()),
@@ -2413,4 +2413,406 @@ fn test_interaction_response_file_search_results_empty_results() {
     // But file_search_results returns empty vec since result array is empty
     let results = response.file_search_results();
     assert!(results.is_empty());
+}
+
+// =============================================================================
+// ImageInfo and images() Tests
+// =============================================================================
+
+#[test]
+fn test_image_info_bytes_decodes_valid_base64() {
+    use base64::Engine as _;
+    // Valid PNG header in base64
+    let png_bytes = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    let base64_data = base64::engine::general_purpose::STANDARD.encode(png_bytes);
+
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Image {
+            data: Some(base64_data),
+            uri: None,
+            mime_type: Some("image/png".to_string()),
+            resolution: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let images: Vec<_> = response.images().collect();
+    assert_eq!(images.len(), 1);
+
+    let decoded = images[0].bytes().expect("Should decode valid base64");
+    assert_eq!(decoded, png_bytes);
+}
+
+#[test]
+fn test_image_info_bytes_invalid_base64() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Image {
+            data: Some("not valid base64!!!".to_string()),
+            uri: None,
+            mime_type: Some("image/png".to_string()),
+            resolution: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let images: Vec<_> = response.images().collect();
+    assert_eq!(images.len(), 1);
+
+    let result = images[0].bytes();
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_image_info_mime_type() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::Image {
+                data: Some("YWJj".to_string()), // "abc" in base64
+                uri: None,
+                mime_type: Some("image/jpeg".to_string()),
+                resolution: None,
+            },
+            InteractionContent::Image {
+                data: Some("ZGVm".to_string()), // "def" in base64
+                uri: None,
+                mime_type: None,
+                resolution: None,
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let images: Vec<_> = response.images().collect();
+    assert_eq!(images.len(), 2);
+
+    assert_eq!(images[0].mime_type(), Some("image/jpeg"));
+    assert_eq!(images[1].mime_type(), None);
+}
+
+#[test]
+fn test_image_info_extension_jpeg() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Image {
+            data: Some("YWJj".to_string()),
+            uri: None,
+            mime_type: Some("image/jpeg".to_string()),
+            resolution: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let images: Vec<_> = response.images().collect();
+    assert_eq!(images[0].extension(), "jpg");
+}
+
+#[test]
+fn test_image_info_extension_jpg_alternate() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Image {
+            data: Some("YWJj".to_string()),
+            uri: None,
+            mime_type: Some("image/jpg".to_string()),
+            resolution: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let images: Vec<_> = response.images().collect();
+    assert_eq!(images[0].extension(), "jpg");
+}
+
+#[test]
+fn test_image_info_extension_png() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Image {
+            data: Some("YWJj".to_string()),
+            uri: None,
+            mime_type: Some("image/png".to_string()),
+            resolution: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let images: Vec<_> = response.images().collect();
+    assert_eq!(images[0].extension(), "png");
+}
+
+#[test]
+fn test_image_info_extension_webp() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Image {
+            data: Some("YWJj".to_string()),
+            uri: None,
+            mime_type: Some("image/webp".to_string()),
+            resolution: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let images: Vec<_> = response.images().collect();
+    assert_eq!(images[0].extension(), "webp");
+}
+
+#[test]
+fn test_image_info_extension_gif() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Image {
+            data: Some("YWJj".to_string()),
+            uri: None,
+            mime_type: Some("image/gif".to_string()),
+            resolution: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let images: Vec<_> = response.images().collect();
+    assert_eq!(images[0].extension(), "gif");
+}
+
+#[test]
+fn test_image_info_extension_unknown_defaults_to_png() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Image {
+            data: Some("YWJj".to_string()),
+            uri: None,
+            mime_type: Some("image/tiff".to_string()), // Unknown type
+            resolution: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let images: Vec<_> = response.images().collect();
+    assert_eq!(images[0].extension(), "png"); // Defaults to png for unknown types
+}
+
+#[test]
+fn test_image_info_extension_none_mime_type_defaults_to_png() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Image {
+            data: Some("YWJj".to_string()),
+            uri: None,
+            mime_type: None,
+            resolution: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let images: Vec<_> = response.images().collect();
+    assert_eq!(images[0].extension(), "png"); // Defaults to png when no MIME type
+}
+
+#[test]
+fn test_images_iterator_returns_only_images_with_data() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::Text {
+                text: Some("Text content".to_string()),
+                annotations: None,
+            },
+            InteractionContent::Image {
+                data: Some("YWJj".to_string()), // Has data - should be included
+                uri: None,
+                mime_type: Some("image/png".to_string()),
+                resolution: None,
+            },
+            InteractionContent::Image {
+                data: None, // No data - URI-based image, should be excluded
+                uri: Some("https://example.com/image.png".to_string()),
+                mime_type: Some("image/png".to_string()),
+                resolution: None,
+            },
+            InteractionContent::Image {
+                data: Some("ZGVm".to_string()), // Has data - should be included
+                uri: None,
+                mime_type: Some("image/jpeg".to_string()),
+                resolution: None,
+            },
+            InteractionContent::FunctionCall {
+                id: None,
+                name: "test".to_string(),
+                args: serde_json::json!({}),
+                thought_signature: None,
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let images: Vec<_> = response.images().collect();
+    // Only 2 images with data should be included, not the URI-based one
+    assert_eq!(images.len(), 2);
+    assert_eq!(images[0].mime_type(), Some("image/png"));
+    assert_eq!(images[1].mime_type(), Some("image/jpeg"));
+}
+
+#[test]
+fn test_images_iterator_empty_when_no_images() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::Text {
+                text: Some("Just text".to_string()),
+                annotations: None,
+            },
+            InteractionContent::Thought {
+                text: Some("Just a thought".to_string()),
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let images: Vec<_> = response.images().collect();
+    assert!(images.is_empty());
+}
+
+#[test]
+fn test_images_iterator_empty_outputs() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let images: Vec<_> = response.images().collect();
+    assert!(images.is_empty());
 }

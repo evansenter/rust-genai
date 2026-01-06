@@ -166,3 +166,18 @@ pub use multimodal::{
     document_from_file_with_mime, image_from_file, image_from_file_with_mime, video_from_file,
     video_from_file_with_mime,
 };
+
+// =============================================================================
+// Test Modules
+// =============================================================================
+
+#[cfg(test)]
+mod content_tests;
+#[cfg(test)]
+mod proptest_tests;
+#[cfg(test)]
+mod request_tests;
+#[cfg(test)]
+mod response_tests;
+#[cfg(test)]
+mod streaming_tests;
