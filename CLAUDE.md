@@ -18,8 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `rust-genai` is a Rust client library for Google's Generative AI (Gemini) API using the **Interactions API** for unified model/agent interactions.
 
 **Workspace structure:**
-- **`rust-genai`** (root): Public API crate with user-facing `Client` and `InteractionBuilder`
-- **`genai-client/`**: Internal HTTP client, JSON models, and SSE streaming
+- **`rust-genai`** (root): Public API crate with user-facing `Client`, `InteractionBuilder`, and all type modules
 - **`rust-genai-macros/`**: Procedural macro for automatic function declaration generation
 
 ## Development Commands
@@ -59,8 +58,9 @@ See `examples/` for full list (multimodal, thinking, files API, image generation
 
 1. **Public API** (`src/lib.rs`, `src/client.rs`, `src/request_builder/`): User-facing `Client`, `InteractionBuilder`
 2. **Internal Logic** (`src/function_calling.rs`, `src/interactions_api.rs`, `src/multimodal.rs`): Function registry, content builders
-3. **HTTP Client** (`genai-client/`): Raw API requests, JSON models, SSE streaming
-4. **Macros** (`rust-genai-macros/`): `#[tool]` macro with `inventory` registration
+3. **HTTP Layer** (`src/http/`): Raw API requests, SSE streaming (internal, `pub(crate)`)
+4. **Type Modules** (`src/content.rs`, `src/request.rs`, `src/response.rs`, `src/tools.rs`): JSON models
+5. **Macros** (`rust-genai-macros/`): `#[tool]` macro with `inventory` registration
 
 ### Key Patterns
 
@@ -105,7 +105,7 @@ See `examples/` for full list (multimodal, thinking, files API, image generation
 
 ### Error Types
 
-- `GenaiError`: API/network errors (thiserror-based), defined in `genai-client/src/errors.rs`
+- `GenaiError`: API/network errors (thiserror-based), defined in `src/errors.rs`
 - `FunctionError`: Function execution errors
 
 ## Core Design Philosophy: Evergreen Soft-Typing
@@ -132,7 +132,7 @@ Unknown {
 
 Helper methods: `is_unknown()`, `unknown_<context>_type()`, `unknown_data()`
 
-See `InteractionContent` in `genai-client/src/models/interactions/content.rs` for reference implementation.
+See `InteractionContent` in `src/content.rs` for reference implementation.
 
 **When adding/updating enums**: Always update `docs/ENUM_WIRE_FORMATS.md` with verified wire format. Test with `LOUD_WIRE=1` to confirm actual API format.
 
@@ -141,7 +141,7 @@ See `InteractionContent` in `genai-client/src/models/interactions/content.rs` fo
 - **Unit tests**: Inline in source files
 - **Integration tests** (`tests/`): Require `GEMINI_API_KEY` for most; see file names for categories
 - **Property-based tests** (proptest): Serialization roundtrip verification
-  - `genai-client/src/models/interactions/proptest_tests.rs`: Strategy generators
+  - `src/proptest_tests.rs`: Strategy generators
   - `tests/proptest_roundtrip_tests.rs`: Integration proptests
 
 ### Test Assertion Strategies
@@ -186,5 +186,5 @@ See `docs/LOGGING_STRATEGY.md`. Key points:
 - Rust edition 2024 (requires Rust 1.85+)
 - Uses `rustls-tls` (not native TLS)
 - Tokio async runtime
-- API version: Gemini V1Beta (configured in `genai-client/src/common.rs`)
+- API version: Gemini V1Beta (configured in `src/http/common.rs`)
 - See `CHANGELOG.md` for breaking changes and migration guides
