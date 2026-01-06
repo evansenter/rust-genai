@@ -1,8 +1,8 @@
 //! Unit tests for InteractionBuilder.
 
 use super::*;
+use crate::Tool;
 use crate::{Client, FunctionDeclaration};
-use genai_client::Tool;
 use serde_json::json;
 
 fn create_test_client() -> Client {
@@ -65,7 +65,7 @@ fn test_interaction_builder_with_model() {
     assert!(builder.agent.is_none());
     assert!(matches!(
         builder.input,
-        Some(genai_client::InteractionInput::Text(_))
+        Some(crate::InteractionInput::Text(_))
     ));
 }
 
@@ -107,14 +107,14 @@ fn test_interaction_builder_with_system_instruction() {
 
     assert!(matches!(
         builder.system_instruction,
-        Some(genai_client::InteractionInput::Text(_))
+        Some(crate::InteractionInput::Text(_))
     ));
 }
 
 #[test]
 fn test_interaction_builder_with_generation_config() {
     let client = create_test_client();
-    let config = genai_client::GenerationConfig {
+    let config = crate::GenerationConfig {
         temperature: Some(0.7),
         max_output_tokens: Some(1000),
         top_p: Some(0.9),
@@ -263,10 +263,7 @@ fn test_interaction_builder_build_request_success() {
 
     let request = result.unwrap();
     assert_eq!(request.model.as_deref(), Some("gemini-3-flash-preview"));
-    assert!(matches!(
-        request.input,
-        genai_client::InteractionInput::Text(_)
-    ));
+    assert!(matches!(request.input, crate::InteractionInput::Text(_)));
 }
 
 #[test]
@@ -524,7 +521,7 @@ fn test_interaction_builder_with_turns() {
 
     assert!(matches!(
         builder.input,
-        Some(genai_client::InteractionInput::Turns(_))
+        Some(crate::InteractionInput::Turns(_))
     ));
 }
 
@@ -549,10 +546,7 @@ fn test_interaction_builder_build_request_with_turns() {
 
     let request = result.unwrap();
     assert_eq!(request.model.as_deref(), Some("gemini-3-flash-preview"));
-    assert!(matches!(
-        request.input,
-        genai_client::InteractionInput::Turns(_)
-    ));
+    assert!(matches!(request.input, crate::InteractionInput::Turns(_)));
 }
 
 #[test]
@@ -587,11 +581,11 @@ fn test_conversation_builder_fluent_api() {
 
     assert!(matches!(
         builder.input,
-        Some(genai_client::InteractionInput::Turns(ref turns)) if turns.len() == 3
+        Some(crate::InteractionInput::Turns(ref turns)) if turns.len() == 3
     ));
 
     // Verify the turns have correct roles
-    if let Some(genai_client::InteractionInput::Turns(ref turns)) = builder.input {
+    if let Some(crate::InteractionInput::Turns(ref turns)) = builder.input {
         assert_eq!(*turns[0].role(), Role::User);
         assert_eq!(*turns[1].role(), Role::Model);
         assert_eq!(*turns[2].role(), Role::User);
@@ -617,11 +611,11 @@ fn test_conversation_builder_with_parts_content() {
 
     assert!(matches!(
         builder.input,
-        Some(genai_client::InteractionInput::Turns(ref turns)) if turns.len() == 1
+        Some(crate::InteractionInput::Turns(ref turns)) if turns.len() == 1
     ));
 
     // Verify the turn has parts content
-    if let Some(genai_client::InteractionInput::Turns(ref turns)) = builder.input {
+    if let Some(crate::InteractionInput::Turns(ref turns)) = builder.input {
         assert!(turns[0].content().is_parts());
     }
 }
@@ -641,7 +635,7 @@ fn test_conversation_builder_with_turn_method() {
 
     assert!(matches!(
         builder.input,
-        Some(genai_client::InteractionInput::Turns(ref turns)) if turns.len() == 2
+        Some(crate::InteractionInput::Turns(ref turns)) if turns.len() == 2
     ));
 }
 
@@ -657,7 +651,7 @@ fn test_conversation_builder_empty() {
     // Empty conversation results in empty turns array
     assert!(matches!(
         builder.input,
-        Some(genai_client::InteractionInput::Turns(ref turns)) if turns.is_empty()
+        Some(crate::InteractionInput::Turns(ref turns)) if turns.is_empty()
     ));
 }
 

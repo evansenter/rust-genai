@@ -100,7 +100,7 @@ fn timestamp() -> String {
 fn request_prefix(request_id: usize) -> String {
     let ts = timestamp().dimmed();
     let req_label = format!("[REQ#{}]", request_id);
-    let colored_label = if request_id.is_multiple_of(2) {
+    let colored_label = if request_id % 2 == 0 {
         req_label.green().bold()
     } else {
         req_label.yellow().bold()
@@ -113,7 +113,7 @@ fn request_prefix(request_id: usize) -> String {
 fn response_prefix(request_id: usize) -> String {
     let ts = timestamp().dimmed();
     let res_label = format!("[RES#{}]", request_id);
-    let colored_label = if request_id.is_multiple_of(2) {
+    let colored_label = if request_id % 2 == 0 {
         res_label.magenta().bold()
     } else {
         res_label.cyan().bold()

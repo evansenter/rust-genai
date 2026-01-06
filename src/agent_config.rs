@@ -184,7 +184,7 @@ impl<'de> Visitor<'de> for ThinkingSummariesVisitor {
 ///
 /// ## Typed configs (recommended for known agents)
 /// ```
-/// use genai_client::models::interactions::{AgentConfig, DeepResearchConfig, ThinkingSummaries};
+/// use rust_genai::{AgentConfig, DeepResearchConfig, ThinkingSummaries};
 ///
 /// let config: AgentConfig = DeepResearchConfig::new()
 ///     .with_thinking_summaries(ThinkingSummaries::Auto)
@@ -193,7 +193,7 @@ impl<'de> Visitor<'de> for ThinkingSummariesVisitor {
 ///
 /// ## Raw JSON (for unknown/future agents)
 /// ```
-/// use genai_client::models::interactions::AgentConfig;
+/// use rust_genai::AgentConfig;
 ///
 /// let config = AgentConfig::from_value(serde_json::json!({
 ///     "type": "future-agent",
@@ -234,7 +234,7 @@ impl AgentConfig {
 /// # Example
 ///
 /// ```
-/// use genai_client::models::interactions::{AgentConfig, DeepResearchConfig, ThinkingSummaries};
+/// use rust_genai::{AgentConfig, DeepResearchConfig, ThinkingSummaries};
 ///
 /// let config: AgentConfig = DeepResearchConfig::new()
 ///     .with_thinking_summaries(ThinkingSummaries::Auto)
@@ -285,7 +285,7 @@ impl From<DeepResearchConfig> for AgentConfig {
 /// # Example
 ///
 /// ```
-/// use genai_client::models::interactions::{AgentConfig, DynamicConfig};
+/// use rust_genai::{AgentConfig, DynamicConfig};
 ///
 /// let config: AgentConfig = DynamicConfig::new().into();
 /// ```

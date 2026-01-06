@@ -11,13 +11,13 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures_util::{StreamExt, stream::BoxStream};
-use genai_client::{
-    self, AgentConfig, CreateInteractionRequest, DeepResearchConfig, FunctionCallingMode,
+use crate::{
+    AgentConfig, CreateInteractionRequest, DeepResearchConfig, FunctionCallingMode,
     FunctionDeclaration, GenerationConfig, InteractionContent, InteractionInput,
     InteractionResponse, Resolution, Role, StreamEvent, ThinkingLevel, ThinkingSummaries,
     Tool as InternalTool, Turn, TurnContent,
 };
+use futures_util::{StreamExt, stream::BoxStream};
 
 // ============================================================================
 // Typestate Markers for Builder State
@@ -1073,7 +1073,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # }
     /// ```
     #[must_use]
-    pub fn with_file(mut self, file: &genai_client::FileMetadata) -> Self {
+    pub fn with_file(mut self, file: &crate::FileMetadata) -> Self {
         let content = crate::interactions_api::file_uri_content(file);
         self.add_content_item(content);
         self

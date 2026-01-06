@@ -4,8 +4,9 @@
 //! methods to `InteractionResponse` that require dependencies only available
 //! in the public `rust-genai` crate (like base64 decoding).
 
+use crate::errors::GenaiError;
+use crate::{InteractionContent, InteractionResponse};
 use base64::Engine;
-use genai_client::{GenaiError, InteractionContent, InteractionResponse};
 
 /// Information about an image in the response.
 ///
@@ -256,7 +257,7 @@ impl InteractionResponseExt for InteractionResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use genai_client::InteractionStatus;
+    use crate::InteractionStatus;
 
     fn make_response_with_image(base64_data: &str, mime_type: Option<&str>) -> InteractionResponse {
         InteractionResponse {

@@ -52,32 +52,105 @@
 //! - [`interactions_api`]: Helper functions for constructing content
 //! - [`function_calling`]: Function registration and execution
 
-// Re-export unified function declaration types from genai_client
-pub use genai_client::{
+// =============================================================================
+// Internal HTTP Layer (pub(crate))
+// =============================================================================
+pub(crate) mod http;
+
+// =============================================================================
+// Core Type Modules
+// =============================================================================
+
+// Error types
+pub mod errors;
+pub use errors::GenaiError;
+
+// Content types (InteractionContent and related)
+pub mod content;
+pub use content::{
+    Annotation, CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem,
+    GoogleSearchResultItem, InteractionContent, Resolution,
+};
+
+// Request types
+pub mod request;
+pub use request::{
+    CreateInteractionRequest, GenerationConfig, InteractionInput, Role, ThinkingLevel, Turn,
+    TurnContent,
+};
+
+// Agent configuration types
+pub mod agent_config;
+pub use agent_config::{AgentConfig, DeepResearchConfig, DynamicConfig, ThinkingSummaries};
+
+// Response types
+pub mod response;
+pub use response::{
+    CodeExecutionCallInfo, CodeExecutionResultInfo, ContentSummary, FunctionCallInfo,
+    FunctionResultInfo, InteractionResponse, InteractionStatus, ModalityTokens,
+    OwnedFunctionCallInfo, UrlContextResultInfo, UsageMetadata,
+};
+
+// Metadata types (grounding, URL context)
+pub mod metadata;
+pub use metadata::{
+    GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
+    WebSource,
+};
+
+// Tool types (function declarations, built-in tools)
+pub mod tools;
+pub use tools::{
     FunctionCallingMode, FunctionDeclaration, FunctionDeclarationBuilder, FunctionParameters, Tool,
 };
 
-// Re-export Interactions API types for convenient access
-pub use genai_client::{
-    AgentConfig, Annotation, CodeExecutionCallInfo, CodeExecutionLanguage, CodeExecutionOutcome,
-    CodeExecutionResultInfo, ContentSummary, CreateInteractionRequest, DeepResearchConfig,
-    DynamicConfig, FileSearchResultItem, FunctionCallInfo, FunctionResultInfo, GenerationConfig,
-    GroundingChunk, GroundingMetadata, InteractionContent, InteractionInput, InteractionResponse,
-    InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, Resolution, Role, StreamChunk,
-    StreamEvent, ThinkingLevel, ThinkingSummaries, Turn, TurnContent, UrlContextMetadata,
-    UrlContextResultInfo, UrlMetadataEntry, UrlRetrievalStatus, UsageMetadata, WebSource,
-};
+// Wire streaming types (from API)
+pub mod wire_streaming;
+pub use wire_streaming::{InteractionStreamEvent, StreamChunk, StreamEvent};
 
-// Re-export Files API types for convenient access
-pub use genai_client::{
+// Files API types
+pub use http::files::{
     DEFAULT_CHUNK_SIZE, FileError, FileMetadata, FileState, ListFilesResponse, ResumableUpload,
     VideoMetadata,
 };
 
-// Re-export error type from genai_client
-pub use genai_client::GenaiError;
+// =============================================================================
+// Client and Builder
+// =============================================================================
 
-// Interactions API helper functions
+pub mod client;
+pub use client::{Client, ClientBuilder};
+
+pub mod request_builder;
+pub use request_builder::{ConversationBuilder, InteractionBuilder};
+
+// =============================================================================
+// Function Calling
+// =============================================================================
+
+pub mod function_calling;
+pub use function_calling::{CallableFunction, FunctionError, ToolService};
+
+// =============================================================================
+// Streaming Types for Auto Function Calling
+// =============================================================================
+
+pub mod streaming;
+pub use streaming::{
+    AutoFunctionResult, AutoFunctionResultAccumulator, AutoFunctionStreamChunk,
+    AutoFunctionStreamEvent, FunctionExecutionResult,
+};
+
+// =============================================================================
+// Response Extension Trait
+// =============================================================================
+
+pub mod response_ext;
+pub use response_ext::{ImageInfo, InteractionResponseExt};
+
+// =============================================================================
+// Content Constructor Functions
+// =============================================================================
 //
 // ## Export Strategy
 //
@@ -100,31 +173,13 @@ pub use interactions_api::{
     video_uri_content_with_resolution,
 };
 
-// Multimodal file loading utilities
+// =============================================================================
+// Multimodal File Loading Utilities
+// =============================================================================
+
 pub mod multimodal;
 pub use multimodal::{
     audio_from_file, audio_from_file_with_mime, detect_mime_type, document_from_file,
     document_from_file_with_mime, image_from_file, image_from_file_with_mime, video_from_file,
     video_from_file_with_mime,
 };
-
-pub mod client;
-pub use client::{Client, ClientBuilder};
-
-pub mod request_builder;
-pub use request_builder::{ConversationBuilder, InteractionBuilder};
-
-pub mod function_calling;
-// Re-export public types from function_calling module
-pub use function_calling::{CallableFunction, FunctionError, ToolService};
-
-pub mod streaming;
-// Re-export streaming types for automatic function calling
-pub use streaming::{
-    AutoFunctionResult, AutoFunctionResultAccumulator, AutoFunctionStreamChunk,
-    AutoFunctionStreamEvent, FunctionExecutionResult,
-};
-
-// Response extension trait for image extraction
-pub mod response_ext;
-pub use response_ext::{ImageInfo, InteractionResponseExt};

@@ -227,7 +227,7 @@ impl Client {
     ///
     /// ```no_run
     /// use rust_genai::Client;
-    /// use genai_client::{CreateInteractionRequest, InteractionInput};
+    /// use rust_genai::{CreateInteractionRequest, InteractionInput};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("your-api-key".to_string());
@@ -256,13 +256,17 @@ impl Client {
     /// ```
     pub async fn create_interaction(
         &self,
-        request: genai_client::CreateInteractionRequest,
-    ) -> Result<genai_client::InteractionResponse, GenaiError> {
+        request: crate::CreateInteractionRequest,
+    ) -> Result<crate::InteractionResponse, GenaiError> {
         log::debug!("Creating interaction");
         log_request_body(&request);
 
-        let response =
-            genai_client::create_interaction(&self.http_client, &self.api_key, request).await?;
+        let response = crate::http::interactions::create_interaction(
+            &self.http_client,
+            &self.api_key,
+            request,
+        )
+        .await?;
 
         log::debug!("Interaction created: ID={:?}", response.id);
 
@@ -286,7 +290,7 @@ impl Client {
     /// # Example
     /// ```no_run
     /// use rust_genai::{Client, StreamChunk};
-    /// use genai_client::{CreateInteractionRequest, InteractionInput};
+    /// use rust_genai::{CreateInteractionRequest, InteractionInput};
     /// use futures_util::StreamExt;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -330,15 +334,18 @@ impl Client {
     /// ```
     pub fn create_interaction_stream(
         &self,
-        request: genai_client::CreateInteractionRequest,
-    ) -> futures_util::stream::BoxStream<'_, Result<genai_client::StreamEvent, GenaiError>> {
+        request: crate::CreateInteractionRequest,
+    ) -> futures_util::stream::BoxStream<'_, Result<crate::StreamEvent, GenaiError>> {
         use futures_util::StreamExt;
 
         log::debug!("Creating streaming interaction");
         log_request_body(&request);
 
-        let stream =
-            genai_client::create_interaction_stream(&self.http_client, &self.api_key, request);
+        let stream = crate::http::interactions::create_interaction_stream(
+            &self.http_client,
+            &self.api_key,
+            request,
+        );
 
         stream
             .map(move |result| {
@@ -371,11 +378,15 @@ impl Client {
     pub async fn get_interaction(
         &self,
         interaction_id: &str,
-    ) -> Result<genai_client::InteractionResponse, GenaiError> {
+    ) -> Result<crate::InteractionResponse, GenaiError> {
         log::debug!("Getting interaction: ID={interaction_id}");
 
-        let response =
-            genai_client::get_interaction(&self.http_client, &self.api_key, interaction_id).await?;
+        let response = crate::http::interactions::get_interaction(
+            &self.http_client,
+            &self.api_key,
+            interaction_id,
+        )
+        .await?;
 
         log::debug!("Retrieved interaction: status={:?}", response.status);
 
@@ -435,7 +446,7 @@ impl Client {
         &'a self,
         interaction_id: &'a str,
         last_event_id: Option<&'a str>,
-    ) -> futures_util::stream::BoxStream<'a, Result<genai_client::StreamEvent, GenaiError>> {
+    ) -> futures_util::stream::BoxStream<'a, Result<crate::StreamEvent, GenaiError>> {
         use futures_util::StreamExt;
 
         log::debug!(
@@ -444,7 +455,7 @@ impl Client {
             last_event_id
         );
 
-        let stream = genai_client::get_interaction_stream(
+        let stream = crate::http::interactions::get_interaction_stream(
             &self.http_client,
             &self.api_key,
             interaction_id,
@@ -481,7 +492,12 @@ impl Client {
     pub async fn delete_interaction(&self, interaction_id: &str) -> Result<(), GenaiError> {
         log::debug!("Deleting interaction: ID={interaction_id}");
 
-        genai_client::delete_interaction(&self.http_client, &self.api_key, interaction_id).await?;
+        crate::http::interactions::delete_interaction(
+            &self.http_client,
+            &self.api_key,
+            interaction_id,
+        )
+        .await?;
 
         log::debug!("Interaction deleted successfully");
 
@@ -543,12 +559,15 @@ impl Client {
     pub async fn cancel_interaction(
         &self,
         interaction_id: &str,
-    ) -> Result<genai_client::InteractionResponse, GenaiError> {
+    ) -> Result<crate::InteractionResponse, GenaiError> {
         log::debug!("Cancelling interaction: ID={interaction_id}");
 
-        let response =
-            genai_client::cancel_interaction(&self.http_client, &self.api_key, interaction_id)
-                .await?;
+        let response = crate::http::interactions::cancel_interaction(
+            &self.http_client,
+            &self.api_key,
+            interaction_id,
+        )
+        .await?;
 
         log::debug!("Interaction cancelled: status={:?}", response.status);
 
@@ -599,7 +618,7 @@ impl Client {
     pub async fn upload_file(
         &self,
         path: impl AsRef<std::path::Path>,
-    ) -> Result<genai_client::FileMetadata, GenaiError> {
+    ) -> Result<crate::FileMetadata, GenaiError> {
         let path = path.as_ref();
 
         // Read file contents
@@ -633,7 +652,7 @@ impl Client {
             mime_type
         );
 
-        genai_client::upload_file(
+        crate::http::files::upload_file(
             &self.http_client,
             &self.api_key,
             file_data,
@@ -668,7 +687,7 @@ impl Client {
         &self,
         path: impl AsRef<std::path::Path>,
         mime_type: &str,
-    ) -> Result<genai_client::FileMetadata, GenaiError> {
+    ) -> Result<crate::FileMetadata, GenaiError> {
         let path = path.as_ref();
 
         let file_data = tokio::fs::read(path).await.map_err(|e| {
@@ -688,7 +707,7 @@ impl Client {
             mime_type
         );
 
-        genai_client::upload_file(
+        crate::http::files::upload_file(
             &self.http_client,
             &self.api_key,
             file_data,
@@ -727,7 +746,7 @@ impl Client {
         data: Vec<u8>,
         mime_type: &str,
         display_name: Option<&str>,
-    ) -> Result<genai_client::FileMetadata, GenaiError> {
+    ) -> Result<crate::FileMetadata, GenaiError> {
         log::debug!(
             "Uploading file bytes: size={} bytes, mime_type={}, display_name={:?}",
             data.len(),
@@ -735,7 +754,7 @@ impl Client {
             display_name
         );
 
-        genai_client::upload_file(
+        crate::http::files::upload_file(
             &self.http_client,
             &self.api_key,
             data,
@@ -770,11 +789,8 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn get_file(
-        &self,
-        file_name: &str,
-    ) -> Result<genai_client::FileMetadata, GenaiError> {
-        genai_client::get_file(&self.http_client, &self.api_key, file_name).await
+    pub async fn get_file(&self, file_name: &str) -> Result<crate::FileMetadata, GenaiError> {
+        crate::http::files::get_file(&self.http_client, &self.api_key, file_name).await
     }
 
     /// Lists all uploaded files.
@@ -798,8 +814,9 @@ impl Client {
         &self,
         page_size: Option<u32>,
         page_token: Option<&str>,
-    ) -> Result<genai_client::ListFilesResponse, GenaiError> {
-        genai_client::list_files(&self.http_client, &self.api_key, page_size, page_token).await
+    ) -> Result<crate::ListFilesResponse, GenaiError> {
+        crate::http::files::list_files(&self.http_client, &self.api_key, page_size, page_token)
+            .await
     }
 
     /// Deletes an uploaded file.
@@ -824,7 +841,7 @@ impl Client {
     /// # }
     /// ```
     pub async fn delete_file(&self, file_name: &str) -> Result<(), GenaiError> {
-        genai_client::delete_file(&self.http_client, &self.api_key, file_name).await
+        crate::http::files::delete_file(&self.http_client, &self.api_key, file_name).await
     }
 
     /// Uploads a file using chunked transfer to minimize memory usage.
@@ -880,7 +897,7 @@ impl Client {
     pub async fn upload_file_chunked(
         &self,
         path: impl AsRef<std::path::Path>,
-    ) -> Result<(genai_client::FileMetadata, genai_client::ResumableUpload), GenaiError> {
+    ) -> Result<(crate::FileMetadata, crate::ResumableUpload), GenaiError> {
         let path = path.as_ref();
 
         // Detect MIME type from extension
@@ -907,7 +924,7 @@ impl Client {
             mime_type
         );
 
-        genai_client::upload_file_chunked(
+        crate::http::files::upload_file_chunked(
             &self.http_client,
             &self.api_key,
             path,
@@ -945,7 +962,7 @@ impl Client {
         &self,
         path: impl AsRef<std::path::Path>,
         mime_type: &str,
-    ) -> Result<(genai_client::FileMetadata, genai_client::ResumableUpload), GenaiError> {
+    ) -> Result<(crate::FileMetadata, crate::ResumableUpload), GenaiError> {
         let path = path.as_ref();
 
         let display_name = path
@@ -959,7 +976,7 @@ impl Client {
             mime_type
         );
 
-        genai_client::upload_file_chunked(
+        crate::http::files::upload_file_chunked(
             &self.http_client,
             &self.api_key,
             path,
@@ -1004,7 +1021,7 @@ impl Client {
         path: impl AsRef<std::path::Path>,
         mime_type: &str,
         chunk_size: usize,
-    ) -> Result<(genai_client::FileMetadata, genai_client::ResumableUpload), GenaiError> {
+    ) -> Result<(crate::FileMetadata, crate::ResumableUpload), GenaiError> {
         let path = path.as_ref();
 
         let display_name = path
@@ -1019,7 +1036,7 @@ impl Client {
             chunk_size
         );
 
-        genai_client::upload_file_chunked_with_chunk_size(
+        crate::http::files::upload_file_chunked_with_chunk_size(
             &self.http_client,
             &self.api_key,
             path,
@@ -1075,10 +1092,10 @@ impl Client {
     /// ```
     pub async fn wait_for_file_ready(
         &self,
-        file: &genai_client::FileMetadata,
+        file: &crate::FileMetadata,
         poll_interval: std::time::Duration,
         timeout: std::time::Duration,
-    ) -> Result<genai_client::FileMetadata, GenaiError> {
+    ) -> Result<crate::FileMetadata, GenaiError> {
         use std::time::Instant;
 
         let start = Instant::now();

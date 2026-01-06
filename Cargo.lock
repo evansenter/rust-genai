@@ -316,28 +316,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "genai-client"
-version = "0.3.0"
-dependencies = [
- "async-stream",
- "bytes",
- "chrono",
- "colored",
- "colored_json",
- "futures-util",
- "log",
- "proptest",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tokio-util",
- "urlencoding",
-]
-
-[[package]]
 name = "getrandom"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1147,11 +1125,13 @@ dependencies = [
  "base64",
  "bytes",
  "chrono",
+ "colored",
+ "colored_json",
  "futures-util",
- "genai-client",
  "inventory",
  "log",
  "proptest",
+ "regex",
  "reqwest",
  "rust-genai-macros",
  "serde",
@@ -1159,7 +1139,9 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "tokio-util",
  "trybuild",
+ "urlencoding",
 ]
 
 [[package]]

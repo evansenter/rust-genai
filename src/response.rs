@@ -8,12 +8,12 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeSet;
 use std::fmt;
 
-use super::content::{
+use crate::content::{
     Annotation, CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem,
     GoogleSearchResultItem, InteractionContent,
 };
-use super::metadata::{GroundingMetadata, UrlContextMetadata};
-use crate::models::shared::Tool;
+use crate::metadata::{GroundingMetadata, UrlContextMetadata};
+use crate::tools::Tool;
 
 // =============================================================================
 // Token Count Deserialization Helpers
@@ -197,7 +197,7 @@ impl<'de> Deserialize<'de> for InteractionStatus {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::UsageMetadata;
+/// # use rust_genai::UsageMetadata;
 /// # let usage: UsageMetadata = Default::default();
 /// if let Some(breakdown) = &usage.input_tokens_by_modality {
 ///     for modality_tokens in breakdown {
@@ -321,7 +321,7 @@ impl UsageMetadata {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::UsageMetadata;
+    /// # use rust_genai::UsageMetadata;
     /// # let usage: UsageMetadata = Default::default();
     /// if let Some(image_tokens) = usage.input_tokens_for_modality("IMAGE") {
     ///     println!("Image input cost: {} tokens", image_tokens);
@@ -350,7 +350,7 @@ impl UsageMetadata {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::UsageMetadata;
+    /// # use rust_genai::UsageMetadata;
     /// # let usage: UsageMetadata = Default::default();
     /// if let Some(rate) = usage.cache_hit_rate() {
     ///     println!("Cache hit rate: {:.1}%", rate * 100.0);
@@ -380,7 +380,7 @@ impl UsageMetadata {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::InteractionResponse;
+/// # use rust_genai::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// for call in response.function_calls() {
 ///     println!("Function: {} with args: {}", call.name, call.args);
@@ -411,7 +411,7 @@ impl FunctionCallInfo<'_> {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// // Store function calls for later processing
     /// let owned_calls: Vec<_> = response.function_calls()
@@ -440,7 +440,7 @@ impl FunctionCallInfo<'_> {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::InteractionResponse;
+/// # use rust_genai::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// let owned_calls: Vec<_> = response.function_calls()
 ///     .into_iter()
@@ -476,7 +476,7 @@ pub struct OwnedFunctionCallInfo {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::InteractionResponse;
+/// # use rust_genai::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// for result in response.function_results() {
 ///     println!("Function {} returned: {}", result.name, result.result);
@@ -504,7 +504,7 @@ pub struct FunctionResultInfo<'a> {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::InteractionResponse;
+/// # use rust_genai::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// for call in response.code_execution_calls() {
 ///     println!("Executing {} code (id: {})", call.language, call.id);
@@ -534,7 +534,7 @@ pub struct CodeExecutionCallInfo<'a> {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::InteractionResponse;
+/// # use rust_genai::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// for result in response.code_execution_results() {
 ///     println!("Call {} completed with outcome: {}", result.call_id, result.outcome);
@@ -566,7 +566,7 @@ pub struct CodeExecutionResultInfo<'a> {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::InteractionResponse;
+/// # use rust_genai::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// for result in response.url_context_results() {
 ///     println!("URL: {}", result.url);
@@ -657,7 +657,7 @@ impl InteractionResponse {
     ///
     /// # Example
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(text) = response.text() {
     ///     println!("Response: {}", text);
@@ -681,7 +681,7 @@ impl InteractionResponse {
     ///
     /// # Example
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// let full_text = response.all_text();
     /// println!("Complete response: {}", full_text);
@@ -714,7 +714,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if response.has_annotations() {
     ///     println!("Response includes {} citations", response.all_annotations().count());
@@ -733,7 +733,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// let text = response.all_text();
     /// for annotation in response.all_annotations() {
@@ -761,7 +761,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// for call in response.function_calls() {
     ///     println!("Function: {} with args: {}", call.name, call.args);
@@ -823,7 +823,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if response.has_function_results() {
     ///     for result in response.function_results() {
@@ -846,7 +846,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// for result in response.function_results() {
     ///     println!("Function {} (call_id: {}) returned: {}",
@@ -898,7 +898,7 @@ impl InteractionResponse {
     ///
     /// # Example
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// for thought in response.thoughts() {
     ///     println!("Reasoning: {}", thought);
@@ -926,7 +926,7 @@ impl InteractionResponse {
     /// Call this after receiving a response to detect if you might be missing content:
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if response.has_unknown() {
     ///     eprintln!("Warning: Response contains unknown content types");
@@ -950,7 +950,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// for (content_type, data) in response.unknown_content() {
     ///     println!("Unknown type '{}': {}", content_type, data);
@@ -985,7 +985,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if response.has_google_search_metadata() {
     ///     println!("Response is grounded with web sources");
@@ -1011,7 +1011,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// // For Interactions API, use direct output accessors:
     /// for query in response.google_search_calls() {
@@ -1037,7 +1037,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if response.has_url_context_metadata() {
     ///     println!("Response includes URL context");
@@ -1056,7 +1056,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(metadata) = response.url_context_metadata() {
     ///     for entry in &metadata.url_metadata {
@@ -1089,7 +1089,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(call) = response.code_execution_call() {
     ///     println!("Model wants to run {} code (id: {}):\n{}", call.language, call.id, call.code);
@@ -1118,7 +1118,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::{InteractionResponse, CodeExecutionLanguage};
+    /// # use rust_genai::{InteractionResponse, CodeExecutionLanguage};
     /// # let response: InteractionResponse = todo!();
     /// for call in response.code_execution_calls() {
     ///     match call.language {
@@ -1161,7 +1161,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::{InteractionResponse, CodeExecutionOutcome};
+    /// # use rust_genai::{InteractionResponse, CodeExecutionOutcome};
     /// # let response: InteractionResponse = todo!();
     /// for result in response.code_execution_results() {
     ///     if result.outcome.is_success() {
@@ -1202,7 +1202,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(output) = response.successful_code_output() {
     ///     println!("Result: {}", output);
@@ -1237,7 +1237,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if response.has_google_search_calls() {
     ///     println!("Model searched: {:?}", response.google_search_calls());
@@ -1258,7 +1258,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(query) = response.google_search_call() {
     ///     println!("Model searched for: {}", query);
@@ -1283,7 +1283,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// for query in response.google_search_calls() {
     ///     println!("Searched for: {}", query);
@@ -1341,7 +1341,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if response.has_url_context_calls() {
     ///     println!("Model fetched: {:?}", response.url_context_calls());
@@ -1362,7 +1362,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(url) = response.url_context_call() {
     ///     println!("Model fetched: {}", url);
@@ -1386,7 +1386,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// for url in response.url_context_calls() {
     ///     println!("Fetched: {}", url);
@@ -1422,7 +1422,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// for result in response.url_context_results() {
     ///     println!("URL: {}", result.url);
@@ -1459,7 +1459,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if response.has_file_search_results() {
     ///     println!("Found {} search matches", response.file_search_results().len());
@@ -1479,7 +1479,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// for result in response.file_search_results() {
     ///     println!("{}: {}", result.title, result.text);
@@ -1512,7 +1512,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// let summary = response.content_summary();
     /// println!("Response has {} text outputs", summary.text_count);
@@ -1587,7 +1587,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(tokens) = response.input_tokens() {
     ///     println!("Input tokens: {}", tokens);
@@ -1605,7 +1605,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(tokens) = response.output_tokens() {
     ///     println!("Output tokens: {}", tokens);
@@ -1623,7 +1623,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(tokens) = response.total_tokens() {
     ///     println!("Total tokens: {}", tokens);
@@ -1643,7 +1643,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(tokens) = response.reasoning_tokens() {
     ///     println!("Reasoning tokens: {}", tokens);
@@ -1662,7 +1662,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(tokens) = response.cached_tokens() {
     ///     println!("Cached tokens: {} (reduces cost)", tokens);
@@ -1681,7 +1681,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(tokens) = response.tool_use_tokens() {
     ///     println!("Tool use overhead: {} tokens", tokens);
@@ -1704,7 +1704,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(created) = response.created() {
     ///     println!("Created at: {}", created.to_rfc3339());
@@ -1723,7 +1723,7 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionResponse;
+    /// # use rust_genai::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(updated) = response.updated() {
     ///     println!("Last updated: {}", updated.to_rfc3339());
@@ -1743,7 +1743,7 @@ impl InteractionResponse {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::InteractionResponse;
+/// # use rust_genai::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// let summary = response.content_summary();
 ///

@@ -53,7 +53,7 @@
 
 use std::time::Duration;
 
-use genai_client::models::interactions::{InteractionContent, InteractionResponse};
+use crate::{InteractionContent, InteractionResponse};
 use serde::{Deserialize, Serialize};
 
 /// A chunk from streaming with automatic function calling.
@@ -909,11 +909,11 @@ mod tests {
 
     #[test]
     fn test_auto_function_result_roundtrip() {
-        use genai_client::InteractionStatus;
+        use crate::InteractionStatus;
 
         // Create a realistic AutoFunctionResult with multiple executions
         let result = AutoFunctionResult {
-            response: genai_client::InteractionResponse {
+            response: crate::InteractionResponse {
                 id: Some("interaction-abc123".to_string()),
                 model: Some("gemini-3-flash-preview".to_string()),
                 agent: None,
@@ -932,7 +932,7 @@ mod tests {
                     },
                 ],
                 status: InteractionStatus::Completed,
-                usage: Some(genai_client::UsageMetadata {
+                usage: Some(crate::UsageMetadata {
                     total_input_tokens: Some(50),
                     total_output_tokens: Some(30),
                     total_tokens: Some(80),
@@ -1033,11 +1033,11 @@ mod tests {
 
     #[test]
     fn test_auto_function_result_reached_max_loops() {
-        use genai_client::InteractionStatus;
+        use crate::InteractionStatus;
 
         // Create an AutoFunctionResult with reached_max_loops: true
         let result = AutoFunctionResult {
-            response: genai_client::InteractionResponse {
+            response: crate::InteractionResponse {
                 id: Some("interaction-stuck".to_string()),
                 model: Some("gemini-3-flash-preview".to_string()),
                 agent: None,
@@ -1116,10 +1116,10 @@ mod tests {
 
     #[test]
     fn test_max_loops_reached_chunk_roundtrip() {
-        use genai_client::InteractionStatus;
+        use crate::InteractionStatus;
 
         // Create a MaxLoopsReached chunk
-        let response = genai_client::InteractionResponse {
+        let response = crate::InteractionResponse {
             id: Some("interaction-max-loops".to_string()),
             model: Some("gemini-3-flash-preview".to_string()),
             agent: None,
@@ -1169,7 +1169,7 @@ mod tests {
 
     #[test]
     fn test_accumulator_handles_max_loops_reached() {
-        use genai_client::InteractionStatus;
+        use crate::InteractionStatus;
 
         let mut accumulator = AutoFunctionResultAccumulator::new();
 
@@ -1188,7 +1188,7 @@ mod tests {
         assert_eq!(accumulator.executions().len(), 1);
 
         // Simulate MaxLoopsReached being yielded
-        let response = genai_client::InteractionResponse {
+        let response = crate::InteractionResponse {
             id: Some("max-loops-response".to_string()),
             model: Some("gemini-3-flash-preview".to_string()),
             agent: None,

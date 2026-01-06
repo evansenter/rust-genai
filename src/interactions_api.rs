@@ -39,7 +39,7 @@
 ///
 /// For manual conversation construction (without `previous_interaction_id`), use
 /// [`function_call_content_with_signature`] to include the signature when echoing function calls.
-use genai_client::{
+use crate::{
     CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem, GoogleSearchResultItem,
     InteractionContent, Resolution,
 };
@@ -573,7 +573,7 @@ pub fn document_uri_content(
 /// # Ok(())
 /// # }
 /// ```
-pub fn file_uri_content(file: &genai_client::FileMetadata) -> InteractionContent {
+pub fn file_uri_content(file: &crate::FileMetadata) -> InteractionContent {
     content_from_uri_and_mime(file.uri.clone(), file.mime_type.clone())
 }
 
@@ -750,7 +750,7 @@ pub fn google_search_call_content(
 /// # Example
 /// ```
 /// use rust_genai::interactions_api::google_search_result_content;
-/// use genai_client::GoogleSearchResultItem;
+/// use rust_genai::GoogleSearchResultItem;
 ///
 /// let results = google_search_result_content("call-123", vec![
 ///     GoogleSearchResultItem::new("Rust", "https://rust-lang.org"),
@@ -777,7 +777,7 @@ pub fn google_search_result_content(
 /// # Example
 /// ```
 /// use rust_genai::interactions_api::file_search_result_content;
-/// use genai_client::FileSearchResultItem;
+/// use rust_genai::FileSearchResultItem;
 ///
 /// let results = file_search_result_content("call-123", vec![
 ///     FileSearchResultItem {
@@ -1272,7 +1272,7 @@ mod tests {
 
     #[test]
     fn test_google_search_result_content() {
-        use genai_client::GoogleSearchResultItem;
+        use crate::GoogleSearchResultItem;
         let result = vec![GoogleSearchResultItem::new("Rust", "https://rust-lang.org")];
         let content = google_search_result_content("call123", result.clone());
         match content {

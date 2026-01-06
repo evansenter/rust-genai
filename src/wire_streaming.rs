@@ -2,8 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::content::InteractionContent;
-use super::response::{InteractionResponse, InteractionStatus};
+use crate::content::InteractionContent;
+use crate::response::{InteractionResponse, InteractionStatus};
 
 /// A chunk from the streaming API
 ///
@@ -136,7 +136,7 @@ impl StreamChunk {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::StreamChunk;
+    /// # use rust_genai::StreamChunk;
     /// # fn example(chunk: StreamChunk) {
     /// if let Some(id) = chunk.interaction_id() {
     ///     println!("Interaction ID: {}", id);
@@ -165,7 +165,7 @@ impl StreamChunk {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::StreamChunk;
+    /// # use rust_genai::StreamChunk;
     /// # fn example(chunk: StreamChunk) {
     /// if chunk.is_terminal() {
     ///     println!("Stream has ended");
@@ -184,7 +184,7 @@ impl StreamChunk {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::StreamChunk;
+    /// # use rust_genai::StreamChunk;
     /// # fn example(chunk: StreamChunk) {
     /// if let Some(status) = chunk.status() {
     ///     println!("Status: {:?}", status);
@@ -497,7 +497,7 @@ impl<'de> Deserialize<'de> for StreamChunk {
 ///
 /// This wrapper pairs a [`StreamChunk`] with its `event_id`, enabling stream resumption
 /// after network interruptions. To resume a stream, pass the `event_id` from the last
-/// successfully received event to [`get_interaction_stream()`](crate::get_interaction_stream).
+/// successfully received event to resume the stream.
 ///
 /// # Example
 ///

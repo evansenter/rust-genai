@@ -1,12 +1,12 @@
 [workspace]
 members = [
-    "genai-client", "rust-genai-macros",
+    "rust-genai-macros",
 ]
 
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
 tokio = { version = "1.48", features = ["full"] }
 async-stream = "0.3"
 futures-util = "0.3"
@@ -29,7 +29,6 @@ rust-version = "1.85"
 license = "MIT"
 
 [dependencies]
-genai-client = { path = "genai-client" }
 rust-genai-macros = { path = "./rust-genai-macros" }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -41,7 +40,15 @@ thiserror = { workspace = true }
 log = { workspace = true }
 async-trait = { workspace = true }
 inventory = { workspace = true }
+bytes = { workspace = true }
+chrono = { workspace = true }
 base64 = "0.22"
+# Dependencies from genai-client
+tokio-util = { version = "0.7", features = ["io"] }
+colored = "3"
+colored_json = "5"
+regex = "1"
+urlencoding = "2"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
@@ -61,7 +68,7 @@ chrono = { workspace = true }
 ## content types your code doesn't handle.
 ##
 ## Default: disabled (unknown types are captured gracefully)
-strict-unknown = ["genai-client/strict-unknown"]
+strict-unknown = []
 
 # Real-world example applications
 [[example]]

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::InteractionResponse;
+/// # use rust_genai::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// if let Some(metadata) = response.google_search_metadata() {
 ///     println!("Search queries: {:?}", metadata.web_search_queries);
@@ -57,7 +57,7 @@ pub struct WebSource {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::InteractionResponse;
+/// # use rust_genai::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// if let Some(metadata) = response.url_context_metadata() {
 ///     for entry in &metadata.url_metadata {

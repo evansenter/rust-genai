@@ -284,7 +284,7 @@ tracing_subscriber::fmt::init();
 Log filtering by level:
 ```bash
 RUST_LOG=rust_genai=debug cargo run --example simple_interaction
-RUST_LOG=genai_client=debug cargo run --example streaming
+RUST_LOG=rust_genai=debug cargo run --example streaming
 ```
 
 ## Wire-Level Debugging with LOUD_WIRE

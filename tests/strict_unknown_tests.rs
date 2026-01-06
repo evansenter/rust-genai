@@ -31,7 +31,7 @@
 //! cargo test --test strict_unknown_tests --features strict-unknown
 //! ```
 
-use genai_client::InteractionContent;
+use rust_genai::InteractionContent;
 use serde_json::json;
 
 // =============================================================================

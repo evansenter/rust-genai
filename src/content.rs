@@ -26,7 +26,7 @@ use std::fmt;
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::{InteractionResponse, Annotation};
+/// # use rust_genai::{InteractionResponse, Annotation};
 /// # let response: InteractionResponse = todo!();
 /// // Get all annotations from the response
 /// for annotation in response.all_annotations() {
@@ -44,7 +44,7 @@ use std::fmt;
 /// To extract the annotated substring from the response text:
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::{InteractionResponse, Annotation};
+/// # use rust_genai::{InteractionResponse, Annotation};
 /// # let response: InteractionResponse = todo!();
 /// # let annotation: &Annotation = todo!();
 /// if let Some(text) = response.text() {
@@ -93,7 +93,7 @@ impl Annotation {
     /// # Example
     ///
     /// ```
-    /// # use genai_client::models::interactions::Annotation;
+    /// # use rust_genai::Annotation;
     /// let annotation = Annotation::new(0, 10, Some("https://example.com".to_string()));
     /// assert_eq!(annotation.start_index, 0);
     /// assert_eq!(annotation.end_index, 10);
@@ -134,7 +134,7 @@ impl Annotation {
     /// # Example
     ///
     /// ```
-    /// # use genai_client::models::interactions::Annotation;
+    /// # use rust_genai::Annotation;
     /// let annotation = Annotation::new(0, 5, Some("https://example.com".to_string()));
     ///
     /// let text = "Hello, world!";
@@ -163,7 +163,7 @@ impl Annotation {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::{InteractionContent, GoogleSearchResultItem};
+/// # use rust_genai::{InteractionContent, GoogleSearchResultItem};
 /// # let content: InteractionContent = todo!();
 /// if let InteractionContent::GoogleSearchResult { result, .. } = content {
 ///     for item in result {
@@ -213,7 +213,7 @@ impl GoogleSearchResultItem {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::{InteractionContent, FileSearchResultItem};
+/// # use rust_genai::{InteractionContent, FileSearchResultItem};
 /// # let content: InteractionContent = todo!();
 /// if let InteractionContent::FileSearchResult { result, .. } = content {
 ///     for item in result {
@@ -264,7 +264,7 @@ impl FileSearchResultItem {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::{InteractionResponse, CodeExecutionOutcome};
+/// # use rust_genai::{InteractionResponse, CodeExecutionOutcome};
 /// # let response: InteractionResponse = todo!();
 /// for result in response.code_execution_results() {
 ///     match result.outcome {
@@ -325,7 +325,7 @@ impl fmt::Display for CodeExecutionOutcome {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::{InteractionContent, CodeExecutionLanguage};
+/// # use rust_genai::{InteractionContent, CodeExecutionLanguage};
 /// # let content: InteractionContent = todo!();
 /// if let InteractionContent::CodeExecutionCall { language, code, .. } = content {
 ///     match language {
@@ -385,7 +385,7 @@ impl fmt::Display for CodeExecutionLanguage {
 /// # Example
 ///
 /// ```
-/// use genai_client::models::interactions::Resolution;
+/// use rust_genai::Resolution;
 ///
 /// // Use Low for cheap, basic analysis
 /// let low_cost = Resolution::Low;
@@ -548,7 +548,7 @@ impl fmt::Display for Resolution {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_client::models::interactions::{InteractionContent, InteractionResponse};
+/// # use rust_genai::{InteractionContent, InteractionResponse};
 /// # let response: InteractionResponse = todo!();
 /// for content in &response.outputs {
 ///     match content {
@@ -644,7 +644,7 @@ pub enum InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::{InteractionContent, CodeExecutionLanguage};
+    /// # use rust_genai::{InteractionContent, CodeExecutionLanguage};
     /// # let content: InteractionContent = todo!();
     /// if let InteractionContent::CodeExecutionCall { id, language, code } = content {
     ///     println!("Executing {:?} code (id: {}): {}", language, id, code);
@@ -671,7 +671,7 @@ pub enum InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::{InteractionContent, CodeExecutionOutcome};
+    /// # use rust_genai::{InteractionContent, CodeExecutionOutcome};
     /// # let content: InteractionContent = todo!();
     /// if let InteractionContent::CodeExecutionResult { outcome, output, .. } = content {
     ///     match outcome {
@@ -737,7 +737,7 @@ pub enum InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::{InteractionContent, FileSearchResultItem};
+    /// # use rust_genai::{InteractionContent, FileSearchResultItem};
     /// # let content: InteractionContent = todo!();
     /// if let InteractionContent::FileSearchResult { call_id, result } = content {
     ///     println!("Results for call {}: {} matches", call_id, result.len());
@@ -767,7 +767,7 @@ pub enum InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionContent;
+    /// # use rust_genai::InteractionContent;
     /// # let content: InteractionContent = todo!();
     /// if let InteractionContent::ComputerUseCall { id, action, parameters } = content {
     ///     println!("Browser action '{}' requested (id: {})", action, id);
@@ -798,7 +798,7 @@ pub enum InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionContent;
+    /// # use rust_genai::InteractionContent;
     /// # let content: InteractionContent = todo!();
     /// if let InteractionContent::ComputerUseResult { success, output, error, .. } = content {
     ///     if success {
@@ -838,7 +838,7 @@ pub enum InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::InteractionContent;
+    /// # use rust_genai::InteractionContent;
     /// # let content: InteractionContent = todo!();
     /// if let InteractionContent::Unknown { content_type, data } = content {
     ///     eprintln!("Encountered unknown type '{}': {:?}", content_type, data);
@@ -860,7 +860,7 @@ pub enum InteractionContent {
     /// ## Example: Object Data (Common Case)
     ///
     /// ```
-    /// # use genai_client::models::interactions::InteractionContent;
+    /// # use rust_genai::InteractionContent;
     /// # use serde_json::json;
     /// let content = InteractionContent::Unknown {
     ///     content_type: "new_feature".to_string(),
@@ -875,7 +875,7 @@ pub enum InteractionContent {
     /// (the `content_type` takes precedence):
     ///
     /// ```
-    /// # use genai_client::models::interactions::InteractionContent;
+    /// # use rust_genai::InteractionContent;
     /// # use serde_json::json;
     /// let content = InteractionContent::Unknown {
     ///     content_type: "my_type".to_string(),
@@ -888,7 +888,7 @@ pub enum InteractionContent {
     /// ## Example: Non-Object Data
     ///
     /// ```
-    /// # use genai_client::models::interactions::InteractionContent;
+    /// # use rust_genai::InteractionContent;
     /// # use serde_json::json;
     /// let content = InteractionContent::Unknown {
     ///     content_type: "array_type".to_string(),
@@ -1218,7 +1218,7 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_client::models::interactions::{InteractionContent, Annotation};
+    /// # use rust_genai::{InteractionContent, Annotation};
     /// # let content: InteractionContent = todo!();
     /// if let Some(annotations) = content.annotations() {
     ///     for annotation in annotations {

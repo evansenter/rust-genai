@@ -5,9 +5,9 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
-use super::agent_config::{AgentConfig, ThinkingSummaries};
-use super::content::InteractionContent;
-use crate::models::shared::{FunctionCallingMode, Tool};
+use crate::agent_config::{AgentConfig, ThinkingSummaries};
+use crate::content::InteractionContent;
+use crate::tools::{FunctionCallingMode, Tool};
 
 /// Role in a conversation turn.
 ///
@@ -24,7 +24,7 @@ use crate::models::shared::{FunctionCallingMode, Tool};
 /// # Example
 ///
 /// ```
-/// use genai_client::Role;
+/// use rust_genai::Role;
 ///
 /// let role = Role::User;
 /// assert!(matches!(role, Role::User));
@@ -124,7 +124,7 @@ impl<'de> Deserialize<'de> for Role {
 /// # Example
 ///
 /// ```
-/// use genai_client::TurnContent;
+/// use rust_genai::TurnContent;
 ///
 /// // Simple text
 /// let content = TurnContent::Text("Hello!".to_string());
@@ -199,7 +199,7 @@ impl TurnContent {
 /// # Example
 ///
 /// ```
-/// use genai_client::{Turn, Role, TurnContent};
+/// use rust_genai::{Turn, Role, TurnContent};
 ///
 /// // Create a user turn with text
 /// let user_turn = Turn::user("What is 2+2?");
@@ -246,7 +246,7 @@ impl Turn {
     /// # Example
     ///
     /// ```
-    /// use genai_client::Turn;
+    /// use rust_genai::Turn;
     ///
     /// let turn = Turn::user("What is the capital of France?");
     /// ```
@@ -259,7 +259,7 @@ impl Turn {
     /// # Example
     ///
     /// ```
-    /// use genai_client::Turn;
+    /// use rust_genai::Turn;
     ///
     /// let turn = Turn::model("The capital of France is Paris.");
     /// ```
@@ -300,7 +300,7 @@ impl Turn {
 /// # Example
 ///
 /// ```
-/// use genai_client::{InteractionInput, Turn};
+/// use rust_genai::{InteractionInput, Turn};
 ///
 /// // Simple text
 /// let input = InteractionInput::Text("Hello!".to_string());
