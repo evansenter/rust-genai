@@ -1360,6 +1360,583 @@ impl InteractionContent {
             _ => None,
         }
     }
+
+    // =========================================================================
+    // Content Constructors
+    // =========================================================================
+    //
+    // These associated functions create InteractionContent variants for sending
+    // to the API. They replace the standalone functions in interactions_api.rs.
+
+    /// Creates text content.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    ///
+    /// let content = InteractionContent::new_text("Hello, world!");
+    /// assert!(content.is_text());
+    /// ```
+    #[must_use]
+    pub fn new_text(text: impl Into<String>) -> Self {
+        Self::Text {
+            text: Some(text.into()),
+            annotations: None,
+        }
+    }
+
+    /// Creates thought content (internal reasoning visible in agent responses).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    ///
+    /// let thought = InteractionContent::new_thought("I need to search for weather data");
+    /// assert!(thought.is_thought());
+    /// ```
+    #[must_use]
+    pub fn new_thought(text: impl Into<String>) -> Self {
+        Self::Thought {
+            text: Some(text.into()),
+        }
+    }
+
+    /// Creates a function call content with optional thought signature and call ID.
+    ///
+    /// For Gemini 3 models, thought signatures are required for multi-turn function calling.
+    /// Extract them from the interaction response and pass them here when building conversation history.
+    ///
+    /// See <https://ai.google.dev/gemini-api/docs/thought-signatures> for details.
+    ///
+    /// **Note**: When using `previous_interaction_id`, the server manages signatures automatically.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    /// use serde_json::json;
+    ///
+    /// let call = InteractionContent::new_function_call_with_signature(
+    ///     Some("call_123"),
+    ///     "get_weather",
+    ///     json!({"location": "San Francisco"}),
+    ///     Some("encrypted_signature_token".to_string())
+    /// );
+    /// assert!(call.is_function_call());
+    /// ```
+    #[must_use]
+    pub fn new_function_call_with_signature(
+        id: Option<impl Into<String>>,
+        name: impl Into<String>,
+        args: serde_json::Value,
+        thought_signature: Option<String>,
+    ) -> Self {
+        let function_name = name.into();
+
+        // Validate that signature is not empty if provided
+        if let Some(ref sig) = thought_signature
+            && sig.trim().is_empty()
+        {
+            log::warn!(
+                "Empty thought signature provided for function call '{}'. \
+                 This may cause issues with Gemini 3 multi-turn conversations.",
+                function_name
+            );
+        }
+
+        Self::FunctionCall {
+            id: id.map(|s| s.into()),
+            name: function_name,
+            args,
+            thought_signature,
+        }
+    }
+
+    /// Creates a function call content (without thought signature or call ID).
+    ///
+    /// For Gemini 3 models, prefer using [`new_function_call_with_signature`](Self::new_function_call_with_signature) instead.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    /// use serde_json::json;
+    ///
+    /// let call = InteractionContent::new_function_call(
+    ///     "get_weather",
+    ///     json!({"location": "San Francisco"})
+    /// );
+    /// assert!(call.is_function_call());
+    /// ```
+    #[must_use]
+    pub fn new_function_call(name: impl Into<String>, args: serde_json::Value) -> Self {
+        Self::new_function_call_with_signature(None::<String>, name, args, None)
+    }
+
+    /// Creates a function result content.
+    ///
+    /// This is the correct way to send function execution results back to the Interactions API.
+    /// The call_id must match the id from the FunctionCall you're responding to.
+    ///
+    /// # Panics
+    ///
+    /// Will log a warning if call_id is empty or whitespace-only, as this may cause
+    /// API errors when the server tries to match the result to a function call.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    /// use serde_json::json;
+    ///
+    /// let result = InteractionContent::new_function_result(
+    ///     "get_weather",
+    ///     "call_abc123",
+    ///     json!({"temperature": "72F", "conditions": "sunny"})
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_function_result(
+        name: impl Into<String>,
+        call_id: impl Into<String>,
+        result: serde_json::Value,
+    ) -> Self {
+        let function_name = name.into();
+        let call_id_str = call_id.into();
+
+        // Validate call_id is not empty
+        if call_id_str.trim().is_empty() {
+            log::warn!(
+                "Empty call_id provided for function result '{}'. \
+                 This may cause the API to fail to match the result to its function call.",
+                function_name
+            );
+        }
+
+        Self::FunctionResult {
+            name: function_name,
+            call_id: call_id_str,
+            result,
+        }
+    }
+
+    /// Creates image content from base64-encoded data.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    ///
+    /// let image = InteractionContent::new_image_data(
+    ///     "base64encodeddata...",
+    ///     "image/png"
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_image_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self::Image {
+            data: Some(data.into()),
+            uri: None,
+            mime_type: Some(mime_type.into()),
+            resolution: None,
+        }
+    }
+
+    /// Creates image content from base64-encoded data with specified resolution.
+    ///
+    /// # Resolution Trade-offs
+    ///
+    /// | Level | Token Cost | Detail |
+    /// |-------|-----------|--------|
+    /// | Low | Lowest | Basic shapes and colors |
+    /// | Medium | Moderate | Standard detail |
+    /// | High | Higher | Fine details visible |
+    /// | UltraHigh | Highest | Maximum fidelity |
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::{InteractionContent, Resolution};
+    ///
+    /// let image = InteractionContent::new_image_data_with_resolution(
+    ///     "base64encodeddata...",
+    ///     "image/png",
+    ///     Resolution::High
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_image_data_with_resolution(
+        data: impl Into<String>,
+        mime_type: impl Into<String>,
+        resolution: Resolution,
+    ) -> Self {
+        Self::Image {
+            data: Some(data.into()),
+            uri: None,
+            mime_type: Some(mime_type.into()),
+            resolution: Some(resolution),
+        }
+    }
+
+    /// Creates image content from a URI.
+    ///
+    /// # Arguments
+    ///
+    /// * `uri` - The URI of the image
+    /// * `mime_type` - The MIME type (required by the API for URI-based content)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    ///
+    /// let image = InteractionContent::new_image_uri(
+    ///     "https://example.com/image.png",
+    ///     "image/png"
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_image_uri(uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self::Image {
+            data: None,
+            uri: Some(uri.into()),
+            mime_type: Some(mime_type.into()),
+            resolution: None,
+        }
+    }
+
+    /// Creates image content from a URI with specified resolution.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::{InteractionContent, Resolution};
+    ///
+    /// let image = InteractionContent::new_image_uri_with_resolution(
+    ///     "https://example.com/image.png",
+    ///     "image/png",
+    ///     Resolution::Low  // Use low resolution to reduce token cost
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_image_uri_with_resolution(
+        uri: impl Into<String>,
+        mime_type: impl Into<String>,
+        resolution: Resolution,
+    ) -> Self {
+        Self::Image {
+            data: None,
+            uri: Some(uri.into()),
+            mime_type: Some(mime_type.into()),
+            resolution: Some(resolution),
+        }
+    }
+
+    /// Creates audio content from base64-encoded data.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    ///
+    /// let audio = InteractionContent::new_audio_data(
+    ///     "base64encodeddata...",
+    ///     "audio/mp3"
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_audio_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self::Audio {
+            data: Some(data.into()),
+            uri: None,
+            mime_type: Some(mime_type.into()),
+        }
+    }
+
+    /// Creates audio content from a URI.
+    ///
+    /// # Arguments
+    ///
+    /// * `uri` - The URI of the audio file
+    /// * `mime_type` - The MIME type (required by the API for URI-based content)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    ///
+    /// let audio = InteractionContent::new_audio_uri(
+    ///     "https://example.com/audio.mp3",
+    ///     "audio/mp3"
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_audio_uri(uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self::Audio {
+            data: None,
+            uri: Some(uri.into()),
+            mime_type: Some(mime_type.into()),
+        }
+    }
+
+    /// Creates video content from base64-encoded data.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    ///
+    /// let video = InteractionContent::new_video_data(
+    ///     "base64encodeddata...",
+    ///     "video/mp4"
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_video_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self::Video {
+            data: Some(data.into()),
+            uri: None,
+            mime_type: Some(mime_type.into()),
+            resolution: None,
+        }
+    }
+
+    /// Creates video content from base64-encoded data with specified resolution.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::{InteractionContent, Resolution};
+    ///
+    /// let video = InteractionContent::new_video_data_with_resolution(
+    ///     "base64encodeddata...",
+    ///     "video/mp4",
+    ///     Resolution::Low  // Use low resolution to reduce token cost for long videos
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_video_data_with_resolution(
+        data: impl Into<String>,
+        mime_type: impl Into<String>,
+        resolution: Resolution,
+    ) -> Self {
+        Self::Video {
+            data: Some(data.into()),
+            uri: None,
+            mime_type: Some(mime_type.into()),
+            resolution: Some(resolution),
+        }
+    }
+
+    /// Creates video content from a URI.
+    ///
+    /// # Arguments
+    ///
+    /// * `uri` - The URI of the video file
+    /// * `mime_type` - The MIME type (required by the API for URI-based content)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    ///
+    /// let video = InteractionContent::new_video_uri(
+    ///     "https://example.com/video.mp4",
+    ///     "video/mp4"
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_video_uri(uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self::Video {
+            data: None,
+            uri: Some(uri.into()),
+            mime_type: Some(mime_type.into()),
+            resolution: None,
+        }
+    }
+
+    /// Creates video content from a URI with specified resolution.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::{InteractionContent, Resolution};
+    ///
+    /// let video = InteractionContent::new_video_uri_with_resolution(
+    ///     "https://example.com/video.mp4",
+    ///     "video/mp4",
+    ///     Resolution::Medium
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_video_uri_with_resolution(
+        uri: impl Into<String>,
+        mime_type: impl Into<String>,
+        resolution: Resolution,
+    ) -> Self {
+        Self::Video {
+            data: None,
+            uri: Some(uri.into()),
+            mime_type: Some(mime_type.into()),
+            resolution: Some(resolution),
+        }
+    }
+
+    /// Creates document content from base64-encoded data.
+    ///
+    /// Use this for PDF files and other document formats.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    ///
+    /// let document = InteractionContent::new_document_data(
+    ///     "base64encodeddata...",
+    ///     "application/pdf"
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_document_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self::Document {
+            data: Some(data.into()),
+            uri: None,
+            mime_type: Some(mime_type.into()),
+        }
+    }
+
+    /// Creates document content from a URI.
+    ///
+    /// Use this for PDF files and other document formats accessible via URI.
+    ///
+    /// # Arguments
+    ///
+    /// * `uri` - The URI of the document
+    /// * `mime_type` - The MIME type (required by the API for URI-based content)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    ///
+    /// let document = InteractionContent::new_document_uri(
+    ///     "https://example.com/document.pdf",
+    ///     "application/pdf"
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_document_uri(uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self::Document {
+            data: None,
+            uri: Some(uri.into()),
+            mime_type: Some(mime_type.into()),
+        }
+    }
+
+    /// Creates content from a URI and MIME type.
+    ///
+    /// The content type is inferred from the MIME type:
+    ///
+    /// - `image/*` → [`InteractionContent::Image`]
+    /// - `audio/*` → [`InteractionContent::Audio`]
+    /// - `video/*` → [`InteractionContent::Video`]
+    /// - Other MIME types (including `application/*`, `text/*`) → [`InteractionContent::Document`]
+    ///
+    /// # Arguments
+    ///
+    /// * `uri` - The file URI (typically from the Files API)
+    /// * `mime_type` - The MIME type of the file
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rust_genai::InteractionContent;
+    ///
+    /// // Creates Image variant for image MIME types
+    /// let image = InteractionContent::from_uri_and_mime(
+    ///     "files/abc123",
+    ///     "image/png"
+    /// );
+    ///
+    /// // Creates Document variant for PDF
+    /// let doc = InteractionContent::from_uri_and_mime(
+    ///     "files/def456",
+    ///     "application/pdf"
+    /// );
+    /// ```
+    #[must_use]
+    pub fn from_uri_and_mime(uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        let uri_str = uri.into();
+        let mime_str = mime_type.into();
+
+        // Choose the appropriate content type based on MIME type prefix
+        if mime_str.starts_with("image/") {
+            Self::Image {
+                data: None,
+                uri: Some(uri_str),
+                mime_type: Some(mime_str),
+                resolution: None,
+            }
+        } else if mime_str.starts_with("audio/") {
+            Self::Audio {
+                data: None,
+                uri: Some(uri_str),
+                mime_type: Some(mime_str),
+            }
+        } else if mime_str.starts_with("video/") {
+            Self::Video {
+                data: None,
+                uri: Some(uri_str),
+                mime_type: Some(mime_str),
+                resolution: None,
+            }
+        } else {
+            // Default to document for PDFs, text files, and other types
+            Self::Document {
+                data: None,
+                uri: Some(uri_str),
+                mime_type: Some(mime_str),
+            }
+        }
+    }
+
+    /// Creates file content from a Files API metadata object.
+    ///
+    /// Use this to reference files uploaded via the Files API. The content type
+    /// is inferred from the file's MIME type (image, audio, video, or document).
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - The uploaded file metadata from the Files API
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, InteractionContent};
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let file = client.upload_file("video.mp4").await?;
+    /// let content = InteractionContent::from_file(&file);
+    ///
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_content(vec![
+    ///         InteractionContent::new_text("Describe this video"),
+    ///         content,
+    ///     ])
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn from_file(file: &crate::http::files::FileMetadata) -> Self {
+        Self::from_uri_and_mime(file.uri.clone(), file.mime_type.clone())
+    }
 }
 
 // Custom Deserialize implementation to handle unknown content types gracefully.

@@ -72,30 +72,20 @@ pub use content::{
     GoogleSearchResultItem, InteractionContent, Resolution,
 };
 
-// Request types
+// Request types (includes agent configuration)
 pub mod request;
 pub use request::{
-    CreateInteractionRequest, GenerationConfig, InteractionInput, Role, ThinkingLevel, Turn,
-    TurnContent,
+    AgentConfig, CreateInteractionRequest, DeepResearchConfig, DynamicConfig, GenerationConfig,
+    InteractionInput, Role, ThinkingLevel, ThinkingSummaries, Turn, TurnContent,
 };
-
-// Agent configuration types
-pub mod agent_config;
-pub use agent_config::{AgentConfig, DeepResearchConfig, DynamicConfig, ThinkingSummaries};
 
 // Response types
 pub mod response;
 pub use response::{
     CodeExecutionCallInfo, CodeExecutionResultInfo, ContentSummary, FunctionCallInfo,
-    FunctionResultInfo, InteractionResponse, InteractionStatus, ModalityTokens,
-    OwnedFunctionCallInfo, UrlContextResultInfo, UsageMetadata,
-};
-
-// Metadata types (grounding, URL context)
-pub mod metadata;
-pub use metadata::{
-    GroundingChunk, GroundingMetadata, UrlContextMetadata, UrlMetadataEntry, UrlRetrievalStatus,
-    WebSource,
+    FunctionResultInfo, GroundingChunk, GroundingMetadata, ImageInfo, InteractionResponse,
+    InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, UrlContextMetadata,
+    UrlContextResultInfo, UrlMetadataEntry, UrlRetrievalStatus, UsageMetadata, WebSource,
 };
 
 // Tool types (function declarations, built-in tools)
@@ -140,13 +130,6 @@ pub use streaming::{
     AutoFunctionResult, AutoFunctionResultAccumulator, AutoFunctionStreamChunk,
     AutoFunctionStreamEvent, FunctionExecutionResult,
 };
-
-// =============================================================================
-// Response Extension Trait
-// =============================================================================
-
-pub mod response_ext;
-pub use response_ext::{ImageInfo, InteractionResponseExt};
 
 // =============================================================================
 // Content Constructor Functions

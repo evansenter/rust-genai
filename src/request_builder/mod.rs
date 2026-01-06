@@ -1664,7 +1664,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::{Client, InteractionResponseExt};
+    /// use rust_genai::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
