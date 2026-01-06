@@ -51,7 +51,7 @@ log::warn!(
     path.display(), size_mb
 );
 
-// Unknown API type (genai-client/src/models/interactions/content.rs)
+// Unknown API type (src/content.rs)
 log::warn!(
     "Encountered unknown InteractionContent type '{}'. \
      Parse error: {}. \
@@ -60,7 +60,7 @@ log::warn!(
     content_type, parse_error
 );
 
-// Validation warning (genai-client/src/models/shared.rs)
+// Validation warning (src/tools.rs)
 log::warn!(
     "FunctionDeclaration '{}' requires parameter '{}' which is not defined in properties...",
     self.name, req
@@ -90,7 +90,7 @@ fn log_request_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
 log::debug!("Creating interaction");
 log::debug!("Interaction created: ID={}", response.id);
 
-// SSE events (genai-client/src/interactions.rs)
+// SSE events (src/http/interactions.rs)
 debug!(
     "SSE event received: event_type={:?}, has_delta={}, has_interaction={}...",
     event.event_type, event.delta.is_some(), event.interaction.is_some()
@@ -125,7 +125,7 @@ Use for very detailed information that would be overwhelming at debug level.
 | Interaction retrieved | `debug` | `src/client.rs::get_interaction()` |
 | Interaction deleted | `debug` | `src/client.rs::delete_interaction()` |
 | Stream chunk received | `debug` | `src/client.rs::create_interaction_stream()` |
-| SSE event details | `debug` | `genai-client/src/interactions.rs` |
+| SSE event details | `debug` | `src/http/interactions.rs` |
 | Auto-function loop iteration | `debug` | `src/request_builder/auto_functions.rs` |
 | Function execution timing | `debug` | `src/request_builder/auto_functions.rs` |
 
@@ -137,10 +137,10 @@ All Evergreen-pattern `Unknown` variants log when encountered:
 
 | Type | Location |
 |------|----------|
-| `InteractionContent::Unknown` | `genai-client/src/models/interactions/content.rs` |
-| `InteractionStatus::Unknown` | `genai-client/src/models/interactions/response.rs` |
-| `Tool::Unknown` | `genai-client/src/models/shared.rs` |
-| `StreamChunk::Unknown` | `genai-client/src/models/interactions/streaming.rs` |
+| `InteractionContent::Unknown` | `src/content.rs` |
+| `InteractionStatus::Unknown` | `src/response.rs` |
+| `Tool::Unknown` | `src/tools.rs` |
+| `StreamChunk::Unknown` | `src/wire_streaming.rs` |
 | `AutoFunctionStreamChunk::Unknown` | `src/streaming.rs` |
 
 ### 3. Validation Warnings
@@ -150,8 +150,8 @@ All Evergreen-pattern `Unknown` variants log when encountered:
 | Condition | Location |
 |-----------|----------|
 | Large file (>20MB) | `src/multimodal.rs::load_and_encode_file()` |
-| Empty function name | `genai-client/src/models/shared.rs::build()` |
-| Missing required parameters | `genai-client/src/models/shared.rs::build()` |
+| Empty function name | `src/tools.rs::build()` |
+| Missing required parameters | `src/tools.rs::build()` |
 | Empty call_id/thought_signature | `src/interactions_api.rs` |
 | max_function_call_loops=0 | `src/request_builder/mod.rs` |
 | Function execution failure | `src/request_builder/auto_functions.rs` |
