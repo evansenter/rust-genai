@@ -581,7 +581,7 @@ impl ImageInfo<'_> {
 ///
 /// let response = client
 ///     .interaction()
-///     .with_model("gemini-2.5-flash-preview-tts")
+///     .with_model("gemini-2.5-pro-preview-tts")
 ///     .with_text("Hello, world!")
 ///     .with_audio_output()
 ///     .with_voice("Kore")
@@ -1186,7 +1186,7 @@ impl InteractionResponse {
     ///
     /// let response = client
     ///     .interaction()
-    ///     .with_model("gemini-2.5-flash-preview-tts")
+    ///     .with_model("gemini-2.5-pro-preview-tts")
     ///     .with_text("Hello, world!")
     ///     .with_audio_output()
     ///     .with_voice("Kore")
@@ -1221,7 +1221,7 @@ impl InteractionResponse {
     ///
     /// let response = client
     ///     .interaction()
-    ///     .with_model("gemini-2.5-flash-preview-tts")
+    ///     .with_model("gemini-2.5-pro-preview-tts")
     ///     .with_text("Generate multiple audio segments")
     ///     .with_audio_output()
     ///     .create()
@@ -1263,7 +1263,7 @@ impl InteractionResponse {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client = Client::new("api-key".to_string());
-    /// # let response = client.interaction().with_model("gemini-2.5-flash-preview-tts")
+    /// # let response = client.interaction().with_model("gemini-2.5-pro-preview-tts")
     /// #     .with_text("Hello").with_audio_output().create().await?;
     /// if response.has_audio() {
     ///     for audio in response.audios() {

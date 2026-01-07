@@ -156,7 +156,7 @@ GitHub Actions runs: check, test, test-strict-unknown, test-integration (4 matri
 
 ## Project Conventions
 
-- **Model name**: Always use `gemini-3-flash-preview` (exception: `gemini-3-pro-image-preview` for image generation)
+- **Model name**: Always use `gemini-3-flash-preview` (exceptions: `gemini-3-pro-image-preview` for image generation, `gemini-2.5-pro-preview-tts` for text-to-speech)
 
 ### Naming Conventions
 

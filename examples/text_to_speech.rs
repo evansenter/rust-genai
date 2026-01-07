@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let client = Client::builder(api_key).build()?;
 
     // TTS model - use the appropriate model for text-to-speech
-    let model_name = "gemini-2.5-flash-preview-tts";
+    let model_name = "gemini-2.5-pro-preview-tts";
 
     // =========================================================================
     // Example 1: Basic Text-to-Speech
@@ -133,7 +133,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         r#"
    let response = client
        .interaction()
-       .with_model("gemini-2.5-flash-preview-tts")
+       .with_model("gemini-2.5-pro-preview-tts")
        .with_text("Your text here")
        .with_audio_output()
        .with_voice("Kore")
@@ -157,7 +157,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
    let response = client
        .interaction()
-       .with_model("gemini-2.5-flash-preview-tts")
+       .with_model("gemini-2.5-pro-preview-tts")
        .with_text("Your text here")
        .with_audio_output()
        .with_speech_config(config)
@@ -188,7 +188,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("  [RES#1] completed: audio content with base64 data\n");
 
     println!("--- Production Considerations ---");
-    println!("  - Use appropriate TTS model (gemini-2.5-flash-preview-tts)");
+    println!("  - Use appropriate TTS model (gemini-2.5-pro-preview-tts)");
     println!("  - Voice selection affects tone and style");
     println!("  - Language setting should match content language");
     println!("  - Audio is returned as base64-encoded data");

@@ -1131,7 +1131,7 @@ async fn test_text_to_speech_basic() {
     };
 
     // TTS requires a specific model
-    let tts_model = "gemini-2.5-flash-preview-tts";
+    let tts_model = "gemini-2.5-pro-preview-tts";
 
     // TTS can be slow - use extended timeout
     with_timeout(EXTENDED_TEST_TIMEOUT, async {
@@ -1177,7 +1177,7 @@ async fn test_text_to_speech_with_speech_config() {
         return;
     };
 
-    let tts_model = "gemini-2.5-flash-preview-tts";
+    let tts_model = "gemini-2.5-pro-preview-tts";
 
     // TTS can be slow - use extended timeout
     with_timeout(EXTENDED_TEST_TIMEOUT, async {

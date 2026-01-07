@@ -2825,7 +2825,7 @@ fn test_images_iterator_empty_outputs() {
 fn test_audios_iterator_returns_only_audios_with_data() {
     let response = InteractionResponse {
         id: Some("test_id".to_string()),
-        model: Some("gemini-2.5-flash-preview-tts".to_string()),
+        model: Some("gemini-2.5-pro-preview-tts".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -2909,7 +2909,7 @@ fn test_audios_iterator_empty_when_no_audios() {
 fn test_audios_iterator_empty_outputs() {
     let response = InteractionResponse {
         id: Some("test_id".to_string()),
-        model: Some("gemini-2.5-flash-preview-tts".to_string()),
+        model: Some("gemini-2.5-pro-preview-tts".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![],
@@ -2931,7 +2931,7 @@ fn test_audios_iterator_empty_outputs() {
 fn test_first_audio() {
     let response = InteractionResponse {
         id: Some("test_id".to_string()),
-        model: Some("gemini-2.5-flash-preview-tts".to_string()),
+        model: Some("gemini-2.5-pro-preview-tts".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![
@@ -2995,7 +2995,7 @@ fn test_first_audio_none_when_empty() {
 fn test_has_audio_true() {
     let response = InteractionResponse {
         id: Some("test_id".to_string()),
-        model: Some("gemini-2.5-flash-preview-tts".to_string()),
+        model: Some("gemini-2.5-pro-preview-tts".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::Audio {
@@ -3046,7 +3046,7 @@ fn test_has_audio_false_when_uri_only() {
     // since the audios() iterator only includes data-based audio
     let response = InteractionResponse {
         id: Some("test_id".to_string()),
-        model: Some("gemini-2.5-flash-preview-tts".to_string()),
+        model: Some("gemini-2.5-pro-preview-tts".to_string()),
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::Audio {

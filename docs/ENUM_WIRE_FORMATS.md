@@ -219,7 +219,7 @@ Used in `generationConfig.speechConfig` for text-to-speech audio output.
 
 ```json
 {
-  "model": "gemini-2.5-flash-preview-tts",
+  "model": "gemini-2.5-pro-preview-tts",
   "input": "Hello, world!",
   "generationConfig": {
     "responseModalities": ["AUDIO"],
