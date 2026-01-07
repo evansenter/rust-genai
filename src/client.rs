@@ -306,7 +306,6 @@ impl Client {
     ///     response_format: None,
     ///     response_mime_type: None,
     ///     generation_config: None,
-    ///     speech_config: None,
     ///     stream: Some(true),
     ///     background: None,
     ///     store: None,
