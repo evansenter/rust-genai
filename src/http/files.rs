@@ -49,10 +49,10 @@
 //! # }
 //! ```
 
-use crate::common::API_KEY_HEADER;
-use crate::error_helpers::{check_response, deserialize_with_context};
+use super::common::API_KEY_HEADER;
+use super::error_helpers::{check_response, deserialize_with_context};
+use super::loud_wire;
 use crate::errors::GenaiError;
-use crate::loud_wire;
 use chrono::{DateTime, Utc};
 use reqwest::Client as ReqwestClient;
 use serde::{Deserialize, Serialize};
@@ -142,7 +142,7 @@ impl FileMetadata {
     /// # Example
     ///
     /// ```
-    /// # use genai_client::FileMetadata;
+    /// # use rust_genai::FileMetadata;
     /// # let file: FileMetadata = serde_json::from_str(r#"{"name":"files/abc","mimeType":"video/mp4","uri":"","sizeBytes":"1234567"}"#).unwrap();
     /// if let Some(size) = file.size_bytes_as_u64() {
     ///     println!("File size: {} bytes", size);
@@ -466,7 +466,7 @@ pub async fn upload_file(
 /// # Example
 ///
 /// ```ignore
-/// use genai_client::files::{ResumableUpload, upload_file_chunked};
+/// use rust_genai::{ResumableUpload, upload_file_chunked};
 /// use std::time::Duration;
 ///
 /// // Start a streaming upload
@@ -661,7 +661,7 @@ pub const DEFAULT_CHUNK_SIZE: usize = 8 * 1024 * 1024; // 8 MB
 /// # Example
 ///
 /// ```ignore
-/// use genai_client::files::upload_file_chunked;
+/// use rust_genai::upload_file_chunked;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let http_client = reqwest::Client::new();

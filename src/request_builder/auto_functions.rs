@@ -8,9 +8,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
+use crate::{InteractionInput, InteractionResponse, StreamChunk};
 use futures_util::StreamExt;
 use futures_util::stream::BoxStream;
-use genai_client::{InteractionInput, InteractionResponse, StreamChunk};
 use log::{debug, error, warn};
 use serde_json::{Value, json};
 
@@ -626,7 +626,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                     match event.chunk {
                         StreamChunk::Delta(delta) => {
                             // Check for function calls in delta
-                            if let genai_client::InteractionContent::FunctionCall { id, name, args, .. } = &delta {
+                            if let crate::InteractionContent::FunctionCall { id, name, args, .. } = &delta {
                                 accumulated_calls.push((id.clone(), name.clone(), args.clone()));
                             }
                             yield AutoFunctionStreamEvent::new(

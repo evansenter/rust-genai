@@ -1,11 +1,12 @@
-use crate::common::{API_KEY_HEADER, Endpoint, construct_endpoint_url};
-use crate::error_helpers::{check_response, deserialize_with_context};
+use super::common::{API_KEY_HEADER, Endpoint, construct_endpoint_url};
+use super::error_helpers::{check_response, deserialize_with_context};
+use super::loud_wire;
+use super::sse_parser::parse_sse_stream;
 use crate::errors::GenaiError;
-use crate::loud_wire;
-use crate::models::interactions::{
-    CreateInteractionRequest, InteractionResponse, InteractionStreamEvent, StreamChunk, StreamEvent,
+use crate::{
+    CreateInteractionRequest, InteractionContent, InteractionResponse, InteractionStreamEvent,
+    StreamChunk, StreamEvent,
 };
-use crate::sse_parser::parse_sse_stream;
 use async_stream::try_stream;
 use futures_util::{Stream, StreamExt};
 use log::{debug, warn};
@@ -195,9 +196,9 @@ pub fn create_interaction_stream<'a>(
                         let content_type = event.content.as_ref().and_then(|c| {
                             // Get the content type name from the variant
                             match c {
-                                crate::models::interactions::InteractionContent::Text { .. } => Some("text".to_string()),
-                                crate::models::interactions::InteractionContent::Thought { .. } => Some("thought".to_string()),
-                                crate::models::interactions::InteractionContent::FunctionCall { .. } => Some("function_call".to_string()),
+                                InteractionContent::Text { .. } => Some("text".to_string()),
+                                InteractionContent::Thought { .. } => Some("thought".to_string()),
+                                InteractionContent::FunctionCall { .. } => Some("function_call".to_string()),
                                 _ => None,
                             }
                         });
@@ -512,7 +513,7 @@ pub async fn cancel_interaction(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::interactions::{InteractionContent, InteractionInput, InteractionStatus};
+    use crate::{InteractionContent, InteractionInput, InteractionStatus};
 
     #[test]
     fn test_endpoint_url_construction() {

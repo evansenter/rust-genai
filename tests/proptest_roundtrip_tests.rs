@@ -8,14 +8,11 @@
 
 use chrono::{DateTime, TimeZone, Utc};
 use proptest::prelude::*;
-use rust_genai::{AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionResult};
-use std::time::Duration;
-
-// Re-export genai_client types for testing
-use genai_client::{
-    Annotation, InteractionContent, InteractionResponse, InteractionStatus, ModalityTokens,
-    UsageMetadata,
+use rust_genai::{
+    Annotation, AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionResult,
+    InteractionContent, InteractionResponse, InteractionStatus, ModalityTokens, UsageMetadata,
 };
+use std::time::Duration;
 
 // =============================================================================
 // Strategy Generators

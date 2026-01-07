@@ -5,8 +5,10 @@
 mod common;
 
 use common::DEFAULT_MODEL;
-use genai_client::{GenerationConfig, InteractionContent, InteractionInput, ThinkingLevel};
-use rust_genai::{Client, FunctionDeclaration, detect_mime_type};
+use rust_genai::{
+    Client, FunctionDeclaration, GenerationConfig, InteractionContent, InteractionInput,
+    ThinkingLevel, detect_mime_type,
+};
 use serde_json::json;
 use std::path::Path;
 

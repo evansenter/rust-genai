@@ -42,7 +42,7 @@ fn assert_no_unknown_content(response: &rust_genai::InteractionResponse, context
              Unknown types: {:?}\n\
              Full summary: {summary}\n\n\
              Action required: Add support for these content types in \
-             genai-client/src/models/interactions/",
+             src/",
             summary.unknown_types
         );
     }
@@ -110,7 +110,7 @@ async fn canary_streaming_interaction() {
             "API returned unknown content types in streaming deltas!\n\
              Unknown types: {:?}\n\n\
              Action required: Add support for these content types in \
-             genai-client/src/models/interactions/",
+             src/",
             unknown_types_found
         );
     }

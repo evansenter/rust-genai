@@ -250,8 +250,7 @@ See [`docs/LOGGING_STRATEGY.md`](docs/LOGGING_STRATEGY.md) for details on log le
 
 ## Project Structure
 
-- **`rust-genai`** (root): Public API crate with `Client` and `InteractionBuilder`
-- **`genai-client/`**: Internal HTTP client, JSON models, SSE streaming
+- **`rust-genai`** (root): Public API crate with `Client`, `InteractionBuilder`, HTTP layer (`src/http/`), and type modules
 - **`rust-genai-macros/`**: Procedural macro for `#[tool]`
 
 ## Forward Compatibility

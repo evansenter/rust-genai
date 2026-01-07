@@ -178,7 +178,7 @@ mod tests {
             FunctionDeclaration::new(
                 "test_function_global".to_string(),
                 "A global test function".to_string(),
-                genai_client::FunctionParameters::new(
+                crate::FunctionParameters::new(
                     "object".to_string(),
                     json!({"param": {"type": "string"}}),
                     vec!["param".to_string()],
@@ -252,7 +252,7 @@ mod tests {
             FunctionDeclaration::new(
                 "greet".to_string(),
                 "Greets a person with a custom prefix".to_string(),
-                genai_client::FunctionParameters::new(
+                crate::FunctionParameters::new(
                     "object".to_string(),
                     json!({"name": {"type": "string"}}),
                     vec!["name".to_string()],
@@ -392,7 +392,7 @@ mod tests {
                 FunctionDeclaration::new(
                     "duplicate_name".to_string(),
                     "First function".to_string(),
-                    genai_client::FunctionParameters::new("object".to_string(), json!({}), vec![]),
+                    crate::FunctionParameters::new("object".to_string(), json!({}), vec![]),
                 )
             }
             async fn call(&self, _args: Value) -> Result<Value, FunctionError> {
@@ -408,7 +408,7 @@ mod tests {
                 FunctionDeclaration::new(
                     "duplicate_name".to_string(),
                     "Second function".to_string(),
-                    genai_client::FunctionParameters::new("object".to_string(), json!({}), vec![]),
+                    crate::FunctionParameters::new("object".to_string(), json!({}), vec![]),
                 )
             }
             async fn call(&self, _args: Value) -> Result<Value, FunctionError> {

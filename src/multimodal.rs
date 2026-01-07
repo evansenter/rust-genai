@@ -83,11 +83,12 @@
 //! # }
 //! ```
 
+use crate::InteractionContent;
+use crate::errors::GenaiError;
 use crate::interactions_api::{
     audio_data_content, document_data_content, image_data_content, video_data_content,
 };
 use base64::Engine;
-use genai_client::{GenaiError, InteractionContent};
 use std::path::Path;
 
 /// Detects MIME type from file extension.

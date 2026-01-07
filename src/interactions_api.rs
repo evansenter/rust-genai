@@ -39,7 +39,7 @@
 ///
 /// For manual conversation construction (without `previous_interaction_id`), use
 /// [`function_call_content_with_signature`] to include the signature when echoing function calls.
-use genai_client::{
+use crate::{
     CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem, GoogleSearchResultItem,
     InteractionContent, Resolution,
 };
@@ -56,7 +56,9 @@ use serde_json::Value;
 // Text & Thought
 // ----------------------------------------------------------------------------
 
-/// Creates text content
+/// Creates text content.
+///
+/// **Prefer:** [`InteractionContent::new_text()`] for new code.
 ///
 /// # Example
 /// ```
@@ -65,13 +67,12 @@ use serde_json::Value;
 /// let content = text_content("This is a response");
 /// ```
 pub fn text_content(text: impl Into<String>) -> InteractionContent {
-    InteractionContent::Text {
-        text: Some(text.into()),
-        annotations: None,
-    }
+    InteractionContent::new_text(text)
 }
 
-/// Creates thought content (internal reasoning visible in agent responses)
+/// Creates thought content (internal reasoning visible in agent responses).
+///
+/// **Prefer:** [`InteractionContent::new_thought()`] for new code.
 ///
 /// # Example
 /// ```
@@ -80,16 +81,16 @@ pub fn text_content(text: impl Into<String>) -> InteractionContent {
 /// let thought = thought_content("I need to search for weather data");
 /// ```
 pub fn thought_content(text: impl Into<String>) -> InteractionContent {
-    InteractionContent::Thought {
-        text: Some(text.into()),
-    }
+    InteractionContent::new_thought(text)
 }
 
 // ----------------------------------------------------------------------------
 // Function Calling
 // ----------------------------------------------------------------------------
 
-/// Creates a function call content with optional thought signature and call ID
+/// Creates a function call content with optional thought signature and call ID.
+///
+/// **Prefer:** [`InteractionContent::new_function_call_with_signature()`] for new code.
 ///
 /// For Gemini 3 models, thought signatures are required for multi-turn function calling.
 /// Extract them from the interaction response and pass them here when building conversation history.
@@ -116,28 +117,12 @@ pub fn function_call_content_with_signature(
     args: Value,
     thought_signature: Option<String>,
 ) -> InteractionContent {
-    let function_name = name.into();
-
-    // Validate that signature is not empty if provided
-    if let Some(ref sig) = thought_signature
-        && sig.trim().is_empty()
-    {
-        log::warn!(
-            "Empty thought signature provided for function call '{}'. \
-             This may cause issues with Gemini 3 multi-turn conversations.",
-            function_name
-        );
-    }
-
-    InteractionContent::FunctionCall {
-        id: id.map(|s| s.into()),
-        name: function_name,
-        args,
-        thought_signature,
-    }
+    InteractionContent::new_function_call_with_signature(id, name, args, thought_signature)
 }
 
-/// Creates a function call content (without thought signature or call ID)
+/// Creates a function call content (without thought signature or call ID).
+///
+/// **Prefer:** [`InteractionContent::new_function_call()`] for new code.
 ///
 /// For Gemini 3 models, prefer using `function_call_content_with_signature` instead.
 ///
@@ -152,10 +137,12 @@ pub fn function_call_content_with_signature(
 /// );
 /// ```
 pub fn function_call_content(name: impl Into<String>, args: Value) -> InteractionContent {
-    function_call_content_with_signature(None::<String>, name, args, None)
+    InteractionContent::new_function_call(name, args)
 }
 
-/// Creates a function result content (preferred for new code)
+/// Creates a function result content.
+///
+/// **Prefer:** [`InteractionContent::new_function_result()`] for new code.
 ///
 /// This is the correct way to send function execution results back to the Interactions API.
 /// The call_id must match the id from the FunctionCall you're responding to.
@@ -181,30 +168,16 @@ pub fn function_result_content(
     call_id: impl Into<String>,
     result: Value,
 ) -> InteractionContent {
-    let function_name = name.into();
-    let call_id_str = call_id.into();
-
-    // Validate call_id is not empty
-    if call_id_str.trim().is_empty() {
-        log::warn!(
-            "Empty call_id provided for function result '{}'. \
-             This may cause the API to fail to match the result to its function call.",
-            function_name
-        );
-    }
-
-    InteractionContent::FunctionResult {
-        name: function_name,
-        call_id: call_id_str,
-        result,
-    }
+    InteractionContent::new_function_result(name, call_id, result)
 }
 
 // ----------------------------------------------------------------------------
 // Multimodal Content (Images, Audio, Video, Documents)
 // ----------------------------------------------------------------------------
 
-/// Creates image content from base64-encoded data
+/// Creates image content from base64-encoded data.
+///
+/// **Prefer:** [`InteractionContent::new_image_data()`] for new code.
 ///
 /// # Example
 /// ```
@@ -219,15 +192,12 @@ pub fn image_data_content(
     data: impl Into<String>,
     mime_type: impl Into<String>,
 ) -> InteractionContent {
-    InteractionContent::Image {
-        data: Some(data.into()),
-        uri: None,
-        mime_type: Some(mime_type.into()),
-        resolution: None,
-    }
+    InteractionContent::new_image_data(data, mime_type)
 }
 
-/// Creates image content from base64-encoded data with specified resolution
+/// Creates image content from base64-encoded data with specified resolution.
+///
+/// **Prefer:** [`InteractionContent::new_image_data_with_resolution()`] for new code.
 ///
 /// # Resolution Trade-offs
 ///
@@ -254,15 +224,12 @@ pub fn image_data_content_with_resolution(
     mime_type: impl Into<String>,
     resolution: Resolution,
 ) -> InteractionContent {
-    InteractionContent::Image {
-        data: Some(data.into()),
-        uri: None,
-        mime_type: Some(mime_type.into()),
-        resolution: Some(resolution),
-    }
+    InteractionContent::new_image_data_with_resolution(data, mime_type, resolution)
 }
 
-/// Creates image content from a URI
+/// Creates image content from a URI.
+///
+/// **Prefer:** [`InteractionContent::new_image_uri()`] for new code.
 ///
 /// # Arguments
 ///
@@ -282,15 +249,12 @@ pub fn image_uri_content(
     uri: impl Into<String>,
     mime_type: impl Into<String>,
 ) -> InteractionContent {
-    InteractionContent::Image {
-        data: None,
-        uri: Some(uri.into()),
-        mime_type: Some(mime_type.into()),
-        resolution: None,
-    }
+    InteractionContent::new_image_uri(uri, mime_type)
 }
 
-/// Creates image content from a URI with specified resolution
+/// Creates image content from a URI with specified resolution.
+///
+/// **Prefer:** [`InteractionContent::new_image_uri_with_resolution()`] for new code.
 ///
 /// # Arguments
 ///
@@ -314,15 +278,12 @@ pub fn image_uri_content_with_resolution(
     mime_type: impl Into<String>,
     resolution: Resolution,
 ) -> InteractionContent {
-    InteractionContent::Image {
-        data: None,
-        uri: Some(uri.into()),
-        mime_type: Some(mime_type.into()),
-        resolution: Some(resolution),
-    }
+    InteractionContent::new_image_uri_with_resolution(uri, mime_type, resolution)
 }
 
-/// Creates audio content from base64-encoded data
+/// Creates audio content from base64-encoded data.
+///
+/// **Prefer:** [`InteractionContent::new_audio_data()`] for new code.
 ///
 /// # Example
 /// ```
@@ -337,14 +298,12 @@ pub fn audio_data_content(
     data: impl Into<String>,
     mime_type: impl Into<String>,
 ) -> InteractionContent {
-    InteractionContent::Audio {
-        data: Some(data.into()),
-        uri: None,
-        mime_type: Some(mime_type.into()),
-    }
+    InteractionContent::new_audio_data(data, mime_type)
 }
 
-/// Creates audio content from a URI
+/// Creates audio content from a URI.
+///
+/// **Prefer:** [`InteractionContent::new_audio_uri()`] for new code.
 ///
 /// # Arguments
 ///
@@ -364,14 +323,12 @@ pub fn audio_uri_content(
     uri: impl Into<String>,
     mime_type: impl Into<String>,
 ) -> InteractionContent {
-    InteractionContent::Audio {
-        data: None,
-        uri: Some(uri.into()),
-        mime_type: Some(mime_type.into()),
-    }
+    InteractionContent::new_audio_uri(uri, mime_type)
 }
 
-/// Creates video content from base64-encoded data
+/// Creates video content from base64-encoded data.
+///
+/// **Prefer:** [`InteractionContent::new_video_data()`] for new code.
 ///
 /// # Example
 /// ```
@@ -386,15 +343,12 @@ pub fn video_data_content(
     data: impl Into<String>,
     mime_type: impl Into<String>,
 ) -> InteractionContent {
-    InteractionContent::Video {
-        data: Some(data.into()),
-        uri: None,
-        mime_type: Some(mime_type.into()),
-        resolution: None,
-    }
+    InteractionContent::new_video_data(data, mime_type)
 }
 
-/// Creates video content from base64-encoded data with specified resolution
+/// Creates video content from base64-encoded data with specified resolution.
+///
+/// **Prefer:** [`InteractionContent::new_video_data_with_resolution()`] for new code.
 ///
 /// # Resolution Trade-offs
 ///
@@ -421,15 +375,12 @@ pub fn video_data_content_with_resolution(
     mime_type: impl Into<String>,
     resolution: Resolution,
 ) -> InteractionContent {
-    InteractionContent::Video {
-        data: Some(data.into()),
-        uri: None,
-        mime_type: Some(mime_type.into()),
-        resolution: Some(resolution),
-    }
+    InteractionContent::new_video_data_with_resolution(data, mime_type, resolution)
 }
 
-/// Creates video content from a URI
+/// Creates video content from a URI.
+///
+/// **Prefer:** [`InteractionContent::new_video_uri()`] for new code.
 ///
 /// # Arguments
 ///
@@ -449,15 +400,12 @@ pub fn video_uri_content(
     uri: impl Into<String>,
     mime_type: impl Into<String>,
 ) -> InteractionContent {
-    InteractionContent::Video {
-        data: None,
-        uri: Some(uri.into()),
-        mime_type: Some(mime_type.into()),
-        resolution: None,
-    }
+    InteractionContent::new_video_uri(uri, mime_type)
 }
 
-/// Creates video content from a URI with specified resolution
+/// Creates video content from a URI with specified resolution.
+///
+/// **Prefer:** [`InteractionContent::new_video_uri_with_resolution()`] for new code.
 ///
 /// # Arguments
 ///
@@ -481,15 +429,12 @@ pub fn video_uri_content_with_resolution(
     mime_type: impl Into<String>,
     resolution: Resolution,
 ) -> InteractionContent {
-    InteractionContent::Video {
-        data: None,
-        uri: Some(uri.into()),
-        mime_type: Some(mime_type.into()),
-        resolution: Some(resolution),
-    }
+    InteractionContent::new_video_uri_with_resolution(uri, mime_type, resolution)
 }
 
-/// Creates document content from base64-encoded data
+/// Creates document content from base64-encoded data.
+///
+/// **Prefer:** [`InteractionContent::new_document_data()`] for new code.
 ///
 /// Use this for PDF files and other document formats.
 ///
@@ -506,14 +451,12 @@ pub fn document_data_content(
     data: impl Into<String>,
     mime_type: impl Into<String>,
 ) -> InteractionContent {
-    InteractionContent::Document {
-        data: Some(data.into()),
-        uri: None,
-        mime_type: Some(mime_type.into()),
-    }
+    InteractionContent::new_document_data(data, mime_type)
 }
 
-/// Creates document content from a URI
+/// Creates document content from a URI.
+///
+/// **Prefer:** [`InteractionContent::new_document_uri()`] for new code.
 ///
 /// Use this for PDF files and other document formats accessible via URI.
 ///
@@ -535,14 +478,12 @@ pub fn document_uri_content(
     uri: impl Into<String>,
     mime_type: impl Into<String>,
 ) -> InteractionContent {
-    InteractionContent::Document {
-        data: None,
-        uri: Some(uri.into()),
-        mime_type: Some(mime_type.into()),
-    }
+    InteractionContent::new_document_uri(uri, mime_type)
 }
 
 /// Creates file content from a Files API URI.
+///
+/// **Prefer:** [`InteractionContent::from_file()`] for new code.
 ///
 /// Use this to reference files uploaded via the Files API. The content type
 /// is inferred from the file's MIME type (image, audio, video, or document).
@@ -573,11 +514,13 @@ pub fn document_uri_content(
 /// # Ok(())
 /// # }
 /// ```
-pub fn file_uri_content(file: &genai_client::FileMetadata) -> InteractionContent {
-    content_from_uri_and_mime(file.uri.clone(), file.mime_type.clone())
+pub fn file_uri_content(file: &crate::FileMetadata) -> InteractionContent {
+    InteractionContent::from_file(file)
 }
 
 /// Creates content from a URI and MIME type.
+///
+/// **Prefer:** [`InteractionContent::from_uri_and_mime()`] for new code.
 ///
 /// This is the shared implementation used by [`file_uri_content`] and
 /// [`crate::InteractionBuilder::with_file_uri`]. The content type is inferred
@@ -593,35 +536,7 @@ pub fn file_uri_content(file: &genai_client::FileMetadata) -> InteractionContent
 /// * `uri` - The file URI (typically from the Files API)
 /// * `mime_type` - The MIME type of the file
 pub fn content_from_uri_and_mime(uri: String, mime_type: String) -> InteractionContent {
-    // Choose the appropriate content type based on MIME type prefix
-    if mime_type.starts_with("image/") {
-        InteractionContent::Image {
-            data: None,
-            uri: Some(uri),
-            mime_type: Some(mime_type),
-            resolution: None,
-        }
-    } else if mime_type.starts_with("audio/") {
-        InteractionContent::Audio {
-            data: None,
-            uri: Some(uri),
-            mime_type: Some(mime_type),
-        }
-    } else if mime_type.starts_with("video/") {
-        InteractionContent::Video {
-            data: None,
-            uri: Some(uri),
-            mime_type: Some(mime_type),
-            resolution: None,
-        }
-    } else {
-        // Default to document for PDFs, text files, and other types
-        InteractionContent::Document {
-            data: None,
-            uri: Some(uri),
-            mime_type: Some(mime_type),
-        }
-    }
+    InteractionContent::from_uri_and_mime(uri, mime_type)
 }
 
 // ============================================================================
@@ -750,7 +665,7 @@ pub fn google_search_call_content(
 /// # Example
 /// ```
 /// use rust_genai::interactions_api::google_search_result_content;
-/// use genai_client::GoogleSearchResultItem;
+/// use rust_genai::GoogleSearchResultItem;
 ///
 /// let results = google_search_result_content("call-123", vec![
 ///     GoogleSearchResultItem::new("Rust", "https://rust-lang.org"),
@@ -777,7 +692,7 @@ pub fn google_search_result_content(
 /// # Example
 /// ```
 /// use rust_genai::interactions_api::file_search_result_content;
-/// use genai_client::FileSearchResultItem;
+/// use rust_genai::FileSearchResultItem;
 ///
 /// let results = file_search_result_content("call-123", vec![
 ///     FileSearchResultItem {
@@ -1272,7 +1187,7 @@ mod tests {
 
     #[test]
     fn test_google_search_result_content() {
-        use genai_client::GoogleSearchResultItem;
+        use crate::GoogleSearchResultItem;
         let result = vec![GoogleSearchResultItem::new("Rust", "https://rust-lang.org")];
         let content = google_search_result_content("call123", result.clone());
         match content {

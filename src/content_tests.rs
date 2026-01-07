@@ -1715,3 +1715,512 @@ fn test_file_search_result_item_default() {
     assert!(item.text.is_empty());
     assert!(item.store.is_empty());
 }
+
+// =============================================================================
+// Content Constructor Tests (new_*() methods)
+// =============================================================================
+
+#[test]
+fn test_new_text_creates_correct_variant() {
+    let content = InteractionContent::new_text("Hello world");
+    match &content {
+        InteractionContent::Text { text, annotations } => {
+            assert_eq!(*text, Some("Hello world".to_string()));
+            assert!(annotations.is_none());
+        }
+        _ => panic!("Expected Text variant"),
+    }
+    assert!(content.is_text());
+    assert_eq!(content.text(), Some("Hello world"));
+}
+
+#[test]
+fn test_new_text_with_empty_string() {
+    let content = InteractionContent::new_text("");
+    match &content {
+        InteractionContent::Text { text, .. } => {
+            assert_eq!(*text, Some(String::new()));
+        }
+        _ => panic!("Expected Text variant"),
+    }
+    // Empty string returns None from text() accessor
+    assert_eq!(content.text(), None);
+}
+
+#[test]
+fn test_new_thought_creates_correct_variant() {
+    let content = InteractionContent::new_thought("I need to search for weather data");
+    match &content {
+        InteractionContent::Thought { text } => {
+            assert_eq!(*text, Some("I need to search for weather data".to_string()));
+        }
+        _ => panic!("Expected Thought variant"),
+    }
+    assert!(content.is_thought());
+    assert_eq!(content.thought(), Some("I need to search for weather data"));
+}
+
+#[test]
+fn test_new_thought_with_empty_string() {
+    let content = InteractionContent::new_thought("");
+    match &content {
+        InteractionContent::Thought { text } => {
+            assert_eq!(*text, Some(String::new()));
+        }
+        _ => panic!("Expected Thought variant"),
+    }
+    // Empty string returns None from thought() accessor (same as text())
+    assert_eq!(content.thought(), None);
+}
+
+#[test]
+fn test_new_function_call_creates_correct_variant() {
+    let content =
+        InteractionContent::new_function_call("get_weather", serde_json::json!({"location": "SF"}));
+    match &content {
+        InteractionContent::FunctionCall {
+            id,
+            name,
+            args,
+            thought_signature,
+        } => {
+            assert!(id.is_none());
+            assert_eq!(name, "get_weather");
+            assert_eq!(args["location"], "SF");
+            assert!(thought_signature.is_none());
+        }
+        _ => panic!("Expected FunctionCall variant"),
+    }
+    assert!(content.is_function_call());
+}
+
+#[test]
+fn test_new_function_call_with_signature_creates_correct_variant() {
+    let content = InteractionContent::new_function_call_with_signature(
+        Some("call_123"),
+        "get_weather",
+        serde_json::json!({"location": "San Francisco"}),
+        Some("encrypted_signature_token".to_string()),
+    );
+    match content {
+        InteractionContent::FunctionCall {
+            id,
+            name,
+            args,
+            thought_signature,
+        } => {
+            assert_eq!(id, Some("call_123".to_string()));
+            assert_eq!(name, "get_weather");
+            assert_eq!(args["location"], "San Francisco");
+            assert_eq!(
+                thought_signature,
+                Some("encrypted_signature_token".to_string())
+            );
+        }
+        _ => panic!("Expected FunctionCall variant"),
+    }
+}
+
+#[test]
+fn test_new_function_call_with_signature_none_id() {
+    let content = InteractionContent::new_function_call_with_signature(
+        None::<String>,
+        "my_func",
+        serde_json::json!({}),
+        None,
+    );
+    match content {
+        InteractionContent::FunctionCall { id, name, .. } => {
+            assert!(id.is_none());
+            assert_eq!(name, "my_func");
+        }
+        _ => panic!("Expected FunctionCall variant"),
+    }
+}
+
+#[test]
+fn test_new_function_result_creates_correct_variant() {
+    let content = InteractionContent::new_function_result(
+        "get_weather",
+        "call_abc123",
+        serde_json::json!({"temperature": "72F", "conditions": "sunny"}),
+    );
+    match content {
+        InteractionContent::FunctionResult {
+            name,
+            call_id,
+            result,
+        } => {
+            assert_eq!(name, "get_weather");
+            assert_eq!(call_id, "call_abc123");
+            assert_eq!(result["temperature"], "72F");
+            assert_eq!(result["conditions"], "sunny");
+        }
+        _ => panic!("Expected FunctionResult variant"),
+    }
+}
+
+#[test]
+fn test_new_image_data_creates_correct_variant() {
+    let content = InteractionContent::new_image_data("base64encodeddata", "image/png");
+    match content {
+        InteractionContent::Image {
+            data,
+            uri,
+            mime_type,
+            resolution,
+        } => {
+            assert_eq!(data, Some("base64encodeddata".to_string()));
+            assert!(uri.is_none());
+            assert_eq!(mime_type, Some("image/png".to_string()));
+            assert!(resolution.is_none());
+        }
+        _ => panic!("Expected Image variant"),
+    }
+}
+
+#[test]
+fn test_new_image_data_with_resolution_creates_correct_variant() {
+    let content = InteractionContent::new_image_data_with_resolution(
+        "base64encodeddata",
+        "image/png",
+        Resolution::High,
+    );
+    match content {
+        InteractionContent::Image {
+            data,
+            uri,
+            mime_type,
+            resolution,
+        } => {
+            assert_eq!(data, Some("base64encodeddata".to_string()));
+            assert!(uri.is_none());
+            assert_eq!(mime_type, Some("image/png".to_string()));
+            assert_eq!(resolution, Some(Resolution::High));
+        }
+        _ => panic!("Expected Image variant"),
+    }
+}
+
+#[test]
+fn test_new_image_uri_creates_correct_variant() {
+    let content = InteractionContent::new_image_uri("https://example.com/image.png", "image/png");
+    match content {
+        InteractionContent::Image {
+            data,
+            uri,
+            mime_type,
+            resolution,
+        } => {
+            assert!(data.is_none());
+            assert_eq!(uri, Some("https://example.com/image.png".to_string()));
+            assert_eq!(mime_type, Some("image/png".to_string()));
+            assert!(resolution.is_none());
+        }
+        _ => panic!("Expected Image variant"),
+    }
+}
+
+#[test]
+fn test_new_image_uri_with_resolution_creates_correct_variant() {
+    let content = InteractionContent::new_image_uri_with_resolution(
+        "https://example.com/image.png",
+        "image/png",
+        Resolution::Low,
+    );
+    match content {
+        InteractionContent::Image {
+            data,
+            uri,
+            resolution,
+            ..
+        } => {
+            assert!(data.is_none());
+            assert_eq!(uri, Some("https://example.com/image.png".to_string()));
+            assert_eq!(resolution, Some(Resolution::Low));
+        }
+        _ => panic!("Expected Image variant"),
+    }
+}
+
+#[test]
+fn test_new_audio_data_creates_correct_variant() {
+    let content = InteractionContent::new_audio_data("base64audiodata", "audio/mp3");
+    match content {
+        InteractionContent::Audio {
+            data,
+            uri,
+            mime_type,
+        } => {
+            assert_eq!(data, Some("base64audiodata".to_string()));
+            assert!(uri.is_none());
+            assert_eq!(mime_type, Some("audio/mp3".to_string()));
+        }
+        _ => panic!("Expected Audio variant"),
+    }
+}
+
+#[test]
+fn test_new_audio_uri_creates_correct_variant() {
+    let content = InteractionContent::new_audio_uri("https://example.com/audio.mp3", "audio/mp3");
+    match content {
+        InteractionContent::Audio {
+            data,
+            uri,
+            mime_type,
+        } => {
+            assert!(data.is_none());
+            assert_eq!(uri, Some("https://example.com/audio.mp3".to_string()));
+            assert_eq!(mime_type, Some("audio/mp3".to_string()));
+        }
+        _ => panic!("Expected Audio variant"),
+    }
+}
+
+#[test]
+fn test_new_video_data_creates_correct_variant() {
+    let content = InteractionContent::new_video_data("base64videodata", "video/mp4");
+    match content {
+        InteractionContent::Video {
+            data,
+            uri,
+            mime_type,
+            resolution,
+        } => {
+            assert_eq!(data, Some("base64videodata".to_string()));
+            assert!(uri.is_none());
+            assert_eq!(mime_type, Some("video/mp4".to_string()));
+            assert!(resolution.is_none());
+        }
+        _ => panic!("Expected Video variant"),
+    }
+}
+
+#[test]
+fn test_new_video_data_with_resolution_creates_correct_variant() {
+    let content = InteractionContent::new_video_data_with_resolution(
+        "base64videodata",
+        "video/mp4",
+        Resolution::Low,
+    );
+    match content {
+        InteractionContent::Video {
+            data, resolution, ..
+        } => {
+            assert_eq!(data, Some("base64videodata".to_string()));
+            assert_eq!(resolution, Some(Resolution::Low));
+        }
+        _ => panic!("Expected Video variant"),
+    }
+}
+
+#[test]
+fn test_new_video_uri_creates_correct_variant() {
+    let content = InteractionContent::new_video_uri("https://example.com/video.mp4", "video/mp4");
+    match content {
+        InteractionContent::Video {
+            data,
+            uri,
+            mime_type,
+            resolution,
+        } => {
+            assert!(data.is_none());
+            assert_eq!(uri, Some("https://example.com/video.mp4".to_string()));
+            assert_eq!(mime_type, Some("video/mp4".to_string()));
+            assert!(resolution.is_none());
+        }
+        _ => panic!("Expected Video variant"),
+    }
+}
+
+#[test]
+fn test_new_video_uri_with_resolution_creates_correct_variant() {
+    let content = InteractionContent::new_video_uri_with_resolution(
+        "https://example.com/video.mp4",
+        "video/mp4",
+        Resolution::Medium,
+    );
+    match content {
+        InteractionContent::Video {
+            uri, resolution, ..
+        } => {
+            assert_eq!(uri, Some("https://example.com/video.mp4".to_string()));
+            assert_eq!(resolution, Some(Resolution::Medium));
+        }
+        _ => panic!("Expected Video variant"),
+    }
+}
+
+#[test]
+fn test_new_document_data_creates_correct_variant() {
+    let content = InteractionContent::new_document_data("base64pdfdata", "application/pdf");
+    match content {
+        InteractionContent::Document {
+            data,
+            uri,
+            mime_type,
+        } => {
+            assert_eq!(data, Some("base64pdfdata".to_string()));
+            assert!(uri.is_none());
+            assert_eq!(mime_type, Some("application/pdf".to_string()));
+        }
+        _ => panic!("Expected Document variant"),
+    }
+}
+
+#[test]
+fn test_new_document_uri_creates_correct_variant() {
+    let content =
+        InteractionContent::new_document_uri("https://example.com/doc.pdf", "application/pdf");
+    match content {
+        InteractionContent::Document {
+            data,
+            uri,
+            mime_type,
+        } => {
+            assert!(data.is_none());
+            assert_eq!(uri, Some("https://example.com/doc.pdf".to_string()));
+            assert_eq!(mime_type, Some("application/pdf".to_string()));
+        }
+        _ => panic!("Expected Document variant"),
+    }
+}
+
+#[test]
+fn test_from_uri_and_mime_infers_image() {
+    let content = InteractionContent::from_uri_and_mime("files/abc123", "image/png");
+    match content {
+        InteractionContent::Image { uri, mime_type, .. } => {
+            assert_eq!(uri, Some("files/abc123".to_string()));
+            assert_eq!(mime_type, Some("image/png".to_string()));
+        }
+        _ => panic!("Expected Image variant for image/* MIME type"),
+    }
+}
+
+#[test]
+fn test_from_uri_and_mime_infers_audio() {
+    let content = InteractionContent::from_uri_and_mime("files/abc123", "audio/wav");
+    match content {
+        InteractionContent::Audio { uri, mime_type, .. } => {
+            assert_eq!(uri, Some("files/abc123".to_string()));
+            assert_eq!(mime_type, Some("audio/wav".to_string()));
+        }
+        _ => panic!("Expected Audio variant for audio/* MIME type"),
+    }
+}
+
+#[test]
+fn test_from_uri_and_mime_infers_video() {
+    let content = InteractionContent::from_uri_and_mime("files/abc123", "video/webm");
+    match content {
+        InteractionContent::Video { uri, mime_type, .. } => {
+            assert_eq!(uri, Some("files/abc123".to_string()));
+            assert_eq!(mime_type, Some("video/webm".to_string()));
+        }
+        _ => panic!("Expected Video variant for video/* MIME type"),
+    }
+}
+
+#[test]
+fn test_from_uri_and_mime_infers_document_for_pdf() {
+    let content = InteractionContent::from_uri_and_mime("files/abc123", "application/pdf");
+    match content {
+        InteractionContent::Document { uri, mime_type, .. } => {
+            assert_eq!(uri, Some("files/abc123".to_string()));
+            assert_eq!(mime_type, Some("application/pdf".to_string()));
+        }
+        _ => panic!("Expected Document variant for application/pdf MIME type"),
+    }
+}
+
+#[test]
+fn test_from_uri_and_mime_infers_document_for_text() {
+    let content = InteractionContent::from_uri_and_mime("files/abc123", "text/plain");
+    match content {
+        InteractionContent::Document { uri, mime_type, .. } => {
+            assert_eq!(uri, Some("files/abc123".to_string()));
+            assert_eq!(mime_type, Some("text/plain".to_string()));
+        }
+        _ => panic!("Expected Document variant for text/* MIME type"),
+    }
+}
+
+#[test]
+fn test_constructors_accept_string_types() {
+    // Test that constructors work with various string types via Into<String>
+    let text1 = InteractionContent::new_text(String::from("owned string"));
+    assert_eq!(text1.text(), Some("owned string"));
+
+    let text2 = InteractionContent::new_text("&str literal");
+    assert_eq!(text2.text(), Some("&str literal"));
+
+    // Cow, Box<str>, etc. would also work via Into<String>
+}
+
+#[test]
+fn test_constructor_serialization_roundtrip() {
+    // Test that content created via constructors serializes correctly
+    let content = InteractionContent::new_text("Test message");
+    let json = serde_json::to_string(&content).expect("Should serialize");
+    let deserialized: InteractionContent = serde_json::from_str(&json).expect("Should deserialize");
+    assert_eq!(deserialized.text(), Some("Test message"));
+
+    let image =
+        InteractionContent::new_image_data_with_resolution("data", "image/png", Resolution::High);
+    let json = serde_json::to_string(&image).expect("Should serialize");
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(value["type"], "image");
+    assert_eq!(value["data"], "data");
+    assert_eq!(value["resolution"], "high");
+}
+
+// =============================================================================
+// Annotation Constructor Tests
+// =============================================================================
+
+#[test]
+fn test_annotation_new_constructor() {
+    let annotation = Annotation::new(0, 10, Some("https://example.com".to_string()));
+    assert_eq!(annotation.start_index, 0);
+    assert_eq!(annotation.end_index, 10);
+    assert!(annotation.has_source());
+    assert_eq!(annotation.source, Some("https://example.com".to_string()));
+}
+
+#[test]
+fn test_annotation_new_without_source() {
+    let annotation = Annotation::new(5, 15, None);
+    assert_eq!(annotation.start_index, 5);
+    assert_eq!(annotation.end_index, 15);
+    assert!(!annotation.has_source());
+    assert!(annotation.source.is_none());
+}
+
+// =============================================================================
+// GoogleSearchResultItem / FileSearchResultItem Constructor Tests
+// =============================================================================
+
+#[test]
+fn test_google_search_result_item_new() {
+    let item = GoogleSearchResultItem::new("Rust Lang", "https://rust-lang.org");
+    assert_eq!(item.title, "Rust Lang");
+    assert_eq!(item.url, "https://rust-lang.org");
+    assert!(!item.has_rendered_content());
+    assert!(item.rendered_content.is_none());
+}
+
+#[test]
+fn test_file_search_result_item_new() {
+    let item = FileSearchResultItem::new("Document Title", "Extracted text content", "my-store");
+    assert_eq!(item.title, "Document Title");
+    assert_eq!(item.text, "Extracted text content");
+    assert_eq!(item.store, "my-store");
+    assert!(item.has_text());
+}
+
+#[test]
+fn test_file_search_result_item_has_text_empty() {
+    let item = FileSearchResultItem::new("Title", "", "store");
+    assert!(!item.has_text());
+}

@@ -24,7 +24,7 @@
 //! a "model not found" error, your API key may not have access to the
 //! image generation model in your region.
 
-use rust_genai::{Client, GenaiError, InteractionResponseExt, InteractionStatus};
+use rust_genai::{Client, GenaiError, InteractionStatus};
 use std::env;
 use std::path::PathBuf;
 
@@ -77,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Status: {:?}", response.status);
 
             if response.status == InteractionStatus::Completed {
-                // New simplified image extraction using InteractionResponseExt
+                // Extract generated image
                 if let Some(bytes) = response.first_image_bytes()? {
                     let path = save_image(&bytes, "png", "birman_cat", 1)?;
                     println!("\n  Image saved!");

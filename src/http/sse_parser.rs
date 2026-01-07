@@ -2,9 +2,9 @@
 ///
 /// This module provides generic utilities for parsing SSE streams from the Gemini API.
 /// SSE format consists of lines starting with "data: " followed by JSON payloads.
-use crate::error_helpers::format_json_parse_error;
+use super::error_helpers::format_json_parse_error;
+use super::loud_wire;
 use crate::errors::GenaiError;
-use crate::loud_wire;
 use async_stream::try_stream;
 use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
