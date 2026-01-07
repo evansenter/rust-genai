@@ -1703,7 +1703,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// ```
     ///
     /// Use this when you want the model to generate speech audio. Requires a model
-    /// that supports text-to-speech (e.g., `gemini-2.5-flash-preview-tts`).
+    /// that supports text-to-speech (e.g., `gemini-2.5-pro-preview-tts`).
     ///
     /// For voice customization, chain with [`with_speech_config`](Self::with_speech_config)
     /// or [`with_voice`](Self::with_voice).
@@ -1719,7 +1719,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// let response = client
     ///     .interaction()
-    ///     .with_model("gemini-2.5-flash-preview-tts")
+    ///     .with_model("gemini-2.5-pro-preview-tts")
     ///     .with_text("Hello, world! Welcome to text-to-speech.")
     ///     .with_audio_output()
     ///     .with_voice("Kore")
@@ -1761,7 +1761,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// let response = client
     ///     .interaction()
-    ///     .with_model("gemini-2.5-flash-preview-tts")
+    ///     .with_model("gemini-2.5-pro-preview-tts")
     ///     .with_text("Hello from Puck!")
     ///     .with_audio_output()
     ///     .with_speech_config(config)
@@ -1798,7 +1798,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// let response = client
     ///     .interaction()
-    ///     .with_model("gemini-2.5-flash-preview-tts")
+    ///     .with_model("gemini-2.5-pro-preview-tts")
     ///     .with_text("Hello, world!")
     ///     .with_audio_output()
     ///     .with_voice("Kore")
