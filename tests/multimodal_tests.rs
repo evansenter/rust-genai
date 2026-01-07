@@ -20,10 +20,10 @@ mod common;
 
 use base64::Engine;
 use common::{
-    SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TEST_TIMEOUT, TINY_BLUE_PNG_BASE64,
-    TINY_MP4_BASE64, TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, consume_stream,
-    get_client, interaction_builder, stateful_builder, validate_response_semantically,
-    with_timeout,
+    EXTENDED_TEST_TIMEOUT, SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TEST_TIMEOUT,
+    TINY_BLUE_PNG_BASE64, TINY_MP4_BASE64, TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64,
+    consume_stream, get_client, interaction_builder, stateful_builder,
+    validate_response_semantically, with_timeout,
 };
 use rust_genai::{
     InteractionInput, InteractionStatus, audio_data_content, audio_uri_content,
@@ -1133,7 +1133,8 @@ async fn test_text_to_speech_basic() {
     // TTS requires a specific model
     let tts_model = "gemini-2.5-flash-preview-tts";
 
-    with_timeout(TEST_TIMEOUT, async {
+    // TTS can be slow - use extended timeout
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
         let response = client
             .interaction()
             .with_model(tts_model)
@@ -1178,7 +1179,8 @@ async fn test_text_to_speech_with_speech_config() {
 
     let tts_model = "gemini-2.5-flash-preview-tts";
 
-    with_timeout(TEST_TIMEOUT, async {
+    // TTS can be slow - use extended timeout
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
         let config = SpeechConfig {
             voice: Some("Puck".to_string()),
             language: Some("en-US".to_string()),
