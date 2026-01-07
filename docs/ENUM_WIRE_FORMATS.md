@@ -16,6 +16,8 @@ This document captures the actual wire formats for enums in the Gemini Interacti
 | `Tool::ComputerUse` | snake_case | `"computer_use"` | **UNVERIFIED** - from docs |
 | `InteractionContent::ComputerUseCall` | snake_case | `"computer_use_call"` | **UNVERIFIED** - from docs |
 | `InteractionContent::ComputerUseResult` | snake_case | `"computer_use_result"` | **UNVERIFIED** - from docs |
+| `SpeechConfig` | camelCase fields | `{"voice": "Kore", "language": "en-US"}` | Inside generationConfig |
+| Audio MIME type (TTS response) | with params | `"audio/L16;codec=pcm;rate=24000"` | Raw PCM audio |
 
 ## Details
 
@@ -210,6 +212,59 @@ Content types (assumed):
 | `InteractionContent::ComputerUseResult` | `"computer_use_result"` | Content type |
 
 **TODO**: Verify with `LOUD_WIRE=1 cargo run --example computer_use` when API access is available.
+
+### SpeechConfig (generation_config)
+
+Used in `generationConfig.speechConfig` for text-to-speech audio output.
+
+```json
+{
+  "model": "gemini-2.5-flash-preview-tts",
+  "input": "Hello, world!",
+  "generationConfig": {
+    "responseModalities": ["AUDIO"],
+    "speechConfig": {
+      "voice": "Kore",
+      "language": "en-US"
+    }
+  }
+}
+```
+
+| Rust Field | Wire Name | Required | Notes |
+|------------|-----------|----------|-------|
+| `voice` | `voice` | No* | Voice name (e.g., "Kore", "Puck", "Charon") |
+| `language` | `language` | Yes** | Language code (e.g., "en-US", "es-ES") |
+| `speaker` | `speaker` | No | For multi-speaker TTS scenarios |
+
+*Voice defaults to a system voice if not specified.
+**Language is required by the API when voice is specified.
+
+**Note**: The Google docs suggest a nested structure (`voiceConfig.prebuiltVoiceConfig.voiceName`) but the simpler flat structure shown above works correctly with the TTS model.
+
+**Verified**: 2026-01-07 - Tested with `LOUD_WIRE=1 cargo run --example text_to_speech`.
+
+### Audio Response (TTS output)
+
+TTS responses return audio content with a specific MIME type:
+
+```json
+{
+  "outputs": [{
+    "type": "audio",
+    "data": "base64-encoded-pcm-data...",
+    "mime_type": "audio/L16;codec=pcm;rate=24000"
+  }]
+}
+```
+
+| MIME Type | Format | Notes |
+|-----------|--------|-------|
+| `audio/L16;codec=pcm;rate=24000` | Raw PCM | 16-bit linear PCM at 24kHz |
+
+The `AudioInfo::extension()` method maps this to `"pcm"` for file saving.
+
+**Verified**: 2026-01-07 - Response format captured from live TTS generation.
 
 ## Testing New Enums
 
