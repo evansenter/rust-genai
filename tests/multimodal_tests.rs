@@ -20,10 +20,10 @@ mod common;
 
 use base64::Engine;
 use common::{
-    SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TEST_TIMEOUT, TINY_BLUE_PNG_BASE64,
-    TINY_MP4_BASE64, TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, consume_stream,
-    get_client, interaction_builder, stateful_builder, validate_response_semantically,
-    with_timeout,
+    EXTENDED_TEST_TIMEOUT, SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TEST_TIMEOUT,
+    TINY_BLUE_PNG_BASE64, TINY_MP4_BASE64, TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64,
+    consume_stream, get_client, interaction_builder, stateful_builder,
+    validate_response_semantically, with_timeout,
 };
 use rust_genai::{
     InteractionInput, InteractionStatus, audio_data_content, audio_uri_content,
@@ -1115,4 +1115,96 @@ async fn test_add_document_bytes_roundtrip() {
             println!("PDF bytes error (may be expected for minimal PDF): {:?}", e);
         }
     }
+}
+
+// =============================================================================
+// Text-to-Speech Output Tests
+// =============================================================================
+
+/// Tests basic text-to-speech audio output
+#[tokio::test]
+#[ignore = "Requires API key and TTS model access"]
+async fn test_text_to_speech_basic() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    // TTS requires a specific model
+    let tts_model = "gemini-2.5-flash-preview-tts";
+
+    // TTS can be slow - use extended timeout
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        let response = client
+            .interaction()
+            .with_model(tts_model)
+            .with_text("Hello, world!")
+            .with_audio_output()
+            .with_voice("Kore")
+            .create()
+            .await;
+
+        match response {
+            Ok(r) => {
+                println!("TTS response status: {:?}", r.status);
+                assert!(r.has_audio(), "Response should contain audio output");
+
+                if let Some(audio) = r.first_audio() {
+                    let bytes = audio.bytes().expect("Should decode audio");
+                    println!("Audio size: {} bytes", bytes.len());
+                    println!("Audio MIME type: {:?}", audio.mime_type());
+                    println!("Audio extension: {}", audio.extension());
+                    assert!(!bytes.is_empty(), "Audio should not be empty");
+                }
+            }
+            Err(e) => {
+                // TTS model might not be available in all regions
+                println!("TTS test error (may be expected): {:?}", e);
+            }
+        }
+    })
+    .await;
+}
+
+/// Tests text-to-speech with speech configuration
+#[tokio::test]
+#[ignore = "Requires API key and TTS model access"]
+async fn test_text_to_speech_with_speech_config() {
+    use rust_genai::SpeechConfig;
+
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let tts_model = "gemini-2.5-flash-preview-tts";
+
+    // TTS can be slow - use extended timeout
+    with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        let config = SpeechConfig {
+            voice: Some("Puck".to_string()),
+            language: Some("en-US".to_string()),
+            speaker: None,
+        };
+
+        let response = client
+            .interaction()
+            .with_model(tts_model)
+            .with_text("Testing speech configuration.")
+            .with_audio_output()
+            .with_speech_config(config)
+            .create()
+            .await;
+
+        match response {
+            Ok(r) => {
+                println!("TTS with config status: {:?}", r.status);
+                assert!(r.has_audio(), "Response should contain audio output");
+            }
+            Err(e) => {
+                println!("TTS with config error (may be expected): {:?}", e);
+            }
+        }
+    })
+    .await;
 }

@@ -2816,3 +2816,253 @@ fn test_images_iterator_empty_outputs() {
     let images: Vec<_> = response.images().collect();
     assert!(images.is_empty());
 }
+
+// ============================================================================
+// AudioInfo Tests
+// ============================================================================
+
+#[test]
+fn test_audios_iterator_returns_only_audios_with_data() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-2.5-flash-preview-tts".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::Text {
+                text: Some("Text content".to_string()),
+                annotations: None,
+            },
+            InteractionContent::Audio {
+                data: Some("YWJj".to_string()), // Has data - should be included
+                uri: None,
+                mime_type: Some("audio/L16;codec=pcm;rate=24000".to_string()),
+            },
+            InteractionContent::Audio {
+                data: None, // No data - URI-based audio, should be excluded
+                uri: Some("https://example.com/audio.mp3".to_string()),
+                mime_type: Some("audio/mp3".to_string()),
+            },
+            InteractionContent::Audio {
+                data: Some("ZGVm".to_string()), // Has data - should be included
+                uri: None,
+                mime_type: Some("audio/wav".to_string()),
+            },
+            InteractionContent::FunctionCall {
+                id: None,
+                name: "test".to_string(),
+                args: serde_json::json!({}),
+                thought_signature: None,
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let audios: Vec<_> = response.audios().collect();
+    // Only 2 audios with data should be included, not the URI-based one
+    assert_eq!(audios.len(), 2);
+    assert_eq!(
+        audios[0].mime_type(),
+        Some("audio/L16;codec=pcm;rate=24000")
+    );
+    assert_eq!(audios[1].mime_type(), Some("audio/wav"));
+}
+
+#[test]
+fn test_audios_iterator_empty_when_no_audios() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::Text {
+                text: Some("Just text".to_string()),
+                annotations: None,
+            },
+            InteractionContent::Thought {
+                text: Some("Just a thought".to_string()),
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let audios: Vec<_> = response.audios().collect();
+    assert!(audios.is_empty());
+}
+
+#[test]
+fn test_audios_iterator_empty_outputs() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-2.5-flash-preview-tts".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let audios: Vec<_> = response.audios().collect();
+    assert!(audios.is_empty());
+}
+
+#[test]
+fn test_first_audio() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-2.5-flash-preview-tts".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            InteractionContent::Text {
+                text: Some("Hello".to_string()),
+                annotations: None,
+            },
+            InteractionContent::Audio {
+                data: Some("Zmlyc3Q=".to_string()),
+                uri: None,
+                mime_type: Some("audio/L16;codec=pcm;rate=24000".to_string()),
+            },
+            InteractionContent::Audio {
+                data: Some("c2Vjb25k".to_string()),
+                uri: None,
+                mime_type: Some("audio/wav".to_string()),
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let first = response.first_audio();
+    assert!(first.is_some());
+    let audio = first.unwrap();
+    assert_eq!(audio.mime_type(), Some("audio/L16;codec=pcm;rate=24000"));
+    assert_eq!(audio.extension(), "pcm");
+}
+
+#[test]
+fn test_first_audio_none_when_empty() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("No audio here".to_string()),
+            annotations: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    assert!(response.first_audio().is_none());
+}
+
+#[test]
+fn test_has_audio_true() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-2.5-flash-preview-tts".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Audio {
+            data: Some("YXVkaW8=".to_string()),
+            uri: None,
+            mime_type: Some("audio/L16;codec=pcm;rate=24000".to_string()),
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    assert!(response.has_audio());
+}
+
+#[test]
+fn test_has_audio_false_when_no_audio() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Text {
+            text: Some("Text only".to_string()),
+            annotations: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    assert!(!response.has_audio());
+}
+
+#[test]
+fn test_has_audio_false_when_uri_only() {
+    // URI-based audio (no data) should not count as "having audio"
+    // since the audios() iterator only includes data-based audio
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-2.5-flash-preview-tts".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![InteractionContent::Audio {
+            data: None,
+            uri: Some("https://example.com/audio.mp3".to_string()),
+            mime_type: Some("audio/mp3".to_string()),
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    assert!(!response.has_audio());
+}
