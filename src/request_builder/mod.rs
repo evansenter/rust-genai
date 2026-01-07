@@ -1776,7 +1776,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         self
     }
 
-    /// Sets the voice for text-to-speech output.
+    /// Sets the voice for text-to-speech output (defaults to en-US language).
     ///
     /// This is a convenience method that sets the voice with a default language of "en-US".
     /// For other languages, use [`with_speech_config`](Self::with_speech_config).

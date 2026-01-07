@@ -2944,6 +2944,9 @@ mod tests {
         check(Some("audio/flac"), "flac");
         check(Some("audio/aac"), "aac");
         check(Some("audio/webm"), "webm");
+        // PCM/L16 format from TTS API
+        check(Some("audio/L16;codec=pcm;rate=24000"), "pcm");
+        check(Some("audio/L16"), "pcm");
         check(Some("audio/unknown"), "wav"); // default
         check(None, "wav"); // default
     }

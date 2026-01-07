@@ -3,3 +3,8 @@
 .DS_Store
 .parallel-context.md
 .worktrees/
+
+# Generated audio files from examples
+*.pcm
+*.wav
+output_*.pcm
