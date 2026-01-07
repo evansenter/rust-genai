@@ -512,6 +512,76 @@ pub struct GenerationConfig {
     /// - `Validated`: Ensures schema adherence for both function calls and natural language
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<FunctionCallingMode>,
+    /// Speech configuration for text-to-speech audio output.
+    ///
+    /// Required when using `AUDIO` response modality.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speech_config: Option<SpeechConfig>,
+}
+
+/// Speech configuration for text-to-speech audio output.
+///
+/// Configure voice, language, and speaker settings when using `AUDIO` response modality.
+///
+/// # Example
+///
+/// ```
+/// use rust_genai::SpeechConfig;
+///
+/// let config = SpeechConfig {
+///     voice: Some("Kore".to_string()),
+///     language: Some("en-US".to_string()),
+///     speaker: None,
+/// };
+/// ```
+///
+/// # Available Voices
+///
+/// Common voices include: Aoede, Charon, Fenrir, Kore, Puck, and others.
+/// See [Google's TTS documentation](https://ai.google.dev/gemini-api/docs/text-generation)
+/// for the full list of available voices.
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SpeechConfig {
+    /// The voice to use for speech synthesis.
+    ///
+    /// Examples: "Kore", "Puck", "Charon", "Fenrir", "Aoede"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub voice: Option<String>,
+
+    /// The language/locale for speech synthesis.
+    ///
+    /// Examples: "en-US", "es-ES", "fr-FR"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+
+    /// The speaker name for multi-speaker scenarios.
+    ///
+    /// Should match a speaker name given in the prompt when using
+    /// multi-speaker text-to-speech.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speaker: Option<String>,
+}
+
+impl SpeechConfig {
+    /// Creates a new `SpeechConfig` with the specified voice.
+    #[must_use]
+    pub fn with_voice(voice: impl Into<String>) -> Self {
+        Self {
+            voice: Some(voice.into()),
+            ..Default::default()
+        }
+    }
+
+    /// Creates a new `SpeechConfig` with the specified voice and language.
+    #[must_use]
+    pub fn with_voice_and_language(voice: impl Into<String>, language: impl Into<String>) -> Self {
+        Self {
+            voice: Some(voice.into()),
+            language: Some(language.into()),
+            ..Default::default()
+        }
+    }
 }
 
 /// Request body for the Interactions API endpoint

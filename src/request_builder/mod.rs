@@ -14,8 +14,8 @@ use std::time::Duration;
 use crate::{
     AgentConfig, CreateInteractionRequest, DeepResearchConfig, FunctionCallingMode,
     FunctionDeclaration, GenerationConfig, InteractionContent, InteractionInput,
-    InteractionResponse, Resolution, Role, StreamEvent, ThinkingLevel, ThinkingSummaries,
-    Tool as InternalTool, Turn, TurnContent,
+    InteractionResponse, Resolution, Role, SpeechConfig, StreamEvent, ThinkingLevel,
+    ThinkingSummaries, Tool as InternalTool, Turn, TurnContent,
 };
 use futures_util::{StreamExt, stream::BoxStream};
 
@@ -164,6 +164,7 @@ pub struct InteractionBuilder<'a, State = FirstTurn> {
     response_format: Option<serde_json::Value>,
     response_mime_type: Option<String>,
     generation_config: Option<GenerationConfig>,
+    speech_config: Option<SpeechConfig>,
     background: Option<bool>,
     store: Option<bool>,
     system_instruction: Option<InteractionInput>,
@@ -190,6 +191,7 @@ impl<State> std::fmt::Debug for InteractionBuilder<'_, State> {
             .field("response_format", &self.response_format)
             .field("response_mime_type", &self.response_mime_type)
             .field("generation_config", &self.generation_config)
+            .field("speech_config", &self.speech_config)
             .field("background", &self.background)
             .field("store", &self.store)
             .field("system_instruction", &self.system_instruction)
@@ -219,6 +221,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             response_format: None,
             response_mime_type: None,
             generation_config: None,
+            speech_config: None,
             background: None,
             store: None,
             system_instruction: None,
@@ -256,6 +259,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             response_format: self.response_format,
             response_mime_type: self.response_mime_type,
             generation_config: self.generation_config,
+            speech_config: self.speech_config,
             background: self.background,
             store: self.store,
             system_instruction: self.system_instruction,
@@ -304,6 +308,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             response_format: self.response_format,
             response_mime_type: self.response_mime_type,
             generation_config: self.generation_config,
+            speech_config: self.speech_config,
             background: None, // Reset - can't be true with store disabled
             store: Some(false),
             system_instruction: self.system_instruction,
@@ -1690,6 +1695,124 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         self.with_response_modalities(vec!["IMAGE".to_string()])
     }
 
+    /// Configures the request to return audio output.
+    ///
+    /// This is a convenience method equivalent to:
+    /// ```ignore
+    /// .with_response_modalities(vec!["AUDIO".to_string()])
+    /// ```
+    ///
+    /// Use this when you want the model to generate speech audio. Requires a model
+    /// that supports text-to-speech (e.g., `gemini-2.5-flash-preview-tts`).
+    ///
+    /// For voice customization, chain with [`with_speech_config`](Self::with_speech_config)
+    /// or [`with_voice`](Self::with_voice).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-2.5-flash-preview-tts")
+    ///     .with_text("Hello, world! Welcome to text-to-speech.")
+    ///     .with_audio_output()
+    ///     .with_voice("Kore")
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // Extract generated audio using the helper methods
+    /// if let Some(audio) = response.first_audio() {
+    ///     let bytes = audio.bytes()?;
+    ///     std::fs::write("speech.wav", &bytes)?;
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn with_audio_output(self) -> Self {
+        self.with_response_modalities(vec!["AUDIO".to_string()])
+    }
+
+    /// Sets speech configuration for text-to-speech output.
+    ///
+    /// Use this to customize voice, language, and speaker settings when
+    /// generating audio output.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::{Client, SpeechConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let config = SpeechConfig {
+    ///     voice: Some("Puck".to_string()),
+    ///     language: Some("en-US".to_string()),
+    ///     speaker: None,
+    /// };
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-2.5-flash-preview-tts")
+    ///     .with_text("Hello from Puck!")
+    ///     .with_audio_output()
+    ///     .with_speech_config(config)
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn with_speech_config(mut self, config: SpeechConfig) -> Self {
+        self.speech_config = Some(config);
+        self
+    }
+
+    /// Sets the voice for text-to-speech output.
+    ///
+    /// This is a convenience method that sets the voice with a default language of "en-US".
+    /// For other languages, use [`with_speech_config`](Self::with_speech_config).
+    ///
+    /// # Available Voices
+    ///
+    /// Common voices include: Aoede, Charon, Fenrir, Kore, Puck, and others.
+    /// See [Google's TTS documentation](https://ai.google.dev/gemini-api/docs/text-generation)
+    /// for the full list.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-2.5-flash-preview-tts")
+    ///     .with_text("Hello, world!")
+    ///     .with_audio_output()
+    ///     .with_voice("Kore")
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn with_voice(self, voice: impl Into<String>) -> Self {
+        // Language is required by the API, default to en-US
+        self.with_speech_config(SpeechConfig::with_voice_and_language(voice, "en-US"))
+    }
+
     /// Sets a JSON schema to enforce structured output from the model.
     ///
     /// When you provide a JSON schema, the model will return responses that
@@ -2269,6 +2392,19 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
             _ => {} // Valid: exactly one is set
         }
 
+        // Merge speech_config into generation_config if present
+        let generation_config = match (self.generation_config, self.speech_config) {
+            (Some(mut config), Some(speech)) => {
+                config.speech_config = Some(speech);
+                Some(config)
+            }
+            (None, Some(speech)) => Some(GenerationConfig {
+                speech_config: Some(speech),
+                ..Default::default()
+            }),
+            (config, None) => config,
+        };
+
         Ok(CreateInteractionRequest {
             model: self.model,
             agent: self.agent,
@@ -2279,7 +2415,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
             response_modalities: self.response_modalities,
             response_format: self.response_format,
             response_mime_type: self.response_mime_type,
-            generation_config: self.generation_config,
+            generation_config,
             stream: None, // Set by create() vs create_stream()
             background: self.background,
             store: self.store,

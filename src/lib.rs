@@ -76,13 +76,13 @@ pub use content::{
 pub mod request;
 pub use request::{
     AgentConfig, CreateInteractionRequest, DeepResearchConfig, DynamicConfig, GenerationConfig,
-    InteractionInput, Role, ThinkingLevel, ThinkingSummaries, Turn, TurnContent,
+    InteractionInput, Role, SpeechConfig, ThinkingLevel, ThinkingSummaries, Turn, TurnContent,
 };
 
 // Response types
 pub mod response;
 pub use response::{
-    CodeExecutionCallInfo, CodeExecutionResultInfo, ContentSummary, FunctionCallInfo,
+    AudioInfo, CodeExecutionCallInfo, CodeExecutionResultInfo, ContentSummary, FunctionCallInfo,
     FunctionResultInfo, GroundingChunk, GroundingMetadata, ImageInfo, InteractionResponse,
     InteractionStatus, ModalityTokens, OwnedFunctionCallInfo, UrlContextMetadata,
     UrlContextResultInfo, UrlMetadataEntry, UrlRetrievalStatus, UsageMetadata, WebSource,

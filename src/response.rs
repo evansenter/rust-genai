@@ -562,6 +562,95 @@ impl ImageInfo<'_> {
 }
 
 // =============================================================================
+// Audio Info Type
+// =============================================================================
+
+/// Information about audio content in the response.
+///
+/// This is a view type that provides convenient access to audio data
+/// in the response, with automatic base64 decoding.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_genai::Client;
+///
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let client = Client::new("api-key".to_string());
+///
+/// let response = client
+///     .interaction()
+///     .with_model("gemini-2.5-flash-preview-tts")
+///     .with_text("Hello, world!")
+///     .with_audio_output()
+///     .with_voice("Kore")
+///     .create()
+///     .await?;
+///
+/// for audio in response.audios() {
+///     let bytes = audio.bytes()?;
+///     let filename = format!("audio.{}", audio.extension());
+///     std::fs::write(&filename, bytes)?;
+/// }
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug, Clone)]
+pub struct AudioInfo<'a> {
+    data: &'a str,
+    mime_type: Option<&'a str>,
+}
+
+impl AudioInfo<'_> {
+    /// Decodes and returns the audio bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the base64 data is invalid.
+    #[must_use = "this `Result` should be used to handle potential decode errors"]
+    pub fn bytes(&self) -> Result<Vec<u8>, GenaiError> {
+        base64::engine::general_purpose::STANDARD
+            .decode(self.data)
+            .map_err(|e| GenaiError::InvalidInput(format!("Invalid base64 audio data: {}", e)))
+    }
+
+    /// Returns the MIME type of the audio, if available.
+    #[must_use]
+    pub fn mime_type(&self) -> Option<&str> {
+        self.mime_type
+    }
+
+    /// Returns a file extension suitable for this audio's MIME type.
+    ///
+    /// Returns "wav" as default if MIME type is unknown or unrecognized.
+    /// Logs a warning for unrecognized MIME types to surface API evolution
+    /// (following the project's Evergreen philosophy).
+    #[must_use]
+    pub fn extension(&self) -> &str {
+        match self.mime_type {
+            Some("audio/wav") | Some("audio/x-wav") => "wav",
+            Some("audio/mp3") | Some("audio/mpeg") => "mp3",
+            Some("audio/ogg") => "ogg",
+            Some("audio/flac") => "flac",
+            Some("audio/aac") => "aac",
+            Some("audio/webm") => "webm",
+            // PCM/L16 format from TTS - raw audio data
+            Some(mime) if mime.starts_with("audio/L16") => "pcm",
+            Some(unknown) => {
+                log::warn!(
+                    "Unknown audio MIME type '{}', defaulting to 'wav' extension. \
+                     Consider updating rust-genai to handle this type.",
+                    unknown
+                );
+                "wav"
+            }
+            None => "wav", // No MIME type provided, default to wav
+        }
+    }
+}
+
+// =============================================================================
 // Function Call/Result Info Types
 // =============================================================================
 
@@ -1075,6 +1164,121 @@ impl InteractionResponse {
         self.outputs
             .iter()
             .any(|output| matches!(output, InteractionContent::Image { data: Some(_), .. }))
+    }
+
+    // =========================================================================
+    // Audio Helpers
+    // =========================================================================
+
+    /// Returns the first audio content in the response.
+    ///
+    /// This is a convenience method for the common case of extracting a single
+    /// generated audio. For multiple audio outputs, use [`audios()`](Self::audios).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-2.5-flash-preview-tts")
+    ///     .with_text("Hello, world!")
+    ///     .with_audio_output()
+    ///     .with_voice("Kore")
+    ///     .create()
+    ///     .await?;
+    ///
+    /// if let Some(audio) = response.first_audio() {
+    ///     let bytes = audio.bytes()?;
+    ///     std::fs::write("speech.wav", &bytes)?;
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn first_audio(&self) -> Option<AudioInfo<'_>> {
+        self.audios().next()
+    }
+
+    /// Returns an iterator over all audio content in the response.
+    ///
+    /// Each [`AudioInfo`] provides methods for accessing the audio data,
+    /// MIME type, and a suitable file extension.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client
+    ///     .interaction()
+    ///     .with_model("gemini-2.5-flash-preview-tts")
+    ///     .with_text("Generate multiple audio segments")
+    ///     .with_audio_output()
+    ///     .create()
+    ///     .await?;
+    ///
+    /// for (i, audio) in response.audios().enumerate() {
+    ///     let bytes = audio.bytes()?;
+    ///     let filename = format!("audio_{}.{}", i, audio.extension());
+    ///     std::fs::write(&filename, bytes)?;
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn audios(&self) -> impl Iterator<Item = AudioInfo<'_>> {
+        self.outputs.iter().filter_map(|output| {
+            if let InteractionContent::Audio {
+                data: Some(base64_data),
+                mime_type,
+                ..
+            } = output
+            {
+                Some(AudioInfo {
+                    data: base64_data.as_str(),
+                    mime_type: mime_type.as_deref(),
+                })
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Check if the response contains any audio content.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rust_genai::Client;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Client::new("api-key".to_string());
+    /// # let response = client.interaction().with_model("gemini-2.5-flash-preview-tts")
+    /// #     .with_text("Hello").with_audio_output().create().await?;
+    /// if response.has_audio() {
+    ///     for audio in response.audios() {
+    ///         let bytes = audio.bytes()?;
+    ///         // process audio...
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn has_audio(&self) -> bool {
+        self.outputs
+            .iter()
+            .any(|output| matches!(output, InteractionContent::Audio { data: Some(_), .. }))
     }
 
     // =========================================================================
@@ -2716,5 +2920,66 @@ mod tests {
             mime_type: Some("application/octet-stream"),
         };
         assert_eq!(info2.extension(), "png");
+    }
+
+    // =========================================================================
+    // AudioInfo Tests
+    // =========================================================================
+
+    #[test]
+    fn test_audio_info_extension() {
+        let check = |mime: Option<&str>, expected: &str| {
+            let info = AudioInfo {
+                data: "",
+                mime_type: mime,
+            };
+            assert_eq!(info.extension(), expected);
+        };
+
+        check(Some("audio/wav"), "wav");
+        check(Some("audio/x-wav"), "wav");
+        check(Some("audio/mp3"), "mp3");
+        check(Some("audio/mpeg"), "mp3");
+        check(Some("audio/ogg"), "ogg");
+        check(Some("audio/flac"), "flac");
+        check(Some("audio/aac"), "aac");
+        check(Some("audio/webm"), "webm");
+        check(Some("audio/unknown"), "wav"); // default
+        check(None, "wav"); // default
+    }
+
+    #[test]
+    fn test_audio_info_bytes_valid_base64() {
+        // Base64 for "test"
+        let info = AudioInfo {
+            data: "dGVzdA==",
+            mime_type: Some("audio/wav"),
+        };
+        let result = info.bytes();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), b"test");
+    }
+
+    #[test]
+    fn test_audio_info_bytes_invalid_base64() {
+        let info = AudioInfo {
+            data: "not-valid-base64!!!",
+            mime_type: Some("audio/wav"),
+        };
+        let result = info.bytes();
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Invalid base64"));
+    }
+
+    #[test]
+    fn test_audio_info_extension_unknown_mime_type() {
+        // Evergreen-compliant behavior: unknown MIME types default to "wav"
+        // and log a warning to surface API evolution.
+        let info = AudioInfo {
+            data: "",
+            mime_type: Some("audio/future-format"),
+        };
+        assert_eq!(info.extension(), "wav");
     }
 }
