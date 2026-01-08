@@ -152,7 +152,7 @@ See `InteractionContent` in `src/content.rs` for reference implementation.
 
 ## CI/CD
 
-GitHub Actions runs: check, test, test-strict-unknown, test-integration (4 matrix groups), fmt, clippy, doc, security, build-metrics. Integration tests require same-repo origin (protects API key).
+GitHub Actions runs: check, test, test-strict-unknown, test-integration (4 matrix groups), fmt, clippy, doc, security, msrv, cross-platform, coverage, build-metrics. Integration tests require same-repo origin (protects API key).
 
 ## Project Conventions
 

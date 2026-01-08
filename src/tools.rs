@@ -339,21 +339,25 @@ impl FunctionDeclaration {
     }
 
     /// Creates a builder for ergonomic FunctionDeclaration construction
+    #[must_use]
     pub fn builder(name: impl Into<String>) -> FunctionDeclarationBuilder {
         FunctionDeclarationBuilder::new(name)
     }
 
     /// Returns the function name
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Returns the function description
+    #[must_use]
     pub fn description(&self) -> &str {
         &self.description
     }
 
     /// Returns a reference to the function parameters
+    #[must_use]
     pub fn parameters(&self) -> &FunctionParameters {
         &self.parameters
     }
@@ -383,16 +387,19 @@ impl FunctionParameters {
     }
 
     /// Returns the parameter type (typically "object")
+    #[must_use]
     pub fn type_(&self) -> &str {
         &self.type_
     }
 
     /// Returns the properties schema
+    #[must_use]
     pub fn properties(&self) -> &serde_json::Value {
         &self.properties
     }
 
     /// Returns the list of required parameter names
+    #[must_use]
     pub fn required(&self) -> &[String] {
         &self.required
     }

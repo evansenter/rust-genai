@@ -128,10 +128,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Show reasoning tokens
-    if let Some(usage) = &response.usage {
-        if let Some(reasoning) = usage.total_reasoning_tokens {
-            println!("Reasoning tokens: {}", reasoning);
-        }
+    if let Some(usage) = &response.usage
+        && let Some(reasoning) = usage.total_reasoning_tokens
+    {
+        println!("Reasoning tokens: {}", reasoning);
     }
 
     // ==========================================================================

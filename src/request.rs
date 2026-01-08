@@ -1077,4 +1077,64 @@ mod tests {
 
         assert_eq!(config, parsed);
     }
+
+    // =========================================================================
+    // SpeechConfig Tests
+    // =========================================================================
+
+    #[test]
+    fn test_speech_config_with_voice() {
+        let config = SpeechConfig::with_voice("Kore");
+        assert_eq!(config.voice, Some("Kore".to_string()));
+        assert_eq!(config.language, None);
+        assert_eq!(config.speaker, None);
+    }
+
+    #[test]
+    fn test_speech_config_with_voice_and_language() {
+        let config = SpeechConfig::with_voice_and_language("Puck", "en-GB");
+        assert_eq!(config.voice, Some("Puck".to_string()));
+        assert_eq!(config.language, Some("en-GB".to_string()));
+        assert_eq!(config.speaker, None);
+    }
+
+    #[test]
+    fn test_speech_config_serialization() {
+        let config = SpeechConfig {
+            voice: Some("Fenrir".to_string()),
+            language: Some("en-US".to_string()),
+            speaker: None,
+        };
+
+        let json = serde_json::to_string(&config).expect("Serialization failed");
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(value["voice"], "Fenrir");
+        assert_eq!(value["language"], "en-US");
+        assert!(value.get("speaker").is_none()); // None fields should be skipped
+    }
+
+    #[test]
+    fn test_speech_config_roundtrip() {
+        let config = SpeechConfig {
+            voice: Some("Aoede".to_string()),
+            language: Some("es-ES".to_string()),
+            speaker: Some("narrator".to_string()),
+        };
+
+        let json = serde_json::to_string(&config).expect("Serialization failed");
+        let parsed: SpeechConfig = serde_json::from_str(&json).expect("Deserialization failed");
+
+        assert_eq!(config.voice, parsed.voice);
+        assert_eq!(config.language, parsed.language);
+        assert_eq!(config.speaker, parsed.speaker);
+    }
+
+    #[test]
+    fn test_speech_config_default() {
+        let config = SpeechConfig::default();
+        assert_eq!(config.voice, None);
+        assert_eq!(config.language, None);
+        assert_eq!(config.speaker, None);
+    }
 }

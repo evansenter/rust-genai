@@ -38,8 +38,8 @@ impl std::fmt::Debug for Client {
 /// use std::time::Duration;
 ///
 /// let client = Client::builder("api_key".to_string())
-///     .timeout(Duration::from_secs(120))
-///     .connect_timeout(Duration::from_secs(10))
+///     .with_timeout(Duration::from_secs(120))
+///     .with_connect_timeout(Duration::from_secs(10))
 ///     .build()?;
 /// # Ok::<(), rust_genai::GenaiError>(())
 /// ```
@@ -79,12 +79,12 @@ impl ClientBuilder {
     /// use std::time::Duration;
     ///
     /// let client = Client::builder("api_key".to_string())
-    ///     .timeout(Duration::from_secs(120))
+    ///     .with_timeout(Duration::from_secs(120))
     ///     .build()?;
     /// # Ok::<(), rust_genai::GenaiError>(())
     /// ```
     #[must_use]
-    pub const fn timeout(mut self, timeout: Duration) -> Self {
+    pub const fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
@@ -103,12 +103,12 @@ impl ClientBuilder {
     /// use std::time::Duration;
     ///
     /// let client = Client::builder("api_key".to_string())
-    ///     .connect_timeout(Duration::from_secs(10))
+    ///     .with_connect_timeout(Duration::from_secs(10))
     ///     .build()?;
     /// # Ok::<(), rust_genai::GenaiError>(())
     /// ```
     #[must_use]
-    pub const fn connect_timeout(mut self, timeout: Duration) -> Self {
+    pub const fn with_connect_timeout(mut self, timeout: Duration) -> Self {
         self.connect_timeout = Some(timeout);
         self
     }
@@ -1131,15 +1131,15 @@ impl Client {
             }
 
             // Log unknown states per Evergreen logging strategy
-            if let Some(state) = &current.state {
-                if state.is_unknown() {
-                    log::warn!(
-                        "File '{}' is in unknown state {:?}, continuing to poll. \
-                         This may indicate API evolution - consider updating rust-genai.",
-                        file.name,
-                        state
-                    );
-                }
+            if let Some(state) = &current.state
+                && state.is_unknown()
+            {
+                log::warn!(
+                    "File '{}' is in unknown state {:?}, continuing to poll. \
+                     This may indicate API evolution - consider updating rust-genai.",
+                    file.name,
+                    state
+                );
             }
 
             if start.elapsed() > timeout {
@@ -1181,7 +1181,7 @@ mod tests {
     #[test]
     fn test_client_builder_with_timeout() {
         let client = Client::builder("test_key".to_string())
-            .timeout(Duration::from_secs(120))
+            .with_timeout(Duration::from_secs(120))
             .build()
             .unwrap();
         assert_eq!(client.api_key, "test_key");
@@ -1192,7 +1192,7 @@ mod tests {
     #[test]
     fn test_client_builder_with_connect_timeout() {
         let client = Client::builder("test_key".to_string())
-            .connect_timeout(Duration::from_secs(10))
+            .with_connect_timeout(Duration::from_secs(10))
             .build()
             .unwrap();
         assert_eq!(client.api_key, "test_key");
@@ -1201,8 +1201,8 @@ mod tests {
     #[test]
     fn test_client_builder_with_both_timeouts() {
         let client = Client::builder("test_key".to_string())
-            .timeout(Duration::from_secs(120))
-            .connect_timeout(Duration::from_secs(10))
+            .with_timeout(Duration::from_secs(120))
+            .with_connect_timeout(Duration::from_secs(10))
             .build()
             .unwrap();
         assert_eq!(client.api_key, "test_key");
@@ -1242,7 +1242,7 @@ mod tests {
     #[test]
     fn test_client_builder_debug_redacts_api_key() {
         let builder = Client::builder("another_secret_key_67890".to_string())
-            .timeout(Duration::from_secs(60));
+            .with_timeout(Duration::from_secs(60));
         let debug_output = format!("{:?}", builder);
 
         // API key should NOT appear in debug output

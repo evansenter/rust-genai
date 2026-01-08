@@ -7,9 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-01-08
+
+### BREAKING CHANGES
+
+#### MSRV Bumped to Rust 1.88
+- **Minimum Supported Rust Version is now 1.88** (was 1.85)
+- Required for Edition 2024 `let` chains feature
+- Update your Rust toolchain: `rustup update`
+
+#### Crate Consolidation (#302)
+- **`genai-client` crate merged into `rust-genai`**
+- Internal HTTP and type modules are now `pub(crate)` instead of separate crate
+- Users only depend on `rust-genai` - no change to public API
+
+### Added
+
+#### Text-to-Speech Audio Output (#303)
+- **New `with_audio_output()` method** - Generate speech from text
+- **New `with_voice(name)` method** - Select voice (Kore, Puck, Aoede, etc.)
+- **New `with_speech_config(SpeechConfig)` method** - Full voice/language/speaker control
+- **New `SpeechConfig` type** with constructors:
+  - `SpeechConfig::with_voice("Kore")`
+  - `SpeechConfig::with_voice_and_language("Puck", "en-GB")`
+- **New response helpers**: `first_audio()`, `audios()`, `has_audio()`
+- **New `AudioInfo` type** with `bytes()`, `mime_type()`, `extension()` methods
+- Use model `gemini-2.5-pro-preview-tts` for TTS
+
+```rust
+let response = client
+    .interaction()
+    .with_model("gemini-2.5-pro-preview-tts")
+    .with_text("Hello, world!")
+    .with_audio_output()
+    .with_voice("Kore")
+    .create()
+    .await?;
+
+if let Some(audio) = response.first_audio() {
+    std::fs::write("speech.wav", audio.bytes()?)?;
+}
+```
+
+#### New Built-in Tools
+- **File Search tool (#299)** - Semantic document retrieval from vector stores
+  - New `with_file_search(store_ids)` method
+- **Computer Use tool (#298)** - Browser automation via Gemini
+  - New `with_computer_use()` method (requires allowlisted API key)
+- **MCP Server convenience (#295)** - Connect to Model Context Protocol servers
+  - New `with_mcp_server(uri)` method
+
+#### Explicit Multi-Turn Conversations (#296)
+- **New `with_turns(Vec<Turn>)` method** - Provide full conversation history
+- **New `Turn` type** with `user()` and `model()` constructors
+- Alternative to `previous_interaction_id` for stateless deployments
+
+#### Typed Agent Configuration (#293)
+- **New `AgentConfig` type** for Deep Research and Dynamic agents
+- **`DeepResearchConfig`** with `with_thinking_summaries()` builder
+- **`DynamicConfig`** for dynamic agent interactions
+- Use `with_agent_config(config.into())` on builder
+
+#### Resolution Control for Media (#297)
+- **New `with_resolution(MediaResolution)` method** on `ImageInput` and `VideoInput`
+- Control processing resolution: `Low`, `Medium`, `High`, `Native`
+
+### Infrastructure
+
+#### CI/CD Workflows
+- **Automated crates.io publishing** on version tags
+- **Release Drafter** for automatic release notes from PR labels
+- **MSRV Check** (Rust 1.88), **Cross-platform testing** (Linux, macOS, Windows)
+- **Code coverage** with Codecov integration
+- **Security audit** with cargo-audit
+
+#### Comprehensive Documentation
+- 12 new documentation guides in `docs/`
+- New `TROUBLESHOOTING.md` for common issues
+
 ### Fixed
 
 - **ThinkingSummaries wire format** (#272): Fixed serialization to use `THINKING_SUMMARIES_AUTO` and `THINKING_SUMMARIES_NONE` (API's actual wire format) instead of `auto`/`none` (what the documentation claims). This enables `agent_config` with `thinking_summaries` to work correctly with the Deep Research agent.
+- **Clippy lints for Rust 1.92** - Use `is_multiple_of()` and collapsed `if let` chains
 
 ### BREAKING CHANGES
 

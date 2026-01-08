@@ -35,7 +35,7 @@ The key decision points are:
 
 ### Non-Streaming (`create()`)
 
-```rust
+```rust,ignore
 let response = client.interaction()
     .with_model("gemini-3-flash-preview")
     .with_text("Write a poem about Rust")
@@ -53,7 +53,7 @@ println!("{}", response.text().unwrap());
 
 ### Basic Streaming (`create_stream()`)
 
-```rust
+```rust,ignore
 use futures_util::StreamExt;
 
 let mut stream = client.interaction()
@@ -94,7 +94,7 @@ The streaming API has a layered type design with consistent naming:
 
 ### Basic Streaming Types
 
-```
+```text
 StreamEvent                    # Wrapper with position metadata
 ├── chunk: StreamChunk         # The actual content/event
 └── event_id: Option<String>   # For stream resumption
@@ -102,7 +102,7 @@ StreamEvent                    # Wrapper with position metadata
 
 ### Auto-Function Streaming Types
 
-```
+```text
 AutoFunctionStreamEvent        # Wrapper with position metadata
 ├── chunk: AutoFunctionStreamChunk  # Content/function lifecycle
 └── event_id: Option<String>   # For stream resumption (API events only)
@@ -129,7 +129,7 @@ This mirrors how SSE works: each Server-Sent Event has an optional `id` field se
 
 ### StreamChunk Variants
 
-```rust
+```rust,ignore
 #[non_exhaustive]
 pub enum StreamChunk {
     /// Interaction accepted (first event, provides early access to ID)
@@ -160,7 +160,7 @@ pub enum StreamChunk {
 
 ### Typical Event Sequence
 
-```
+```text
 Start           →  Interaction accepted, ID available
 ContentStart    →  Output block 0 starting (type: "text")
 Delta           →  "The "
@@ -175,7 +175,7 @@ Complete        →  Full response with usage metadata
 
 `Complete` and `Error` are terminal events - no more events will follow:
 
-```rust
+```rust,ignore
 if event.is_terminal() {
     break;  // Stream has ended
 }
@@ -185,7 +185,7 @@ if event.is_terminal() {
 
 For auto-function streaming, additional variants track function lifecycle:
 
-```rust
+```rust,ignore
 #[non_exhaustive]
 pub enum AutoFunctionStreamChunk {
     /// Incremental content from the model
@@ -212,7 +212,7 @@ pub enum AutoFunctionStreamChunk {
 
 ### Minimal Example
 
-```rust
+```rust,ignore
 use futures_util::StreamExt;
 use rust_genai::{Client, StreamChunk};
 
@@ -242,7 +242,7 @@ while let Some(result) = stream.next().await {
 
 ### Complete Event Handling
 
-```rust
+```rust,ignore
 while let Some(result) = stream.next().await {
     let event = result?;
 
@@ -293,7 +293,7 @@ Combines streaming with automatic function execution. Content is streamed in rea
 
 ### Basic Usage
 
-```rust
+```rust,ignore
 use futures_util::StreamExt;
 use rust_genai::{Client, AutoFunctionStreamChunk};
 
@@ -335,7 +335,7 @@ while let Some(result) = stream.next().await {
 
 Client-generated events don't come from the SSE stream, so they have no event ID:
 
-```rust
+```rust,ignore
 // Track only API events for resume
 if event.event_id.is_some() {
     last_event_id = event.event_id.clone();
@@ -346,7 +346,7 @@ if event.event_id.is_some() {
 
 Convert a stream into the same result type as non-streaming `create_with_auto_functions()`:
 
-```rust
+```rust,ignore
 use rust_genai::AutoFunctionResultAccumulator;
 
 let mut accumulator = AutoFunctionResultAccumulator::new();
@@ -383,7 +383,7 @@ The streaming API supports resuming interrupted streams using `event_id`.
 
 ### Resume Pattern
 
-```rust
+```rust,ignore
 // Initial stream
 let mut last_event_id: Option<String> = None;
 let mut interaction_id: Option<String> = None;
@@ -425,7 +425,7 @@ if let (Some(id), Some(last_evt)) = (&interaction_id, &last_event_id) {
 
 ### get_interaction_stream()
 
-```rust
+```rust,ignore
 /// Retrieves an existing interaction by its ID with streaming.
 pub fn get_interaction_stream(
     &self,
@@ -443,7 +443,7 @@ pub fn get_interaction_stream(
 
 The `last_event_id` is URL-encoded and passed as a query parameter:
 
-```
+```text
 GET /v1beta/interactions/{id}?alt=sse&last_event_id={encoded_id}
 ```
 
@@ -491,7 +491,7 @@ Following the [Evergreen](https://github.com/google-deepmind/evergreen-spec) phi
 
 All chunk enums use `#[non_exhaustive]`:
 
-```rust
+```rust,ignore
 #[non_exhaustive]
 pub enum StreamChunk {
     // Known variants...
@@ -501,7 +501,7 @@ pub enum StreamChunk {
 
 Always include a wildcard arm in match statements:
 
-```rust
+```rust,ignore
 match &event.chunk {
     StreamChunk::Delta(_) => { /* ... */ }
     StreamChunk::Complete(_) => { /* ... */ }
@@ -518,7 +518,7 @@ match &event.chunk {
 
 Unknown variants preserve data for debugging and roundtrip serialization:
 
-```rust
+```rust,ignore
 Unknown {
     /// The unrecognized type from the API
     chunk_type: String,
@@ -536,7 +536,7 @@ Access with helper methods:
 
 Unknown events log at `warn` level to surface API evolution:
 
-```rust
+```rust,ignore
 log::warn!(
     "Encountered unknown StreamChunk type '{}'. \
      This may indicate a new API feature.",
@@ -548,7 +548,7 @@ log::warn!(
 
 ### Pattern 1: Streaming with Progress Tracking
 
-```rust
+```rust,ignore
 struct StreamingSession {
     client: Client,
     last_event_id: Option<String>,
@@ -602,7 +602,7 @@ impl StreamingSession {
 
 For high-frequency deltas, buffer before updating UI:
 
-```rust
+```rust,ignore
 use std::time::{Duration, Instant};
 
 let mut buffer = String::new();
@@ -631,7 +631,7 @@ while let Some(event) = stream.next().await {
 
 ### Pattern 3: Error Recovery with Resume
 
-```rust
+```rust,ignore
 async fn stream_with_retry(
     client: &Client,
     prompt: &str,
@@ -704,7 +704,7 @@ async fn stream_with_retry(
 
 ### Choosing Streaming Mode
 
-```
+```text
 Need real-time display? ─────────────────────────> Streaming
 Short response, simple code? ────────────────────> Non-streaming
 Need resume capability? ─────────────────────────> Streaming
@@ -714,7 +714,7 @@ Batch processing? ────────────────────�
 
 ### Choosing Resume Strategy
 
-```
+```text
 Long-running interaction (deep research)? ───────> Always track event_id
 Unreliable network? ─────────────────────────────> Track event_id + retry logic
 Simple chat UI? ─────────────────────────────────> Optional, can restart on error
@@ -723,7 +723,7 @@ Background processing? ───────────────────
 
 ### Event Handling Approach
 
-```
+```text
 Just need text output? ──────────────────────────> Only handle Delta + Complete
 Need progress tracking? ─────────────────────────> Handle Start, ContentStart/Stop
 Building chat UI? ───────────────────────────────> Handle Delta for text, Complete for metadata
@@ -754,7 +754,7 @@ LOUD_WIRE=1 cargo run --example streaming
 
 With `LOUD_WIRE=1`, you'll see the raw SSE events:
 
-```
+```text
 [REQ#1] POST /v1beta/interactions?alt=sse
   model: gemini-3-flash-preview
   input: "Write a poem"

@@ -26,7 +26,7 @@ All types below implement graceful handling of unrecognized values via an `Unkno
 
 All Unknown variants follow this naming convention:
 
-```rust
+```rust,ignore
 Unknown {
     <context>_type: String,      // The unrecognized type from API
     data: serde_json::Value,     // Full JSON preserved for roundtrip
@@ -329,7 +329,7 @@ Common patterns to try:
 
 All enums implement the Evergreen pattern with an `Unknown` variant that preserves unrecognized values:
 
-```rust
+```rust,ignore
 #[non_exhaustive]
 pub enum ThinkingSummaries {
     Auto,

@@ -181,3 +181,41 @@ mod request_tests;
 mod response_tests;
 #[cfg(test)]
 mod streaming_tests;
+
+// =============================================================================
+// Documentation Tests
+// =============================================================================
+//
+// These include markdown documentation files for doctest verification.
+// Code blocks in markdown use annotations:
+// - `rust,ignore` - Not compiled (incomplete snippets)
+// - `rust,no_run` - Compiled but not executed (needs API key)
+// - `rust,compile_fail` - Should fail compilation
+//
+// Run with: cargo test --doc
+
+#[cfg(doctest)]
+mod doc_tests {
+    use doc_comment::doc_comment;
+
+    // Root-level documentation
+    doc_comment!(include_str!("../TROUBLESHOOTING.md"));
+
+    // Detailed guides in docs/
+    doc_comment!(include_str!("../docs/AGENTS_AND_BACKGROUND.md"));
+    doc_comment!(include_str!("../docs/BUILT_IN_TOOLS.md"));
+    doc_comment!(include_str!("../docs/CONFIGURATION.md"));
+    doc_comment!(include_str!("../docs/CONVERSATION_PATTERNS.md"));
+    doc_comment!(include_str!("../docs/ENUM_WIRE_FORMATS.md"));
+    doc_comment!(include_str!("../docs/ERROR_HANDLING.md"));
+    doc_comment!(include_str!("../docs/EXAMPLES_INDEX.md"));
+    doc_comment!(include_str!("../docs/FUNCTION_CALLING.md"));
+    doc_comment!(include_str!("../docs/LOGGING_STRATEGY.md"));
+    doc_comment!(include_str!("../docs/MULTI_TURN_FUNCTION_CALLING.md"));
+    doc_comment!(include_str!("../docs/MULTIMODAL.md"));
+    doc_comment!(include_str!("../docs/OUTPUT_MODALITIES.md"));
+    doc_comment!(include_str!("../docs/RELIABILITY_PATTERNS.md"));
+    doc_comment!(include_str!("../docs/STREAMING_API.md"));
+    doc_comment!(include_str!("../docs/TESTING.md"));
+    doc_comment!(include_str!("../docs/THINKING_MODE.md"));
+}

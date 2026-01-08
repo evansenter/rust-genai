@@ -31,7 +31,7 @@ The Gemini Interactions API supports two modes controlled by the `store` paramet
 
 ### Stateful Mode (`store: true`)
 
-```rust
+```rust,ignore
 // First turn
 let response = client.interaction()
     .with_model("gemini-3-flash-preview")
@@ -61,7 +61,7 @@ let response = client.interaction()
 
 ### Stateless Mode (`store: false`)
 
-```rust
+```rust,ignore
 let mut history: Vec<InteractionContent> = vec![];
 
 // First turn
@@ -116,7 +116,7 @@ Three ways to declare functions, each suited to different needs:
 
 ### 1. `#[tool]` Macro (Compile-time, Stateless)
 
-```rust
+```rust,ignore
 use rust_genai_macros::tool;
 
 /// Look up customer information by ID or email
@@ -145,7 +145,7 @@ let result = client.interaction()
 
 ### 2. `ToolService` (Runtime, Stateful)
 
-```rust
+```rust,ignore
 use rust_genai::{ToolService, CallableFunction, FunctionDeclaration};
 
 struct MyToolService {
@@ -182,7 +182,7 @@ let result = client.interaction()
 
 ### 3. `FunctionDeclaration` Builder (Manual)
 
-```rust
+```rust,ignore
 use rust_genai::FunctionDeclaration;
 
 let functions = vec![
@@ -219,7 +219,7 @@ for call in response.function_calls() {
 
 ### Auto (`create_with_auto_functions()`)
 
-```rust
+```rust,ignore
 // With #[tool] functions
 let result = client.interaction()
     .with_text("Calculate 2 + 2")
@@ -248,7 +248,7 @@ println!("Final: {}", result.response.text().unwrap());
 
 ### Manual (`create()`)
 
-```rust
+```rust,ignore
 let mut response = client.interaction()
     .with_text("What's the weather in Tokyo?")
     .with_functions(functions)
@@ -295,7 +295,7 @@ The Gemini API supports advanced function calling patterns:
 
 The model can request multiple independent functions in a single response:
 
-```rust
+```rust,ignore
 // Model might return multiple function calls at once
 let calls = response.function_calls();
 // calls = [get_weather("Tokyo"), get_weather("London"), get_time("UTC")]
@@ -334,7 +334,7 @@ response = client.interaction()
 
 The model can chain functions where output of one becomes input to another:
 
-```rust
+```rust,ignore
 // User: "Get the weather in my current location"
 // Step 1: Model calls get_current_location()
 // Step 2: After receiving location, model calls get_weather(location)
@@ -371,7 +371,7 @@ When using `previous_interaction_id` (stateful mode), some settings are inherite
 
 This leads to the recommended pattern:
 
-```rust
+```rust,ignore
 match &self.last_interaction_id {
     Some(prev_id) => {
         // Subsequent turns: chain, tools required, system inherited
@@ -400,7 +400,7 @@ match &self.last_interaction_id {
 
 When sending function results back to the model, you do NOT need to resend tools:
 
-```rust
+```rust,ignore
 // After model requests function calls...
 let results = execute_functions(&calls);
 
@@ -446,7 +446,7 @@ Through testing, we discovered:
 3. **You do NOT need to echo thought signatures in function results**
 4. **Basic stateless multi-turn works without any thought handling**
 
-```rust
+```rust,ignore
 // This works fine - no thought signature needed
 for call in response.function_calls() {
     let call_id = call.id.ok_or("Missing call_id")?;
@@ -482,7 +482,7 @@ Thought signatures are cryptographic proofs that the model's thinking wasn't mod
 
 The typestate pattern enforces that `with_system_instruction()` is only available on the first turn. Use a match:
 
-```rust
+```rust,ignore
 struct Agent {
     client: Client,
     last_id: Option<String>,
@@ -529,7 +529,7 @@ The match pattern is verbose but clear about the two distinct states.
 
 ### Pattern 2: Stateless History Builder
 
-```rust
+```rust,ignore
 struct StatelessSession {
     client: Client,
     history: Vec<InteractionContent>,
@@ -564,7 +564,7 @@ impl StatelessSession {
 
 ### Pattern 3: ToolService with Shared State
 
-```rust
+```rust,ignore
 struct ProductionToolService {
     db: Arc<DatabasePool>,
     http: Arc<reqwest::Client>,
@@ -598,7 +598,7 @@ let r2 = client.interaction()
 
 ### Choosing State Management
 
-```
+```text
 Need privacy/no server storage? ─────────────────> Stateless
 Need custom conversation persistence? ───────────> Stateless
 Need automatic function execution? ──────────────> Stateful
@@ -607,7 +607,7 @@ Building a typical agent? ──────────────────
 
 ### Choosing Function Declaration
 
-```
+```text
 Pure functions, no dependencies? ────────────────> #[tool] macro
 Need database/API access? ───────────────────────> ToolService
 Need full control/custom execution? ─────────────> FunctionDeclaration + manual
@@ -616,7 +616,7 @@ Stateless mode? ─────────────────────�
 
 ### Choosing Execution Mode
 
-```
+```text
 store: false? ───────────────────────────────────> Manual (auto is blocked)
 Need custom logging/rate limiting? ──────────────> Manual
 Need simplest code? ─────────────────────────────> Auto

@@ -13,7 +13,7 @@ Use for situations where the operation cannot continue and needs user interventi
 - Malformed API responses that prevent operation (e.g., missing required fields)
 
 **Examples from codebase:**
-```rust
+```rust,ignore
 // Missing required call_id field (src/request_builder/auto_functions.rs)
 error!(
     "Function call '{}' is missing required call_id field.",
@@ -37,7 +37,7 @@ Use for situations that are unusual, potentially problematic, or indicate degrad
 - Function execution failures in auto-function mode (error sent to model for recovery)
 
 **Examples from codebase:**
-```rust
+```rust,ignore
 // Function execution failure - recoverable (src/request_builder/auto_functions.rs)
 warn!(
     "Function execution failed (recoverable): function='{}', error='{}'. \
@@ -77,7 +77,7 @@ Use for information useful during development or when diagnosing issues.
 - Internal state transitions
 
 **Examples from codebase:**
-```rust
+```rust,ignore
 // Request body logging (src/client.rs)
 fn log_request_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
     match serde_json::to_string_pretty(body) {
@@ -204,7 +204,7 @@ The codebase uses string-based log messages. For better machine parseability, co
 
 ### Potential Improvements
 
-```rust
+```rust,ignore
 // Current style
 log::debug!("Interaction created: ID={}", response.id);
 
@@ -235,7 +235,7 @@ This would require:
 
 Use consistent message formatting:
 
-```rust
+```rust,ignore
 // Good: Action-oriented with key=value context
 log::debug!("Creating interaction");
 log::debug!("Interaction created: ID={}", response.id);
@@ -259,7 +259,7 @@ log::debug!("{:?}", internal_state);
 
 The `test_log` crate can be used for tests that need to verify logging behavior:
 
-```rust
+```rust,ignore
 #[test_log::test]
 fn test_unknown_type_logs_warning() {
     // ... test that triggers Unknown variant creation
@@ -273,7 +273,7 @@ fn test_unknown_type_logs_warning() {
 
 Users can configure logging using any `log`-compatible backend:
 
-```rust
+```rust,ignore
 // Simple setup with env_logger
 env_logger::init();
 
@@ -323,7 +323,7 @@ LOUD_WIRE=1 cargo run --example simple_interaction
 
 ### LOUD_WIRE Output Format
 
-```
+```text
 [LOUD_WIRE] 2026-01-02T10:30:45Z [REQ#1] >>> POST https://...
 [LOUD_WIRE] 2026-01-02T10:30:45Z [REQ#1] Body: {...}
 [LOUD_WIRE] 2026-01-02T10:30:46Z [RES#1] <<< 200 OK
