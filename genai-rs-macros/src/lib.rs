@@ -16,7 +16,7 @@ use schema::{build_param_schema, get_type_info};
 ///
 /// # Example
 /// ```ignore
-/// use rust_genai_macros::tool;
+/// use genai_rs_macros::tool;
 ///
 /// #[tool(
 ///     location(description = "The city and state"),
@@ -27,7 +27,7 @@ use schema::{build_param_schema, get_type_info};
 /// }
 ///
 /// // The macro generates:
-/// // pub fn get_weather_declaration() -> rust_genai::FunctionDeclaration { ... }
+/// // pub fn get_weather_declaration() -> genai_rs::FunctionDeclaration { ... }
 /// ```
 #[proc_macro_attribute]
 pub fn tool(attr_input: TokenStream, item: TokenStream) -> TokenStream {
