@@ -1,5 +1,10 @@
 # Rust GenAI
 
+[![Crates.io](https://img.shields.io/crates/v/rust-genai.svg)](https://crates.io/crates/rust-genai)
+[![Documentation](https://docs.rs/rust-genai/badge.svg)](https://docs.rs/rust-genai)
+[![CI](https://github.com/evansenter/rust-genai/actions/workflows/rust.yml/badge.svg)](https://github.com/evansenter/rust-genai/actions/workflows/rust.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A Rust client library for interacting with Google's Generative AI (Gemini) API using the Interactions API.
 
 ## Features
@@ -268,7 +273,7 @@ match output {
 
 Two main error types:
 
-- **`GenaiError`**: API/network errors (Http, Parse, Json, Api, InvalidInput)
+- **`GenaiError`**: API/network errors (Http, Parse, Json, Utf8, Api, Internal, InvalidInput, MalformedResponse, Timeout, ClientBuild)
 - **`FunctionError`**: Function calling errors (ArgumentMismatch, ExecutionError)
 
 ## Troubleshooting
