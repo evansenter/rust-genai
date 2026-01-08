@@ -1,6 +1,49 @@
-# Enum Wire Formats
+# Enum Wire Formats & Unknown Variants
 
-This document captures the actual wire formats for enums in the Gemini Interactions API. **The official documentation is sometimes wrong** - this reflects empirically tested values.
+This document captures:
+1. **Wire formats** for enums in the Gemini Interactions API (the official docs are sometimes wrong)
+2. **Unknown variant types** that implement Evergreen soft-typing for forward compatibility
+
+## Types with Unknown Variants
+
+All types below implement graceful handling of unrecognized values via an `Unknown` variant. This ensures the library doesn't break when Google adds new enum values.
+
+| # | Type | Location | Context Field | Notes |
+|---|------|----------|---------------|-------|
+| 1 | `Resolution` | src/content.rs | `resolution_type` | Image/video quality |
+| 2 | `InteractionContent` | src/content.rs | `content_type` | 18+ content types |
+| 3 | `StreamChunk` | src/wire_streaming.rs | `chunk_type` | Low-level SSE chunks |
+| 4 | `AutoFunctionStreamChunk` | src/streaming.rs | `chunk_type` | High-level streaming |
+| 5 | `FileState` | src/http/files.rs | `state_type` | File upload states |
+| 6 | `Tool` | src/tools.rs | `tool_type` | Tool types |
+| 7 | `FunctionCallingMode` | src/tools.rs | `mode_type` | AUTO/ANY/NONE/VALIDATED |
+| 8 | `Role` | src/request.rs | `role_type` | user/model/system |
+| 9 | `ThinkingLevel` | src/request.rs | `level_type` | minimal/low/medium/high |
+| 10 | `ThinkingSummaries` | src/request.rs | `summaries_type` | Context-dependent format |
+| 11 | `InteractionStatus` | src/response.rs | `status_type` | Response status |
+
+### Unknown Variant Pattern
+
+All Unknown variants follow this naming convention:
+
+```rust
+Unknown {
+    <context>_type: String,      // The unrecognized type from API
+    data: serde_json::Value,     // Full JSON preserved for roundtrip
+}
+```
+
+Helper methods on each type:
+- `is_unknown()` - Check if this is an Unknown variant
+- `unknown_<context>_type()` - Get the unrecognized type string
+- `unknown_data()` - Get the preserved JSON data
+
+### `strict-unknown` Feature Flag
+
+- **Default (disabled)**: Unknown values deserialize into `Unknown` variant, logs warning
+- **Strict mode (enabled)**: Unknown values cause deserialization error (fail-fast)
+- Enable: `cargo test --features strict-unknown`
+- CI runs dedicated `test-strict-unknown` job
 
 ## Quick Reference
 

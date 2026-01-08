@@ -5,12 +5,29 @@
 //!
 //! Note: Since `AutoFunctionResult` is `#[non_exhaustive]`, we can't construct it directly
 //! from integration tests. Instead, we deserialize from JSON and verify roundtrip stability.
+//!
+//! ## Unknown Variant Tests
+//!
+//! Tests for Unknown variant preservation are gated with `#[cfg(not(feature = "strict-unknown"))]`
+//! because the `strict-unknown` feature causes deserialization errors instead of creating
+//! Unknown variants. The Unknown variant tests cover all 11 types with Unknown support:
+//!
+//! 1. Resolution, InteractionContent, StreamChunk, AutoFunctionStreamChunk
+//! 2. Tool, FunctionCallingMode, FileState
+//! 3. Role, ThinkingLevel, ThinkingSummaries, InteractionStatus
 
 use chrono::{DateTime, TimeZone, Utc};
 use proptest::prelude::*;
 use rust_genai::{
     Annotation, AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionResult,
     InteractionContent, InteractionResponse, InteractionStatus, ModalityTokens, UsageMetadata,
+};
+
+// Additional imports for Unknown variant tests (only used when strict-unknown is disabled)
+#[cfg(not(feature = "strict-unknown"))]
+use rust_genai::{
+    FileState, FunctionCallingMode, Resolution, Role, StreamChunk, ThinkingLevel,
+    ThinkingSummaries, Tool,
 };
 use std::time::Duration;
 
@@ -486,5 +503,363 @@ proptest! {
         let json = serde_json::to_string(&result).expect("Serialization should succeed");
         let restored: FunctionExecutionResult = serde_json::from_str(&json).expect("Deserialization should succeed");
         prop_assert_eq!(result, restored);
+    }
+}
+
+// =============================================================================
+// Unknown Variant Strategy Generators
+// =============================================================================
+//
+// These strategies generate Unknown variants for all 11 types with Unknown support.
+// Tests using these are gated with #[cfg(not(feature = "strict-unknown"))] because
+// strict mode causes deserialization errors instead of creating Unknown variants.
+
+/// Strategy for generating unknown type strings (simulating future API additions).
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_unknown_type_string() -> impl Strategy<Value = String> {
+    prop_oneof![
+        Just("future_type".to_string()),
+        Just("experimental_feature".to_string()),
+        Just("v2_content".to_string()),
+        "[a-z_]{3,20}".prop_map(|s| format!("future_{}", s)),
+    ]
+}
+
+/// Strategy for generating Resolution values including Unknown variant.
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_resolution_with_unknown() -> impl Strategy<Value = Resolution> {
+    prop_oneof![
+        Just(Resolution::Low),
+        Just(Resolution::Medium),
+        Just(Resolution::High),
+        Just(Resolution::UltraHigh),
+        // Unknown variant via JSON deserialization
+        arb_unknown_type_string().prop_map(|type_str| {
+            serde_json::from_value::<Resolution>(serde_json::json!(type_str))
+                .expect("Unknown resolution should deserialize")
+        }),
+    ]
+}
+
+/// Strategy for generating Role values including Unknown variant.
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_role_with_unknown() -> impl Strategy<Value = Role> {
+    prop_oneof![
+        Just(Role::User),
+        Just(Role::Model),
+        // Unknown variant via JSON deserialization
+        arb_unknown_type_string().prop_map(|type_str| {
+            serde_json::from_value::<Role>(serde_json::json!(type_str))
+                .expect("Unknown role should deserialize")
+        }),
+    ]
+}
+
+/// Strategy for generating ThinkingLevel values including Unknown variant.
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_thinking_level_with_unknown() -> impl Strategy<Value = ThinkingLevel> {
+    prop_oneof![
+        Just(ThinkingLevel::Minimal),
+        Just(ThinkingLevel::Low),
+        Just(ThinkingLevel::Medium),
+        Just(ThinkingLevel::High),
+        // Unknown variant via JSON deserialization
+        arb_unknown_type_string().prop_map(|type_str| {
+            serde_json::from_value::<ThinkingLevel>(serde_json::json!(type_str))
+                .expect("Unknown thinking level should deserialize")
+        }),
+    ]
+}
+
+/// Strategy for generating ThinkingSummaries values including Unknown variant.
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_thinking_summaries_with_unknown() -> impl Strategy<Value = ThinkingSummaries> {
+    prop_oneof![
+        Just(ThinkingSummaries::Auto),
+        Just(ThinkingSummaries::None),
+        // Unknown variant via JSON deserialization (uses SCREAMING_CASE)
+        arb_unknown_type_string().prop_map(|type_str| {
+            let screaming = type_str.to_uppercase();
+            serde_json::from_value::<ThinkingSummaries>(serde_json::json!(screaming))
+                .expect("Unknown thinking summaries should deserialize")
+        }),
+    ]
+}
+
+/// Strategy for generating FunctionCallingMode values including Unknown variant.
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_function_calling_mode_with_unknown() -> impl Strategy<Value = FunctionCallingMode> {
+    prop_oneof![
+        Just(FunctionCallingMode::Auto),
+        Just(FunctionCallingMode::Any),
+        Just(FunctionCallingMode::None),
+        Just(FunctionCallingMode::Validated),
+        // Unknown variant via JSON deserialization (uses SCREAMING_CASE)
+        arb_unknown_type_string().prop_map(|type_str| {
+            let screaming = type_str.to_uppercase();
+            serde_json::from_value::<FunctionCallingMode>(serde_json::json!(screaming))
+                .expect("Unknown function calling mode should deserialize")
+        }),
+    ]
+}
+
+/// Strategy for generating InteractionStatus values including Unknown variant.
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_interaction_status_with_unknown() -> impl Strategy<Value = InteractionStatus> {
+    prop_oneof![
+        Just(InteractionStatus::Completed),
+        Just(InteractionStatus::InProgress),
+        Just(InteractionStatus::RequiresAction),
+        Just(InteractionStatus::Failed),
+        Just(InteractionStatus::Cancelled),
+        // Unknown variant via JSON deserialization
+        arb_unknown_type_string().prop_map(|type_str| {
+            serde_json::from_value::<InteractionStatus>(serde_json::json!(type_str))
+                .expect("Unknown interaction status should deserialize")
+        }),
+    ]
+}
+
+/// Strategy for generating FileState values including Unknown variant.
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_file_state_with_unknown() -> impl Strategy<Value = FileState> {
+    prop_oneof![
+        Just(FileState::Processing),
+        Just(FileState::Active),
+        Just(FileState::Failed),
+        // Unknown variant via JSON deserialization (uses SCREAMING_CASE)
+        arb_unknown_type_string().prop_map(|type_str| {
+            let screaming = format!("STATE_{}", type_str.to_uppercase());
+            serde_json::from_value::<FileState>(serde_json::json!(screaming))
+                .expect("Unknown file state should deserialize")
+        }),
+    ]
+}
+
+/// Strategy for generating InteractionContent Unknown variant.
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_interaction_content_unknown() -> impl Strategy<Value = InteractionContent> {
+    (arb_unknown_type_string(), arb_json_value()).prop_map(|(type_str, extra_data)| {
+        let json = serde_json::json!({
+            "type": type_str,
+            "extra_field": extra_data,
+        });
+        serde_json::from_value::<InteractionContent>(json)
+            .expect("Unknown interaction content should deserialize")
+    })
+}
+
+/// Strategy for generating StreamChunk Unknown variant.
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_stream_chunk_unknown() -> impl Strategy<Value = StreamChunk> {
+    (arb_unknown_type_string(), arb_json_value()).prop_map(|(type_str, data)| {
+        let json = serde_json::json!({
+            "chunk_type": type_str,
+            "data": data,
+        });
+        serde_json::from_value::<StreamChunk>(json)
+            .expect("Unknown stream chunk should deserialize")
+    })
+}
+
+/// Strategy for generating Tool Unknown variant.
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_tool_unknown() -> impl Strategy<Value = Tool> {
+    (arb_unknown_type_string(), arb_json_value()).prop_map(|(type_str, config)| {
+        let json = serde_json::json!({
+            "type": type_str,
+            "config": config,
+        });
+        serde_json::from_value::<Tool>(json).expect("Unknown tool should deserialize")
+    })
+}
+
+// =============================================================================
+// Unknown Variant Roundtrip Tests
+// =============================================================================
+//
+// These tests verify that Unknown variants roundtrip correctly through
+// JSON serialization/deserialization. They are skipped when strict-unknown
+// feature is enabled because strict mode errors instead of creating Unknown.
+
+#[cfg(not(feature = "strict-unknown"))]
+proptest! {
+    /// Test Resolution Unknown variant roundtrip.
+    #[test]
+    fn resolution_unknown_roundtrip(resolution in arb_resolution_with_unknown()) {
+        let json = serde_json::to_value(&resolution).expect("Serialization should succeed");
+        let restored: Resolution = serde_json::from_value(json.clone()).expect("Deserialization should succeed");
+
+        // Verify Unknown preservation
+        if resolution.is_unknown() {
+            prop_assert!(restored.is_unknown(), "Unknown variant should be preserved");
+            prop_assert_eq!(
+                resolution.unknown_resolution_type(),
+                restored.unknown_resolution_type(),
+                "Unknown type string should match"
+            );
+        }
+
+        // Verify roundtrip by re-serializing
+        let restored_json = serde_json::to_value(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test Role Unknown variant roundtrip.
+    #[test]
+    fn role_unknown_roundtrip(role in arb_role_with_unknown()) {
+        let json = serde_json::to_value(&role).expect("Serialization should succeed");
+        let restored: Role = serde_json::from_value(json.clone()).expect("Deserialization should succeed");
+
+        if role.is_unknown() {
+            prop_assert!(restored.is_unknown());
+            prop_assert_eq!(role.unknown_role_type(), restored.unknown_role_type());
+        }
+
+        let restored_json = serde_json::to_value(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test ThinkingLevel Unknown variant roundtrip.
+    #[test]
+    fn thinking_level_unknown_roundtrip(level in arb_thinking_level_with_unknown()) {
+        let json = serde_json::to_value(&level).expect("Serialization should succeed");
+        let restored: ThinkingLevel = serde_json::from_value(json.clone()).expect("Deserialization should succeed");
+
+        if level.is_unknown() {
+            prop_assert!(restored.is_unknown());
+            prop_assert_eq!(level.unknown_level_type(), restored.unknown_level_type());
+        }
+
+        let restored_json = serde_json::to_value(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test ThinkingSummaries Unknown variant roundtrip.
+    #[test]
+    fn thinking_summaries_unknown_roundtrip(summaries in arb_thinking_summaries_with_unknown()) {
+        let json = serde_json::to_value(&summaries).expect("Serialization should succeed");
+        let restored: ThinkingSummaries = serde_json::from_value(json.clone()).expect("Deserialization should succeed");
+
+        if summaries.is_unknown() {
+            prop_assert!(restored.is_unknown());
+            prop_assert_eq!(summaries.unknown_summaries_type(), restored.unknown_summaries_type());
+        }
+
+        let restored_json = serde_json::to_value(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test FunctionCallingMode Unknown variant roundtrip.
+    #[test]
+    fn function_calling_mode_unknown_roundtrip(mode in arb_function_calling_mode_with_unknown()) {
+        let json = serde_json::to_value(&mode).expect("Serialization should succeed");
+        let restored: FunctionCallingMode = serde_json::from_value(json.clone()).expect("Deserialization should succeed");
+
+        if mode.is_unknown() {
+            prop_assert!(restored.is_unknown());
+            prop_assert_eq!(mode.unknown_mode_type(), restored.unknown_mode_type());
+        }
+
+        let restored_json = serde_json::to_value(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test InteractionStatus Unknown variant roundtrip.
+    #[test]
+    fn interaction_status_unknown_roundtrip(status in arb_interaction_status_with_unknown()) {
+        let json = serde_json::to_value(&status).expect("Serialization should succeed");
+        let restored: InteractionStatus = serde_json::from_value(json.clone()).expect("Deserialization should succeed");
+
+        if status.is_unknown() {
+            prop_assert!(restored.is_unknown());
+            prop_assert_eq!(status.unknown_status_type(), restored.unknown_status_type());
+        }
+
+        let restored_json = serde_json::to_value(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test FileState Unknown variant roundtrip.
+    #[test]
+    fn file_state_unknown_roundtrip(state in arb_file_state_with_unknown()) {
+        let json = serde_json::to_value(&state).expect("Serialization should succeed");
+        let restored: FileState = serde_json::from_value(json.clone()).expect("Deserialization should succeed");
+
+        if state.is_unknown() {
+            prop_assert!(restored.is_unknown());
+            prop_assert_eq!(state.unknown_state_type(), restored.unknown_state_type());
+        }
+
+        let restored_json = serde_json::to_value(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test InteractionContent Unknown variant roundtrip.
+    #[test]
+    fn interaction_content_unknown_roundtrip(content in arb_interaction_content_unknown()) {
+        let json = serde_json::to_value(&content).expect("Serialization should succeed");
+        let restored: InteractionContent = serde_json::from_value(json.clone()).expect("Deserialization should succeed");
+
+        prop_assert!(content.is_unknown(), "Generated content should be Unknown");
+        prop_assert!(restored.is_unknown(), "Restored content should be Unknown");
+        prop_assert_eq!(content.unknown_content_type(), restored.unknown_content_type());
+
+        let restored_json = serde_json::to_value(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test StreamChunk Unknown variant roundtrip.
+    #[test]
+    fn stream_chunk_unknown_roundtrip(chunk in arb_stream_chunk_unknown()) {
+        let json = serde_json::to_value(&chunk).expect("Serialization should succeed");
+        let restored: StreamChunk = serde_json::from_value(json.clone()).expect("Deserialization should succeed");
+
+        prop_assert!(chunk.is_unknown(), "Generated chunk should be Unknown");
+        prop_assert!(restored.is_unknown(), "Restored chunk should be Unknown");
+        prop_assert_eq!(chunk.unknown_chunk_type(), restored.unknown_chunk_type());
+
+        let restored_json = serde_json::to_value(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test Tool Unknown variant roundtrip.
+    #[test]
+    fn tool_unknown_roundtrip(tool in arb_tool_unknown()) {
+        let json = serde_json::to_value(&tool).expect("Serialization should succeed");
+        let restored: Tool = serde_json::from_value(json.clone()).expect("Deserialization should succeed");
+
+        prop_assert!(tool.is_unknown(), "Generated tool should be Unknown");
+        prop_assert!(restored.is_unknown(), "Restored tool should be Unknown");
+        prop_assert_eq!(tool.unknown_tool_type(), restored.unknown_tool_type());
+
+        let restored_json = serde_json::to_value(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
+    }
+
+    /// Test AutoFunctionStreamChunk Unknown variant data preservation.
+    ///
+    /// This test verifies that Unknown variants preserve all original data through
+    /// serialization roundtrips, not just the type string.
+    #[test]
+    fn auto_function_stream_chunk_unknown_data_preservation(
+        chunk_type in arb_unknown_type_string(),
+        data in arb_json_value()
+    ) {
+        let chunk = AutoFunctionStreamChunk::Unknown {
+            chunk_type: chunk_type.clone(),
+            data: data.clone(),
+        };
+
+        let json = serde_json::to_value(&chunk).expect("Serialization should succeed");
+        let restored: AutoFunctionStreamChunk = serde_json::from_value(json.clone())
+            .expect("Deserialization should succeed");
+
+        prop_assert!(restored.is_unknown());
+        prop_assert_eq!(restored.unknown_chunk_type(), Some(chunk_type.as_str()));
+
+        // Verify full data preservation via re-serialization
+        let restored_json = serde_json::to_value(&restored).expect("Re-serialization should succeed");
+        prop_assert_eq!(json, restored_json);
     }
 }
