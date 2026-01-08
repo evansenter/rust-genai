@@ -13,16 +13,14 @@ All types below implement graceful handling of unrecognized values via an `Unkno
 | 1 | `Resolution` | src/content.rs | `resolution_type` | Image/video quality |
 | 2 | `InteractionContent` | src/content.rs | `content_type` | 18+ content types |
 | 3 | `StreamChunk` | src/wire_streaming.rs | `chunk_type` | Low-level SSE chunks |
-| 4 | `InteractionContentDelta` | src/wire_streaming.rs | `delta_type` | Streaming deltas |
-| 5 | `AutoFunctionStreamChunk` | src/streaming.rs | `chunk_type` | High-level streaming |
-| 6 | `AutoFunctionEvent` | src/streaming.rs | `event_type` | Auto-function events |
-| 7 | `FileState` | src/http/files.rs | `state_type` | File upload states |
-| 8 | `Tool` | src/tools.rs | `tool_type` | Tool types |
-| 9 | `FunctionCallingMode` | src/tools.rs | `mode_type` | AUTO/ANY/NONE/VALIDATED |
-| 10 | `Role` | src/request.rs | `role_type` | user/model/system |
-| 11 | `ThinkingLevel` | src/request.rs | `level_type` | minimal/low/medium/high |
-| 12 | `ThinkingSummaries` | src/request.rs | `summaries_type` | Context-dependent format |
-| 13 | `InteractionStatus` | src/response.rs | `status_type` | Response status |
+| 4 | `AutoFunctionStreamChunk` | src/streaming.rs | `chunk_type` | High-level streaming |
+| 5 | `FileState` | src/http/files.rs | `state_type` | File upload states |
+| 6 | `Tool` | src/tools.rs | `tool_type` | Tool types |
+| 7 | `FunctionCallingMode` | src/tools.rs | `mode_type` | AUTO/ANY/NONE/VALIDATED |
+| 8 | `Role` | src/request.rs | `role_type` | user/model/system |
+| 9 | `ThinkingLevel` | src/request.rs | `level_type` | minimal/low/medium/high |
+| 10 | `ThinkingSummaries` | src/request.rs | `summaries_type` | Context-dependent format |
+| 11 | `InteractionStatus` | src/response.rs | `status_type` | Response status |
 
 ### Unknown Variant Pattern
 
