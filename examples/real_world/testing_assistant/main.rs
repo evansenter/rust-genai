@@ -374,10 +374,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!();
             }
 
-            if let Some(setup) = &suite.setup_code {
-                if !setup.is_empty() {
-                    println!("Setup:\n{}\n", setup);
-                }
+            if let Some(setup) = &suite.setup_code
+                && !setup.is_empty()
+            {
+                println!("Setup:\n{}\n", setup);
             }
 
             println!("Test Cases ({} total):", suite.test_cases.len());

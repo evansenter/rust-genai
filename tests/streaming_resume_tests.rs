@@ -294,10 +294,10 @@ async fn test_stream_resume_with_last_event_id() {
             if let Some(ref eid) = event.event_id {
                 all_event_ids.push(eid.clone());
             }
-            if let StreamChunk::Delta(delta) = event.chunk {
-                if let Some(text) = delta.text() {
-                    full_text.push_str(text);
-                }
+            if let StreamChunk::Delta(delta) = event.chunk
+                && let Some(text) = delta.text()
+            {
+                full_text.push_str(text);
             }
         }
     }
@@ -334,10 +334,10 @@ async fn test_stream_resume_with_last_event_id() {
             if let Some(ref eid) = event.event_id {
                 resumed_event_ids.push(eid.clone());
             }
-            if let StreamChunk::Delta(delta) = event.chunk {
-                if let Some(text) = delta.text() {
-                    resumed_text.push_str(text);
-                }
+            if let StreamChunk::Delta(delta) = event.chunk
+                && let Some(text) = delta.text()
+            {
+                resumed_text.push_str(text);
             }
         }
     }

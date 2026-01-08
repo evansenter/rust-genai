@@ -869,8 +869,9 @@ pub async fn validate_response_semantically(
         .await?;
 
     // Parse structured output
-    if let Some(text) = validation.text() {
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(text) {
+    if let Some(text) = validation.text()
+        && let Ok(json) = serde_json::from_str::<serde_json::Value>(text)
+    {
             let is_valid = json
                 .get("is_valid")
                 .and_then(|v| v.as_bool())
@@ -893,8 +894,7 @@ pub async fn validate_response_semantically(
                 reason
             );
 
-            return Ok(is_valid);
-        }
+        return Ok(is_valid);
     }
 
     // Fallback: if we can't parse the structured output at all, assume valid

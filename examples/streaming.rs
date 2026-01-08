@@ -113,10 +113,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             total_chars += text.len();
                         }
                         // Handle thought deltas (thinking mode)
-                        if delta.is_thought() {
-                            if let Some(thought_text) = delta.thought() {
-                                eprintln!("[Thought] {}", thought_text);
-                            }
+                        if delta.is_thought()
+                            && let Some(thought_text) = delta.thought()
+                        {
+                            eprintln!("[Thought] {}", thought_text);
                         }
                     }
                     StreamChunk::ContentStop { index } => {
