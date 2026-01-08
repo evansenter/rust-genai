@@ -17,11 +17,11 @@
 //! 3. Role, ThinkingLevel, ThinkingSummaries, InteractionStatus
 
 use chrono::{DateTime, TimeZone, Utc};
-use proptest::prelude::*;
 use genai_rs::{
     Annotation, AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionResult,
     InteractionContent, InteractionResponse, InteractionStatus, ModalityTokens, UsageMetadata,
 };
+use proptest::prelude::*;
 
 // Additional imports for Unknown variant tests (only used when strict-unknown is disabled)
 #[cfg(not(feature = "strict-unknown"))]
