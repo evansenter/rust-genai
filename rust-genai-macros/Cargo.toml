@@ -2,6 +2,14 @@
 name = "rust-genai-macros"
 version = "0.3.0"
 edition = "2024"
+rust-version = "1.86"
+license = "MIT"
+description = "Procedural macros for rust-genai: automatic function declaration generation for Gemini API tool calling"
+repository = "https://github.com/evansenter/rust-genai"
+documentation = "https://docs.rs/rust-genai-macros"
+readme = "../README.md"
+keywords = ["macros", "gemini", "genai", "proc-macro"]
+categories = ["development-tools::procedural-macro-helpers"]
 
 [lib]
 proc-macro = true

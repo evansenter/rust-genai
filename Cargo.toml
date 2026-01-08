@@ -25,8 +25,14 @@ chrono = { version = "0.4", features = ["serde"] }
 name = "rust-genai"
 version = "0.3.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.86"
 license = "MIT"
+description = "A Rust client library for Google's Generative AI (Gemini) API with streaming, function calling, and multi-turn conversations"
+repository = "https://github.com/evansenter/rust-genai"
+documentation = "https://docs.rs/rust-genai"
+readme = "README.md"
+keywords = ["gemini", "google", "ai", "llm", "genai"]
+categories = ["api-bindings", "asynchronous"]
 
 [dependencies]
 rust-genai-macros = { path = "./rust-genai-macros" }
@@ -58,6 +64,7 @@ bytes = { workspace = true }
 futures-util = { workspace = true }
 proptest = "1.9"
 chrono = { workspace = true }
+doc-comment = "0.3"
 
 [features]
 ## Strict mode for unknown content types.

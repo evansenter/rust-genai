@@ -127,7 +127,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.85.0
+      - uses: dtolnay/rust-toolchain@1.86.0
       - uses: Swatinem/rust-cache@v2
       - name: Check workspace with MSRV
         run: cargo check --workspace
@@ -149,9 +149,10 @@ jobs:
         with:
           shared-key: ${{ matrix.os }}-${{ matrix.rust }}
       - name: Build
-        run: cargo build --workspace
+        run: cargo build --workspace --release
       - name: Run tests
-        run: cargo test --workspace --verbose
+        # Use release mode on Windows to avoid linker resource exhaustion (error 1318)
+        run: cargo test --workspace --release --verbose
 
   coverage:
     name: Code Coverage
