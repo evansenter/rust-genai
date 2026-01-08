@@ -18,7 +18,7 @@
 mod common;
 
 use common::{get_client, retry_on_any_error, validate_response_semantically};
-use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
+use genai_rs::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 
 // =============================================================================
@@ -511,7 +511,7 @@ async fn test_system_instruction_inheritance() {
 #[ignore = "Requires API key"]
 async fn test_multiturn_streaming_auto_functions() {
     use futures_util::StreamExt;
-    use rust_genai::AutoFunctionStreamChunk;
+    use genai_rs::AutoFunctionStreamChunk;
 
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");

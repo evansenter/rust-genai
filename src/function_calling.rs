@@ -58,7 +58,7 @@ pub trait CallableFunction: Send + Sync {
 /// # Example
 ///
 /// ```ignore
-/// use rust_genai::{CallableFunction, ToolService, FunctionDeclaration};
+/// use genai_rs::{CallableFunction, ToolService, FunctionDeclaration};
 /// use std::sync::Arc;
 ///
 /// struct WeatherService {

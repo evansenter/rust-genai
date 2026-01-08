@@ -20,7 +20,7 @@
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
 use async_trait::async_trait;
-use rust_genai::{CallableFunction, Client, FunctionDeclaration, FunctionError, ToolService};
+use genai_rs::{CallableFunction, Client, FunctionDeclaration, FunctionError, ToolService};
 use serde_json::{Value, json};
 use std::env;
 use std::sync::{Arc, RwLock};

@@ -8,7 +8,7 @@
 //! Run with: cargo run --example code_execution
 
 use futures_util::StreamExt;
-use rust_genai::{Client, CodeExecutionOutcome, GenaiError, StreamChunk};
+use genai_rs::{Client, CodeExecutionOutcome, GenaiError, StreamChunk};
 use std::env;
 use std::error::Error;
 use std::io::{Write, stdout};

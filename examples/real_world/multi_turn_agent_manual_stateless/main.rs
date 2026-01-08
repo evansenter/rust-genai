@@ -32,8 +32,8 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use rust_genai::interactions_api::{function_call_content, function_result_content, text_content};
-use rust_genai::{Client, FunctionDeclaration, InteractionContent, InteractionInput};
+use genai_rs::interactions_api::{function_call_content, function_result_content, text_content};
+use genai_rs::{Client, FunctionDeclaration, InteractionContent, InteractionInput};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;

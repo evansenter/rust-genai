@@ -26,7 +26,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use rust_genai::Client;
+//! use genai_rs::Client;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let client = Client::new("api-key".to_string());
@@ -142,7 +142,7 @@ impl FileMetadata {
     /// # Example
     ///
     /// ```
-    /// # use rust_genai::FileMetadata;
+    /// # use genai_rs::FileMetadata;
     /// # let file: FileMetadata = serde_json::from_str(r#"{"name":"files/abc","mimeType":"video/mp4","uri":"","sizeBytes":"1234567"}"#).unwrap();
     /// if let Some(size) = file.size_bytes_as_u64() {
     ///     println!("File size: {} bytes", size);
@@ -466,7 +466,7 @@ pub async fn upload_file(
 /// # Example
 ///
 /// ```ignore
-/// use rust_genai::{ResumableUpload, upload_file_chunked};
+/// use genai_rs::{ResumableUpload, upload_file_chunked};
 /// use std::time::Duration;
 ///
 /// // Start a streaming upload
@@ -661,7 +661,7 @@ pub const DEFAULT_CHUNK_SIZE: usize = 8 * 1024 * 1024; // 8 MB
 /// # Example
 ///
 /// ```ignore
-/// use rust_genai::upload_file_chunked;
+/// use genai_rs::upload_file_chunked;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let http_client = reqwest::Client::new();

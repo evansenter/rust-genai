@@ -14,7 +14,7 @@ mod common;
 
 use common::{consume_stream, get_client, interaction_builder, stateful_builder};
 use futures_util::StreamExt;
-use rust_genai::{InteractionStatus, StreamChunk};
+use genai_rs::{InteractionStatus, StreamChunk};
 
 // =============================================================================
 // Stream Event ID Tests

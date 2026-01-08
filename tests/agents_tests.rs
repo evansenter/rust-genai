@@ -18,7 +18,7 @@
 mod common;
 
 use common::{PollError, get_client, poll_until_complete};
-use rust_genai::{DeepResearchConfig, InteractionStatus, ThinkingSummaries};
+use genai_rs::{DeepResearchConfig, InteractionStatus, ThinkingSummaries};
 use std::time::Duration;
 
 /// Maximum time to wait for background tasks to complete.

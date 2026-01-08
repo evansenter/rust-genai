@@ -25,7 +25,7 @@
 //! ```
 
 use futures_util::future::join_all;
-use rust_genai::{Client, FunctionDeclaration, function_result_content};
+use genai_rs::{Client, FunctionDeclaration, function_result_content};
 use serde_json::{Value, json};
 use std::env;
 use std::error::Error;

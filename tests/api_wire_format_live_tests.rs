@@ -27,7 +27,7 @@
 //! it means the API has drifted and we need to update our types.
 
 use futures_util::StreamExt;
-use rust_genai::Client;
+use genai_rs::Client;
 use std::env;
 
 /// Helper to create a client for canary tests.
@@ -126,7 +126,7 @@ async fn canary_response_status_is_known() {
 async fn canary_function_calling_no_unknown_content() {
     require_api_key!(client);
 
-    use rust_genai::FunctionDeclaration;
+    use genai_rs::FunctionDeclaration;
 
     // Simple function declaration using the correct API
     let get_weather = FunctionDeclaration::builder("get_weather")
@@ -175,7 +175,7 @@ async fn canary_function_calling_no_unknown_content() {
 async fn canary_thinking_mode_no_unknown_content() {
     require_api_key!(client);
 
-    use rust_genai::ThinkingLevel;
+    use genai_rs::ThinkingLevel;
 
     let response = client
         .interaction()
@@ -310,7 +310,7 @@ async fn canary_code_execution_no_unknown_content() {
 /// and they don't become Unknown variants.
 #[test]
 fn canary_builtin_tools_are_known() {
-    use rust_genai::Tool;
+    use genai_rs::Tool;
 
     // Test all known built-in tools (using enum variants directly)
     let tools = vec![Tool::GoogleSearch, Tool::CodeExecution, Tool::UrlContext];

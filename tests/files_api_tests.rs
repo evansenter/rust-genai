@@ -2,7 +2,7 @@
 //!
 //! These tests verify file upload, listing, deletion, and integration with interactions.
 
-use rust_genai::Client;
+use genai_rs::Client;
 use std::time::Duration;
 
 fn get_client() -> Client {
@@ -195,7 +195,7 @@ async fn test_file_in_interaction() {
 #[tokio::test]
 #[ignore] // Requires API key
 async fn test_file_uri_content_type_inference() {
-    use rust_genai::{InteractionContent, file_uri_content};
+    use genai_rs::{InteractionContent, file_uri_content};
 
     let client = get_client();
 

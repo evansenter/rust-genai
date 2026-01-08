@@ -28,8 +28,8 @@
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
 use futures_util::StreamExt;
-use rust_genai::{CallableFunction, Client, FunctionCallingMode, StreamChunk};
-use rust_genai_macros::tool;
+use genai_rs::{CallableFunction, Client, FunctionCallingMode, StreamChunk};
+use genai_rs_macros::tool;
 use std::env;
 use std::io::{Write, stdout};
 

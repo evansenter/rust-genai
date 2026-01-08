@@ -7,7 +7,7 @@
 //!
 //! Run with: cargo run --example audio_input
 
-use rust_genai::{Client, GenaiError};
+use genai_rs::{Client, GenaiError};
 use std::env;
 use std::error::Error;
 
@@ -200,7 +200,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Option 1: Use the built-in file loading helper (recommended):\n");
     println!(
         r#"
-   use rust_genai::audio_from_file;
+   use genai_rs::audio_from_file;
 
    // Load audio file with automatic MIME detection and base64 encoding
    let audio_content = audio_from_file("path/to/audio.mp3").await?;

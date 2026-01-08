@@ -100,7 +100,7 @@ pub fn format_json_parse_error(json_str: &str, error: serde_json::Error) -> Stri
 ///
 /// ```ignore
 /// // This module is pub(crate) - example shown for documentation only
-/// use rust_genai::http::error_helpers::deserialize_with_context;
+/// use genai_rs::http::error_helpers::deserialize_with_context;
 /// use serde::Deserialize;
 ///
 /// #[derive(Deserialize, Debug)]

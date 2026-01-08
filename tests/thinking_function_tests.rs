@@ -23,7 +23,7 @@
 mod common;
 
 use common::{consume_stream, get_client, stateful_builder, validate_response_semantically};
-use rust_genai::{FunctionDeclaration, InteractionStatus, ThinkingLevel, function_result_content};
+use genai_rs::{FunctionDeclaration, InteractionStatus, ThinkingLevel, function_result_content};
 use serde_json::json;
 
 // =============================================================================

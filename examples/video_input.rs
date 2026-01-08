@@ -7,7 +7,7 @@
 //!
 //! Run with: cargo run --example video_input
 
-use rust_genai::{Client, GenaiError};
+use genai_rs::{Client, GenaiError};
 use std::env;
 use std::error::Error;
 
@@ -243,7 +243,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Option 1: Use the built-in file loading helper (recommended):\n");
     println!(
         r#"
-   use rust_genai::video_from_file;
+   use genai_rs::video_from_file;
 
    // Load video file with automatic MIME detection and base64 encoding
    let video_content = video_from_file("path/to/video.mp4").await?;

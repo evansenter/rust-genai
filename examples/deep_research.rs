@@ -18,7 +18,7 @@
 //!
 //! Run with: cargo run --example deep_research
 
-use rust_genai::{Client, DeepResearchConfig, GenaiError, InteractionStatus, ThinkingSummaries};
+use genai_rs::{Client, DeepResearchConfig, GenaiError, InteractionStatus, ThinkingSummaries};
 use std::env;
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -190,7 +190,7 @@ impl From<GenaiError> for PollError {
 async fn poll_for_completion(
     client: &Client,
     interaction_id: &str,
-) -> Result<rust_genai::InteractionResponse, PollError> {
+) -> Result<genai_rs::InteractionResponse, PollError> {
     let start = Instant::now();
     let mut delay = INITIAL_POLL_DELAY;
     let mut poll_count = 0;
@@ -253,7 +253,7 @@ async fn poll_for_completion(
 }
 
 /// Displays the research results from a completed interaction
-fn display_research_results(response: &rust_genai::InteractionResponse) {
+fn display_research_results(response: &genai_rs::InteractionResponse) {
     println!("Status: {:?}", response.status);
     println!("Interaction ID: {:?}\n", response.id);
 

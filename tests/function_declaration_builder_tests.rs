@@ -2,7 +2,7 @@
 //!
 //! This file contains tests for FunctionDeclarationBuilder edge cases and validation.
 
-use rust_genai::FunctionDeclaration;
+use genai_rs::FunctionDeclaration;
 use serde_json::json;
 
 #[test]

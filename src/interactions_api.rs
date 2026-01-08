@@ -62,7 +62,7 @@ use serde_json::Value;
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::text_content;
+/// use genai_rs::interactions_api::text_content;
 ///
 /// let content = text_content("This is a response");
 /// ```
@@ -76,7 +76,7 @@ pub fn text_content(text: impl Into<String>) -> InteractionContent {
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::thought_content;
+/// use genai_rs::interactions_api::thought_content;
 ///
 /// let thought = thought_content("I need to search for weather data");
 /// ```
@@ -101,7 +101,7 @@ pub fn thought_content(text: impl Into<String>) -> InteractionContent {
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::function_call_content_with_signature;
+/// use genai_rs::interactions_api::function_call_content_with_signature;
 /// use serde_json::json;
 ///
 /// let call = function_call_content_with_signature(
@@ -128,7 +128,7 @@ pub fn function_call_content_with_signature(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::function_call_content;
+/// use genai_rs::interactions_api::function_call_content;
 /// use serde_json::json;
 ///
 /// let call = function_call_content(
@@ -154,7 +154,7 @@ pub fn function_call_content(name: impl Into<String>, args: Value) -> Interactio
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::function_result_content;
+/// use genai_rs::interactions_api::function_result_content;
 /// use serde_json::json;
 ///
 /// let result = function_result_content(
@@ -181,7 +181,7 @@ pub fn function_result_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::image_data_content;
+/// use genai_rs::interactions_api::image_data_content;
 ///
 /// let image = image_data_content(
 ///     "base64encodeddata...",
@@ -210,8 +210,8 @@ pub fn image_data_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::image_data_content_with_resolution;
-/// use rust_genai::Resolution;
+/// use genai_rs::interactions_api::image_data_content_with_resolution;
+/// use genai_rs::Resolution;
 ///
 /// let image = image_data_content_with_resolution(
 ///     "base64encodeddata...",
@@ -238,7 +238,7 @@ pub fn image_data_content_with_resolution(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::image_uri_content;
+/// use genai_rs::interactions_api::image_uri_content;
 ///
 /// let image = image_uri_content(
 ///     "https://example.com/image.png",
@@ -264,8 +264,8 @@ pub fn image_uri_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::image_uri_content_with_resolution;
-/// use rust_genai::Resolution;
+/// use genai_rs::interactions_api::image_uri_content_with_resolution;
+/// use genai_rs::Resolution;
 ///
 /// let image = image_uri_content_with_resolution(
 ///     "https://example.com/image.png",
@@ -287,7 +287,7 @@ pub fn image_uri_content_with_resolution(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::audio_data_content;
+/// use genai_rs::interactions_api::audio_data_content;
 ///
 /// let audio = audio_data_content(
 ///     "base64encodeddata...",
@@ -312,7 +312,7 @@ pub fn audio_data_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::audio_uri_content;
+/// use genai_rs::interactions_api::audio_uri_content;
 ///
 /// let audio = audio_uri_content(
 ///     "https://example.com/audio.mp3",
@@ -332,7 +332,7 @@ pub fn audio_uri_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::video_data_content;
+/// use genai_rs::interactions_api::video_data_content;
 ///
 /// let video = video_data_content(
 ///     "base64encodeddata...",
@@ -361,8 +361,8 @@ pub fn video_data_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::video_data_content_with_resolution;
-/// use rust_genai::Resolution;
+/// use genai_rs::interactions_api::video_data_content_with_resolution;
+/// use genai_rs::Resolution;
 ///
 /// let video = video_data_content_with_resolution(
 ///     "base64encodeddata...",
@@ -389,7 +389,7 @@ pub fn video_data_content_with_resolution(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::video_uri_content;
+/// use genai_rs::interactions_api::video_uri_content;
 ///
 /// let video = video_uri_content(
 ///     "https://example.com/video.mp4",
@@ -415,8 +415,8 @@ pub fn video_uri_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::video_uri_content_with_resolution;
-/// use rust_genai::Resolution;
+/// use genai_rs::interactions_api::video_uri_content_with_resolution;
+/// use genai_rs::Resolution;
 ///
 /// let video = video_uri_content_with_resolution(
 ///     "https://example.com/video.mp4",
@@ -440,7 +440,7 @@ pub fn video_uri_content_with_resolution(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::document_data_content;
+/// use genai_rs::interactions_api::document_data_content;
 ///
 /// let document = document_data_content(
 ///     "base64encodeddata...",
@@ -467,7 +467,7 @@ pub fn document_data_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::document_uri_content;
+/// use genai_rs::interactions_api::document_uri_content;
 ///
 /// let document = document_uri_content(
 ///     "https://example.com/document.pdf",
@@ -495,18 +495,18 @@ pub fn document_uri_content(
 /// # Example
 ///
 /// ```no_run
-/// use rust_genai::Client;
+/// use genai_rs::Client;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let client = Client::new("api-key".to_string());
 ///
 /// let file = client.upload_file("video.mp4").await?;
-/// let content = rust_genai::file_uri_content(&file);
+/// let content = genai_rs::file_uri_content(&file);
 ///
 /// let response = client.interaction()
 ///     .with_model("gemini-3-flash-preview")
 ///     .with_content(vec![
-///         rust_genai::text_content("Describe this video"),
+///         genai_rs::text_content("Describe this video"),
 ///         content,
 ///     ])
 ///     .create()
@@ -547,7 +547,7 @@ pub fn content_from_uri_and_mime(uri: String, mime_type: String) -> InteractionC
 // NOT re-exported from crate root - access via response methods instead
 // (e.g., response.google_search_results(), response.code_execution_results()).
 //
-// Available via rust_genai::interactions_api::* if direct construction is needed.
+// Available via genai_rs::interactions_api::* if direct construction is needed.
 
 // ----------------------------------------------------------------------------
 // Code Execution (built-in tool output)
@@ -560,8 +560,8 @@ pub fn content_from_uri_and_mime(uri: String, mime_type: String) -> InteractionC
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::code_execution_call_content;
-/// use rust_genai::CodeExecutionLanguage;
+/// use genai_rs::interactions_api::code_execution_call_content;
+/// use genai_rs::CodeExecutionLanguage;
 ///
 /// let call = code_execution_call_content("call_123", CodeExecutionLanguage::Python, "print('Hello, World!')");
 /// ```
@@ -583,8 +583,8 @@ pub fn code_execution_call_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::code_execution_result_content;
-/// use rust_genai::CodeExecutionOutcome;
+/// use genai_rs::interactions_api::code_execution_result_content;
+/// use genai_rs::CodeExecutionOutcome;
 ///
 /// let result = code_execution_result_content("call_123", CodeExecutionOutcome::Ok, "42");
 /// ```
@@ -606,7 +606,7 @@ pub fn code_execution_result_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::code_execution_success;
+/// use genai_rs::interactions_api::code_execution_success;
 ///
 /// let result = code_execution_success("call_123", "42\n");
 /// ```
@@ -623,7 +623,7 @@ pub fn code_execution_success(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::code_execution_error;
+/// use genai_rs::interactions_api::code_execution_error;
 ///
 /// let result = code_execution_error("call_123", "NameError: name 'x' is not defined");
 /// ```
@@ -644,7 +644,7 @@ pub fn code_execution_error(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::google_search_call_content;
+/// use genai_rs::interactions_api::google_search_call_content;
 ///
 /// let search = google_search_call_content("call-123", vec!["Rust programming language"]);
 /// ```
@@ -664,8 +664,8 @@ pub fn google_search_call_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::google_search_result_content;
-/// use rust_genai::GoogleSearchResultItem;
+/// use genai_rs::interactions_api::google_search_result_content;
+/// use genai_rs::GoogleSearchResultItem;
 ///
 /// let results = google_search_result_content("call-123", vec![
 ///     GoogleSearchResultItem::new("Rust", "https://rust-lang.org"),
@@ -691,8 +691,8 @@ pub fn google_search_result_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::file_search_result_content;
-/// use rust_genai::FileSearchResultItem;
+/// use genai_rs::interactions_api::file_search_result_content;
+/// use genai_rs::FileSearchResultItem;
 ///
 /// let results = file_search_result_content("call-123", vec![
 ///     FileSearchResultItem {
@@ -722,7 +722,7 @@ pub fn file_search_result_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::url_context_call_content;
+/// use genai_rs::interactions_api::url_context_call_content;
 ///
 /// let fetch = url_context_call_content("https://example.com");
 /// ```
@@ -736,7 +736,7 @@ pub fn url_context_call_content(url: impl Into<String>) -> InteractionContent {
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::url_context_result_content;
+/// use genai_rs::interactions_api::url_context_result_content;
 ///
 /// let result = url_context_result_content(
 ///     "https://example.com",
@@ -759,7 +759,7 @@ pub fn url_context_result_content(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::url_context_success;
+/// use genai_rs::interactions_api::url_context_success;
 ///
 /// let result = url_context_success("https://example.com", "<html>...</html>");
 /// ```
@@ -777,7 +777,7 @@ pub fn url_context_success(
 ///
 /// # Example
 /// ```
-/// use rust_genai::interactions_api::url_context_failure;
+/// use genai_rs::interactions_api::url_context_failure;
 ///
 /// let result = url_context_failure("https://example.com/blocked");
 /// ```

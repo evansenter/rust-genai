@@ -25,7 +25,7 @@ use common::{
     consume_stream, get_client, interaction_builder, stateful_builder,
     validate_response_semantically, with_timeout,
 };
-use rust_genai::{
+use genai_rs::{
     InteractionInput, InteractionStatus, audio_data_content, audio_uri_content,
     document_data_content, image_data_content, image_uri_content, text_content, video_data_content,
     video_uri_content,
@@ -259,7 +259,7 @@ async fn test_audio_input_from_base64() {
     // Note: This is a minimal header with no actual audio, so the model may report it's empty/silent
     let contents = vec![
         text_content("Describe what you hear in this audio file."),
-        rust_genai::audio_data_content(TINY_WAV_BASE64, "audio/wav"),
+        genai_rs::audio_data_content(TINY_WAV_BASE64, "audio/wav"),
     ];
 
     let result = stateful_builder(&client)
@@ -882,7 +882,7 @@ async fn test_add_multiple_image_files_builder() {
 #[tokio::test]
 async fn test_add_image_file_not_found() {
     // This test doesn't require an API key - just tests local file loading error
-    let client = rust_genai::Client::builder("fake-key-for-testing".to_string())
+    let client = genai_rs::Client::builder("fake-key-for-testing".to_string())
         .build()
         .unwrap();
 
@@ -1170,7 +1170,7 @@ async fn test_text_to_speech_basic() {
 #[tokio::test]
 #[ignore = "Requires API key and TTS model access"]
 async fn test_text_to_speech_with_speech_config() {
-    use rust_genai::SpeechConfig;
+    use genai_rs::SpeechConfig;
 
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");

@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "rust-genai-macros",
+    "genai-rs-macros",
 ]
 
 [workspace.dependencies]
@@ -22,20 +22,20 @@ utoipa = "5.4"
 chrono = { version = "0.4", features = ["serde"] }
 
 [package]
-name = "rust-genai"
+name = "genai-rs"
 version = "0.4.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT"
 description = "A Rust client library for Google's Generative AI (Gemini) API with streaming, function calling, and multi-turn conversations"
 repository = "https://github.com/evansenter/rust-genai"
-documentation = "https://docs.rs/rust-genai"
+documentation = "https://docs.rs/genai-rs"
 readme = "README.md"
 keywords = ["gemini", "google", "ai", "llm", "genai"]
 categories = ["api-bindings", "asynchronous"]
 
 [dependencies]
-rust-genai-macros = { path = "./rust-genai-macros" }
+genai-rs-macros = { path = "./genai-rs-macros" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 reqwest = { workspace = true }

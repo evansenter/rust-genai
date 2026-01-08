@@ -18,14 +18,14 @@
 
 use chrono::{DateTime, TimeZone, Utc};
 use proptest::prelude::*;
-use rust_genai::{
+use genai_rs::{
     Annotation, AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionResult,
     InteractionContent, InteractionResponse, InteractionStatus, ModalityTokens, UsageMetadata,
 };
 
 // Additional imports for Unknown variant tests (only used when strict-unknown is disabled)
 #[cfg(not(feature = "strict-unknown"))]
-use rust_genai::{
+use genai_rs::{
     FileState, FunctionCallingMode, Resolution, Role, StreamChunk, ThinkingLevel,
     ThinkingSummaries, Tool,
 };

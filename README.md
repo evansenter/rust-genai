@@ -1,8 +1,8 @@
 # Rust GenAI
 
-[![Crates.io](https://img.shields.io/crates/v/rust-genai.svg)](https://crates.io/crates/rust-genai)
-[![Documentation](https://docs.rs/rust-genai/badge.svg)](https://docs.rs/rust-genai)
-[![CI](https://github.com/evansenter/rust-genai/actions/workflows/rust.yml/badge.svg)](https://github.com/evansenter/rust-genai/actions/workflows/rust.yml)
+[![Crates.io](https://img.shields.io/crates/v/genai-rs.svg)](https://crates.io/crates/genai-rs)
+[![Documentation](https://docs.rs/genai-rs/badge.svg)](https://docs.rs/genai-rs)
+[![CI](https://github.com/evansenter/genai-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/evansenter/genai-rs/actions/workflows/rust.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A Rust client library for interacting with Google's Generative AI (Gemini) API using the Interactions API.
@@ -36,8 +36,8 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rust-genai = "0.3.0"
-rust-genai-macros = "0.3.0"  # Only if using the procedural macros
+genai-rs = "0.3.0"
+genai-rs-macros = "0.3.0"  # Only if using the procedural macros
 tokio = { version = "1.0", features = ["full"] }
 serde_json = "1.0"
 futures-util = "0.3"  # Only if using streaming responses
@@ -55,7 +55,7 @@ See `examples/` for complete, runnable examples covering all features.
 ### Simple Interaction
 
 ```rust
-use rust_genai::Client;
+use genai_rs::Client;
 use std::env;
 
 #[tokio::main]
@@ -78,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Streaming Responses
 
 ```rust
-use rust_genai::Client;
+use genai_rs::Client;
 use futures_util::StreamExt;
 
 let stream = client
@@ -141,7 +141,7 @@ Three approaches for client-side function calling:
 #### Automatic with `#[tool]` Macro
 
 ```rust
-use rust_genai_macros::tool;
+use genai_rs_macros::tool;
 
 /// Get the weather in a location
 #[tool(location(description = "City and state, e.g. San Francisco, CA"))]
@@ -165,7 +165,7 @@ println!("{}", result.response.text().unwrap());
 For tools that need shared state (database pools, API clients, configuration):
 
 ```rust
-use rust_genai::{ToolService, CallableFunction};
+use genai_rs::{ToolService, CallableFunction};
 
 struct MyService {
     db: Arc<DatabasePool>,
@@ -211,7 +211,7 @@ let response = client.interaction()
 ### Thinking Mode
 
 ```rust
-use rust_genai::ThinkingLevel;
+use genai_rs::ThinkingLevel;
 
 let response = client.interaction()
     .with_thinking_level(ThinkingLevel::Medium)
@@ -242,7 +242,7 @@ All media types follow the same pattern: `add_*_file()`, `add_*_data()`, `add_*_
 Enable debug logging:
 
 ```bash
-RUST_LOG=rust_genai=debug cargo run --example simple_interaction
+RUST_LOG=genai_rs=debug cargo run --example simple_interaction
 ```
 
 For wire-level API debugging without configuring a logging backend:
@@ -255,8 +255,8 @@ See [`docs/LOGGING_STRATEGY.md`](docs/LOGGING_STRATEGY.md) for details on log le
 
 ## Project Structure
 
-- **`rust-genai`** (root): Public API crate with `Client`, `InteractionBuilder`, HTTP layer (`src/http/`), and type modules
-- **`rust-genai-macros/`**: Procedural macro for `#[tool]`
+- **`genai-rs`** (root): Public API crate with `Client`, `InteractionBuilder`, HTTP layer (`src/http/`), and type modules
+- **`genai-rs-macros/`**: Procedural macro for `#[tool]`
 
 ## Forward Compatibility
 

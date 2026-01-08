@@ -28,13 +28,13 @@ mod common;
 
 use common::get_client;
 use futures_util::StreamExt;
-use rust_genai::InteractionInput;
+use genai_rs::InteractionInput;
 
 /// Model used for all canary tests - update if model availability changes
 const CANARY_MODEL: &str = "gemini-3-flash-preview";
 
 /// Helper to check a response for unknown content types and panic with details if found
-fn assert_no_unknown_content(response: &rust_genai::InteractionResponse, context: &str) {
+fn assert_no_unknown_content(response: &genai_rs::InteractionResponse, context: &str) {
     if response.has_unknown() {
         let summary = response.content_summary();
         panic!(
@@ -89,14 +89,14 @@ async fn canary_streaming_interaction() {
         chunk_count += 1;
         let event = result.expect("Stream event should be valid");
         match event.chunk {
-            rust_genai::StreamChunk::Delta(content) => {
-                if let rust_genai::InteractionContent::Unknown { content_type, .. } = &content
+            genai_rs::StreamChunk::Delta(content) => {
+                if let genai_rs::InteractionContent::Unknown { content_type, .. } = &content
                     && !unknown_types_found.contains(content_type)
                 {
                     unknown_types_found.push(content_type.clone());
                 }
             }
-            rust_genai::StreamChunk::Complete(response) => {
+            genai_rs::StreamChunk::Complete(response) => {
                 assert_no_unknown_content(&response, "streaming complete response");
             }
             _ => {} // Handle unknown variants
@@ -123,7 +123,7 @@ async fn canary_streaming_interaction() {
 #[tokio::test]
 #[ignore] // Requires GEMINI_API_KEY
 async fn canary_function_calling_interaction() {
-    use rust_genai::FunctionDeclaration;
+    use genai_rs::FunctionDeclaration;
     use serde_json::json;
 
     let client = get_client().expect("GEMINI_API_KEY must be set");
@@ -149,7 +149,7 @@ async fn canary_function_calling_interaction() {
     if !response.function_calls().is_empty() {
         let call = &response.function_calls()[0];
 
-        use rust_genai::interactions_api::{
+        use genai_rs::interactions_api::{
             function_call_content, function_result_content, text_content,
         };
 
@@ -179,7 +179,7 @@ async fn canary_function_calling_interaction() {
 #[tokio::test]
 #[ignore] // Requires GEMINI_API_KEY
 async fn canary_code_execution_interaction() {
-    use rust_genai::Tool;
+    use genai_rs::Tool;
 
     let client = get_client().expect("GEMINI_API_KEY must be set");
 
@@ -201,7 +201,7 @@ async fn canary_code_execution_interaction() {
 #[tokio::test]
 #[ignore] // Requires GEMINI_API_KEY
 async fn canary_multimodal_interaction() {
-    use rust_genai::interactions_api::{image_data_content, text_content};
+    use genai_rs::interactions_api::{image_data_content, text_content};
 
     let client = get_client().expect("GEMINI_API_KEY must be set");
 
@@ -228,7 +228,7 @@ async fn canary_multimodal_interaction() {
 #[tokio::test]
 #[ignore] // Requires GEMINI_API_KEY
 async fn canary_thinking_model_interaction() {
-    use rust_genai::{GenerationConfig, ThinkingLevel};
+    use genai_rs::{GenerationConfig, ThinkingLevel};
 
     let client = get_client().expect("GEMINI_API_KEY must be set");
 

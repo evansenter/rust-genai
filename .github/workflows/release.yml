@@ -50,17 +50,17 @@ jobs:
           fi
           echo "Version verified: $TAG_VERSION"
 
-      - name: Publish rust-genai-macros
-        run: cargo publish -p rust-genai-macros --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Publish genai-rs-macros
+        run: cargo publish -p genai-rs-macros --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
         continue-on-error: false
 
       # Wait for crates.io to index the macros crate
       - name: Wait for crates.io indexing
         run: |
-          MACRO_VERSION=$(grep '^version = ' rust-genai-macros/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-          echo "Waiting for rust-genai-macros v${MACRO_VERSION} to be indexed..."
+          MACRO_VERSION=$(grep '^version = ' genai-rs-macros/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "Waiting for genai-rs-macros v${MACRO_VERSION} to be indexed..."
           for i in {1..30}; do
-            if cargo search rust-genai-macros --limit 1 2>/dev/null | grep -q "${MACRO_VERSION}"; then
+            if cargo search genai-rs-macros --limit 1 2>/dev/null | grep -q "${MACRO_VERSION}"; then
               echo "Crate indexed successfully after $((i * 10)) seconds"
               exit 0
             fi
@@ -70,8 +70,8 @@ jobs:
           echo "::error::Timed out waiting for crate indexing after 5 minutes"
           exit 1
 
-      - name: Publish rust-genai
-        run: cargo publish -p rust-genai --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Publish genai-rs
+        run: cargo publish -p genai-rs --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   # Create GitHub release
   github-release:

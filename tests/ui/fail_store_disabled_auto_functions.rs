@@ -4,7 +4,7 @@
 //! the automatic function calling loop is not available because it requires
 //! server-side state to chain interactions.
 
-use rust_genai::Client;
+use genai_rs::Client;
 
 fn main() {
     let client = Client::builder("test-key".to_string()).build().unwrap();

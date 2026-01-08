@@ -18,7 +18,7 @@ use common::{
     EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_auto_function_stream, get_client,
     interaction_builder, with_timeout,
 };
-use rust_genai::{CallableFunction, FunctionDeclaration, FunctionError, ToolService};
+use genai_rs::{CallableFunction, FunctionDeclaration, FunctionError, ToolService};
 use serde_json::json;
 use std::sync::Arc;
 

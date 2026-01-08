@@ -20,7 +20,7 @@
 //! gracefully handle the unsupported URI error.
 
 use futures_util::StreamExt;
-use rust_genai::{
+use genai_rs::{
     AutoFunctionStreamChunk, AutoFunctionStreamEvent, Client, GenaiError, InteractionContent,
     InteractionResponse, InteractionStatus, StreamChunk, StreamEvent,
 };
@@ -749,7 +749,7 @@ pub const DEFAULT_MODEL: &str = "gemini-3-flash-preview";
 ///     .expect("Request failed");
 /// ```
 #[allow(dead_code)]
-pub fn interaction_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
+pub fn interaction_builder(client: &Client) -> genai_rs::InteractionBuilder<'_> {
     client.interaction().with_model(DEFAULT_MODEL)
 }
 
@@ -766,7 +766,7 @@ pub fn interaction_builder(client: &Client) -> rust_genai::InteractionBuilder<'_
 ///     .await?;
 /// ```
 #[allow(dead_code)]
-pub fn stateful_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
+pub fn stateful_builder(client: &Client) -> genai_rs::InteractionBuilder<'_> {
     interaction_builder(client).with_store_enabled()
 }
 

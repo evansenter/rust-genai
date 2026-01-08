@@ -23,7 +23,7 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use rust_genai::Client;
+use genai_rs::Client;
 use std::env;
 use std::error::Error;
 
