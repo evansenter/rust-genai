@@ -872,27 +872,27 @@ pub async fn validate_response_semantically(
     if let Some(text) = validation.text()
         && let Ok(json) = serde_json::from_str::<serde_json::Value>(text)
     {
-            let is_valid = json
-                .get("is_valid")
-                .and_then(|v| v.as_bool())
-                // Design decision: Default to valid if the boolean is missing or malformed.
-                // This favors test reliability (avoiding false negatives from API format changes)
-                // over catching edge cases where Gemini might return invalid but we can't parse it.
-                // The tradeoff is acceptable because: (1) structured output is typically reliable,
-                // (2) we log the reason for debugging, and (3) blocking tests on parse errors
-                // would make tests fragile to API evolution.
-                .unwrap_or(true);
+        let is_valid = json
+            .get("is_valid")
+            .and_then(|v| v.as_bool())
+            // Design decision: Default to valid if the boolean is missing or malformed.
+            // This favors test reliability (avoiding false negatives from API format changes)
+            // over catching edge cases where Gemini might return invalid but we can't parse it.
+            // The tradeoff is acceptable because: (1) structured output is typically reliable,
+            // (2) we log the reason for debugging, and (3) blocking tests on parse errors
+            // would make tests fragile to API evolution.
+            .unwrap_or(true);
 
-            let reason = json
-                .get("reason")
-                .and_then(|v| v.as_str())
-                .unwrap_or("(no reason provided)");
+        let reason = json
+            .get("reason")
+            .and_then(|v| v.as_str())
+            .unwrap_or("(no reason provided)");
 
-            println!(
-                "Semantic validation: {} - {}",
-                if is_valid { "✓ VALID" } else { "✗ INVALID" },
-                reason
-            );
+        println!(
+            "Semantic validation: {} - {}",
+            if is_valid { "✓ VALID" } else { "✗ INVALID" },
+            reason
+        );
 
         return Ok(is_valid);
     }
