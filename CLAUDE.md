@@ -101,7 +101,7 @@ See `examples/` for full list (multimodal, thinking, files API, image generation
 - `docs/MULTI_TURN_FUNCTION_CALLING.md` - Stateful/stateless, auto/manual execution, thought signatures
 - `docs/STREAMING_API.md` - Stream types, resume capability, auto-function streaming
 - `docs/LOGGING_STRATEGY.md` - Log levels, sensitive data handling
-- `docs/ENUM_WIRE_FORMATS.md` - Wire formats + all 13 Unknown variant types
+- `docs/ENUM_WIRE_FORMATS.md` - Wire formats + all 11 Unknown variant types
 
 ### Error Types
 

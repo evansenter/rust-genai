@@ -10,12 +10,11 @@
 //!
 //! Tests for Unknown variant preservation are gated with `#[cfg(not(feature = "strict-unknown"))]`
 //! because the `strict-unknown` feature causes deserialization errors instead of creating
-//! Unknown variants. The Unknown variant tests cover all 13 types with Unknown support:
+//! Unknown variants. The Unknown variant tests cover all 11 types with Unknown support:
 //!
 //! 1. Resolution, InteractionContent, StreamChunk, AutoFunctionStreamChunk
 //! 2. Tool, FunctionCallingMode, FileState
 //! 3. Role, ThinkingLevel, ThinkingSummaries, InteractionStatus
-//! 4. StreamEvent, AutoFunctionStreamEvent (wrapper types)
 
 use chrono::{DateTime, TimeZone, Utc};
 use proptest::prelude::*;
@@ -511,7 +510,7 @@ proptest! {
 // Unknown Variant Strategy Generators
 // =============================================================================
 //
-// These strategies generate Unknown variants for all 13 types with Unknown support.
+// These strategies generate Unknown variants for all 11 types with Unknown support.
 // Tests using these are gated with #[cfg(not(feature = "strict-unknown"))] because
 // strict mode causes deserialization errors instead of creating Unknown variants.
 
