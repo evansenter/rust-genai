@@ -25,7 +25,7 @@ chrono = { version = "0.4", features = ["serde"] }
 name = "rust-genai"
 version = "0.3.0"
 edition = "2024"
-rust-version = "1.86"
+rust-version = "1.88"
 license = "MIT"
 description = "A Rust client library for Google's Generative AI (Gemini) API with streaming, function calling, and multi-turn conversations"
 repository = "https://github.com/evansenter/rust-genai"

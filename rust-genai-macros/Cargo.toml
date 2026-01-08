@@ -2,7 +2,7 @@
 name = "rust-genai-macros"
 version = "0.3.0"
 edition = "2024"
-rust-version = "1.86"
+rust-version = "1.88"
 license = "MIT"
 description = "Procedural macros for rust-genai: automatic function declaration generation for Gemini API tool calling"
 repository = "https://github.com/evansenter/rust-genai"

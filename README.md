@@ -45,7 +45,7 @@ futures-util = "0.3"  # Only if using streaming responses
 
 ### Prerequisites
 
-- Rust 1.86 or later (edition 2024)
+- Rust 1.88 or later (edition 2024)
 - A Google AI API key with access to Gemini models (get one from [Google AI Studio](https://ai.dev/))
 
 ## Usage
