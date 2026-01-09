@@ -183,7 +183,7 @@ See `docs/LOGGING_STRATEGY.md`. Key points:
 
 ## Technical Notes
 
-- Rust edition 2024 (requires Rust 1.85+)
+- Rust edition 2024 (requires Rust 1.88+)
 - Uses `rustls-tls` (not native TLS)
 - Tokio async runtime
 - API version: Gemini V1Beta (configured in `src/http/common.rs`)

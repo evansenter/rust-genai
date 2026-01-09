@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-This guide covers common issues, debugging techniques, and solutions when working with `rust-genai`.
+This guide covers common issues, debugging techniques, and solutions when working with `genai-rs`.
 
 ## Table of Contents
 
@@ -45,7 +45,7 @@ Output shows:
 For internal library behavior:
 
 ```bash
-RUST_LOG=rust_genai=debug cargo run --example simple_interaction
+RUST_LOG=genai_rs=debug cargo run --example simple_interaction
 ```
 
 Log levels:
@@ -57,7 +57,7 @@ Log levels:
 ### Combined Debugging
 
 ```bash
-LOUD_WIRE=1 RUST_LOG=rust_genai=debug cargo run --example auto_function_calling
+LOUD_WIRE=1 RUST_LOG=genai_rs=debug cargo run --example auto_function_calling
 ```
 
 ## Common Errors
@@ -224,7 +224,7 @@ let prompt = "Use the get_weather function to check Tokyo's weather";
 
 4. **Force function calling:**
 ```rust,ignore
-use rust_genai::FunctionCallingMode;
+use genai_rs::FunctionCallingMode;
 
 let result = client
     .interaction()
@@ -526,7 +526,7 @@ The model may call functions in parallel or sequentially. This is normal behavio
 
 ### Can I use this library synchronously?
 
-No, `rust-genai` is async-only. Use a runtime like Tokio:
+No, `genai-rs` is async-only. Use a runtime like Tokio:
 ```rust,ignore
 #[tokio::main]
 async fn main() {
@@ -549,11 +549,11 @@ The Evergreen pattern logs when the API returns values not yet in the library's 
 1. Enable `LOUD_WIRE=1` and capture output
 2. Include Rust version: `rustc --version`
 3. Include library version from `Cargo.toml`
-4. Open issue at [GitHub](https://github.com/evansenter/rust-genai/issues)
+4. Open issue at [GitHub](https://github.com/evansenter/genai-rs/issues)
 
 ## Getting Help
 
 1. **Check examples:** `cargo run --example <name>`
 2. **Read docs:** See `docs/` directory
-3. **Enable debugging:** `LOUD_WIRE=1 RUST_LOG=rust_genai=debug`
+3. **Enable debugging:** `LOUD_WIRE=1 RUST_LOG=genai_rs=debug`
 4. **Open issue:** Include debug output and reproduction steps
