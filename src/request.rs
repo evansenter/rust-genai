@@ -47,7 +47,7 @@ pub enum Role {
 impl Role {
     /// Returns true if this is an unknown role.
     #[must_use]
-    pub fn is_unknown(&self) -> bool {
+    pub const fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown { .. })
     }
 
@@ -359,7 +359,7 @@ pub enum ThinkingLevel {
 impl ThinkingLevel {
     /// Returns true if this is an unknown thinking level.
     #[must_use]
-    pub fn is_unknown(&self) -> bool {
+    pub const fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown { .. })
     }
 
@@ -682,7 +682,7 @@ pub enum ThinkingSummaries {
 impl ThinkingSummaries {
     /// Returns true if this is an unknown thinking summaries value.
     #[must_use]
-    pub fn is_unknown(&self) -> bool {
+    pub const fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown { .. })
     }
 
