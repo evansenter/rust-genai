@@ -17,7 +17,7 @@ This guide covers model configuration options including generation parameters, t
 
 ## Overview
 
-Configuration in `rust-genai` happens at three levels:
+Configuration in `genai-rs` happens at three levels:
 
 | Level | Configured Via | Affects |
 |-------|---------------|---------|
@@ -32,7 +32,7 @@ The `GenerationConfig` struct controls model generation parameters.
 ### Using the Struct Directly
 
 ```rust,ignore
-use rust_genai::{Client, GenerationConfig, ThinkingLevel};
+use genai_rs::{Client, GenerationConfig, ThinkingLevel};
 
 let config = GenerationConfig {
     temperature: Some(0.7),
@@ -317,7 +317,7 @@ Control how the model uses declared functions.
 ### Setting the Mode
 
 ```rust,ignore
-use rust_genai::FunctionCallingMode;
+use genai_rs::FunctionCallingMode;
 
 // Force function use
 let response = client

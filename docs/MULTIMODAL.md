@@ -1,6 +1,6 @@
 # Multimodal Content Guide
 
-This guide covers working with images, audio, video, and documents in `rust-genai`.
+This guide covers working with images, audio, video, and documents in `genai-rs`.
 
 ## Table of Contents
 
@@ -69,7 +69,7 @@ let response = client
 ### Method 2: Content Constructors
 
 ```rust,ignore
-use rust_genai::{text_content, image_data_content};
+use genai_rs::{text_content, image_data_content};
 
 // Build content vector manually
 let contents = vec![
@@ -89,7 +89,7 @@ let response = client
 ### Method 3: File Helpers
 
 ```rust,ignore
-use rust_genai::image_from_file;
+use genai_rs::image_from_file;
 
 // Load and encode from filesystem
 let content = image_from_file("photo.jpg").await?;
@@ -143,7 +143,7 @@ let response = client
 let response = client
     .interaction()
     .with_model("gemini-2.5-pro-preview-tts")  // TTS-specific model
-    .with_text("Hello, welcome to rust-genai!")
+    .with_text("Hello, welcome to genai-rs!")
     .with_audio_output()
     .with_voice("Kore")  // Optional voice selection
     .create()
@@ -353,7 +353,7 @@ Control the trade-off between image quality and token cost.
 ### Usage
 
 ```rust,ignore
-use rust_genai::Resolution;
+use genai_rs::Resolution;
 
 // Builder pattern
 let response = client
@@ -365,7 +365,7 @@ let response = client
     .await?;
 
 // Content constructor
-use rust_genai::image_data_content_with_resolution;
+use genai_rs::image_data_content_with_resolution;
 
 let content = image_data_content_with_resolution(
     base64,
@@ -390,7 +390,7 @@ All constructors are re-exported from the crate root.
 ### Text
 
 ```rust,ignore
-use rust_genai::text_content;
+use genai_rs::text_content;
 
 let content = text_content("Analyze the following:");
 ```
@@ -398,7 +398,7 @@ let content = text_content("Analyze the following:");
 ### Images
 
 ```rust,ignore
-use rust_genai::{
+use genai_rs::{
     image_data_content,
     image_data_content_with_resolution,
     image_uri_content,
@@ -416,7 +416,7 @@ let content = image_uri_content(uri, "image/png");
 ### Audio
 
 ```rust,ignore
-use rust_genai::{audio_data_content, audio_uri_content};
+use genai_rs::{audio_data_content, audio_uri_content};
 
 let content = audio_data_content(base64, "audio/mp3");
 let content = audio_uri_content(uri, "audio/mp3");
@@ -425,7 +425,7 @@ let content = audio_uri_content(uri, "audio/mp3");
 ### Video
 
 ```rust,ignore
-use rust_genai::{
+use genai_rs::{
     video_data_content,
     video_data_content_with_resolution,
     video_uri_content,
@@ -439,7 +439,7 @@ let content = video_uri_content(uri, "video/mp4");
 ### Documents
 
 ```rust,ignore
-use rust_genai::{document_data_content, document_uri_content};
+use genai_rs::{document_data_content, document_uri_content};
 
 let content = document_data_content(base64, "application/pdf");
 let content = document_uri_content(uri, "application/pdf");
@@ -448,7 +448,7 @@ let content = document_uri_content(uri, "application/pdf");
 ### From File Metadata
 
 ```rust,ignore
-use rust_genai::file_uri_content;
+use genai_rs::file_uri_content;
 
 let file = client.upload_file("document.pdf").await?;
 let content = file_uri_content(&file);

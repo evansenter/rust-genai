@@ -36,8 +36,8 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-genai-rs = "0.3.0"
-genai-rs-macros = "0.3.0"  # Only if using the procedural macros
+genai-rs = "0.4.0"
+genai-rs-macros = "0.4.0"  # Only if using the procedural macros
 tokio = { version = "1.0", features = ["full"] }
 serde_json = "1.0"
 futures-util = "0.3"  # Only if using streaming responses

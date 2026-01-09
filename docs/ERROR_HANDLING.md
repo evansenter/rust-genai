@@ -1,6 +1,6 @@
 # Error Handling Guide
 
-This guide covers error types, common error scenarios, and recovery patterns in `rust-genai`.
+This guide covers error types, common error scenarios, and recovery patterns in `genai-rs`.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ This guide covers error types, common error scenarios, and recovery patterns in 
 The primary error type for all API operations.
 
 ```rust,ignore
-use rust_genai::GenaiError;
+use genai_rs::GenaiError;
 
 match client.interaction().create().await {
     Ok(response) => { /* success */ }
@@ -65,7 +65,7 @@ match client.interaction().create().await {
 Errors from function execution (client-side function calling).
 
 ```rust,ignore
-use rust_genai::FunctionError;
+use genai_rs::FunctionError;
 
 match result {
     Err(FunctionError::NotFound(name)) => {
@@ -459,7 +459,7 @@ match result {
 ### Enable Library Logging
 
 ```bash
-RUST_LOG=rust_genai=debug cargo run --example simple_interaction
+RUST_LOG=genai_rs=debug cargo run --example simple_interaction
 ```
 
 ### Wire-Level Debugging

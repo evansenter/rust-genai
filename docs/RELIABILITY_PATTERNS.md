@@ -1,6 +1,6 @@
 # Reliability Patterns Guide
 
-This guide covers production patterns for building reliable applications with `rust-genai`, including retry strategies, error handling, timeout management, and graceful degradation.
+This guide covers production patterns for building reliable applications with `genai-rs`, including retry strategies, error handling, timeout management, and graceful degradation.
 
 ## Table of Contents
 
@@ -31,7 +31,7 @@ Building reliable AI applications requires handling:
 ### Basic Retry
 
 ```rust,ignore
-use rust_genai::{Client, GenaiError};
+use genai_rs::{Client, GenaiError};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -598,7 +598,7 @@ async fn health_check(client: &Client) -> bool {
 ### Complete Retry Wrapper
 
 ```rust,ignore
-use rust_genai::{Client, GenaiError, InteractionResponse};
+use genai_rs::{Client, GenaiError, InteractionResponse};
 use std::time::Duration;
 use tokio::time::sleep;
 

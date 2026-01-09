@@ -1,6 +1,6 @@
 # Multi-Turn Function Calling Guide
 
-This guide covers everything you need to know about multi-turn conversations and function calling in `rust-genai`. It explains the patterns, trade-offs, and design decisions behind the API.
+This guide covers everything you need to know about multi-turn conversations and function calling in `genai-rs`. It explains the patterns, trade-offs, and design decisions behind the API.
 
 ## Table of Contents
 
@@ -117,7 +117,7 @@ Three ways to declare functions, each suited to different needs:
 ### 1. `#[tool]` Macro (Compile-time, Stateless)
 
 ```rust,ignore
-use rust_genai_macros::tool;
+use genai_rs_macros::tool;
 
 /// Look up customer information by ID or email
 #[tool(identifier(description = "Customer ID or email"))]
@@ -146,7 +146,7 @@ let result = client.interaction()
 ### 2. `ToolService` (Runtime, Stateful)
 
 ```rust,ignore
-use rust_genai::{ToolService, CallableFunction, FunctionDeclaration};
+use genai_rs::{ToolService, CallableFunction, FunctionDeclaration};
 
 struct MyToolService {
     db: Arc<DatabasePool>,
@@ -183,7 +183,7 @@ let result = client.interaction()
 ### 3. `FunctionDeclaration` Builder (Manual)
 
 ```rust,ignore
-use rust_genai::FunctionDeclaration;
+use genai_rs::FunctionDeclaration;
 
 let functions = vec![
     FunctionDeclaration::builder("lookup_customer")

@@ -122,7 +122,7 @@ Convert text to spoken audio.
 let response = client
     .interaction()
     .with_model("gemini-2.5-pro-preview-tts")  // TTS model required
-    .with_text("Hello, welcome to rust-genai!")
+    .with_text("Hello, welcome to genai-rs!")
     .with_audio_output()
     .with_voice("Kore")
     .create()
@@ -162,7 +162,7 @@ let response = client
 ### Full Speech Configuration
 
 ```rust,ignore
-use rust_genai::SpeechConfig;
+use genai_rs::SpeechConfig;
 
 // Using SpeechConfig struct
 let config = SpeechConfig {
@@ -184,7 +184,7 @@ let response = client
 ### SpeechConfig Convenience Methods
 
 ```rust,ignore
-use rust_genai::SpeechConfig;
+use genai_rs::SpeechConfig;
 
 // Voice only
 let config = SpeechConfig::with_voice("Kore");

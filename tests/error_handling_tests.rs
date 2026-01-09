@@ -1,4 +1,4 @@
-//! Error handling tests for the rust-genai library.
+//! Error handling tests for the genai-rs library.
 //!
 //! These tests verify that error types, error messages, and retry behavior
 //! work correctly. Most tests don't require an API key.

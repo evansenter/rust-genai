@@ -49,7 +49,7 @@ pub fn is_transient_error(err: &GenaiError) -> bool {
     match err {
         GenaiError::Api { message, .. } => {
             // Spanner UTF-8 errors are transient backend issues
-            // See: https://github.com/evansenter/rust-genai/issues/60
+            // See: https://github.com/evansenter/genai-rs/issues/60
             // Check for both "spanner" and "utf-8" to avoid false positives
             let lower = message.to_lowercase();
             lower.contains("spanner") && lower.contains("utf-8")
