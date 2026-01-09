@@ -576,6 +576,11 @@ pub enum InteractionContent {
     /// provide citation information linking text spans to their sources.
     Text {
         /// The text content.
+        ///
+        /// This is `Option<String>` because during streaming, `content.start` events
+        /// announce the content type before any text arrives. The actual text is
+        /// delivered in subsequent `content.delta` events. For non-streaming responses
+        /// and delta events, this will always be `Some`.
         text: Option<String>,
         /// Source annotations for portions of the text.
         ///
@@ -583,7 +588,10 @@ pub enum InteractionContent {
         /// Use [`annotations()`](Self::annotations) for convenient access.
         annotations: Option<Vec<Annotation>>,
     },
-    /// Thought content (internal reasoning)
+    /// Thought content (internal reasoning).
+    ///
+    /// The `text` field is `Option<String>` for the same streaming reason as [`Text`](Self::Text):
+    /// `content.start` events announce the type before content arrives via `content.delta`.
     Thought { text: Option<String> },
     /// Thought signature (cryptographic signature for thought verification)
     ///

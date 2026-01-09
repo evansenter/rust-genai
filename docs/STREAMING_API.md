@@ -138,7 +138,9 @@ pub enum StreamChunk {
     /// Status change during processing (for background/agent interactions)
     StatusUpdate { interaction_id: String, status: InteractionStatus },
 
-    /// Content generation begins for an output position
+    /// Content generation begins for an output position.
+    /// NOTE: This event only announces the content type - actual content arrives in Delta events.
+    /// This is why `InteractionContent::Text.text` and `Thought.text` are `Option<String>`.
     ContentStart { index: usize, content_type: Option<String> },
 
     /// Incremental content (text, thought, function_call)
