@@ -393,18 +393,20 @@ async fn test_multiturn_manual_functions_error_handling() {
         "Should have text response explaining error"
     );
 
-    let text = response2.text().unwrap().to_lowercase();
-    println!("Response: {}", response2.text().unwrap());
+    let text = response2.text().unwrap();
+    println!("Response: {}", text);
 
-    // Model should explain the error to user
-    assert!(
-        text.contains("permission")
-            || text.contains("denied")
-            || text.contains("error")
-            || text.contains("unable")
-            || text.contains("cannot"),
-        "Response should explain the permission error"
-    );
+    // Model should explain the error to user - use semantic validation to avoid brittle keyword matching
+    let is_valid = validate_response_semantically(
+        &client,
+        "A function call to get_secret_data returned an error: 'Permission denied: insufficient privileges for key test123'. The system instruction says to explain errors to the user.",
+        text,
+        "Does this response appropriately explain to the user that accessing the secret data failed due to a permissions/privileges issue?",
+    )
+    .await
+    .expect("Semantic validation should succeed");
+
+    assert!(is_valid, "Response should explain the permission error");
 }
 
 // =============================================================================

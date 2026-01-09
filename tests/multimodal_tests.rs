@@ -68,14 +68,15 @@ async fn test_image_input_gcs_uri_unsupported() {
             println!("Image description: {}", text);
         }
         Err(e) => {
-            let error_str = format!("{:?}", e);
-            // GCS URIs are expected to fail with "Unsupported file uri"
-            if error_str.contains("Unsupported file uri") {
-                println!(
-                    "Expected: GCS URIs not supported by Interactions API. Use base64 encoding instead."
-                );
-            } else {
-                panic!("Unexpected error: {:?}", e);
+            // GCS URIs are expected to fail with a 400-class error.
+            // Don't check specific message - API error text changes over time.
+            match &e {
+                genai_rs::GenaiError::Api { status_code, .. } if *status_code == 400 => {
+                    println!(
+                        "Expected: GCS URIs not supported directly (400 error). Use base64 encoding or FileService.RegisterFile."
+                    );
+                }
+                _ => panic!("Unexpected error type: {:?}", e),
             }
         }
     }
