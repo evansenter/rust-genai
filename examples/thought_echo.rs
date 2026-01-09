@@ -23,8 +23,8 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use rust_genai::interactions_api::{text_content, thought_content};
-use rust_genai::{Client, InteractionContent, InteractionInput, ThinkingLevel};
+use genai_rs::interactions_api::{text_content, thought_content};
+use genai_rs::{Client, InteractionContent, InteractionInput, ThinkingLevel};
 use std::env;
 
 #[tokio::main]

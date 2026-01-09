@@ -10,7 +10,7 @@
 //!
 //! When adding new enums or updating wire formats, add corresponding tests here.
 
-use rust_genai::{
+use genai_rs::{
     FunctionCallingMode, InteractionContent, InteractionStatus, Resolution, Role, ThinkingLevel,
     ThinkingSummaries,
 };
@@ -423,7 +423,7 @@ mod interaction_content {
     fn code_execution_call_uses_snake_case_type() {
         let content = InteractionContent::CodeExecutionCall {
             id: "exec_123".to_string(),
-            language: rust_genai::CodeExecutionLanguage::Python,
+            language: genai_rs::CodeExecutionLanguage::Python,
             code: "print('hello')".to_string(),
         };
         let json = serde_json::to_value(&content).unwrap();
@@ -434,7 +434,7 @@ mod interaction_content {
     fn code_execution_result_uses_snake_case_type() {
         let content = InteractionContent::CodeExecutionResult {
             call_id: "exec_123".to_string(),
-            outcome: rust_genai::CodeExecutionOutcome::Ok,
+            outcome: genai_rs::CodeExecutionOutcome::Ok,
             output: "hello".to_string(),
         };
         let json = serde_json::to_value(&content).unwrap();

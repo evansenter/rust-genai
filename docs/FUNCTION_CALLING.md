@@ -1,6 +1,6 @@
 # Function Calling Guide
 
-This guide covers function calling fundamentals in `rust-genai`, including the `#[tool]` macro, `ToolService` for stateful functions, and manual handling patterns.
+This guide covers function calling fundamentals in `genai-rs`, including the `#[tool]` macro, `ToolService` for stateful functions, and manual handling patterns.
 
 ## Table of Contents
 
@@ -55,7 +55,7 @@ The simplest approach - define functions with the `#[tool]` attribute.
 ### Basic Usage
 
 ```rust,ignore
-use rust_genai_macros::tool;
+use genai_rs_macros::tool;
 
 /// Gets the current weather for a city
 #[tool(city(description = "The city to get weather for"))]
@@ -144,7 +144,7 @@ Use `ToolService` when functions need shared state like database connections or 
 
 ```rust,ignore
 use async_trait::async_trait;
-use rust_genai::{CallableFunction, FunctionDeclaration, FunctionError, ToolService};
+use genai_rs::{CallableFunction, FunctionDeclaration, FunctionError, ToolService};
 use std::sync::Arc;
 
 // Your tool with state
@@ -229,7 +229,7 @@ For full control over execution, handle function calls manually.
 ### Manual Loop Pattern
 
 ```rust,ignore
-use rust_genai::{FunctionDeclaration, function_result_content};
+use genai_rs::{FunctionDeclaration, function_result_content};
 
 // Define declarations (schemas only)
 let get_weather = FunctionDeclaration::builder("get_weather")
@@ -312,7 +312,7 @@ Build function schemas programmatically.
 ### Basic Builder
 
 ```rust,ignore
-use rust_genai::FunctionDeclaration;
+use genai_rs::FunctionDeclaration;
 use serde_json::json;
 
 let declaration = FunctionDeclaration::builder("search_products")
@@ -389,7 +389,7 @@ Control how the model uses functions.
 ### Available Modes
 
 ```rust,ignore
-use rust_genai::FunctionCallingMode;
+use genai_rs::FunctionCallingMode;
 
 // Auto (default): Model decides whether to call
 client.interaction()

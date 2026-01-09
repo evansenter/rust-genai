@@ -12,7 +12,7 @@
 //! - Migration from other providers with existing conversation history
 //! - Testing with controlled conversation states
 
-use rust_genai::{Client, Turn};
+use genai_rs::{Client, Turn};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -23,7 +23,7 @@
 //! Higher levels produce more detailed reasoning but consume more tokens.
 
 use futures_util::StreamExt;
-use rust_genai::{Client, StreamChunk, ThinkingLevel, ThinkingSummaries};
+use genai_rs::{Client, StreamChunk, ThinkingLevel, ThinkingSummaries};
 use std::env;
 use std::io::{Write, stdout};
 

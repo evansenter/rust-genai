@@ -136,7 +136,7 @@ impl StreamChunk {
     /// # Example
     ///
     /// ```no_run
-    /// # use rust_genai::StreamChunk;
+    /// # use genai_rs::StreamChunk;
     /// # fn example(chunk: StreamChunk) {
     /// if let Some(id) = chunk.interaction_id() {
     ///     println!("Interaction ID: {}", id);
@@ -165,7 +165,7 @@ impl StreamChunk {
     /// # Example
     ///
     /// ```no_run
-    /// # use rust_genai::StreamChunk;
+    /// # use genai_rs::StreamChunk;
     /// # fn example(chunk: StreamChunk) {
     /// if chunk.is_terminal() {
     ///     println!("Stream has ended");
@@ -184,7 +184,7 @@ impl StreamChunk {
     /// # Example
     ///
     /// ```no_run
-    /// # use rust_genai::StreamChunk;
+    /// # use genai_rs::StreamChunk;
     /// # fn example(chunk: StreamChunk) {
     /// if let Some(status) = chunk.status() {
     ///     println!("Status: {:?}", status);

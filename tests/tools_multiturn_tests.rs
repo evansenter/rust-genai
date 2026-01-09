@@ -14,12 +14,12 @@
 mod common;
 
 use common::{get_client, stateful_builder, validate_response_semantically};
-use rust_genai::InteractionStatus;
+use genai_rs::InteractionStatus;
 
 /// Checks if an error is a known API limitation for long conversation chains.
 /// These errors (UTF-8 encoding issues, spanner errors, truncation) can occur
 /// when the conversation context becomes too large.
-fn is_long_conversation_api_error(error: &rust_genai::GenaiError) -> bool {
+fn is_long_conversation_api_error(error: &genai_rs::GenaiError) -> bool {
     let error_str = format!("{:?}", error);
     error_str.contains("UTF-8") || error_str.contains("spanner") || error_str.contains("truncated")
 }

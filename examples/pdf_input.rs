@@ -25,7 +25,7 @@
 //! Gemini's image pricing (see <https://ai.google.dev/gemini-api/docs/document-processing>).
 
 use futures_util::StreamExt;
-use rust_genai::{Client, StreamChunk, document_data_content, text_content};
+use genai_rs::{Client, StreamChunk, document_data_content, text_content};
 use std::env;
 use std::io::{Write, stdout};
 
@@ -158,7 +158,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  .add_document_file(\"doc.pdf\").await?");
     println!("  ");
     println!("Or use document_from_file() for programmatic loading:");
-    println!("  use rust_genai::document_from_file;");
+    println!("  use genai_rs::document_from_file;");
     println!("  let doc = document_from_file(\"doc.pdf\").await?;");
 
     // =========================================================================

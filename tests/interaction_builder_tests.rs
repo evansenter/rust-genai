@@ -5,7 +5,7 @@
 mod common;
 
 use common::DEFAULT_MODEL;
-use rust_genai::{
+use genai_rs::{
     Client, FunctionDeclaration, GenerationConfig, InteractionContent, InteractionInput,
     ThinkingLevel, detect_mime_type,
 };
@@ -257,10 +257,10 @@ fn test_interaction_builder_validation_missing_input() {
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(matches!(err, rust_genai::GenaiError::InvalidInput(_)));
+    assert!(matches!(err, genai_rs::GenaiError::InvalidInput(_)));
 
     // Verify error message mentions input requirement
-    if let rust_genai::GenaiError::InvalidInput(msg) = err {
+    if let genai_rs::GenaiError::InvalidInput(msg) = err {
         assert!(msg.contains("Input is required"));
     }
 }
@@ -276,10 +276,10 @@ fn test_interaction_builder_validation_missing_model_and_agent() {
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(matches!(err, rust_genai::GenaiError::InvalidInput(_)));
+    assert!(matches!(err, genai_rs::GenaiError::InvalidInput(_)));
 
     // Verify error message mentions model/agent requirement
-    if let rust_genai::GenaiError::InvalidInput(msg) = err {
+    if let genai_rs::GenaiError::InvalidInput(msg) = err {
         assert!(msg.contains("model or agent"));
     }
 }
@@ -304,7 +304,7 @@ fn test_interaction_builder_validation_success_with_model() {
 
 #[test]
 fn test_interaction_builder_with_google_search() {
-    use rust_genai::Tool;
+    use genai_rs::Tool;
 
     // Test that with_google_search adds the GoogleSearch tool
     let client = Client::new("test-api-key".to_string());
@@ -329,7 +329,7 @@ fn test_interaction_builder_with_google_search() {
 
 #[test]
 fn test_interaction_builder_with_google_search_and_functions() {
-    use rust_genai::Tool;
+    use genai_rs::Tool;
 
     // Test that with_google_search can be combined with function declarations
     let client = Client::new("test-api-key".to_string());
@@ -360,7 +360,7 @@ fn test_interaction_builder_with_google_search_and_functions() {
 
 #[test]
 fn test_interaction_builder_with_code_execution() {
-    use rust_genai::Tool;
+    use genai_rs::Tool;
 
     // Test that with_code_execution adds the CodeExecution tool
     let client = Client::new("test-api-key".to_string());
@@ -385,7 +385,7 @@ fn test_interaction_builder_with_code_execution() {
 
 #[test]
 fn test_interaction_builder_with_code_execution_and_google_search() {
-    use rust_genai::Tool;
+    use genai_rs::Tool;
 
     // Test that with_code_execution can be combined with with_google_search
     let client = Client::new("test-api-key".to_string());
@@ -412,7 +412,7 @@ fn test_interaction_builder_with_code_execution_and_google_search() {
 
 #[test]
 fn test_interaction_builder_with_url_context() {
-    use rust_genai::Tool;
+    use genai_rs::Tool;
 
     // Test that with_url_context adds the UrlContext tool
     let client = Client::new("test-api-key".to_string());
@@ -436,7 +436,7 @@ fn test_interaction_builder_with_url_context() {
 
 #[test]
 fn test_interaction_builder_with_url_context_and_functions() {
-    use rust_genai::Tool;
+    use genai_rs::Tool;
 
     // Test that with_url_context can be combined with function declarations
     let client = Client::new("test-api-key".to_string());
@@ -566,7 +566,7 @@ fn test_interaction_builder_max_function_call_loops() {
 
 #[test]
 fn test_interaction_builder_all_three_tools_combined() {
-    use rust_genai::Tool;
+    use genai_rs::Tool;
 
     // Verify all three built-in tools can be combined
     let client = Client::new("test-api-key".to_string());
@@ -917,7 +917,7 @@ fn test_add_video_uri_works() {
 #[test]
 fn test_add_methods_combine_with_all_builder_features() {
     // Verify add_* methods work with other builder features
-    use rust_genai::Tool;
+    use genai_rs::Tool;
 
     let client = Client::new("test-api-key".to_string());
 

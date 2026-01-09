@@ -15,11 +15,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`rust-genai` is a Rust client library for Google's Generative AI (Gemini) API using the **Interactions API** for unified model/agent interactions.
+`genai-rs` is a Rust client library for Google's Generative AI (Gemini) API using the **Interactions API** for unified model/agent interactions.
 
 **Workspace structure:**
-- **`rust-genai`** (root): Public API crate with user-facing `Client`, `InteractionBuilder`, and all type modules
-- **`rust-genai-macros/`**: Procedural macro for automatic function declaration generation
+- **`genai-rs`** (root): Public API crate with user-facing `Client`, `InteractionBuilder`, and all type modules
+- **`genai-rs-macros/`**: Procedural macro for automatic function declaration generation
 
 ## Development Commands
 
@@ -60,7 +60,7 @@ See `examples/` for full list (multimodal, thinking, files API, image generation
 2. **Internal Logic** (`src/function_calling.rs`, `src/interactions_api.rs`, `src/multimodal.rs`): Function registry, content builders
 3. **HTTP Layer** (`src/http/`): Raw API requests, SSE streaming (internal, `pub(crate)`)
 4. **Type Modules** (`src/content.rs`, `src/request.rs`, `src/response.rs`, `src/tools.rs`): JSON models
-5. **Macros** (`rust-genai-macros/`): `#[tool]` macro with `inventory` registration
+5. **Macros** (`genai-rs-macros/`): `#[tool]` macro with `inventory` registration
 
 ### Key Patterns
 
@@ -179,7 +179,7 @@ Breaking changes are permitted and preferred when they simplify the API or align
 See `docs/LOGGING_STRATEGY.md`. Key points:
 - `error` for unrecoverable, `warn` for recoverable (including Evergreen unknowns), `debug` for API lifecycle
 - API keys redacted; user content only at `debug` level
-- Enable: `RUST_LOG=rust_genai=debug cargo run --example simple_interaction`
+- Enable: `RUST_LOG=genai_rs=debug cargo run --example simple_interaction`
 
 ## Technical Notes
 

@@ -34,14 +34,14 @@ impl std::fmt::Debug for Client {
 /// # Example
 ///
 /// ```
-/// use rust_genai::Client;
+/// use genai_rs::Client;
 /// use std::time::Duration;
 ///
 /// let client = Client::builder("api_key".to_string())
 ///     .with_timeout(Duration::from_secs(120))
 ///     .with_connect_timeout(Duration::from_secs(10))
 ///     .build()?;
-/// # Ok::<(), rust_genai::GenaiError>(())
+/// # Ok::<(), genai_rs::GenaiError>(())
 /// ```
 pub struct ClientBuilder {
     api_key: String,
@@ -75,13 +75,13 @@ impl ClientBuilder {
     /// # Example
     ///
     /// ```
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     /// use std::time::Duration;
     ///
     /// let client = Client::builder("api_key".to_string())
     ///     .with_timeout(Duration::from_secs(120))
     ///     .build()?;
-    /// # Ok::<(), rust_genai::GenaiError>(())
+    /// # Ok::<(), genai_rs::GenaiError>(())
     /// ```
     #[must_use]
     pub const fn with_timeout(mut self, timeout: Duration) -> Self {
@@ -99,13 +99,13 @@ impl ClientBuilder {
     /// # Example
     ///
     /// ```
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     /// use std::time::Duration;
     ///
     /// let client = Client::builder("api_key".to_string())
     ///     .with_connect_timeout(Duration::from_secs(10))
     ///     .build()?;
-    /// # Ok::<(), rust_genai::GenaiError>(())
+    /// # Ok::<(), genai_rs::GenaiError>(())
     /// ```
     #[must_use]
     pub const fn with_connect_timeout(mut self, timeout: Duration) -> Self {
@@ -180,7 +180,7 @@ impl Client {
     /// # Examples
     ///
     /// ```no_run
-    /// # use rust_genai::Client;
+    /// # use genai_rs::Client;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api_key".to_string()).build()?;
@@ -226,8 +226,8 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
-    /// use rust_genai::{CreateInteractionRequest, InteractionInput};
+    /// use genai_rs::Client;
+    /// use genai_rs::{CreateInteractionRequest, InteractionInput};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("your-api-key".to_string());
@@ -289,8 +289,8 @@ impl Client {
     ///
     /// # Example
     /// ```no_run
-    /// use rust_genai::{Client, StreamChunk};
-    /// use rust_genai::{CreateInteractionRequest, InteractionInput};
+    /// use genai_rs::{Client, StreamChunk};
+    /// use genai_rs::{CreateInteractionRequest, InteractionInput};
     /// use futures_util::StreamExt;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -413,7 +413,7 @@ impl Client {
     ///
     /// # Example
     /// ```no_run
-    /// use rust_genai::{Client, StreamChunk};
+    /// use genai_rs::{Client, StreamChunk};
     /// use futures_util::StreamExt;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -531,7 +531,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::{Client, InteractionStatus};
+    /// use genai_rs::{Client, InteractionStatus};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("your-api-key".to_string());
@@ -596,7 +596,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
@@ -674,7 +674,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
@@ -730,7 +730,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
@@ -775,7 +775,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
@@ -798,7 +798,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
@@ -828,7 +828,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
@@ -875,7 +875,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
@@ -946,7 +946,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
@@ -1001,7 +1001,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
@@ -1071,7 +1071,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     /// use std::time::Duration;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -1136,7 +1136,7 @@ impl Client {
             {
                 log::warn!(
                     "File '{}' is in unknown state {:?}, continuing to poll. \
-                     This may indicate API evolution - consider updating rust-genai.",
+                     This may indicate API evolution - consider updating genai-rs.",
                     file.name,
                     state
                 );

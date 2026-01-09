@@ -296,7 +296,7 @@ for result in response.file_search_results() {
 ### With Configuration
 
 ```rust,ignore
-use rust_genai::FileSearchConfig;
+use genai_rs::FileSearchConfig;
 
 let config = FileSearchConfig {
     max_results: Some(10),
@@ -351,7 +351,7 @@ let response = client
 Built-in tools can also combine with your own functions:
 
 ```rust,ignore
-use rust_genai_macros::tool;
+use genai_rs_macros::tool;
 
 #[tool(description = "Get current user's preferences")]
 fn get_user_prefs() -> String {

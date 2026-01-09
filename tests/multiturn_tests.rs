@@ -14,7 +14,7 @@
 mod common;
 
 use common::{get_client, stateful_builder};
-use rust_genai::{FunctionDeclaration, InteractionStatus, function_result_content};
+use genai_rs::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 
 // =============================================================================
@@ -35,7 +35,7 @@ const MIN_REMEMBERED_FACTS: usize = 5;
 /// Checks if an error is a known API limitation for long conversation chains.
 /// These errors (UTF-8 encoding issues, spanner errors, truncation) can occur
 /// when the conversation context becomes too large.
-fn is_long_conversation_api_error(error: &rust_genai::GenaiError) -> bool {
+fn is_long_conversation_api_error(error: &genai_rs::GenaiError) -> bool {
     let error_str = format!("{:?}", error);
     error_str.contains("UTF-8") || error_str.contains("spanner") || error_str.contains("truncated")
 }
@@ -472,7 +472,7 @@ async fn test_usage_longer_response() {
 // =============================================================================
 
 use common::interaction_builder;
-use rust_genai::Turn;
+use genai_rs::Turn;
 
 #[tokio::test]
 #[ignore = "Requires API key"]

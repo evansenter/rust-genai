@@ -24,7 +24,7 @@
 //! a "model not found" error, your API key may not have access to the
 //! image generation model in your region.
 
-use rust_genai::{Client, GenaiError, InteractionStatus};
+use genai_rs::{Client, GenaiError, InteractionStatus};
 use std::env;
 use std::path::PathBuf;
 

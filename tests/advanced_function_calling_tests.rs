@@ -17,8 +17,8 @@ use common::{
     EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_auto_function_stream, consume_stream, get_client,
     interaction_builder, stateful_builder, validate_response_semantically, with_timeout,
 };
-use rust_genai::{CallableFunction, FunctionDeclaration, GenaiError, function_result_content};
-use rust_genai_macros::tool;
+use genai_rs::{CallableFunction, FunctionDeclaration, GenaiError, function_result_content};
+use genai_rs_macros::tool;
 use serde_json::json;
 
 // =============================================================================
@@ -1440,8 +1440,8 @@ async fn test_auto_functions_timeout_with_registered_functions() {
 #[tokio::test]
 #[ignore = "requires GEMINI_API_KEY"]
 async fn test_stateless_function_calling_multi_turn() {
-    use rust_genai::InteractionInput;
-    use rust_genai::interactions_api::{
+    use genai_rs::InteractionInput;
+    use genai_rs::interactions_api::{
         function_call_content, function_result_content, text_content,
     };
 
@@ -1468,7 +1468,7 @@ async fn test_stateless_function_calling_multi_turn() {
         ];
 
         // Build conversation history manually
-        let mut history: Vec<rust_genai::InteractionContent> = vec![];
+        let mut history: Vec<genai_rs::InteractionContent> = vec![];
 
         // Turn 1: User asks a question
         history.push(text_content("What's the weather in Tokyo?"));

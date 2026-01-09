@@ -19,7 +19,7 @@ mod common;
 
 use base64::Engine;
 use common::{TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, get_client, stateful_builder};
-use rust_genai::{
+use genai_rs::{
     InteractionInput, InteractionStatus, audio_from_file, document_from_file, image_from_file,
     text_content,
 };

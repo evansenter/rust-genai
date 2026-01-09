@@ -8,7 +8,7 @@
 //! Run with: cargo run --example url_context
 
 use futures_util::StreamExt;
-use rust_genai::{Client, GenaiError, StreamChunk, UrlRetrievalStatus};
+use genai_rs::{Client, GenaiError, StreamChunk, UrlRetrievalStatus};
 use std::env;
 use std::error::Error;
 use std::io::{Write, stdout};

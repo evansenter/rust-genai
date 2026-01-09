@@ -2,8 +2,8 @@
 #![allow(clippy::needless_pass_by_value)] // Macro needs owned types for schema generation
 #![allow(clippy::uninlined_format_args)] // Not important in tests
 
-use rust_genai::CallableFunction;
-use rust_genai_macros::tool;
+use genai_rs::CallableFunction;
+use genai_rs_macros::tool;
 
 #[test]
 fn test_basic_function_declaration() {

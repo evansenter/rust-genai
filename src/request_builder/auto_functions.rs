@@ -141,7 +141,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// # Example
     /// ```no_run
-    /// # use rust_genai::{Client, FunctionDeclaration};
+    /// # use genai_rs::{Client, FunctionDeclaration};
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api_key".to_string()).build()?;
@@ -178,7 +178,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     /// history and the last response for debugging stuck loops.
     ///
     /// ```no_run
-    /// # use rust_genai::Client;
+    /// # use genai_rs::Client;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client = Client::new("key".to_string());
@@ -208,7 +208,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     /// - For a total timeout, wrap the call in `tokio::time::timeout()`
     ///
     /// ```no_run
-    /// # use rust_genai::Client;
+    /// # use genai_rs::Client;
     /// # use std::time::Duration;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -432,7 +432,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// # use rust_genai::{Client, AutoFunctionStreamChunk, InteractionContent};
+    /// # use genai_rs::{Client, AutoFunctionStreamChunk, InteractionContent};
     /// # use futures_util::StreamExt;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -490,7 +490,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     /// - For a total timeout, wrap the stream consumption in `tokio::time::timeout()`
     ///
     /// ```no_run
-    /// # use rust_genai::Client;
+    /// # use genai_rs::Client;
     /// # use futures_util::StreamExt;
     /// # use std::time::Duration;
     /// # #[tokio::main]

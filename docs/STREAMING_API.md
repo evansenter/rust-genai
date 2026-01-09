@@ -1,6 +1,6 @@
 # Streaming API Guide
 
-This guide covers everything you need to know about streaming responses and stream resumption in `rust-genai`. It explains the types, patterns, trade-offs, and design decisions behind the streaming API.
+This guide covers everything you need to know about streaming responses and stream resumption in `genai-rs`. It explains the types, patterns, trade-offs, and design decisions behind the streaming API.
 
 ## Table of Contents
 
@@ -214,7 +214,7 @@ pub enum AutoFunctionStreamChunk {
 
 ```rust,ignore
 use futures_util::StreamExt;
-use rust_genai::{Client, StreamChunk};
+use genai_rs::{Client, StreamChunk};
 
 let client = Client::builder(api_key).build()?;
 
@@ -295,7 +295,7 @@ Combines streaming with automatic function execution. Content is streamed in rea
 
 ```rust,ignore
 use futures_util::StreamExt;
-use rust_genai::{Client, AutoFunctionStreamChunk};
+use genai_rs::{Client, AutoFunctionStreamChunk};
 
 let mut stream = client.interaction()
     .with_model("gemini-3-flash-preview")
@@ -347,7 +347,7 @@ if event.event_id.is_some() {
 Convert a stream into the same result type as non-streaming `create_with_auto_functions()`:
 
 ```rust,ignore
-use rust_genai::AutoFunctionResultAccumulator;
+use genai_rs::AutoFunctionResultAccumulator;
 
 let mut accumulator = AutoFunctionResultAccumulator::new();
 

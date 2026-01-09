@@ -11,7 +11,7 @@
 //!
 //! Run with: cargo run --example cancel_interaction
 
-use rust_genai::{Client, GenaiError, InteractionStatus};
+use genai_rs::{Client, GenaiError, InteractionStatus};
 use std::env;
 use std::error::Error;
 use std::time::Duration;

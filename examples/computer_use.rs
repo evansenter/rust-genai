@@ -10,7 +10,7 @@
 //!
 //! Run with: cargo run --example computer_use
 
-use rust_genai::{Client, GenaiError};
+use genai_rs::{Client, GenaiError};
 use std::env;
 use std::error::Error;
 

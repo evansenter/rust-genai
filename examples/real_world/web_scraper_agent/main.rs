@@ -28,7 +28,7 @@
 //! Google Search grounding may not be available in all regions or accounts.
 
 use futures_util::StreamExt;
-use rust_genai::{Client, StreamChunk};
+use genai_rs::{Client, StreamChunk};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::env;

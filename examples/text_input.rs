@@ -27,7 +27,7 @@
 //! when using `document_data_content()`. The model can still parse the content.
 
 use base64::Engine;
-use rust_genai::{Client, document_data_content, document_from_file, text_content};
+use genai_rs::{Client, document_data_content, document_from_file, text_content};
 use std::env;
 
 /// Helper to base64-encode text for document_data_content

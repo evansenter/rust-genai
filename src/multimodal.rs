@@ -24,7 +24,7 @@
 //!    the `add_*_uri()` builder methods instead:
 //!
 //!    ```no_run
-//!    # use rust_genai::Client;
+//!    # use genai_rs::Client;
 //!    # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //!    # let client = Client::new("key".to_string());
 //!    let response = client
@@ -42,7 +42,7 @@
 //!    interactions, the Files API allows uploading once and referencing by URI:
 //!
 //!    ```no_run
-//!    # use rust_genai::Client;
+//!    # use genai_rs::Client;
 //!    # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //!    # let client = Client::new("key".to_string());
 //!    let file = client.upload_file("large-video.mp4").await?;
@@ -60,7 +60,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use rust_genai::{Client, image_from_file, text_content};
+//! use genai_rs::{Client, image_from_file, text_content};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let client = Client::new("api-key".to_string());
@@ -134,7 +134,7 @@ use std::path::Path;
 ///
 /// ```
 /// use std::path::Path;
-/// use rust_genai::detect_mime_type;
+/// use genai_rs::detect_mime_type;
 ///
 /// assert_eq!(detect_mime_type(Path::new("photo.jpg")), Some("image/jpeg"));
 /// assert_eq!(detect_mime_type(Path::new("audio.mp3")), Some("audio/mp3"));
@@ -297,7 +297,7 @@ fn validate_mime_category(
 /// # Example
 ///
 /// ```no_run
-/// use rust_genai::image_from_file;
+/// use genai_rs::image_from_file;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let image = image_from_file("photo.jpg").await?;
@@ -334,7 +334,7 @@ pub async fn image_from_file(path: impl AsRef<Path>) -> Result<InteractionConten
 /// # Example
 ///
 /// ```no_run
-/// use rust_genai::image_from_file_with_mime;
+/// use genai_rs::image_from_file_with_mime;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let image = image_from_file_with_mime("image.raw", "image/png").await?;
@@ -379,7 +379,7 @@ pub async fn image_from_file_with_mime(
 /// # Example
 ///
 /// ```no_run
-/// use rust_genai::audio_from_file;
+/// use genai_rs::audio_from_file;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let audio = audio_from_file("recording.mp3").await?;
@@ -417,7 +417,7 @@ pub async fn audio_from_file(path: impl AsRef<Path>) -> Result<InteractionConten
 /// # Example
 ///
 /// ```no_run
-/// use rust_genai::audio_from_file_with_mime;
+/// use genai_rs::audio_from_file_with_mime;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// // Load a raw audio file with explicit MIME type
@@ -462,7 +462,7 @@ pub async fn audio_from_file_with_mime(
 /// # Example
 ///
 /// ```no_run
-/// use rust_genai::video_from_file;
+/// use genai_rs::video_from_file;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let video = video_from_file("clip.mp4").await?;
@@ -500,7 +500,7 @@ pub async fn video_from_file(path: impl AsRef<Path>) -> Result<InteractionConten
 /// # Example
 ///
 /// ```no_run
-/// use rust_genai::video_from_file_with_mime;
+/// use genai_rs::video_from_file_with_mime;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// // Load a video file with explicit MIME type
@@ -544,7 +544,7 @@ pub async fn video_from_file_with_mime(
 /// # Example
 ///
 /// ```no_run
-/// use rust_genai::document_from_file;
+/// use genai_rs::document_from_file;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let doc = document_from_file("report.pdf").await?;
@@ -599,7 +599,7 @@ pub async fn document_from_file(path: impl AsRef<Path>) -> Result<InteractionCon
 /// # Example
 ///
 /// ```no_run
-/// use rust_genai::document_from_file_with_mime;
+/// use genai_rs::document_from_file_with_mime;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// // Load a text file as a document

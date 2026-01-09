@@ -14,7 +14,7 @@ This guide covers patterns for multi-turn conversations, including stateless app
 
 ## Overview
 
-`rust-genai` supports three approaches to multi-turn conversations:
+`genai-rs` supports three approaches to multi-turn conversations:
 
 | Approach | State Storage | Best For |
 |----------|--------------|----------|
@@ -116,7 +116,7 @@ let response = client
 ### With Multimodal Content
 
 ```rust,ignore
-use rust_genai::{Turn, TurnContent, image_data_content, text_content};
+use genai_rs::{Turn, TurnContent, image_data_content, text_content};
 
 // Build multimodal turn manually
 let multimodal_turn = Turn {
@@ -142,7 +142,7 @@ Direct array of Turn objects for external history management.
 ### Creating Turns
 
 ```rust,ignore
-use rust_genai::Turn;
+use genai_rs::Turn;
 
 // Simple text turns
 let user_turn = Turn::user("Hello!");
@@ -303,7 +303,7 @@ let response = client
 Turn arrays work with all features:
 
 ```rust,ignore
-use rust_genai_macros::tool;
+use genai_rs_macros::tool;
 
 #[tool(description = "Get current weather")]
 fn get_weather(city: String) -> String {

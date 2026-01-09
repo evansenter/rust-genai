@@ -13,7 +13,7 @@
 //!
 //! Run with: cargo run --example file_search
 
-use rust_genai::Client;
+use genai_rs::Client;
 use std::env;
 use std::error::Error;
 

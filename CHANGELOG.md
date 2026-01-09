@@ -11,15 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING CHANGES
 
+#### Crate Renamed to `genai-rs`
+- **`rust-genai` is now `genai-rs`** - Update your Cargo.toml dependencies
+- **`rust-genai-macros` is now `genai-rs-macros`** - Update macro imports
+- Change `use rust_genai::*` to `use genai_rs::*` in your code
+
 #### MSRV Bumped to Rust 1.88
 - **Minimum Supported Rust Version is now 1.88** (was 1.85)
 - Required for Edition 2024 `let` chains feature
 - Update your Rust toolchain: `rustup update`
 
 #### Crate Consolidation (#302)
-- **`genai-client` crate merged into `rust-genai`**
+- **`genai-client` crate merged into `genai-rs`**
 - Internal HTTP and type modules are now `pub(crate)` instead of separate crate
-- Users only depend on `rust-genai` - no change to public API
+- Users only depend on `genai-rs` - no change to public API
 
 ### Added
 
@@ -202,7 +207,7 @@ image_uri_content("https://example.com/image.png", "image/png")
 #### Error Type Consolidation (#131)
 - **`InternalError` renamed to `GenaiError`** in `genai-client` crate
 - New `Internal` and `InvalidInput` variants for better error categorization
-- Users of the public `rust-genai` crate are unaffected (uses the same `GenaiError`)
+- Users of the public `genai-rs` crate are unaffected (uses the same `GenaiError`)
 
 #### create_with_auto_functions() Returns AutoFunctionResult (#148)
 - **Changed return type**: `create_with_auto_functions()` now returns `AutoFunctionResult` instead of `InteractionResponse`
@@ -362,7 +367,7 @@ if let Some(text) = delta.text() { /* ... */ }
   - Sensitive data handling (API keys redacted, user content at debug only)
   - Evergreen pattern logging (Unknown variants log at warn level)
   - Debug logging for auto-function loop lifecycle (iteration tracking, execution timing)
-  - Enable with `RUST_LOG=rust_genai=debug`
+  - Enable with `RUST_LOG=genai_rs=debug`
 
 ### Changed
 - **`InteractionContent` is now `#[non_exhaustive]`** (#44): Match statements must include a wildcard arm (`_ => {}`). This allows adding new variants in minor version updates without breaking downstream code.
@@ -378,7 +383,7 @@ if let Some(text) = delta.text() { /* ... */ }
   - Before: `Client::new(api_key, None)`
   - After: `Client::new(api_key)`
   - The `api_version` was stored but never used; the library defaults to V1Beta internally
-- **`ApiVersion` no longer re-exported** from rust-genai (still available in genai-client for internal use)
+- **`ApiVersion` no longer re-exported** from genai-rs (still available in genai-client for internal use)
 
 #### Removed deprecated function calling helpers
 - **`function_response_content()` helper removed**: Use `function_result_content()` instead

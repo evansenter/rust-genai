@@ -69,7 +69,7 @@ The Deep Research agent conducts multi-step research by:
 ### Basic Usage
 
 ```rust,ignore
-use rust_genai::{Client, DeepResearchConfig, ThinkingSummaries};
+use genai_rs::{Client, DeepResearchConfig, ThinkingSummaries};
 
 let response = client
     .interaction()
@@ -96,7 +96,7 @@ let interaction_id = response.id.expect("stored interaction has ID");
 ### Configuration Options
 
 ```rust,ignore
-use rust_genai::{DeepResearchConfig, ThinkingSummaries};
+use genai_rs::{DeepResearchConfig, ThinkingSummaries};
 
 let config = DeepResearchConfig::new()
     .with_thinking_summaries(ThinkingSummaries::Auto);  // Include reasoning summary

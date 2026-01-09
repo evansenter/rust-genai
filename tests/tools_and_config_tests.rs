@@ -19,7 +19,7 @@
 mod common;
 
 use common::{get_client, interaction_builder, retry_on_any_error, stateful_builder};
-use rust_genai::{
+use genai_rs::{
     FunctionCallingMode, FunctionDeclaration, GenerationConfig, InteractionStatus, ThinkingLevel,
     ThinkingSummaries, Tool,
 };
@@ -98,7 +98,7 @@ async fn test_google_search() {
 async fn test_google_search_streaming() {
     // Test Google Search with streaming
     use futures_util::StreamExt;
-    use rust_genai::StreamChunk;
+    use genai_rs::StreamChunk;
 
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
@@ -372,8 +372,8 @@ async fn test_code_execution_complex() {
 async fn test_code_execution_streaming() {
     // Test code execution with streaming
     use futures_util::StreamExt;
-    use rust_genai::InteractionContent;
-    use rust_genai::StreamChunk;
+    use genai_rs::InteractionContent;
+    use genai_rs::StreamChunk;
 
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
@@ -537,7 +537,7 @@ async fn test_url_context() {
 async fn test_url_context_streaming() {
     // Test URL context with streaming
     use futures_util::StreamExt;
-    use rust_genai::StreamChunk;
+    use genai_rs::StreamChunk;
 
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
@@ -909,7 +909,7 @@ async fn test_structured_output_nested() {
 async fn test_structured_output_streaming() {
     // Test structured output with streaming
     use futures_util::StreamExt;
-    use rust_genai::StreamChunk;
+    use genai_rs::StreamChunk;
 
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
@@ -1034,7 +1034,7 @@ async fn test_response_modalities_image() {
             let has_image = response
                 .outputs
                 .iter()
-                .any(|o| matches!(o, rust_genai::InteractionContent::Image { .. }));
+                .any(|o| matches!(o, genai_rs::InteractionContent::Image { .. }));
 
             if has_image {
                 println!("Has image output: true");

@@ -40,7 +40,7 @@ Higher levels produce more detailed reasoning but consume more tokens.
 ### Enable Thinking
 
 ```rust,ignore
-use rust_genai::{Client, ThinkingLevel};
+use genai_rs::{Client, ThinkingLevel};
 
 let response = client
     .interaction()
@@ -114,7 +114,7 @@ if let Some(reasoning_tokens) = response
 Request a summary of the reasoning process:
 
 ```rust,ignore
-use rust_genai::{ThinkingLevel, ThinkingSummaries};
+use genai_rs::{ThinkingLevel, ThinkingSummaries};
 
 let response = client
     .interaction()
@@ -139,7 +139,7 @@ Thoughts stream before the final response:
 
 ```rust,ignore
 use futures_util::StreamExt;
-use rust_genai::StreamChunk;
+use genai_rs::StreamChunk;
 
 let mut stream = client
     .interaction()

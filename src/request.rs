@@ -23,7 +23,7 @@ use crate::tools::{FunctionCallingMode, Tool};
 /// # Example
 ///
 /// ```
-/// use rust_genai::Role;
+/// use genai_rs::Role;
 ///
 /// let role = Role::User;
 /// assert!(matches!(role, Role::User));
@@ -123,7 +123,7 @@ impl<'de> Deserialize<'de> for Role {
 /// # Example
 ///
 /// ```
-/// use rust_genai::TurnContent;
+/// use genai_rs::TurnContent;
 ///
 /// // Simple text
 /// let content = TurnContent::Text("Hello!".to_string());
@@ -198,7 +198,7 @@ impl TurnContent {
 /// # Example
 ///
 /// ```
-/// use rust_genai::{Turn, Role, TurnContent};
+/// use genai_rs::{Turn, Role, TurnContent};
 ///
 /// // Create a user turn with text
 /// let user_turn = Turn::user("What is 2+2?");
@@ -245,7 +245,7 @@ impl Turn {
     /// # Example
     ///
     /// ```
-    /// use rust_genai::Turn;
+    /// use genai_rs::Turn;
     ///
     /// let turn = Turn::user("What is the capital of France?");
     /// ```
@@ -258,7 +258,7 @@ impl Turn {
     /// # Example
     ///
     /// ```
-    /// use rust_genai::Turn;
+    /// use genai_rs::Turn;
     ///
     /// let turn = Turn::model("The capital of France is Paris.");
     /// ```
@@ -299,7 +299,7 @@ impl Turn {
 /// # Example
 ///
 /// ```
-/// use rust_genai::{InteractionInput, Turn};
+/// use genai_rs::{InteractionInput, Turn};
 ///
 /// // Simple text
 /// let input = InteractionInput::Text("Hello!".to_string());
@@ -526,7 +526,7 @@ pub struct GenerationConfig {
 /// # Example
 ///
 /// ```
-/// use rust_genai::SpeechConfig;
+/// use genai_rs::SpeechConfig;
 ///
 /// let config = SpeechConfig {
 ///     voice: Some("Kore".to_string()),
@@ -828,7 +828,7 @@ impl<'de> Visitor<'de> for ThinkingSummariesVisitor {
 ///
 /// ## Typed configs (recommended for known agents)
 /// ```
-/// use rust_genai::{AgentConfig, DeepResearchConfig, ThinkingSummaries};
+/// use genai_rs::{AgentConfig, DeepResearchConfig, ThinkingSummaries};
 ///
 /// let config: AgentConfig = DeepResearchConfig::new()
 ///     .with_thinking_summaries(ThinkingSummaries::Auto)
@@ -837,7 +837,7 @@ impl<'de> Visitor<'de> for ThinkingSummariesVisitor {
 ///
 /// ## Raw JSON (for unknown/future agents)
 /// ```
-/// use rust_genai::AgentConfig;
+/// use genai_rs::AgentConfig;
 ///
 /// let config = AgentConfig::from_value(serde_json::json!({
 ///     "type": "future-agent",
@@ -878,7 +878,7 @@ impl AgentConfig {
 /// # Example
 ///
 /// ```
-/// use rust_genai::{AgentConfig, DeepResearchConfig, ThinkingSummaries};
+/// use genai_rs::{AgentConfig, DeepResearchConfig, ThinkingSummaries};
 ///
 /// let config: AgentConfig = DeepResearchConfig::new()
 ///     .with_thinking_summaries(ThinkingSummaries::Auto)
@@ -929,7 +929,7 @@ impl From<DeepResearchConfig> for AgentConfig {
 /// # Example
 ///
 /// ```
-/// use rust_genai::{AgentConfig, DynamicConfig};
+/// use genai_rs::{AgentConfig, DynamicConfig};
 ///
 /// let config: AgentConfig = DynamicConfig::new().into();
 /// ```

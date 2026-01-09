@@ -15,7 +15,7 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use rust_genai::{
+use genai_rs::{
     Client, Resolution, image_data_content, image_data_content_with_resolution, text_content,
 };
 use std::env;

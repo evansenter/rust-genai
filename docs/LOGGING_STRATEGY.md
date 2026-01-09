@@ -1,6 +1,6 @@
 # Logging Strategy
 
-This document defines the logging strategy for `rust-genai`, ensuring consistent, secure, and useful log output across the codebase.
+This document defines the logging strategy for `genai-rs`, ensuring consistent, secure, and useful log output across the codebase.
 
 ## Log Levels
 
@@ -267,7 +267,7 @@ fn test_unknown_type_logs_warning() {
 }
 ```
 
-> **Note**: `test_log` is not currently used in the codebase. The logging changes are straightforward enough that manual verification via `RUST_LOG=rust_genai=debug` is adequate. Consider adding logging tests if regressions become an issue.
+> **Note**: `test_log` is not currently used in the codebase. The logging changes are straightforward enough that manual verification via `RUST_LOG=genai_rs=debug` is adequate. Consider adding logging tests if regressions become an issue.
 
 ## Integration with User Code
 
@@ -283,8 +283,8 @@ tracing_subscriber::fmt::init();
 
 Log filtering by level:
 ```bash
-RUST_LOG=rust_genai=debug cargo run --example simple_interaction
-RUST_LOG=rust_genai=debug cargo run --example streaming
+RUST_LOG=genai_rs=debug cargo run --example simple_interaction
+RUST_LOG=genai_rs=debug cargo run --example streaming
 ```
 
 ## Wire-Level Debugging with LOUD_WIRE

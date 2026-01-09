@@ -115,7 +115,7 @@ impl CanAutoFunction for Chained {}
 /// # Examples
 ///
 /// ```no_run
-/// # use rust_genai::{Client, StreamChunk};
+/// # use genai_rs::{Client, StreamChunk};
 /// # use futures_util::StreamExt;
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -391,7 +391,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example with typed config (recommended)
     ///
     /// ```no_run
-    /// use rust_genai::{Client, DeepResearchConfig, ThinkingSummaries};
+    /// use genai_rs::{Client, DeepResearchConfig, ThinkingSummaries};
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -413,7 +413,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example with raw JSON (for unknown/future agents)
     ///
     /// ```no_run
-    /// use rust_genai::{Client, AgentConfig};
+    /// use genai_rs::{Client, AgentConfig};
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -451,7 +451,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::{Client, ThinkingSummaries};
+    /// use genai_rs::{Client, ThinkingSummaries};
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -502,7 +502,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// # Example
     /// ```no_run
-    /// # use rust_genai::{Client, function_result_content};
+    /// # use genai_rs::{Client, function_result_content};
     /// # use serde_json::json;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -536,7 +536,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::{Client, Turn};
+    /// use genai_rs::{Client, Turn};
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -577,7 +577,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -627,7 +627,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -669,7 +669,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::{Client, Resolution};
+    /// use genai_rs::{Client, Resolution};
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -737,7 +737,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -828,7 +828,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -922,7 +922,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1013,7 +1013,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1057,7 +1057,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1092,7 +1092,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1164,7 +1164,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::{Client, FunctionDeclaration};
+    /// use genai_rs::{Client, FunctionDeclaration};
     /// use serde_json::json;
     ///
     /// let client = Client::new("api-key".to_string());
@@ -1194,7 +1194,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::{Client, FunctionDeclaration};
+    /// use genai_rs::{Client, FunctionDeclaration};
     ///
     /// let client = Client::new("api-key".to_string());
     ///
@@ -1231,7 +1231,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```ignore
-    /// use rust_genai::{Client, ToolService, CallableFunction};
+    /// use genai_rs::{Client, ToolService, CallableFunction};
     /// use std::sync::Arc;
     ///
     /// struct MyService { db: Database }
@@ -1267,7 +1267,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1316,7 +1316,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1362,7 +1362,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1414,7 +1414,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1469,7 +1469,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1509,7 +1509,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1529,7 +1529,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Multiple Servers
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1568,7 +1568,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1614,7 +1614,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1669,7 +1669,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1711,7 +1711,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1747,7 +1747,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::{Client, SpeechConfig};
+    /// use genai_rs::{Client, SpeechConfig};
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1790,7 +1790,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1827,7 +1827,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     /// use serde_json::json;
     ///
     /// # #[tokio::main]
@@ -1869,7 +1869,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// or URL Context to get structured data from real-time sources:
     ///
     /// ```no_run
-    /// # use rust_genai::Client;
+    /// # use genai_rs::Client;
     /// # use serde_json::json;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1914,7 +1914,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// # Example
     /// ```no_run
-    /// # use rust_genai::{Client, ThinkingLevel};
+    /// # use genai_rs::{Client, ThinkingLevel};
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api-key".to_string()).build()?;
     /// let response = client
@@ -1950,7 +1950,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// # Example
     /// ```no_run
-    /// # use rust_genai::{Client, ThinkingLevel, ThinkingSummaries};
+    /// # use genai_rs::{Client, ThinkingLevel, ThinkingSummaries};
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api-key".to_string()).build()?;
     /// let response = client
@@ -1981,7 +1981,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// # Example
     /// ```no_run
-    /// # use rust_genai::Client;
+    /// # use genai_rs::Client;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api-key".to_string()).build()?;
     ///
@@ -2023,7 +2023,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// # Example
     /// ```no_run
-    /// # use rust_genai::Client;
+    /// # use genai_rs::Client;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api-key".to_string()).build()?;
     /// let response = client
@@ -2058,7 +2058,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// # Example
     /// ```no_run
-    /// # use rust_genai::{Client, FunctionCallingMode};
+    /// # use genai_rs::{Client, FunctionCallingMode};
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api-key".to_string()).build()?;
     ///
@@ -2098,7 +2098,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// # Example
     /// ```no_run
-    /// # use rust_genai::Client;
+    /// # use genai_rs::Client;
     /// # use serde_json::json;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api-key".to_string()).build()?;
@@ -2152,7 +2152,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// # Example
     /// ```no_run
-    /// # use rust_genai::Client;
+    /// # use genai_rs::Client;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api_key".to_string()).build()?;
@@ -2200,7 +2200,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     /// use std::time::Duration;
     ///
     /// # #[tokio::main]
@@ -2268,7 +2268,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// in `tokio::time::timeout()`:
     ///
     /// ```no_run
-    /// # use rust_genai::Client;
+    /// # use genai_rs::Client;
     /// # use futures_util::StreamExt;
     /// # use std::time::Duration;
     /// # #[tokio::main]
@@ -2300,7 +2300,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Examples
     ///
     /// ```no_run
-    /// # use rust_genai::{Client, StreamChunk, StreamEvent};
+    /// # use genai_rs::{Client, StreamChunk, StreamEvent};
     /// # use futures_util::StreamExt;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -2437,7 +2437,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
 /// # Example
 ///
 /// ```no_run
-/// use rust_genai::Client;
+/// use genai_rs::Client;
 ///
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -2471,7 +2471,7 @@ impl<'a, State: Send + 'a> ConversationBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -2506,7 +2506,7 @@ impl<'a, State: Send + 'a> ConversationBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -2539,7 +2539,7 @@ impl<'a, State: Send + 'a> ConversationBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::{Client, Role};
+    /// use genai_rs::{Client, Role};
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -2571,7 +2571,7 @@ impl<'a, State: Send + 'a> ConversationBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// use rust_genai::Client;
+    /// use genai_rs::Client;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {

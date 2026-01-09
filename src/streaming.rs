@@ -9,9 +9,9 @@
 //!
 //! ```no_run
 //! use futures_util::StreamExt;
-//! use rust_genai::{Client, AutoFunctionStreamChunk};
+//! use genai_rs::{Client, AutoFunctionStreamChunk};
 //!
-//! # async fn example() -> Result<(), rust_genai::GenaiError> {
+//! # async fn example() -> Result<(), genai_rs::GenaiError> {
 //! let client = Client::new("your-api-key".to_string());
 //!
 //! let mut stream = client
@@ -386,9 +386,9 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
 ///
 /// ```no_run
 /// use futures_util::StreamExt;
-/// use rust_genai::{Client, AutoFunctionStreamEvent, AutoFunctionStreamChunk};
+/// use genai_rs::{Client, AutoFunctionStreamEvent, AutoFunctionStreamChunk};
 ///
-/// # async fn example() -> Result<(), rust_genai::GenaiError> {
+/// # async fn example() -> Result<(), genai_rs::GenaiError> {
 /// let client = Client::new("your-api-key".to_string());
 ///
 /// let mut stream = client
@@ -525,7 +525,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamEvent {
 /// # Example
 ///
 /// ```no_run
-/// # use rust_genai::FunctionExecutionResult;
+/// # use genai_rs::FunctionExecutionResult;
 /// # let result: FunctionExecutionResult = todo!();
 /// println!("Function {} returned: {}", result.name, result.result);
 /// println!("  Call ID: {}, Duration: {:?}", result.call_id, result.duration);
@@ -611,8 +611,8 @@ mod duration_millis {
 /// # Example
 ///
 /// ```no_run
-/// # use rust_genai::{Client, AutoFunctionResult};
-/// # async fn example() -> Result<(), rust_genai::GenaiError> {
+/// # use genai_rs::{Client, AutoFunctionResult};
+/// # async fn example() -> Result<(), genai_rs::GenaiError> {
 /// # let client = Client::new("key".to_string());
 /// let result = client
 ///     .interaction()
@@ -664,9 +664,9 @@ pub struct AutoFunctionResult {
 ///
 /// ```no_run
 /// use futures_util::StreamExt;
-/// use rust_genai::{Client, AutoFunctionStreamChunk, AutoFunctionResultAccumulator};
+/// use genai_rs::{Client, AutoFunctionStreamChunk, AutoFunctionResultAccumulator};
 ///
-/// # async fn example() -> Result<(), rust_genai::GenaiError> {
+/// # async fn example() -> Result<(), genai_rs::GenaiError> {
 /// let client = Client::new("your-api-key".to_string());
 ///
 /// let mut stream = client

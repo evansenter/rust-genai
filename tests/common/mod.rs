@@ -20,7 +20,7 @@
 //! gracefully handle the unsupported URI error.
 
 use futures_util::StreamExt;
-use rust_genai::{
+use genai_rs::{
     AutoFunctionStreamChunk, AutoFunctionStreamEvent, Client, GenaiError, InteractionContent,
     InteractionResponse, InteractionStatus, StreamChunk, StreamEvent,
 };
@@ -49,7 +49,7 @@ pub fn is_transient_error(err: &GenaiError) -> bool {
     match err {
         GenaiError::Api { message, .. } => {
             // Spanner UTF-8 errors are transient backend issues
-            // See: https://github.com/evansenter/rust-genai/issues/60
+            // See: https://github.com/evansenter/genai-rs/issues/60
             // Check for both "spanner" and "utf-8" to avoid false positives
             let lower = message.to_lowercase();
             lower.contains("spanner") && lower.contains("utf-8")
@@ -749,7 +749,7 @@ pub const DEFAULT_MODEL: &str = "gemini-3-flash-preview";
 ///     .expect("Request failed");
 /// ```
 #[allow(dead_code)]
-pub fn interaction_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
+pub fn interaction_builder(client: &Client) -> genai_rs::InteractionBuilder<'_> {
     client.interaction().with_model(DEFAULT_MODEL)
 }
 
@@ -766,7 +766,7 @@ pub fn interaction_builder(client: &Client) -> rust_genai::InteractionBuilder<'_
 ///     .await?;
 /// ```
 #[allow(dead_code)]
-pub fn stateful_builder(client: &Client) -> rust_genai::InteractionBuilder<'_> {
+pub fn stateful_builder(client: &Client) -> genai_rs::InteractionBuilder<'_> {
     interaction_builder(client).with_store_enabled()
 }
 

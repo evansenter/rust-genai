@@ -1,4 +1,4 @@
-use rust_genai_macros::tool;
+use genai_rs_macros::tool;
 
 #[tool(
     unit(enum_values = [1, 2, 3])

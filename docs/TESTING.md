@@ -1,6 +1,6 @@
 # Testing Guide
 
-This guide explains the testing infrastructure, philosophy, and how to write tests for `rust-genai`.
+This guide explains the testing infrastructure, philosophy, and how to write tests for `genai-rs`.
 
 ## Table of Contents
 
@@ -147,7 +147,7 @@ cargo test -- --include-ignored --nocapture
 | Variable | Purpose |
 |----------|---------|
 | `GEMINI_API_KEY` | Required for integration tests |
-| `RUST_LOG=rust_genai=debug` | Enable debug logging |
+| `RUST_LOG=genai_rs=debug` | Enable debug logging |
 | `LOUD_WIRE=1` | Show raw HTTP request/response |
 
 ## CI Pipeline
@@ -384,7 +384,7 @@ let builder = stateful_builder(&client);
 ### Enable Logging
 
 ```bash
-RUST_LOG=rust_genai=debug cargo test test_name -- --nocapture
+RUST_LOG=genai_rs=debug cargo test test_name -- --nocapture
 ```
 
 ### See Wire Traffic

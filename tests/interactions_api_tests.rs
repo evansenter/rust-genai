@@ -36,12 +36,12 @@ use common::{
     EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_stream, interaction_builder, retry_on_any_error,
     stateful_builder, validate_response_semantically, with_timeout,
 };
-use rust_genai::{
+use genai_rs::{
     CallableFunction, Client, CreateInteractionRequest, FunctionDeclaration, GenaiError,
     GenerationConfig, InteractionInput, InteractionStatus, function_result_content,
     image_uri_content, text_content,
 };
-use rust_genai_macros::tool;
+use genai_rs_macros::tool;
 use serde_json::json;
 use std::env;
 
@@ -334,7 +334,7 @@ async fn test_streaming_interaction() {
 #[ignore = "Requires API key"]
 async fn test_streaming_deltas_are_incremental() {
     use futures_util::StreamExt;
-    use rust_genai::StreamChunk;
+    use genai_rs::StreamChunk;
 
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
@@ -1522,7 +1522,7 @@ async fn test_system_instructions_influence_response() {
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_request_timeout() {
-    use rust_genai::GenaiError;
+    use genai_rs::GenaiError;
     use std::time::Duration;
 
     let Some(client) = get_client() else {
@@ -1664,7 +1664,7 @@ async fn test_deep_research_polling() {
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_image_generation() {
-    use rust_genai::InteractionContent;
+    use genai_rs::InteractionContent;
     use std::time::Duration;
 
     let Some(client) = get_client() else {
@@ -1750,8 +1750,8 @@ async fn test_image_generation() {
 #[tokio::test]
 #[ignore = "Requires API key"]
 async fn test_thought_echo_manual_history() {
-    use rust_genai::ThinkingLevel;
-    use rust_genai::interactions_api::{text_content, thought_content};
+    use genai_rs::ThinkingLevel;
+    use genai_rs::interactions_api::{text_content, thought_content};
 
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");

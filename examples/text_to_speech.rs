@@ -5,7 +5,7 @@
 //!
 //! Run with: cargo run --example text_to_speech
 
-use rust_genai::{Client, SpeechConfig};
+use genai_rs::{Client, SpeechConfig};
 use std::env;
 use std::error::Error;
 

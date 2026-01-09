@@ -4,7 +4,7 @@
 //! previous_interaction_id, system instructions cannot be set because
 //! they are inherited from the first turn.
 
-use rust_genai::Client;
+use genai_rs::Client;
 
 fn main() {
     let client = Client::builder("test-key".to_string()).build().unwrap();

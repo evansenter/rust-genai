@@ -159,7 +159,7 @@ pub fn generate_declaration_function(
                     let #param_ident: #param_type = match args.get(#param_name_str) {
                         Some(val) if !val.is_null() => {
                             ::serde_json::from_value(val.clone()).map_err(|e| {
-                                ::rust_genai::function_calling::FunctionError::ArgumentMismatch(
+                                ::genai_rs::function_calling::FunctionError::ArgumentMismatch(
                                     format!("Failed to deserialize optional argument '{}': {}", #param_name_str, e)
                                 )
                             })?
@@ -170,9 +170,9 @@ pub fn generate_declaration_function(
             } else {
                 arg_extraction_tokens.push(quote! {
                     let #param_ident: #param_type = args.get(#param_name_str)
-                        .ok_or_else(|| ::rust_genai::function_calling::FunctionError::ArgumentMismatch(format!("Missing required argument '{}'", #param_name_str)))
+                        .ok_or_else(|| ::genai_rs::function_calling::FunctionError::ArgumentMismatch(format!("Missing required argument '{}'", #param_name_str)))
                         .and_then(|val| ::serde_json::from_value(val.clone()).map_err(|e| {
-                            ::rust_genai::function_calling::FunctionError::ArgumentMismatch(
+                            ::genai_rs::function_calling::FunctionError::ArgumentMismatch(
                                 format!("Failed to deserialize argument '{}': {}", #param_name_str, e)
                             )
                         }))?;
@@ -204,12 +204,12 @@ pub fn generate_declaration_function(
         }
 
         #[::async_trait::async_trait]
-        impl ::rust_genai::function_calling::CallableFunction for #callable_struct_name {
-            fn declaration(&self) -> ::rust_genai::FunctionDeclaration {
-                ::rust_genai::FunctionDeclaration::new(
+        impl ::genai_rs::function_calling::CallableFunction for #callable_struct_name {
+            fn declaration(&self) -> ::genai_rs::FunctionDeclaration {
+                ::genai_rs::FunctionDeclaration::new(
                     #func_name.to_string(),
                     #func_description.to_string(),
-                    ::rust_genai::FunctionParameters::new(
+                    ::genai_rs::FunctionParameters::new(
                         "object".to_string(),
                         #properties_tokens,
                         #required_field_tokens,
@@ -217,7 +217,7 @@ pub fn generate_declaration_function(
                 )
             }
 
-            async fn call(&self, args: ::serde_json::Value) -> Result<::serde_json::Value, ::rust_genai::function_calling::FunctionError> {
+            async fn call(&self, args: ::serde_json::Value) -> Result<::serde_json::Value, ::genai_rs::function_calling::FunctionError> {
                 #(#arg_extraction_tokens)*
 
                 let original_fn_result = #fn_call_expr;
@@ -232,21 +232,21 @@ pub fn generate_declaration_function(
                             Ok(::serde_json::json!({ "result": value_from_fn_result }))
                         }
                     }
-                    Err(e) => Err(::rust_genai::function_calling::FunctionError::ExecutionError(Box::new(e)))
+                    Err(e) => Err(::genai_rs::function_calling::FunctionError::ExecutionError(Box::new(e)))
                 }
             }
         }
 
-        pub fn #generated_fn_name() -> ::rust_genai::FunctionDeclaration {
+        pub fn #generated_fn_name() -> ::genai_rs::FunctionDeclaration {
              #callable_struct_name::new().declaration()
         }
 
-        pub fn #generated_callable_factory_fn_name() -> Box<dyn ::rust_genai::function_calling::CallableFunction> {
+        pub fn #generated_callable_factory_fn_name() -> Box<dyn ::genai_rs::function_calling::CallableFunction> {
             Box::new(#callable_struct_name::new())
         }
 
-        ::rust_genai::function_calling::submit! {
-            ::rust_genai::function_calling::CallableFunctionFactory::new(#generated_callable_factory_fn_name)
+        ::genai_rs::function_calling::submit! {
+            ::genai_rs::function_calling::CallableFunctionFactory::new(#generated_callable_factory_fn_name)
         }
     };
 

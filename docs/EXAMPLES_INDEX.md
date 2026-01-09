@@ -1,6 +1,6 @@
 # Examples Index
 
-This guide provides an overview of all examples in the `rust-genai` repository, organized by category to help you find what you need.
+This guide provides an overview of all examples in the `genai-rs` repository, organized by category to help you find what you need.
 
 ## Running Examples
 
@@ -271,7 +271,7 @@ cargo run --example cancel_interaction
 
 ## Example Progression
 
-**New to rust-genai?** Follow this path:
+**New to genai-rs?** Follow this path:
 
 1. `simple_interaction` - Basic usage
 2. `streaming` - Real-time responses

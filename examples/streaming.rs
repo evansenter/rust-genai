@@ -28,7 +28,7 @@
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
 use futures_util::StreamExt;
-use rust_genai::{Client, StreamChunk};
+use genai_rs::{Client, StreamChunk};
 use std::env;
 use std::io::{self, Write};
 

@@ -14,7 +14,7 @@
 
 #![cfg(not(feature = "strict-unknown"))]
 
-use rust_genai::{
+use genai_rs::{
     FunctionCallingMode, InteractionContent, InteractionStatus, Resolution, Role, StreamChunk,
     ThinkingLevel, ThinkingSummaries,
 };

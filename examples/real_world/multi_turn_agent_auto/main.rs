@@ -24,8 +24,8 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use rust_genai::{CallableFunction, Client};
-use rust_genai_macros::tool;
+use genai_rs::{CallableFunction, Client};
+use genai_rs_macros::tool;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;

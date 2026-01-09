@@ -8,7 +8,7 @@
 //! Run with: cargo run --example structured_output
 
 use futures_util::StreamExt;
-use rust_genai::{Client, StreamChunk};
+use genai_rs::{Client, StreamChunk};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::env;

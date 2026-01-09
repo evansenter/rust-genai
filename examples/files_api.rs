@@ -9,7 +9,7 @@
 //!
 //! Run with: `cargo run --example files_api`
 
-use rust_genai::Client;
+use genai_rs::Client;
 use std::time::Duration;
 
 #[tokio::main]
