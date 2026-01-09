@@ -4,7 +4,7 @@
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-If you discover a security vulnerability in rust-genai, please report it privately using one of these methods:
+If you discover a security vulnerability in genai-rs, please report it privately using one of these methods:
 
 1. **GitHub Private Vulnerability Reporting**: Use the "Report a vulnerability" button in the Security tab
 2. **Email**: Contact the maintainers directly

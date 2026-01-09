@@ -1,6 +1,6 @@
 # Real-World Example Applications
 
-This directory contains comprehensive example applications demonstrating practical use cases for the `rust-genai` library. Each example showcases production patterns, error handling, and best practices.
+This directory contains comprehensive example applications demonstrating practical use cases for the `genai-rs` library. Each example showcases production patterns, error handling, and best practices.
 
 ## Examples Overview
 
