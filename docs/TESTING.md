@@ -30,7 +30,7 @@ cargo test --workspace -- test_name       # Run specific test
 - Helper method behavior
 - Error type formatting
 
-### Integration Tests (31 files)
+### Integration Tests (25 files)
 
 End-to-end tests that call the real Gemini API. Require `GEMINI_API_KEY`.
 

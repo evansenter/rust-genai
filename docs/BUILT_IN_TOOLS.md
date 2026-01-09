@@ -165,8 +165,8 @@ Fetch and analyze web pages.
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("Summarize this article")
-    .with_url_context(&["https://example.com/article"])
+    .with_text("Summarize this article: https://example.com/article")
+    .with_url_context()
     .create()
     .await?;
 
@@ -182,16 +182,11 @@ if let Some(metadata) = response.url_context_metadata() {
 ### Multiple URLs
 
 ```rust,ignore
-let urls = vec![
-    "https://example.com/page1",
-    "https://example.com/page2",
-];
-
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("Compare these two pages")
-    .with_url_context(&urls)
+    .with_text("Compare https://example.com/page1 and https://example.com/page2")
+    .with_url_context()
     .create()
     .await?;
 ```
@@ -341,7 +336,7 @@ let response = client
     .with_model("gemini-3-flash-preview")
     .with_text("Compare our internal report with public benchmarks")
     .with_file_search(&[&report_file])
-    .with_url_context(&["https://benchmarks.example.com"])
+    .with_url_context()
     .create()
     .await?;
 ```
@@ -364,7 +359,7 @@ let response = client
     .with_model("gemini-3-flash-preview")
     .with_text("Personalize search results based on my preferences")
     .with_google_search()
-    .with_function::<get_user_prefs>()
+    .with_function(get_user_prefs.declaration())
     .create_with_auto_functions()
     .await?;
 ```
