@@ -134,6 +134,9 @@ jobs:
 
   cross-platform:
     name: Cross Platform (${{ matrix.os }}, ${{ matrix.rust }})
+    # Only run on main branch pushes to speed up PR feedback loop.
+    # Platform-specific issues are rare and will be caught immediately after merge.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
