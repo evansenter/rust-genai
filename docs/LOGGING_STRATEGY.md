@@ -86,6 +86,14 @@ fn log_request_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
     }
 }
 
+// Response body logging (src/client.rs)
+fn log_response_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
+    match serde_json::to_string_pretty(body) {
+        Ok(json) => log::debug!("Response Body (JSON):\n{json}"),
+        Err(_) => log::debug!("Response Body: {body:#?}"),
+    }
+}
+
 // Interaction lifecycle (src/client.rs)
 log::debug!("Creating interaction");
 log::debug!("Interaction created: ID={}", response.id);
@@ -121,6 +129,7 @@ Use for very detailed information that would be overwhelming at debug level.
 | Event | Level | Location |
 |-------|-------|----------|
 | Request body | `debug` | `src/client.rs::log_request_body()` |
+| Response body | `debug` | `src/client.rs::log_response_body()` |
 | Interaction created | `debug` | `src/client.rs::create_interaction()` |
 | Interaction retrieved | `debug` | `src/client.rs::get_interaction()` |
 | Interaction deleted | `debug` | `src/client.rs::delete_interaction()` |
