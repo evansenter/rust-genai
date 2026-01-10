@@ -143,12 +143,17 @@ async fn test_multiturn_auto_functions_happy_path() {
     let text = response3.text().unwrap();
     println!("Turn 3 response: {}", text);
 
-    // Model should reference both cities from context
-    let text_lower = text.to_lowercase();
+    // Model should reference both cities from context - use semantic validation
+    let is_valid = validate_response_semantically(
+        &client,
+        "Previous turns got weather for Seattle (65F) and Tokyo (72F). Asked 'Which city is warmer?'",
+        text,
+        "Does this response compare the temperatures or identify which city is warmer?",
+    )
+    .await
+    .expect("Semantic validation failed");
     assert!(
-        text_lower.contains("seattle")
-            || text_lower.contains("tokyo")
-            || text_lower.contains("warm"),
+        is_valid,
         "Response should reference the weather comparison context"
     );
 }
@@ -314,15 +319,17 @@ async fn test_multiturn_manual_functions_happy_path() {
     if response3.has_text() {
         let text = response3.text().unwrap();
         println!("Turn 3 response: {}", text);
-        // Should reference the time context
-        let text_lower = text.to_lowercase();
+        // Should reference the time context - use semantic validation
+        let is_valid = validate_response_semantically(
+            &client,
+            "Previous turn got time 14:00 in London. Asked 'Is it a good time to call someone there?'",
+            text,
+            "Does this response address whether it's a good time to call (yes/no) or reference the time?",
+        )
+        .await
+        .expect("Semantic validation failed");
         assert!(
-            text_lower.contains("yes")
-                || text_lower.contains("no")
-                || text_lower.contains("14")
-                || text_lower.contains("afternoon")
-                || text_lower.contains("good")
-                || text_lower.contains("time"),
+            is_valid,
             "Response should address the calling time question"
         );
     }
@@ -405,7 +412,6 @@ async fn test_multiturn_manual_functions_error_handling() {
     )
     .await
     .expect("Semantic validation should succeed");
-
     assert!(is_valid, "Response should explain the permission error");
 }
 

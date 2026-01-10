@@ -405,13 +405,18 @@ async fn test_streaming_deltas_are_incremental() {
              If these differ, deltas may contain overlapping content."
         );
 
-        // Verify the content looks reasonable (should mention seasons)
-        let lower = concatenated.to_lowercase();
+        // Verify the content looks reasonable - use semantic validation
+        let is_valid = validate_response_semantically(
+            &client,
+            "Asked for haikus about each season: spring, summer, fall, winter",
+            &concatenated,
+            "Does this response contain haiku-like poetry about seasons?",
+        )
+        .await
+        .expect("Semantic validation failed");
         assert!(
-            ["spring", "summer", "fall", "winter"]
-                .iter()
-                .any(|season| lower.contains(season)),
-            "Response should mention seasons. Got: {:?}",
+            is_valid,
+            "Response should contain seasonal haikus. Got: {:?}",
             concatenated
         );
     })

@@ -22,7 +22,7 @@ use base64::Engine;
 use common::{
     EXTENDED_TEST_TIMEOUT, SAMPLE_AUDIO_URL, SAMPLE_IMAGE_URL, SAMPLE_VIDEO_URL, TEST_TIMEOUT,
     TINY_BLUE_PNG_BASE64, TINY_MP4_BASE64, TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64,
-    consume_stream, get_client, interaction_builder, stateful_builder,
+    assert_response_semantic, consume_stream, get_client, interaction_builder, stateful_builder,
     validate_response_semantically, with_timeout,
 };
 use genai_rs::{
@@ -105,15 +105,17 @@ async fn test_image_input_from_base64() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Color response: {}", text);
 
     // The tiny PNG is red
-    assert!(
-        text.contains("red") || text.contains("pink") || text.contains("magenta"),
-        "Response should identify the red color: {}",
-        text
-    );
+    assert_response_semantic(
+        &client,
+        "Showed a red 1x1 pixel image and asked what color it is",
+        text,
+        "Does this response identify the color as red or a shade of red (like pink, magenta, crimson)?",
+    )
+    .await;
 }
 
 /// Tests multiple images in a single request using base64.
@@ -141,18 +143,17 @@ async fn test_multiple_images_single_request() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Multiple images response: {}", text);
 
-    // Should mention both colors
-    let mentions_red = text.contains("red") || text.contains("pink");
-    let mentions_blue = text.contains("blue");
-
-    assert!(
-        mentions_red || mentions_blue,
-        "Response should describe at least one of the colors: {}",
-        text
-    );
+    // Should mention the colors from both images
+    assert_response_semantic(
+        &client,
+        "Showed two images (one red, one blue) and asked to describe the colors",
+        text,
+        "Does this response mention at least one of the colors red or blue?",
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -190,15 +191,17 @@ async fn test_image_with_follow_up_question() {
         assert_eq!(response2.status, InteractionStatus::Completed);
         assert!(response2.has_text(), "Should have follow-up response");
 
-        let text = response2.text().unwrap().to_lowercase();
+        let text = response2.text().unwrap();
         println!("Follow-up response: {}", text);
 
-        // Red is a warm color
-        assert!(
-            text.contains("warm") || text.contains("hot") || text.contains("red"),
-            "Response should identify warm color: {}",
-            text
-        );
+        // Red is a warm color - use semantic validation
+        assert_response_semantic(
+            &client,
+            "Previous turn discussed a red image. Asked if the color is warm or cool.",
+            text,
+            "Does this response identify the color as warm (or mention red/hot)?",
+        )
+        .await;
     })
     .await;
 }
@@ -402,22 +405,17 @@ async fn test_multimodal_text_and_image_interleaved() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Interleaved content response: {}", text);
 
-    // Red is associated with passion, anger, love, energy
-    assert!(
-        text.contains("passion")
-            || text.contains("anger")
-            || text.contains("love")
-            || text.contains("energy")
-            || text.contains("emotion")
-            || text.contains("warm")
-            || text.contains("intense")
-            || text.contains("red"),
-        "Response should address emotional association: {}",
-        text
-    );
+    // Red is associated with passion, anger, love, energy - use semantic validation
+    assert_response_semantic(
+        &client,
+        "Showed a red image and asked what emotion it might represent",
+        text,
+        "Does this response discuss emotions or feelings commonly associated with red (like passion, anger, love, energy, warmth, or intensity)?",
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -446,20 +444,17 @@ async fn test_multimodal_comparison() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Comparison response: {}", text);
 
-    // Should mention differences or colors
-    assert!(
-        text.contains("different")
-            || text.contains("red")
-            || text.contains("blue")
-            || text.contains("color")
-            || text.contains("first")
-            || text.contains("second"),
-        "Response should compare the images: {}",
-        text
-    );
+    // Should mention differences or colors - use semantic validation
+    assert_response_semantic(
+        &client,
+        "Showed two colored squares (red and blue) and asked to compare them",
+        text,
+        "Does this response compare two colors or mention that the images are different?",
+    )
+    .await;
 }
 
 // =============================================================================
@@ -507,25 +502,18 @@ async fn test_mixed_image_and_audio() {
             );
             assert!(response.has_text(), "Should have text response");
 
-            let text = response.text().unwrap().to_lowercase();
+            let text = response.text().unwrap();
             println!("Mixed media response: {}", text);
 
-            // Verify the model acknowledged the inputs
-            // Note: We check for image OR audio keywords since minimal test files
-            // may not provide enough data for the model to analyze both
-            let mentions_image =
-                text.contains("image") || text.contains("color") || text.contains("red");
-            let mentions_audio = text.contains("audio")
-                || text.contains("sound")
-                || text.contains("wav")
-                || text.contains("silent")
-                || text.contains("empty");
-
-            assert!(
-                mentions_image || mentions_audio,
-                "Response should mention at least one input (image or audio): {}",
-                text
-            );
+            // Verify the model acknowledged at least one input using semantic validation
+            // Note: Minimal test files may not provide enough data for the model to analyze both
+            assert_response_semantic(
+                &client,
+                "Sent a red image and a WAV audio file, asked to describe both",
+                text,
+                "Does this response mention anything about an image (color, red) OR audio (sound, silent, empty)?",
+            )
+            .await;
         }
         Err(e) => {
             // The minimal test files might not be fully valid
@@ -631,18 +619,19 @@ async fn test_pdf_document_input_from_base64() {
     match result {
         Ok(response) => {
             println!("PDF document response status: {:?}", response.status);
+            assert_eq!(response.status, InteractionStatus::Completed);
             if response.has_text() {
                 let text = response.text().unwrap();
                 println!("PDF response: {}", text);
-                // The minimal PDF contains "Hello World"
-                let lower = text.to_lowercase();
-                assert!(
-                    lower.contains("hello") || lower.contains("world"),
-                    "Response should mention the PDF content: {}",
-                    text
-                );
+                // The minimal PDF contains "Hello World" - use semantic validation
+                assert_response_semantic(
+                    &client,
+                    "Asked about text in a PDF that contains 'Hello World'",
+                    text,
+                    "Does this response mention 'Hello' or 'World' or indicate those words were found?",
+                )
+                .await;
             }
-            assert_eq!(response.status, InteractionStatus::Completed);
         }
         Err(e) => {
             // The minimal PDF might not be fully valid or the API might have restrictions
@@ -678,14 +667,16 @@ async fn test_pdf_with_question() {
         Ok(response) => {
             assert_eq!(response.status, InteractionStatus::Completed);
             assert!(response.has_text(), "Should have text response");
-            let text = response.text().unwrap().to_lowercase();
+            let text = response.text().unwrap();
             println!("PDF question response: {}", text);
-            // Should mention something about the PDF
-            assert!(
-                text.contains("pdf") || text.contains("document") || text.contains("page"),
-                "Response should address the PDF: {}",
-                text
-            );
+            // Should mention something about the PDF - use semantic validation
+            assert_response_semantic(
+                &client,
+                "Sent a PDF and asked if it's valid and about its structure",
+                text,
+                "Does this response discuss the PDF, document structure, or pages?",
+            )
+            .await;
         }
         Err(e) => {
             println!("PDF with question error (may be expected): {:?}", e);
@@ -738,18 +729,21 @@ async fn test_multimodal_streaming() {
 
         // Verify content describes the red image
         let text_to_check = if !result.collected_text.is_empty() {
-            result.collected_text.to_lowercase()
+            result.collected_text.clone()
         } else if let Some(ref response) = result.final_response {
-            response.text().unwrap_or_default().to_lowercase()
+            response.text().unwrap_or_default().to_string()
         } else {
             String::new()
         };
 
-        assert!(
-            text_to_check.contains("red"),
-            "Response should identify the red color. Got: {}",
-            text_to_check
-        );
+        // Use semantic validation for the color check
+        assert_response_semantic(
+            &client,
+            "Asked what color a red 1x1 pixel image is",
+            &text_to_check,
+            "Does this response identify the color as red or a shade of red?",
+        )
+        .await;
 
         // Verify final response if present
         if let Some(ref response) = result.final_response {
@@ -807,15 +801,17 @@ async fn test_add_image_file_builder() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Color response: {}", text);
 
-    // The tiny PNG is red
-    assert!(
-        text.contains("red") || text.contains("pink") || text.contains("magenta"),
-        "Response should identify the red color: {}",
-        text
-    );
+    // The tiny PNG is red - use semantic validation
+    assert_response_semantic(
+        &client,
+        "Asked what color a red 1x1 pixel PNG image is",
+        text,
+        "Does this response identify the color as red or a shade of red (like pink, magenta)?",
+    )
+    .await;
 }
 
 /// Tests chaining multiple add_image_file() calls.
@@ -865,18 +861,17 @@ async fn test_add_multiple_image_files_builder() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Multiple images response: {}", text);
 
-    // Should mention at least one color
-    let mentions_red = text.contains("red") || text.contains("pink");
-    let mentions_blue = text.contains("blue");
-
-    assert!(
-        mentions_red || mentions_blue,
-        "Response should describe at least one of the colors: {}",
-        text
-    );
+    // Should mention at least one color - use semantic validation
+    assert_response_semantic(
+        &client,
+        "Showed two images (red and blue) and asked to list both colors",
+        text,
+        "Does this response mention at least one color (red, blue, pink, etc.)?",
+    )
+    .await;
 }
 
 /// Tests add_image_file() error handling for missing file.
@@ -946,20 +941,13 @@ async fn test_add_image_bytes_roundtrip() {
     println!("Color response: {}", text);
 
     // Use semantic validation instead of brittle content checks
-    let is_valid = validate_response_semantically(
+    assert_response_semantic(
         &client,
         "User asked about the color of a 1x1 red PNG image",
         text,
         "Does this response describe a red, pink, magenta, or similar warm color?",
     )
-    .await
-    .expect("Semantic validation failed");
-
-    assert!(
-        is_valid,
-        "Response should identify a red/warm color: {}",
-        text
-    );
+    .await;
 }
 
 /// Tests the add_audio_bytes() builder method.

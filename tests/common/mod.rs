@@ -918,3 +918,43 @@ pub async fn validate_response_semantically(
     );
     Ok(true)
 }
+
+/// Validates and asserts that a response is semantically appropriate in one call.
+///
+/// This is a convenience wrapper around [`validate_response_semantically`] that combines
+/// the validation check and assertion, reducing boilerplate in tests.
+///
+/// # Panics
+///
+/// - If the semantic validation API call fails
+/// - If the response is not semantically valid
+///
+/// # Example
+///
+/// ```ignore
+/// // Instead of:
+/// let is_valid = validate_response_semantically(&client, context, &text, question)
+///     .await
+///     .expect("Semantic validation failed");
+/// assert!(is_valid, "Response should...");
+///
+/// // Use:
+/// assert_response_semantic(&client, context, &text, question).await;
+/// ```
+#[allow(dead_code)]
+pub async fn assert_response_semantic(
+    client: &Client,
+    context: &str,
+    response_text: &str,
+    validation_question: &str,
+) {
+    let is_valid =
+        validate_response_semantically(client, context, response_text, validation_question)
+            .await
+            .expect("Semantic validation API call failed");
+    assert!(
+        is_valid,
+        "Semantic validation failed.\nQuestion: {}\nResponse: {}",
+        validation_question, response_text
+    );
+}

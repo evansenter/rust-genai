@@ -13,7 +13,7 @@
 
 mod common;
 
-use common::{get_client, stateful_builder};
+use common::{get_client, interaction_builder, stateful_builder, validate_response_semantically};
 use genai_rs::{FunctionDeclaration, InteractionStatus, function_result_content};
 use serde_json::json;
 
@@ -259,19 +259,19 @@ async fn test_conversation_function_then_text() {
     println!("Turn 3 status: {:?}", response3.status);
     assert!(response3.has_text(), "Turn 3 should have text response");
 
-    let text = response3.text().unwrap().to_lowercase();
+    let text = response3.text().unwrap();
     println!("Turn 3 text: {}", text);
 
     // Should reference the weather context
-    assert!(
-        text.contains("no")
-            || text.contains("yes")
-            || text.contains("sunny")
-            || text.contains("warm")
-            || text.contains("jacket")
-            || text.contains("25"),
-        "Response should reference weather context"
-    );
+    let is_valid = validate_response_semantically(
+        &client,
+        "Function returned 25°C sunny weather for Tokyo. User asked if they should bring a jacket.",
+        text,
+        "Does this response use the weather context (warm/sunny, 25°C) to advise about whether to bring a jacket?",
+    )
+    .await
+    .expect("Semantic validation failed");
+    assert!(is_valid, "Response should reference weather context");
 }
 
 // =============================================================================
@@ -333,24 +333,19 @@ async fn test_conversation_branch() {
 
     assert!(branch_response.has_text(), "Should have text response");
 
-    let text = branch_response.text().unwrap().to_lowercase();
+    let text = branch_response.text().unwrap();
     println!("Branch response (from turn 2): {}", text);
 
-    // Should know about color and number, but NOT cat (that was in turn 3)
-    let knows_color = text.contains("red");
-    let knows_number = text.contains("7") || text.contains("seven");
-    let knows_cat = text.contains("cat");
-
-    println!(
-        "Knows color: {}, number: {}, cat: {}",
-        knows_color, knows_number, knows_cat
-    );
-
-    // Should know at least color or number
-    assert!(
-        knows_color || knows_number,
-        "Branch should have context from earlier turns"
-    );
+    // Should know about color and number from turns 1-2
+    let is_valid = validate_response_semantically(
+        &client,
+        "User said favorite color is red (turn 1), favorite number is 7 (turn 2), then asked about favorites. Branch from turn 2 - cat was only mentioned in turn 3.",
+        text,
+        "Does this response mention the user's favorite color (red) or favorite number (7)?",
+    )
+    .await
+    .expect("Semantic validation failed");
+    assert!(is_valid, "Branch should have context from earlier turns");
 
     // Continue from turn 3 to verify it still works
     let prev_id = response3.id.clone().expect("id should exist");
@@ -363,12 +358,18 @@ async fn test_conversation_branch() {
     })
     .expect("Continue failed");
 
-    let continue_text = continue_response.text().unwrap().to_lowercase();
+    let continue_text = continue_response.text().unwrap();
     println!("Continue response (from turn 3): {}", continue_text);
-    assert!(
-        continue_text.contains("cat"),
-        "Continue should remember the cat from turn 3"
-    );
+
+    let is_valid = validate_response_semantically(
+        &client,
+        "User said their favorite animal is a cat in turn 3, then asked what their favorite animal is",
+        continue_text,
+        "Does this response correctly identify cat as the user's favorite animal?",
+    )
+    .await
+    .expect("Semantic validation failed");
+    assert!(is_valid, "Continue should remember the cat from turn 3");
 }
 
 // =============================================================================
@@ -471,7 +472,6 @@ async fn test_usage_longer_response() {
 // Explicit Turn Array Tests (Issue #271)
 // =============================================================================
 
-use common::interaction_builder;
 use genai_rs::Turn;
 
 #[tokio::test]
@@ -498,14 +498,19 @@ async fn test_explicit_turns_basic() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Response: {}", text);
 
     // Model should compute 4 * 3 = 12
-    assert!(
-        text.contains("12") || text.contains("twelve"),
-        "Response should contain the answer 12"
-    );
+    let is_valid = validate_response_semantically(
+        &client,
+        "User asked 2+2, model said 4, then user asked 'what's that times 3'",
+        text,
+        "Does this response correctly state that the answer is 12 (4 times 3)?",
+    )
+    .await
+    .expect("Semantic validation failed");
+    assert!(is_valid, "Response should compute 4 * 3 = 12");
 }
 
 #[tokio::test]
@@ -532,15 +537,19 @@ async fn test_conversation_builder_fluent_api() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Response: {}", text);
 
     // Model should remember both facts
-    assert!(text.contains("alice"), "Response should mention Alice");
-    assert!(
-        text.contains("hik"),
-        "Response should mention hiking (or hiking-related word)"
-    );
+    let is_valid = validate_response_semantically(
+        &client,
+        "User said their name is Alice and they love hiking, then asked what their name is and what they enjoy",
+        text,
+        "Does this response correctly recall that the user's name is Alice AND that they enjoy hiking?",
+    )
+    .await
+    .expect("Semantic validation failed");
+    assert!(is_valid, "Response should mention both Alice and hiking");
 }
 
 #[tokio::test]
@@ -576,18 +585,19 @@ async fn test_explicit_turns_context_preservation() {
 
     assert_eq!(response.status, InteractionStatus::Completed);
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Response: {}", text);
 
     // Should remember both destination and interest
-    assert!(
-        text.contains("tokyo") || text.contains("japan"),
-        "Response should mention Tokyo/Japan"
-    );
-    assert!(
-        text.contains("food") || text.contains("cuisine") || text.contains("eat"),
-        "Response should mention food/cuisine"
-    );
+    let is_valid = validate_response_semantically(
+        &client,
+        "User discussed planning a trip to Tokyo and mentioned loving local cuisine. Then asked where they're going and what they enjoy.",
+        text,
+        "Does this response correctly recall that the user is going to Tokyo/Japan AND that they enjoy food/cuisine?",
+    )
+    .await
+    .expect("Semantic validation failed");
+    assert!(is_valid, "Response should mention Tokyo and food interests");
 }
 
 #[tokio::test]
@@ -612,8 +622,16 @@ async fn test_explicit_turns_single_user_message() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Response: {}", text);
 
-    assert!(text.contains("paris"), "Response should contain Paris");
+    let is_valid = validate_response_semantically(
+        &client,
+        "Asked for the capital of France in one word",
+        text,
+        "Does this response identify Paris as the capital of France?",
+    )
+    .await
+    .expect("Semantic validation failed");
+    assert!(is_valid, "Response should identify Paris as the capital");
 }

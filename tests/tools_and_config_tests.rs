@@ -18,7 +18,10 @@
 
 mod common;
 
-use common::{get_client, interaction_builder, retry_on_any_error, stateful_builder};
+use common::{
+    get_client, interaction_builder, retry_on_any_error, stateful_builder,
+    validate_response_semantically,
+};
 use genai_rs::{
     FunctionCallingMode, FunctionDeclaration, GenerationConfig, InteractionStatus, ThinkingLevel,
     ThinkingSummaries, Tool,
@@ -52,16 +55,16 @@ async fn test_google_search() {
             if response.has_text() {
                 let text = response.text().unwrap();
                 println!("Response with Google Search: {}", text);
-                // Should provide current/recent information
-                let text_lower = text.to_lowercase();
-                assert!(
-                    text_lower.contains("weather")
-                        || text_lower.contains("temperature")
-                        || text_lower.contains("new york")
-                        || text_lower.contains("today")
-                        || text_lower.contains("currently"),
-                    "Response should mention weather-related content"
-                );
+                // Should provide current/recent information - use semantic validation
+                let is_valid = validate_response_semantically(
+                    &client,
+                    "Asked about current weather in New York City with Google Search enabled",
+                    text,
+                    "Does this response discuss weather, temperature, or conditions in New York?",
+                )
+                .await
+                .expect("Semantic validation failed");
+                assert!(is_valid, "Response should mention weather-related content");
             }
 
             // Verify grounding metadata is available
@@ -510,14 +513,17 @@ async fn test_url_context() {
             if response.has_text() {
                 let text = response.text().unwrap();
                 println!("URL Context response: {}", text);
-                // example.com has standard placeholder content
-                let text_lower = text.to_lowercase();
+                // example.com has standard placeholder content - use semantic validation
+                let is_valid = validate_response_semantically(
+                    &client,
+                    "Asked to describe example.com (IANA reserved domain for documentation)",
+                    text,
+                    "Does this response describe example.com as a reserved/example domain or mention its illustrative/documentation purpose?",
+                )
+                .await
+                .expect("Semantic validation failed");
                 assert!(
-                    text_lower.contains("example")
-                        || text_lower.contains("domain")
-                        || text_lower.contains("website")
-                        || text_lower.contains("illustrative")
-                        || text_lower.contains("documentation"),
+                    is_valid,
                     "Response should describe content from example.com"
                 );
             }
@@ -1087,7 +1093,13 @@ async fn test_generation_config_thinking_level_minimal() {
 
     let text = response.text().unwrap();
     println!("Minimal thinking response: {}", text);
-    assert!(text.contains('4'), "Should contain the answer");
+
+    // Deterministic math - use .contains() per CLAUDE.md guidance
+    assert!(
+        text.contains('4'),
+        "Should contain the answer 4. Got: {}",
+        text
+    );
 }
 
 #[tokio::test]
@@ -1121,9 +1133,12 @@ async fn test_generation_config_thinking_level_high() {
     // Should provide a detailed explanation
     let word_count = text.split_whitespace().count();
     println!("Word count: {}", word_count);
+
+    // Deterministic math - use .contains() per CLAUDE.md guidance
     assert!(
         text.contains('4') || text.contains("four"),
-        "Should contain the answer"
+        "Should contain the answer x = 4. Got: {}",
+        text
     );
 }
 
@@ -1157,9 +1172,18 @@ async fn test_generation_config_top_p() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Top-p response: {}", text);
-    assert!(text.contains("paris"), "Should answer Paris");
+
+    let is_valid = validate_response_semantically(
+        &client,
+        "Asked for the capital of France in one word",
+        text,
+        "Does this response identify Paris as the capital of France?",
+    )
+    .await
+    .expect("Semantic validation failed");
+    assert!(is_valid, "Should answer Paris");
 }
 
 /// Test top_k generation config parameter.
@@ -1193,9 +1217,12 @@ async fn test_generation_config_top_k() {
 
             let text = response.text().unwrap();
             println!("Top-k response: {}", text);
+
+            // Deterministic math - use .contains() per CLAUDE.md guidance
             assert!(
                 text.contains("15") || text.contains("fifteen"),
-                "Should contain 15"
+                "Should contain 15. Got: {}",
+                text
             );
         }
         Err(e) => {

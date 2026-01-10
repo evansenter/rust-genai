@@ -297,6 +297,18 @@ proptest! {
 
 ## Assertion Strategies
 
+### Decision Flowchart
+
+Use this to choose the right assertion type:
+
+```text
+Is it checking LLM-generated text content?
+├── NO → Use structural assertions
+└── YES → Is the expected value deterministic?
+          ├── YES (error message, code execution result) → .contains() is OK
+          └── NO (natural language response) → Use semantic validation
+```
+
 ### Structural Assertions (Preferred)
 
 Check API mechanics without depending on LLM output:
@@ -306,14 +318,11 @@ Check API mechanics without depending on LLM output:
 assert!(response.text().is_some());
 assert_eq!(response.status, InteractionStatus::Completed);
 assert!(response.function_calls().len() > 0);
-
-// Bad - brittle
-assert!(response.text().unwrap().contains("hello"));
 ```
 
-### Semantic Assertions (When Needed)
+### Semantic Assertions (For LLM Output)
 
-For behavioral tests where correctness matters:
+For behavioral tests where the LLM's response content matters:
 
 ```rust,ignore
 let is_valid = validate_response_semantically(
@@ -326,14 +335,74 @@ assert!(is_valid, "Response should use function result");
 ```
 
 **When to use semantic validation**:
-- Multi-turn context preservation
-- Function result incorporation
-- Complex behavioral requirements
+- Multi-turn context preservation ("Does this recall the user's name?")
+- Function result incorporation ("Does this use the weather data?")
+- Factual correctness ("Does this identify Paris as the capital?")
+- Content understanding ("Does this describe the image colors?")
 
 **When NOT to use**:
-- Simple presence/absence checks
 - Status code verification
-- Structural validation
+- Field presence checks
+- Error message validation (deterministic strings)
+
+### Anti-Patterns to Avoid
+
+These patterns cause flaky tests because LLM output varies:
+
+```rust,ignore
+// BAD - Single keyword that may be rephrased
+assert!(text.contains("paris"));
+// Model might say "The capital is Paris", "Paris, France", or "It's Paris"
+
+// BAD - OR chains trying to handle variability
+assert!(text.contains("red") || text.contains("crimson") || text.contains("scarlet"));
+// Still misses "reddish", "ruby", "a shade of red", etc.
+
+// BAD - Partial match that's too specific
+assert!(text.contains("hik"));  // Trying to catch "hiking"
+// Misses "outdoor activities", "trekking", "walks"
+```
+
+**Correct approach**:
+
+```rust,ignore
+// GOOD - Semantic validation handles natural language variability
+let is_valid = validate_response_semantically(
+    &client,
+    "Asked about the capital of France",
+    text,
+    "Does this response correctly identify Paris as the capital of France?"
+).await?;
+assert!(is_valid);
+
+// GOOD - For color identification
+let is_valid = validate_response_semantically(
+    &client,
+    "Showed a red image",
+    text,
+    "Does this response identify the color as red or a shade of red?"
+).await?;
+assert!(is_valid);
+```
+
+### Acceptable `.contains()` Usage
+
+These patterns ARE appropriate because the values are deterministic:
+
+```rust,ignore
+// OK - Error messages from the library (deterministic strings)
+assert!(error.to_string().contains("invalid API key"));
+
+// OK - Code execution results (exact computed values)
+assert!(text.contains("3628800"));  // factorial(10)
+assert!(text.contains("24133"));    // sum of primes
+
+// OK - JSON/schema structure checks
+assert!(schema.contains("\"type\": \"string\""));
+
+// OK - Format validation
+assert!(email.contains("@"));
+```
 
 ### Unknown Content Checks
 
