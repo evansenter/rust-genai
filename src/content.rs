@@ -381,6 +381,15 @@ impl CodeExecutionOutcome {
     }
 
     /// Returns true if the execution failed (any error type).
+    ///
+    /// **Note:** This returns `true` for `Unknown` and `Unspecified` variants
+    /// as a conservative safety measure. In code execution contexts, treating
+    /// unrecognized outcomes as errors is the safer default—code that might
+    /// have failed should not be assumed to have succeeded.
+    ///
+    /// This differs from [`crate::UrlRetrievalStatus::is_error()`], which does NOT
+    /// treat `Unknown` as an error since URL retrieval failures are less
+    /// critical and the `Unknown` status may represent a new success state.
     pub const fn is_error(&self) -> bool {
         !self.is_success()
     }

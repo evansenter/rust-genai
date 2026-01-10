@@ -549,6 +549,15 @@ impl UrlRetrievalStatus {
     }
 
     /// Returns true if retrieval failed for any reason.
+    ///
+    /// **Note:** This returns `true` only for `Error` and `Unsafe` variants.
+    /// The `Unknown` variant is NOT treated as an error because:
+    /// 1. URL retrieval failures are non-critical (graceful degradation)
+    /// 2. An `Unknown` status may represent a new success state from the API
+    ///
+    /// This differs from [`crate::CodeExecutionOutcome::is_error()`], which treats
+    /// `Unknown` as an error since code execution failures have more serious
+    /// implications and require conservative handling.
     #[must_use]
     pub const fn is_error(&self) -> bool {
         matches!(self, Self::Error | Self::Unsafe)
