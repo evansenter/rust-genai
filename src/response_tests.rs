@@ -126,17 +126,17 @@ fn test_interaction_response_thoughts() {
         input: vec![],
         outputs: vec![
             InteractionContent::Thought {
-                text: Some("Let me think about this...".to_string()),
+                signature: Some("sig_1".to_string()),
             },
             InteractionContent::Thought {
-                text: Some("The answer is 42.".to_string()),
+                signature: Some("sig_2".to_string()),
             },
             InteractionContent::Text {
                 text: Some("The answer is 42.".to_string()),
                 annotations: None,
             },
-            // Thought with None text should be filtered out
-            InteractionContent::Thought { text: None },
+            // Thought with None signature should be filtered out
+            InteractionContent::Thought { signature: None },
         ],
         status: InteractionStatus::Completed,
         usage: None,
@@ -150,10 +150,10 @@ fn test_interaction_response_thoughts() {
 
     assert!(response.has_thoughts());
 
-    let thoughts: Vec<_> = response.thoughts().collect();
-    assert_eq!(thoughts.len(), 2);
-    assert_eq!(thoughts[0], "Let me think about this...");
-    assert_eq!(thoughts[1], "The answer is 42.");
+    let signatures: Vec<_> = response.thought_signatures().collect();
+    assert_eq!(signatures.len(), 2);
+    assert_eq!(signatures[0], "sig_1");
+    assert_eq!(signatures[1], "sig_2");
 
     // Verify text() still works (only returns Text content)
     assert_eq!(response.text(), Some("The answer is 42."));
@@ -181,8 +181,8 @@ fn test_interaction_response_no_thoughts() {
     };
 
     assert!(!response.has_thoughts());
-    let thoughts: Vec<_> = response.thoughts().collect();
-    assert!(thoughts.is_empty());
+    let signatures: Vec<_> = response.thought_signatures().collect();
+    assert!(signatures.is_empty());
 }
 
 #[test]
@@ -419,7 +419,7 @@ fn test_content_summary() {
                 annotations: None,
             },
             InteractionContent::Thought {
-                text: Some("Thinking".to_string()),
+                signature: Some("sig_thinking".to_string()),
             },
             InteractionContent::FunctionCall {
                 id: Some("call_1".to_string()),
@@ -557,11 +557,12 @@ fn test_content_summary_with_built_in_tools() {
                 result: vec![],
             },
             InteractionContent::UrlContextCall {
-                url: "https://example.com".to_string(),
+                id: "ctx_123".to_string(),
+                urls: vec!["https://example.com".to_string()],
             },
             InteractionContent::UrlContextResult {
-                url: "https://example.com".to_string(),
-                content: None,
+                call_id: "ctx_123".to_string(),
+                result: vec![],
             },
         ],
         status: InteractionStatus::Completed,
@@ -687,8 +688,8 @@ fn test_interaction_response_url_context_helpers() {
         agent: None,
         input: vec![],
         outputs: vec![InteractionContent::UrlContextResult {
-            url: "https://example.com".to_string(),
-            content: Some("Example content".to_string()),
+            call_id: "ctx_123".to_string(),
+            result: vec![UrlContextResultItem::new("https://example.com", "success")],
         }],
         status: InteractionStatus::Completed,
         usage: None,
@@ -704,8 +705,10 @@ fn test_interaction_response_url_context_helpers() {
 
     let url_results = response.url_context_results();
     assert_eq!(url_results.len(), 1);
-    assert_eq!(url_results[0].url, "https://example.com");
-    assert_eq!(url_results[0].content, Some("Example content"));
+    assert_eq!(url_results[0].call_id, "ctx_123");
+    assert_eq!(url_results[0].items.len(), 1);
+    assert_eq!(url_results[0].items[0].url, "https://example.com");
+    assert!(url_results[0].items[0].is_success());
 }
 
 // --- URL Context Metadata Tests ---
@@ -950,10 +953,15 @@ fn test_interaction_response_url_context_call_helpers() {
         input: vec![],
         outputs: vec![
             InteractionContent::UrlContextCall {
-                url: "https://docs.rs".to_string(),
+                id: "ctx_1".to_string(),
+                urls: vec!["https://docs.rs".to_string()],
             },
             InteractionContent::UrlContextCall {
-                url: "https://rust-lang.org".to_string(),
+                id: "ctx_2".to_string(),
+                urls: vec![
+                    "https://rust-lang.org".to_string(),
+                    "https://crates.io".to_string(),
+                ],
             },
         ],
         status: InteractionStatus::Completed,
@@ -968,14 +976,15 @@ fn test_interaction_response_url_context_call_helpers() {
 
     assert!(response.has_url_context_calls());
 
-    // Test url_context_call() - returns first one
-    assert_eq!(response.url_context_call(), Some("https://docs.rs"));
+    // Test url_context_call_id() - returns first call ID
+    assert_eq!(response.url_context_call_id(), Some("ctx_1"));
 
-    // Test url_context_calls() - returns all
-    let urls = response.url_context_calls();
-    assert_eq!(urls.len(), 2);
+    // Test url_context_call_urls() - returns all URLs flattened
+    let urls = response.url_context_call_urls();
+    assert_eq!(urls.len(), 3);
     assert_eq!(urls[0], "https://docs.rs");
     assert_eq!(urls[1], "https://rust-lang.org");
+    assert_eq!(urls[2], "https://crates.io");
 }
 
 #[test]
@@ -997,8 +1006,8 @@ fn test_interaction_response_no_url_context_calls() {
     };
 
     assert!(!response.has_url_context_calls());
-    assert!(response.url_context_call().is_none());
-    assert!(response.url_context_calls().is_empty());
+    assert!(response.url_context_call_id().is_none());
+    assert!(response.url_context_call_urls().is_empty());
 }
 
 // --- Code Execution Helpers ---
@@ -1374,16 +1383,15 @@ fn test_interaction_response_url_context_results() {
         input: vec![],
         outputs: vec![
             InteractionContent::UrlContextResult {
-                url: "https://docs.rs".to_string(),
-                content: Some("<html>docs content</html>".to_string()),
+                call_id: "ctx_1".to_string(),
+                result: vec![
+                    UrlContextResultItem::new("https://docs.rs", "success"),
+                    UrlContextResultItem::new("https://crates.io", "success"),
+                ],
             },
             InteractionContent::UrlContextResult {
-                url: "https://crates.io".to_string(),
-                content: Some("<html>crates content</html>".to_string()),
-            },
-            InteractionContent::UrlContextResult {
-                url: "https://blocked.com".to_string(),
-                content: None, // Failed fetch
+                call_id: "ctx_2".to_string(),
+                result: vec![UrlContextResultItem::new("https://blocked.com", "error")],
             },
         ],
         status: InteractionStatus::Completed,
@@ -1399,13 +1407,14 @@ fn test_interaction_response_url_context_results() {
     assert!(response.has_url_context_results());
 
     let results = response.url_context_results();
-    assert_eq!(results.len(), 3);
-    assert_eq!(results[0].url, "https://docs.rs");
-    assert_eq!(results[0].content, Some("<html>docs content</html>"));
-    assert_eq!(results[1].url, "https://crates.io");
-    assert_eq!(results[1].content, Some("<html>crates content</html>"));
-    assert_eq!(results[2].url, "https://blocked.com");
-    assert_eq!(results[2].content, None); // Failed fetch has no content
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].call_id, "ctx_1");
+    assert_eq!(results[0].items.len(), 2);
+    assert!(results[0].items[0].is_success());
+    assert!(results[0].items[1].is_success());
+    assert_eq!(results[1].call_id, "ctx_2");
+    assert_eq!(results[1].items.len(), 1);
+    assert!(results[1].items[0].is_error());
 }
 
 #[test]
@@ -1457,7 +1466,7 @@ fn test_interaction_response_complex_roundtrip() {
         outputs: vec![
             // Thought with signature (thinking models)
             InteractionContent::Thought {
-                text: Some("Let me think about this request...".to_string()),
+                signature: Some("sig_thinking".to_string()),
             },
             InteractionContent::ThoughtSignature {
                 signature: "thought-sig-abc123".to_string(),
@@ -1501,11 +1510,12 @@ fn test_interaction_response_complex_roundtrip() {
             },
             // URL context
             InteractionContent::UrlContextCall {
-                url: "https://example.com".to_string(),
+                id: "ctx_123".to_string(),
+                urls: vec!["https://example.com".to_string()],
             },
             InteractionContent::UrlContextResult {
-                url: "https://example.com".to_string(),
-                content: Some("<html>Example content</html>".to_string()),
+                call_id: "ctx_123".to_string(),
+                result: vec![UrlContextResultItem::new("https://example.com", "success")],
             },
             // Final text response
             InteractionContent::Text {
@@ -1618,7 +1628,9 @@ fn test_interaction_response_complex_roundtrip() {
     // Verify URL context results
     let url_results = deserialized.url_context_results();
     assert_eq!(url_results.len(), 1);
-    assert_eq!(url_results[0].url, "https://example.com");
+    assert_eq!(url_results[0].call_id, "ctx_123");
+    assert_eq!(url_results[0].items.len(), 1);
+    assert!(url_results[0].items[0].is_success());
 
     // Verify usage metadata
     let usage = deserialized.usage.expect("Should have usage");
@@ -2139,7 +2151,7 @@ fn test_interaction_response_all_annotations() {
                 }]),
             },
             InteractionContent::Thought {
-                text: Some("Thinking about sources...".to_string()),
+                signature: Some("sig_thinking".to_string()),
             },
             InteractionContent::Text {
                 text: Some("Second and third claims.".to_string()),
@@ -2778,7 +2790,7 @@ fn test_images_iterator_empty_when_no_images() {
                 annotations: None,
             },
             InteractionContent::Thought {
-                text: Some("Just a thought".to_string()),
+                signature: Some("sig_thought".to_string()),
             },
         ],
         status: InteractionStatus::Completed,
@@ -2888,7 +2900,7 @@ fn test_audios_iterator_empty_when_no_audios() {
                 annotations: None,
             },
             InteractionContent::Thought {
-                text: Some("Just a thought".to_string()),
+                signature: Some("sig_thought".to_string()),
             },
         ],
         status: InteractionStatus::Completed,

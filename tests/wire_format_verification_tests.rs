@@ -413,10 +413,11 @@ mod interaction_content {
     #[test]
     fn thought_uses_snake_case_type() {
         let content = InteractionContent::Thought {
-            text: Some("thinking...".to_string()),
+            signature: Some("Eq0JCqoJ...signature".to_string()),
         };
         let json = serde_json::to_value(&content).unwrap();
         assert_eq!(json["type"], "thought");
+        assert_eq!(json["signature"], "Eq0JCqoJ...signature");
     }
 
     #[test]

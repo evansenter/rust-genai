@@ -1782,16 +1782,16 @@ async fn test_thought_echo_manual_history() {
     let answer1 = response1.text().unwrap_or("(no text)");
     println!("Turn 1 answer: {}", answer1);
 
-    // Collect thoughts (if any)
-    let thoughts: Vec<String> = response1.thoughts().map(String::from).collect();
-    println!("Thoughts collected: {} items", thoughts.len());
+    // Collect thought signatures (if any)
+    let thought_sigs: Vec<String> = response1.thought_signatures().map(String::from).collect();
+    println!("Thought signatures collected: {} items", thought_sigs.len());
 
     // Turn 2: Build manual history with thought echo
     let mut history = vec![text_content(initial_prompt)];
 
-    // Echo back thoughts
-    for thought in &thoughts {
-        history.push(thought_content(thought));
+    // Echo back thought signatures
+    for sig in &thought_sigs {
+        history.push(thought_content(sig));
     }
 
     // Echo back the answer

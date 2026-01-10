@@ -53,12 +53,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    // Display the response
+    // Display thought count (signatures are cryptographic, not human-readable)
     if response1.has_thoughts() {
-        println!("Model's reasoning:");
-        for thought in response1.thoughts() {
-            println!("  [Thought] {}", thought);
-        }
+        let sig_count = response1.thought_signatures().count();
+        println!(
+            "Model used internal reasoning ({} thought signature(s))",
+            sig_count
+        );
     }
 
     if let Some(text) = response1.text() {
@@ -77,9 +78,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         text_content(initial_prompt),
     ];
 
-    // Echo back the model's thoughts using thought_content()
-    for thought in response1.thoughts() {
-        history.push(thought_content(thought));
+    // Echo back the model's thought signatures using thought_content()
+    for signature in response1.thought_signatures() {
+        history.push(thought_content(signature));
     }
 
     // Echo back the model's answer
@@ -103,12 +104,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    // Display the response
+    // Display thought count (signatures are cryptographic, not human-readable)
     if response2.has_thoughts() {
-        println!("Model's reasoning:");
-        for thought in response2.thoughts() {
-            println!("  [Thought] {}", thought);
-        }
+        let sig_count = response2.thought_signatures().count();
+        println!(
+            "Model used internal reasoning ({} thought signature(s))",
+            sig_count
+        );
     }
 
     if let Some(text) = response2.text() {
@@ -178,7 +180,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("• thought_content() echoes model thoughts in manual multi-turn");
     println!("• Useful for custom conversation stores or history filtering");
     println!("• with_previous_interaction() handles this automatically (preferred)");
-    println!("• Thoughts from response1.thoughts() can be echoed back\n");
+    println!("• Signatures from thought_signatures() can be echoed back\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");
     println!("Manual history:");

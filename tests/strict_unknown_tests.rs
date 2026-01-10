@@ -414,11 +414,11 @@ mod common {
         assert_eq!(json["text"], "hello");
 
         let thought = InteractionContent::Thought {
-            text: Some("thinking".to_string()),
+            signature: Some("Eq0JCqoJ...signature".to_string()),
         };
         let json = serde_json::to_value(&thought).unwrap();
         assert_eq!(json["type"], "thought");
-        assert_eq!(json["text"], "thinking");
+        assert_eq!(json["signature"], "Eq0JCqoJ...signature");
 
         let image = InteractionContent::Image {
             data: Some("b64".to_string()),

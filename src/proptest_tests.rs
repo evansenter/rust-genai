@@ -8,7 +8,7 @@ use proptest::prelude::*;
 
 use super::content::{
     Annotation, CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem,
-    GoogleSearchResultItem, InteractionContent, Resolution,
+    GoogleSearchResultItem, InteractionContent, Resolution, UrlContextResultItem,
 };
 use super::request::{
     AgentConfig, DeepResearchConfig, DynamicConfig, Role, ThinkingLevel, ThinkingSummaries, Turn,
@@ -148,6 +148,15 @@ fn arb_file_search_result_item() -> impl Strategy<Value = FileSearchResultItem> 
         text,
         store,
     })
+}
+
+/// Strategy for generating UrlContextResultItem objects.
+fn arb_url_context_result_item() -> impl Strategy<Value = UrlContextResultItem> {
+    (
+        arb_text(),
+        prop_oneof![Just("success"), Just("error"), Just("unsafe")],
+    )
+        .prop_map(|(url, status)| UrlContextResultItem::new(url, status))
 }
 
 // =============================================================================
@@ -415,6 +424,7 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
         proptest::option::of(any::<u32>()),
         proptest::option::of(any::<u32>()),
         proptest::option::of(any::<u32>()),
+        proptest::option::of(any::<u32>()),
         arb_modality_tokens_vec(),
         arb_modality_tokens_vec(),
         arb_modality_tokens_vec(),
@@ -427,6 +437,7 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
                 total_tokens,
                 total_cached_tokens,
                 total_reasoning_tokens,
+                total_thought_tokens,
                 total_tool_use_tokens,
                 input_tokens_by_modality,
                 output_tokens_by_modality,
@@ -439,6 +450,7 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
                     total_tokens,
                     total_cached_tokens,
                     total_reasoning_tokens,
+                    total_thought_tokens,
                     total_tool_use_tokens,
                     input_tokens_by_modality,
                     output_tokens_by_modality,
@@ -483,8 +495,9 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
             proptest::option::of(proptest::collection::vec(arb_annotation(), 0..3))
         )
             .prop_map(|(text, annotations)| InteractionContent::Text { text, annotations }),
-        // Thought content
-        proptest::option::of(arb_text()).prop_map(|text| InteractionContent::Thought { text }),
+        // Thought content (contains signature, not text)
+        proptest::option::of(arb_text())
+            .prop_map(|signature| InteractionContent::Thought { signature }),
         // ThoughtSignature content
         arb_text().prop_map(|signature| InteractionContent::ThoughtSignature { signature }),
         // Image content
@@ -587,10 +600,14 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
                 result
             }),
         // UrlContextCall content
-        arb_text().prop_map(|url| InteractionContent::UrlContextCall { url }),
+        (arb_text(), proptest::collection::vec(arb_text(), 1..3))
+            .prop_map(|(id, urls)| InteractionContent::UrlContextCall { id, urls }),
         // UrlContextResult content
-        (arb_text(), proptest::option::of(arb_text()))
-            .prop_map(|(url, content)| InteractionContent::UrlContextResult { url, content }),
+        (
+            arb_text(),
+            proptest::collection::vec(arb_url_context_result_item(), 0..3)
+        )
+            .prop_map(|(call_id, result)| InteractionContent::UrlContextResult { call_id, result }),
         // FileSearchResult content
         (
             arb_text(),

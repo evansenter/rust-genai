@@ -152,13 +152,9 @@ async fn test_thinking_with_function_calling_multi_turn() {
     println!("Turn 2 has_text: {}", response2.has_text());
 
     if response2.has_thoughts() {
-        for (i, thought) in response2.thoughts().enumerate() {
-            println!(
-                "Turn 2 thought {}: {}...",
-                i + 1,
-                &thought[..thought.len().min(100)]
-            );
-        }
+        // Thought signatures are cryptographic, not human-readable
+        let sig_count = response2.thought_signatures().count();
+        println!("Turn 2: {} thought signature(s) present", sig_count);
     }
 
     if response2.has_text() {
@@ -221,13 +217,9 @@ async fn test_thinking_with_function_calling_multi_turn() {
     println!("Turn 3 has_text: {}", response3.has_text());
 
     if response3.has_thoughts() {
-        for (i, thought) in response3.thoughts().enumerate() {
-            println!(
-                "Turn 3 thought {}: {}...",
-                i + 1,
-                &thought[..thought.len().min(100)]
-            );
-        }
+        // Thought signatures are cryptographic, not human-readable
+        let sig_count = response3.thought_signatures().count();
+        println!("Turn 3: {} thought signature(s) present", sig_count);
     }
 
     if response3.has_text() {

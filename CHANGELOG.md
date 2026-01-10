@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### BREAKING CHANGES
+
+#### InteractionContent Field Type Audit (#318)
+
+Wire format alignment fixes for `InteractionContent` variants. These changes fix critical mismatches where real API data was silently falling back to `Unknown` variants.
+
+- **`InteractionContent::Thought`**: Field `text` renamed to `signature`
+  - Thoughts contain cryptographic signatures for verification, not human-readable reasoning
+  - Use `response.thought_signatures()` to iterate over signatures
+  - Use `response.has_thoughts()` to check for thought presence
+
+- **`InteractionContent::UrlContextCall`**: Field `url` split into `id` + `urls`
+  - `id: String` - Call identifier for matching results
+  - `urls: Vec<String>` - List of URLs requested
+  - Use `response.url_context_call_id()` and `response.url_context_call_urls()`
+
+- **`InteractionContent::UrlContextResult`**: Fields `url`/`content` replaced with `call_id` + `result`
+  - `call_id: String` - Matches the corresponding call
+  - `result: Vec<UrlContextResultItem>` - Results for each URL
+  - New `UrlContextResultItem` type with `url`, `status` fields and `is_success()`/`is_error()`/`is_unsafe()` helpers
+
+- **`InteractionResponse::thoughts()`**: Method removed
+  - Was returning signatures but named incorrectly
+  - Use `thought_signatures()` instead
+
+- **`InteractionResponse::url_context_call()`**: Method renamed to `url_context_call_id()`
+  - New `url_context_call_urls()` method returns the list of URLs
+
+**Migration guide:**
+
+```rust
+// Before: Thought had text field
+InteractionContent::Thought { text: Some(t) } => println!("{}", t);
+
+// After: Thought has signature field (cryptographic, not readable)
+InteractionContent::Thought { signature: Some(s) } => {
+    // s is a cryptographic signature, not human-readable text
+    println!("Has thought signature: {}", s.len() > 0);
+}
+
+// Before: UrlContextCall had single url
+InteractionContent::UrlContextCall { url } => println!("{}", url);
+
+// After: UrlContextCall has id + urls
+InteractionContent::UrlContextCall { id, urls } => {
+    println!("Call {}: {:?}", id, urls);
+}
+
+// Before: UrlContextResult had url/content
+InteractionContent::UrlContextResult { url, content } => { ... }
+
+// After: UrlContextResult has call_id + result array
+InteractionContent::UrlContextResult { call_id, result } => {
+    for item in result {
+        if item.is_success() {
+            println!("Fetched: {}", item.url);
+        }
+    }
+}
+
+// Before: Using thoughts() method
+for thought in response.thoughts() { ... }
+
+// After: Use thought_signatures()
+for sig in response.thought_signatures() { ... }
+```
+
+### Added
+
+- **`UrlContextResultItem` type** (#318): New struct for URL context result items
+  - `url: String` - The URL that was fetched
+  - `status: String` - Result status ("success", "error", "unsafe")
+  - Helper methods: `is_success()`, `is_error()`, `is_unsafe()`
+
+- **`UsageMetadata::total_thought_tokens` field** (#318): Token count for thinking/reasoning
+  - Use `response.thought_tokens()` helper method
+
+### Fixed
+
+- **`CodeExecutionResult` outcome derivation** (#318): When `is_error` is `None`, outcome now correctly defaults to `Ok` instead of `Unspecified`
+
 ## [0.4.0] - 2026-01-08
 
 ### BREAKING CHANGES
