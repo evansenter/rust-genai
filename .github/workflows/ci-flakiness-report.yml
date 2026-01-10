@@ -1,0 +1,263 @@
+name: CI Flakiness Report
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Weekly on Monday at 9am UTC
+  workflow_dispatch:  # Allow manual triggering
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  flakiness-report:
+    name: Generate Flakiness Report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate flakiness report
+        id: report
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Configuration
+          DAYS_BACK=7
+          WORKFLOW_NAME="Rust"
+          REPORT_FILE="flakiness_report.md"
+
+          # Calculate date range
+          END_DATE=$(date -u +"%Y-%m-%d")
+          START_DATE=$(date -u -d "$DAYS_BACK days ago" +"%Y-%m-%d")
+
+          echo "Analyzing CI runs from $START_DATE to $END_DATE"
+
+          # Initialize counters
+          TOTAL_RUNS=0
+          FAILED_RUNS=0
+          declare -A TEST_FAILURES
+          declare -A TEST_FILES
+
+          # Get all workflow runs from the past week
+          echo "Fetching workflow runs..."
+          RUNS_JSON=$(gh run list \
+            --workflow "$WORKFLOW_NAME" \
+            --limit 200 \
+            --json databaseId,conclusion,createdAt,headBranch,event \
+            2>/dev/null || echo "[]")
+
+          # Filter runs from the past week
+          WEEK_AGO=$(date -u -d "$DAYS_BACK days ago" +%s)
+
+          # Process runs
+          while IFS= read -r run; do
+            RUN_ID=$(echo "$run" | jq -r '.databaseId')
+            CONCLUSION=$(echo "$run" | jq -r '.conclusion')
+            CREATED_AT=$(echo "$run" | jq -r '.createdAt')
+
+            # Convert to timestamp and check if within range
+            RUN_TS=$(date -d "$CREATED_AT" +%s 2>/dev/null || echo "0")
+            if [ "$RUN_TS" -lt "$WEEK_AGO" ]; then
+              continue
+            fi
+
+            TOTAL_RUNS=$((TOTAL_RUNS + 1))
+
+            if [ "$CONCLUSION" = "failure" ]; then
+              FAILED_RUNS=$((FAILED_RUNS + 1))
+
+              echo "Analyzing failed run $RUN_ID..."
+
+              # Get failed job logs
+              LOGS=$(gh run view "$RUN_ID" --log-failed 2>/dev/null || echo "")
+
+              # Extract failed test names from Rust test output
+              # Pattern matches: "test <test_name> ... FAILED"
+              while IFS= read -r test_name; do
+                if [ -n "$test_name" ]; then
+                  # Clean up the test name
+                  test_name=$(echo "$test_name" | sed 's/^test //' | sed 's/ \.\.\..*$//')
+
+                  # Increment failure count
+                  if [ -n "${TEST_FAILURES[$test_name]:-}" ]; then
+                    TEST_FAILURES[$test_name]=$((TEST_FAILURES[$test_name] + 1))
+                  else
+                    TEST_FAILURES[$test_name]=1
+                  fi
+                fi
+              done < <(echo "$LOGS" | grep -oE "test [a-zA-Z0-9_:]+ \.\.\. FAILED" || true)
+
+              # Also check for panicked tests
+              while IFS= read -r test_name; do
+                if [ -n "$test_name" ]; then
+                  if [ -n "${TEST_FAILURES[$test_name]:-}" ]; then
+                    TEST_FAILURES[$test_name]=$((TEST_FAILURES[$test_name] + 1))
+                  else
+                    TEST_FAILURES[$test_name]=1
+                  fi
+                fi
+              done < <(echo "$LOGS" | grep -oE "thread '[^']+' panicked" | sed "s/thread '//" | sed "s/' panicked//" || true)
+            fi
+          done < <(echo "$RUNS_JSON" | jq -c '.[]')
+
+          # Calculate failure rate
+          if [ "$TOTAL_RUNS" -gt 0 ]; then
+            FAILURE_RATE=$(awk "BEGIN {printf \"%.1f\", ($FAILED_RUNS / $TOTAL_RUNS) * 100}")
+          else
+            FAILURE_RATE="0.0"
+          fi
+
+          # Count unique flaky tests
+          UNIQUE_FLAKY=${#TEST_FAILURES[@]}
+
+          # Find test file locations
+          echo "Locating test files..."
+          for test_name in "${!TEST_FAILURES[@]}"; do
+            # Try to find the test file
+            FILE=$(grep -rl "fn $test_name\|fn ${test_name#*::}" tests/ src/ 2>/dev/null | head -1 || echo "unknown")
+            if [ -n "$FILE" ] && [ "$FILE" != "unknown" ]; then
+              TEST_FILES[$test_name]=$(basename "$FILE")
+            else
+              TEST_FILES[$test_name]="unknown"
+            fi
+          done
+
+          # Scan for brittle patterns in test files
+          echo "Scanning for brittle patterns..."
+          BRITTLE_COUNT=0
+          BRITTLE_FILES=""
+
+          # Pattern: text.contains() or .contains() assertions on LLM output
+          while IFS= read -r match; do
+            BRITTLE_COUNT=$((BRITTLE_COUNT + 1))
+            FILE=$(echo "$match" | cut -d: -f1)
+            if [[ ! "$BRITTLE_FILES" =~ "$FILE" ]]; then
+              if [ -n "$BRITTLE_FILES" ]; then
+                BRITTLE_FILES="$BRITTLE_FILES, "
+              fi
+              BRITTLE_FILES="$BRITTLE_FILES$(basename "$FILE")"
+            fi
+          done < <(grep -rn '\.contains\s*(' tests/ --include="*.rs" 2>/dev/null | grep -v "// OK:" || true)
+
+          # Also count assert! with contains
+          ASSERT_CONTAINS=$(grep -rn 'assert.*contains' tests/ --include="*.rs" 2>/dev/null | wc -l || echo "0")
+          BRITTLE_COUNT=$((BRITTLE_COUNT + ASSERT_CONTAINS))
+
+          # Generate markdown report
+          echo "Generating report..."
+          cat > "$REPORT_FILE" << EOF
+          ## CI Flakiness Report ($START_DATE to $END_DATE)
+
+          ### Summary
+          - **Total CI runs:** $TOTAL_RUNS
+          - **Failed runs:** $FAILED_RUNS ($FAILURE_RATE%)
+          - **Unique flaky tests:** $UNIQUE_FLAKY
+
+          EOF
+
+          # Add top flaky tests section
+          if [ "$UNIQUE_FLAKY" -gt 0 ]; then
+            cat >> "$REPORT_FILE" << 'EOF'
+          ### Top Flaky Tests
+
+          | Test | Failures | File |
+          |------|----------|------|
+          EOF
+
+            # Sort tests by failure count and output
+            for test_name in "${!TEST_FAILURES[@]}"; do
+              echo "${TEST_FAILURES[$test_name]}|$test_name|${TEST_FILES[$test_name]:-unknown}"
+            done | sort -t'|' -k1 -nr | head -10 | while IFS='|' read -r count name file; do
+              echo "| \`$name\` | $count | $file |" >> "$REPORT_FILE"
+            done
+          else
+            cat >> "$REPORT_FILE" << 'EOF'
+          ### Top Flaky Tests
+
+          No test failures detected in the reporting period.
+          EOF
+          fi
+
+          # Add brittle pattern section
+          cat >> "$REPORT_FILE" << EOF
+
+          ### Brittle Pattern Scan
+
+          Found **$BRITTLE_COUNT** instances of \`.contains()\` in test assertions.
+
+          EOF
+
+          if [ "$BRITTLE_COUNT" -gt 0 ] && [ -n "$BRITTLE_FILES" ]; then
+            cat >> "$REPORT_FILE" << EOF
+          Files with brittle patterns: $BRITTLE_FILES
+
+          > **Note:** \`.contains()\` assertions on LLM output are brittle because model responses vary.
+          > Consider using \`validate_response_semantically()\` for behavioral validation.
+          > See [#324](https://github.com/${{ github.repository }}/issues/324) for migration guidance.
+          EOF
+          fi
+
+          # Add recommendations section
+          cat >> "$REPORT_FILE" << 'EOF'
+
+          ### Recommendations
+
+          1. **Investigate repeated failures** - Tests failing multiple times need attention
+          2. **Migrate brittle assertions** - Replace `.contains()` with semantic validation
+          3. **Add retry logic** - Consider `#[flaky_test]` attribute for known-flaky tests
+          4. **Review error messages** - Ensure assertions don't depend on exact LLM wording
+
+          ---
+          *Generated automatically by [CI Flakiness Report](${{ github.server_url }}/${{ github.repository }}/actions/workflows/ci-flakiness-report.yml)*
+          EOF
+
+          # Output report content for debugging
+          echo "=== Report Content ==="
+          cat "$REPORT_FILE"
+          echo "======================"
+
+          # Set outputs for issue creation
+          echo "report_file=$REPORT_FILE" >> $GITHUB_OUTPUT
+          echo "total_runs=$TOTAL_RUNS" >> $GITHUB_OUTPUT
+          echo "failed_runs=$FAILED_RUNS" >> $GITHUB_OUTPUT
+          echo "unique_flaky=$UNIQUE_FLAKY" >> $GITHUB_OUTPUT
+
+      - name: Create or update issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          REPORT_FILE="${{ steps.report.outputs.report_file }}"
+          TITLE="CI Flakiness Report - Week of $(date -u +"%Y-%m-%d")"
+
+          # Check if an issue with ci-health label already exists for this week
+          EXISTING_ISSUE=$(gh issue list \
+            --label "ci-health" \
+            --state open \
+            --json number,title \
+            --jq ".[] | select(.title | startswith(\"CI Flakiness Report - Week of $(date -u +\"%Y-%m-%d\")\")) | .number" \
+            2>/dev/null || echo "")
+
+          REPORT_BODY=$(cat "$REPORT_FILE")
+
+          if [ -n "$EXISTING_ISSUE" ]; then
+            echo "Updating existing issue #$EXISTING_ISSUE"
+            gh issue edit "$EXISTING_ISSUE" --body "$REPORT_BODY"
+            echo "Updated issue: ${{ github.server_url }}/${{ github.repository }}/issues/$EXISTING_ISSUE"
+          else
+            echo "Creating new issue"
+            # First ensure the ci-health label exists
+            gh label create "ci-health" \
+              --description "CI health and flakiness tracking" \
+              --color "fbca04" \
+              2>/dev/null || true
+
+            NEW_ISSUE=$(gh issue create \
+              --title "$TITLE" \
+              --body "$REPORT_BODY" \
+              --label "ci-health")
+            echo "Created issue: $NEW_ISSUE"
+          fi
