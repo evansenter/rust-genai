@@ -53,9 +53,9 @@ jobs:
           - group: core
             tests: "interactions_api_tests multiturn_tests streaming_multiturn_tests"
           - group: tools
-            tests: "tools_and_config_tests tools_multiturn_tests agents_tests"
+            tests: "tools_and_config_tests agents_tests"
           - group: functions
-            tests: "advanced_function_calling_tests thinking_function_tests multiturn_function_tests"
+            tests: "function_calling_tests"
           - group: multimodal
             tests: "multimodal_tests api_canary_tests temp_file_tests"
           - group: files-and-wire
