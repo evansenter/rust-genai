@@ -3,7 +3,7 @@
 Feedback for the Google Gemini API team based on building and maintaining [genai-rs](https://github.com/evansenter/genai-rs), a Rust client library for the Interactions API.
 
 **Date**: 2026-01-10
-**Library Version**: 0.5.2
+**Library Version**: 0.5.3
 
 ---
 
