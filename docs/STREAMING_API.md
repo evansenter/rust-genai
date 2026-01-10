@@ -332,10 +332,13 @@ while let Some(result) = stream.next().await {
 
 ### Event ID Behavior
 
-- **API events** (`Delta`, `Complete`): Have `event_id` for resume
+> **Note**: Per the [Interactions API spec](https://ai.google.dev/api/interactions-api#Resource:InteractionSseEvent),
+> `event_id` is **optional** on all SSE event types. The API may or may not include it.
+
+- **API events** (`Delta`, `Complete`): May include `event_id` for resume (optional per spec)
 - **Client events** (`ExecutingFunctions`, `FunctionResults`): `event_id` is `None`
 
-Client-generated events don't come from the SSE stream, so they have no event ID:
+Client-generated events don't come from the SSE stream, so they have no event ID.
 
 ```rust,ignore
 // Track only API events for resume
@@ -376,10 +379,14 @@ while let Some(event) = stream.next().await {
 
 The streaming API supports resuming interrupted streams using `event_id`.
 
+> **Note**: `event_id` is optional per the API spec. Stream resume only works when the API
+> provides event IDs. If the API doesn't return them, you'll need alternative recovery
+> strategies (e.g., restart from beginning, use stored interaction replay).
+
 ### How It Works
 
-1. Each streaming event includes an `event_id`
-2. Track the last received `event_id` as events arrive
+1. Each streaming event may include an `event_id` (optional per API spec)
+2. Track the last received `event_id` as events arrive (when present)
 3. If connection drops, call `get_interaction_stream()` with the saved ID
 4. Stream resumes from after that event
 
