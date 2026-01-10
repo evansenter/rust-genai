@@ -475,26 +475,161 @@ pub struct UrlMetadataEntry {
 
 /// Status of a URL retrieval attempt.
 ///
-/// This enum is marked `#[non_exhaustive]` for forward compatibility.
-/// New status values may be added by the API in future versions.
-#[derive(Clone, Deserialize, Serialize, Debug, Default, PartialEq, Eq)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+/// # Forward Compatibility (Evergreen Philosophy)
+///
+/// This enum is marked `#[non_exhaustive]`, which means:
+/// - Match statements must include a wildcard arm (`_ => ...`)
+/// - New variants may be added in minor version updates without breaking your code
+///
+/// When the API returns a status value that this library doesn't recognize,
+/// it will be captured as `UrlRetrievalStatus::Unknown` rather than causing a
+/// deserialization error. This follows the
+/// [Evergreen spec](https://github.com/google-deepmind/evergreen-spec)
+/// philosophy of graceful degradation.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum UrlRetrievalStatus {
     /// Status not specified
     #[default]
-    UrlRetrievalStatusUnspecified,
+    Unspecified,
     /// URL content was successfully retrieved
-    UrlRetrievalStatusSuccess,
+    Success,
     /// URL failed safety/content moderation checks
-    UrlRetrievalStatusUnsafe,
+    Unsafe,
     /// URL retrieval failed for other reasons
-    UrlRetrievalStatusError,
+    Error,
     /// Unknown status (for forward compatibility).
     ///
-    /// This variant captures any unrecognized status values from the API.
-    #[serde(other, rename = "URL_RETRIEVAL_STATUS_UNKNOWN")]
-    Unknown,
+    /// This variant captures any unrecognized status values from the API,
+    /// allowing the library to handle new statuses gracefully.
+    ///
+    /// The `status_type` field contains the unrecognized status string,
+    /// and `data` contains the full JSON value for debugging.
+    Unknown {
+        /// The unrecognized status string from the API
+        status_type: String,
+        /// The raw JSON value, preserved for debugging
+        data: serde_json::Value,
+    },
+}
+
+impl UrlRetrievalStatus {
+    /// Check if this is an unknown status.
+    #[must_use]
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown { .. })
+    }
+
+    /// Returns the status type name if this is an unknown status.
+    ///
+    /// Returns `None` for known statuses.
+    #[must_use]
+    pub fn unknown_status_type(&self) -> Option<&str> {
+        match self {
+            Self::Unknown { status_type, .. } => Some(status_type),
+            _ => None,
+        }
+    }
+
+    /// Returns the raw JSON data if this is an unknown status.
+    ///
+    /// Returns `None` for known statuses.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::Unknown { data, .. } => Some(data),
+            _ => None,
+        }
+    }
+
+    /// Returns true if retrieval was successful.
+    #[must_use]
+    pub const fn is_success(&self) -> bool {
+        matches!(self, Self::Success)
+    }
+
+    /// Returns true if retrieval failed for any reason.
+    ///
+    /// **Note:** This returns `true` only for `Error` and `Unsafe` variants.
+    /// The `Unknown` variant is NOT treated as an error because:
+    /// 1. URL retrieval failures are non-critical (graceful degradation)
+    /// 2. An `Unknown` status may represent a new success state from the API
+    ///
+    /// This differs from [`crate::CodeExecutionOutcome::is_error()`], which treats
+    /// `Unknown` as an error since code execution failures have more serious
+    /// implications and require conservative handling.
+    #[must_use]
+    pub const fn is_error(&self) -> bool {
+        matches!(self, Self::Error | Self::Unsafe)
+    }
+}
+
+impl Serialize for UrlRetrievalStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Unspecified => serializer.serialize_str("URL_RETRIEVAL_STATUS_UNSPECIFIED"),
+            Self::Success => serializer.serialize_str("URL_RETRIEVAL_STATUS_SUCCESS"),
+            Self::Unsafe => serializer.serialize_str("URL_RETRIEVAL_STATUS_UNSAFE"),
+            Self::Error => serializer.serialize_str("URL_RETRIEVAL_STATUS_ERROR"),
+            Self::Unknown { status_type, .. } => serializer.serialize_str(status_type),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for UrlRetrievalStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        match value.as_str() {
+            Some("URL_RETRIEVAL_STATUS_UNSPECIFIED") => Ok(Self::Unspecified),
+            Some("URL_RETRIEVAL_STATUS_SUCCESS") => Ok(Self::Success),
+            Some("URL_RETRIEVAL_STATUS_UNSAFE") => Ok(Self::Unsafe),
+            Some("URL_RETRIEVAL_STATUS_ERROR") => Ok(Self::Error),
+            Some(other) => {
+                log::warn!(
+                    "Encountered unknown UrlRetrievalStatus '{}'. \
+                     This may indicate a new API feature. \
+                     The status will be preserved in the Unknown variant.",
+                    other
+                );
+                Ok(Self::Unknown {
+                    status_type: other.to_string(),
+                    data: value,
+                })
+            }
+            None => {
+                // Non-string value - preserve it in Unknown
+                let status_type = format!("<non-string: {}>", value);
+                log::warn!(
+                    "UrlRetrievalStatus received non-string value: {}. \
+                     Preserving in Unknown variant.",
+                    value
+                );
+                Ok(Self::Unknown {
+                    status_type,
+                    data: value,
+                })
+            }
+        }
+    }
+}
+
+impl fmt::Display for UrlRetrievalStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unspecified => write!(f, "URL_RETRIEVAL_STATUS_UNSPECIFIED"),
+            Self::Success => write!(f, "URL_RETRIEVAL_STATUS_SUCCESS"),
+            Self::Unsafe => write!(f, "URL_RETRIEVAL_STATUS_UNSAFE"),
+            Self::Error => write!(f, "URL_RETRIEVAL_STATUS_ERROR"),
+            Self::Unknown { status_type, .. } => write!(f, "{}", status_type),
+        }
+    }
 }
 
 // =============================================================================
@@ -1660,7 +1795,7 @@ impl InteractionResponse {
             if let InteractionContent::CodeExecutionCall { id, language, code } = content {
                 Some(CodeExecutionCallInfo {
                     id: id.as_deref(),
-                    language: *language,
+                    language: language.clone(),
                     code: code.as_str(),
                 })
             } else {
@@ -1694,7 +1829,7 @@ impl InteractionResponse {
                 if let InteractionContent::CodeExecutionCall { id, language, code } = content {
                     Some(CodeExecutionCallInfo {
                         id: id.as_deref(),
-                        language: *language,
+                        language: language.clone(),
                         code: code.as_str(),
                     })
                 } else {
@@ -1743,7 +1878,7 @@ impl InteractionResponse {
                 {
                     Some(CodeExecutionResultInfo {
                         call_id: call_id.as_deref(),
-                        outcome: *outcome,
+                        outcome: outcome.clone(),
                         output: output.as_str(),
                     })
                 } else {

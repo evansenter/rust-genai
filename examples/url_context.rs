@@ -50,10 +50,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("\nURL Context Metadata:");
                 for entry in &metadata.url_metadata {
                     let status_str = match entry.url_retrieval_status {
-                        UrlRetrievalStatus::UrlRetrievalStatusSuccess => "Success",
-                        UrlRetrievalStatus::UrlRetrievalStatusUnsafe => "Unsafe (blocked)",
-                        UrlRetrievalStatus::UrlRetrievalStatusError => "Error",
-                        UrlRetrievalStatus::UrlRetrievalStatusUnspecified => "Unspecified",
+                        UrlRetrievalStatus::Success => "Success",
+                        UrlRetrievalStatus::Unsafe => "Unsafe (blocked)",
+                        UrlRetrievalStatus::Error => "Error",
+                        UrlRetrievalStatus::Unspecified => "Unspecified",
                         _ => "Unknown", // Handle future status values
                     };
                     println!("  {} - {}", entry.retrieved_url, status_str);
@@ -164,7 +164,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         println!("URLs fetched:");
         for entry in &metadata.url_metadata {
             let status = match entry.url_retrieval_status {
-                UrlRetrievalStatus::UrlRetrievalStatusSuccess => "Success",
+                UrlRetrievalStatus::Success => "Success",
                 _ => "Other",
             };
             println!("  {} - {}", entry.retrieved_url, status);

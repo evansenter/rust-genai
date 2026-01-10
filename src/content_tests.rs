@@ -606,6 +606,114 @@ fn test_code_execution_outcome_enum() {
     assert!(CodeExecutionOutcome::Unspecified.is_error());
 }
 
+// =============================================================================
+// CodeExecutionOutcome Unknown Variant Tests
+// =============================================================================
+
+#[cfg(not(feature = "strict-unknown"))]
+#[test]
+fn test_code_execution_outcome_unknown_deserialization() {
+    // Simulate a new outcome value the library doesn't know about
+    let unknown_json = r#""OUTCOME_FUTURE_STATUS""#;
+    let outcome: CodeExecutionOutcome =
+        serde_json::from_str(unknown_json).expect("Should deserialize as Unknown");
+
+    assert!(outcome.is_unknown());
+    assert!(!outcome.is_success());
+    assert!(outcome.is_error()); // Unknown outcomes are treated as errors
+
+    // Verify helper methods
+    assert_eq!(
+        outcome.unknown_outcome_type(),
+        Some("OUTCOME_FUTURE_STATUS")
+    );
+    assert!(outcome.unknown_data().is_some());
+
+    // Verify roundtrip serialization preserves the value
+    let reserialized = serde_json::to_string(&outcome).expect("Should serialize");
+    assert_eq!(reserialized, r#""OUTCOME_FUTURE_STATUS""#);
+}
+
+#[cfg(not(feature = "strict-unknown"))]
+#[test]
+fn test_code_execution_outcome_unknown_display() {
+    let unknown = CodeExecutionOutcome::Unknown {
+        outcome_type: "OUTCOME_NEW_STATUS".to_string(),
+        data: serde_json::Value::String("OUTCOME_NEW_STATUS".to_string()),
+    };
+    assert_eq!(format!("{}", unknown), "OUTCOME_NEW_STATUS");
+}
+
+#[test]
+fn test_code_execution_outcome_known_variants_serde() {
+    // Verify all known variants roundtrip correctly
+    let variants = [
+        (CodeExecutionOutcome::Ok, "OUTCOME_OK"),
+        (CodeExecutionOutcome::Failed, "OUTCOME_FAILED"),
+        (
+            CodeExecutionOutcome::DeadlineExceeded,
+            "OUTCOME_DEADLINE_EXCEEDED",
+        ),
+        (CodeExecutionOutcome::Unspecified, "OUTCOME_UNSPECIFIED"),
+    ];
+
+    for (outcome, expected_wire) in variants {
+        let serialized = serde_json::to_string(&outcome).expect("Should serialize");
+        assert_eq!(serialized, format!(r#""{}""#, expected_wire));
+
+        let deserialized: CodeExecutionOutcome =
+            serde_json::from_str(&serialized).expect("Should deserialize");
+        assert_eq!(deserialized, outcome);
+        assert!(!deserialized.is_unknown());
+    }
+}
+
+// =============================================================================
+// CodeExecutionLanguage Unknown Variant Tests
+// =============================================================================
+
+#[cfg(not(feature = "strict-unknown"))]
+#[test]
+fn test_code_execution_language_unknown_deserialization() {
+    // Simulate a new language the library doesn't know about
+    let unknown_json = r#""JAVASCRIPT""#;
+    let language: CodeExecutionLanguage =
+        serde_json::from_str(unknown_json).expect("Should deserialize as Unknown");
+
+    assert!(language.is_unknown());
+
+    // Verify helper methods
+    assert_eq!(language.unknown_language_type(), Some("JAVASCRIPT"));
+    assert!(language.unknown_data().is_some());
+
+    // Verify roundtrip serialization preserves the value
+    let reserialized = serde_json::to_string(&language).expect("Should serialize");
+    assert_eq!(reserialized, r#""JAVASCRIPT""#);
+}
+
+#[cfg(not(feature = "strict-unknown"))]
+#[test]
+fn test_code_execution_language_unknown_display() {
+    let unknown = CodeExecutionLanguage::Unknown {
+        language_type: "RUST".to_string(),
+        data: serde_json::Value::String("RUST".to_string()),
+    };
+    assert_eq!(format!("{}", unknown), "RUST");
+}
+
+#[test]
+fn test_code_execution_language_known_variants_serde() {
+    // Verify Python roundtrips correctly
+    let language = CodeExecutionLanguage::Python;
+    let serialized = serde_json::to_string(&language).expect("Should serialize");
+    assert_eq!(serialized, r#""PYTHON""#);
+
+    let deserialized: CodeExecutionLanguage =
+        serde_json::from_str(&serialized).expect("Should deserialize");
+    assert_eq!(deserialized, language);
+    assert!(!deserialized.is_unknown());
+}
+
 #[test]
 fn test_deserialize_google_search_call() {
     // Test the actual API format: arguments.queries is an array

@@ -9,6 +9,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING CHANGES
 
+#### Enum Unknown Variant Upgrade (#329)
+
+Three enums upgraded from `#[serde(other)]` fallback to full Evergreen Unknown variant pattern. This enables logging and debugging of unrecognized API values.
+
+**Affected types:**
+- `UrlRetrievalStatus`: Variant renames for consistency
+- `CodeExecutionOutcome`: Full Unknown pattern with data preservation
+- `CodeExecutionLanguage`: Full Unknown pattern, `Unspecified` variant removed
+
+**UrlRetrievalStatus variant renames:**
+| Before | After |
+|--------|-------|
+| `UrlRetrievalStatusUnspecified` | `Unspecified` |
+| `UrlRetrievalStatusSuccess` | `Success` |
+| `UrlRetrievalStatusUnsafe` | `Unsafe` |
+| `UrlRetrievalStatusError` | `Error` |
+
+**CodeExecutionLanguage changes:**
+- `Unspecified` variant removed (API only returns known languages)
+- `Unknown { language_type, data }` variant added for forward compatibility
+
+**Copy trait removed** from all three types (Unknown variants contain `serde_json::Value`).
+
+**Migration guide:**
+
+```rust
+// UrlRetrievalStatus: Update variant names
+// Before:
+match status {
+    UrlRetrievalStatus::UrlRetrievalStatusSuccess => { ... }
+    UrlRetrievalStatus::UrlRetrievalStatusError => { ... }
+    _ => { ... }
+}
+
+// After:
+match status {
+    UrlRetrievalStatus::Success => { ... }
+    UrlRetrievalStatus::Error => { ... }
+    UrlRetrievalStatus::Unknown { status_type, .. } => {
+        log::warn!("Unknown status: {}", status_type);
+    }
+    _ => { ... }
+}
+
+// CodeExecutionLanguage: Handle Unknown instead of Unspecified
+// Before:
+match language {
+    CodeExecutionLanguage::Python => { ... }
+    CodeExecutionLanguage::Unspecified => { ... }
+}
+
+// After:
+match language {
+    CodeExecutionLanguage::Python => { ... }
+    CodeExecutionLanguage::Unknown { language_type, .. } => {
+        log::warn!("Unknown language: {}", language_type);
+    }
+    _ => { ... }
+}
+
+// Copy trait removal: Use .clone() where needed
+// Before:
+let outcome = *some_outcome_ref;
+
+// After:
+let outcome = some_outcome_ref.clone();
+```
+
 #### InteractionContent Field Type Audit (#318)
 
 Wire format alignment fixes for `InteractionContent` variants. These changes fix critical mismatches where real API data was silently falling back to `Unknown` variants.

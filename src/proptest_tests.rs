@@ -368,22 +368,60 @@ fn arb_agent_config() -> impl Strategy<Value = AgentConfig> {
 }
 
 // =============================================================================
-// CodeExecutionLanguage and CodeExecutionOutcome Strategies
+// CodeExecutionLanguage Strategies
 // =============================================================================
 
+/// Strategy for known CodeExecutionLanguage variants only.
+/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
+#[cfg(feature = "strict-unknown")]
+fn arb_code_execution_language() -> impl Strategy<Value = CodeExecutionLanguage> {
+    Just(CodeExecutionLanguage::Python)
+}
+
+/// Strategy for all CodeExecutionLanguage variants including Unknown.
+/// Used in normal mode (Unknown variants are gracefully handled).
+#[cfg(not(feature = "strict-unknown"))]
 fn arb_code_execution_language() -> impl Strategy<Value = CodeExecutionLanguage> {
     prop_oneof![
         Just(CodeExecutionLanguage::Python),
-        Just(CodeExecutionLanguage::Unspecified),
+        // Unknown variant with preserved data
+        arb_identifier().prop_map(|language_type| CodeExecutionLanguage::Unknown {
+            language_type: language_type.clone(),
+            data: serde_json::Value::String(language_type),
+        }),
     ]
 }
 
+// =============================================================================
+// CodeExecutionOutcome Strategies
+// =============================================================================
+
+/// Strategy for known CodeExecutionOutcome variants only.
+/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
+#[cfg(feature = "strict-unknown")]
 fn arb_code_execution_outcome() -> impl Strategy<Value = CodeExecutionOutcome> {
     prop_oneof![
         Just(CodeExecutionOutcome::Ok),
         Just(CodeExecutionOutcome::Failed),
         Just(CodeExecutionOutcome::DeadlineExceeded),
         Just(CodeExecutionOutcome::Unspecified),
+    ]
+}
+
+/// Strategy for all CodeExecutionOutcome variants including Unknown.
+/// Used in normal mode (Unknown variants are gracefully handled).
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_code_execution_outcome() -> impl Strategy<Value = CodeExecutionOutcome> {
+    prop_oneof![
+        Just(CodeExecutionOutcome::Ok),
+        Just(CodeExecutionOutcome::Failed),
+        Just(CodeExecutionOutcome::DeadlineExceeded),
+        Just(CodeExecutionOutcome::Unspecified),
+        // Unknown variant with preserved data
+        arb_identifier().prop_map(|outcome_type| CodeExecutionOutcome::Unknown {
+            outcome_type: outcome_type.clone(),
+            data: serde_json::Value::String(outcome_type),
+        }),
     ]
 }
 
@@ -681,13 +719,32 @@ fn arb_grounding_metadata() -> impl Strategy<Value = GroundingMetadata> {
         })
 }
 
+/// Strategy for known UrlRetrievalStatus variants only.
+/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
+#[cfg(feature = "strict-unknown")]
 fn arb_url_retrieval_status() -> impl Strategy<Value = UrlRetrievalStatus> {
     prop_oneof![
-        Just(UrlRetrievalStatus::UrlRetrievalStatusUnspecified),
-        Just(UrlRetrievalStatus::UrlRetrievalStatusSuccess),
-        Just(UrlRetrievalStatus::UrlRetrievalStatusUnsafe),
-        Just(UrlRetrievalStatus::UrlRetrievalStatusError),
-        Just(UrlRetrievalStatus::Unknown),
+        Just(UrlRetrievalStatus::Unspecified),
+        Just(UrlRetrievalStatus::Success),
+        Just(UrlRetrievalStatus::Unsafe),
+        Just(UrlRetrievalStatus::Error),
+    ]
+}
+
+/// Strategy for all UrlRetrievalStatus variants including Unknown.
+/// Used in normal mode (Unknown variants are gracefully handled).
+#[cfg(not(feature = "strict-unknown"))]
+fn arb_url_retrieval_status() -> impl Strategy<Value = UrlRetrievalStatus> {
+    prop_oneof![
+        Just(UrlRetrievalStatus::Unspecified),
+        Just(UrlRetrievalStatus::Success),
+        Just(UrlRetrievalStatus::Unsafe),
+        Just(UrlRetrievalStatus::Error),
+        // Unknown variant with preserved data
+        arb_identifier().prop_map(|status_type| UrlRetrievalStatus::Unknown {
+            status_type: status_type.clone(),
+            data: serde_json::Value::String(status_type),
+        }),
     ]
 }
 
