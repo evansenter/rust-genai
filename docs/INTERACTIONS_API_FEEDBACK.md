@@ -3,7 +3,7 @@
 Feedback for the Google Gemini API team based on building and maintaining [genai-rs](https://github.com/evansenter/genai-rs), a Rust client library for the Interactions API.
 
 **Date**: 2026-01-10
-****Library Version**: 0.5.1
+**Library Version**: 0.5.2
 
 ---
 
@@ -11,51 +11,21 @@ Feedback for the Google Gemini API team based on building and maintaining [genai
 
 | # | Priority | Issue | Action |
 |---|----------|-------|--------|
-| 1 | P0 | Thought signatures for Interactions API | Clarify if/how thought signatures work |
-| 2 | P0 | ThinkingSummaries wire format | Fix docs: `"THINKING_SUMMARIES_AUTO"` not `"auto"` |
-| 3 | P0 | Multi-turn inheritance | Add documentation page for `previousInteractionId` behavior |
-| 4 | P1 | Agent mode requirements | Make `background=true` requirement more prominent |
-| 5 | P1 | Enum wire formats | Provide authoritative format table for all enums |
-| 6 | P2 | Content type nesting | Document rationale or consider flattening |
-| 7 | P2 | SpeechConfig format | Fix docs: nested format fails, only flat works |
-| 8 | P2 | Annotation byte indexing | Document that indices are UTF-8 byte positions |
+| 1 | P0 | ThinkingSummaries wire format | Fix docs: `"THINKING_SUMMARIES_AUTO"` not `"auto"` |
+| 2 | P0 | Multi-turn inheritance | Add documentation page for `previousInteractionId` behavior |
+| 3 | P1 | Agent mode requirements | Make `background=true` requirement more prominent |
+| 4 | P1 | Enum wire formats | Provide authoritative format table for all enums |
+| 5 | P2 | Content type nesting | Document rationale or consider flattening |
+| 6 | P2 | SpeechConfig format | Fix docs: nested format fails, only flat works |
+| 7 | P2 | Annotation byte indexing | Document that indices are UTF-8 byte positions |
+| 8 | P2 | Thought signatures differ from generateContent | Document Interactions API signature location |
 | 9 | P3 | Parallel function call ordering | Document matching by `call_id` |
 
 ---
 
 ## Critical Issues (P0)
 
-### 1. Thought Signatures Are Undocumented for Interactions API
-
-**Severity**: Critical — feature parity unclear between APIs
-
-**Documentation**: [Thought Signatures Guide](https://ai.google.dev/gemini-api/docs/thought-signatures.md.txt) documents thought signature behavior, but exclusively references the `generateContent` API endpoint - not the Interactions API.
-
-**Reality**: There's no documentation on whether or how thought signatures work with the Interactions API. Our exhaustive testing across 7 configurations shows **no signatures appearing on function calls in any scenario**:
-
-| Configuration | Signature on FC? | Test |
-|---------------|------------------|------|
-| `store: true` (stateful) | ❌ No | `test_thought_signature_parallel_only_first` |
-| `store: false` (stateless) | ❌ No | `test_stateless_with_thinking_thought_signatures` |
-| Parallel function calls | ❌ No | `test_thought_signature_parallel_only_first` |
-| Sequential function calls | ❌ No | `test_thought_signature_sequential_each_step` |
-| ThinkingLevel::High | ❌ No | `test_thinking_level_high_thought_signatures` |
-| FunctionCallingMode::Any | ❌ No | `test_function_calling_mode_any_thought_signatures` |
-| Streaming + FC | ❌ No | `test_streaming_with_thinking_and_function_calling` |
-
-**Impact**: Client implementers who reference the thought signatures documentation and try to apply it to the Interactions API have no guidance on whether it should work. We cannot implement thought signature verification.
-
-**Recommendation**: Either:
-1. Add Interactions API examples to the thought signatures documentation, or
-2. Explicitly document that thought signatures are only available via `generateContent`
-
-**Our workaround**: We've implemented the `thought_signature` field but document that verification is uncertain.
-- [`docs/MULTI_TURN_FUNCTION_CALLING.md`](./MULTI_TURN_FUNCTION_CALLING.md#thought-signatures) - Documents the uncertainty with full test matrix
-- [`tests/function_calling_tests.rs`](../tests/function_calling_tests.rs) - `test_thought_signature_*` tests
-
----
-
-### 2. ThinkingSummaries Wire Format is Misdocumented
+### 1. ThinkingSummaries Wire Format is Misdocumented
 
 **Severity**: Critical — causes silent failures
 
@@ -81,7 +51,7 @@ Feedback for the Google Gemini API team based on building and maintaining [genai
 
 ---
 
-### 3. Multi-Turn Inheritance Rules Are Undocumented
+### 2. Multi-Turn Inheritance Rules Are Undocumented
 
 **Severity**: Critical — fundamental to correct API usage
 
@@ -110,7 +80,7 @@ The `tools` behavior is particularly sharp:
 
 ## Important Issues (P1)
 
-### 4. Agents Require `background=true` (Buried in Docs)
+### 3. Agents Require `background=true` (Buried in Docs)
 
 **Documentation**: [Deep Research Guide](https://ai.google.dev/gemini-api/docs/deep-research) does mention this requirement, but it's not prominent in the main API reference.
 
@@ -126,7 +96,7 @@ The Deep Research agent (`deep-research-pro-preview`) silently fails without `ba
 
 ---
 
-### 5. Multiple Enum Wire Format Mismatches
+### 4. Multiple Enum Wire Format Mismatches
 
 **Documentation**: [Interactions API Reference](https://ai.google.dev/static/api/interactions.md.txt) provides enum descriptions but not always the exact wire format strings.
 
@@ -146,7 +116,7 @@ The Deep Research agent (`deep-research-pro-preview`) silently fails without `ba
 
 ## Documentation Gaps (P2)
 
-### 6. Nesting in Content Types Adds Client Complexity
+### 5. Nesting in Content Types Adds Client Complexity
 
 **Documentation**: [Interactions API Reference](https://ai.google.dev/static/api/interactions.md.txt) shows `UrlContextCall` and `CodeExecutionCall` with nested `arguments` objects.
 
@@ -166,7 +136,7 @@ Several content types nest data inside `arguments` objects, which requires extra
 
 ---
 
-### 7. SpeechConfig Documentation Shows Wrong Format
+### 6. SpeechConfig Documentation Shows Wrong Format
 
 **Severity**: Important — documented format doesn't work
 
@@ -218,13 +188,13 @@ Several content types nest data inside `arguments` objects, which requires extra
 
 ---
 
-### 8. Annotation Indices Are Byte Positions (Not Character Indices)
+### 7. Annotation Indices Are Byte Positions (Not Character Indices)
 
 **Documentation**: [Interactions API Reference](https://ai.google.dev/static/api/interactions.md.txt) defines `Annotation` with `start_index` and `end_index` but doesn't specify the unit.
 
 Annotation `start_index` and `end_index` fields are UTF-8 byte positions, not character indices. For multi-byte characters (emoji, non-ASCII text), using character indexing breaks text extraction.
 
-```rust
+```rust,ignore
 // WRONG - breaks on non-ASCII:
 let cited = &text[annotation.start_index..annotation.end_index];
 
@@ -236,6 +206,43 @@ let cited = &text.as_bytes()[annotation.start_index..annotation.end_index];
 
 **Our workaround**: We document the byte semantics and provide a helper method.
 - [`src/content.rs`](../src/content.rs) - `Annotation::extract_span()` uses byte slicing correctly
+
+---
+
+### 8. Thought Signatures Differ from generateContent
+
+**Documentation**: [Thought Signatures Guide](https://ai.google.dev/gemini-api/docs/thought-signatures.md.txt) documents thought signatures for the `generateContent` API, showing signatures on `function_call` outputs.
+
+**Reality**: The Interactions API handles thought signatures differently:
+
+| API | Signature Location |
+|-----|-------------------|
+| `generateContent` (per docs) | On `function_call` as `thought_signature` field |
+| Interactions API (actual) | On separate `thought` output as `signature` field |
+
+Additionally, **the API rejects thought blocks in user input** with: `"User turns cannot contain thought blocks."` This means signatures cannot be echoed back in stateless multi-turn.
+
+```json
+// Interactions API response structure:
+"outputs": [
+  {
+    "signature": "EjQKMgFyy...",  // <-- Signature is HERE on thought
+    "type": "thought"
+  },
+  {
+    "arguments": {"city": "Paris"},
+    "name": "get_weather",
+    "type": "function_call"        // <-- NOT here
+  }
+]
+```
+
+**Workaround**: For multi-turn with thinking, use `with_previous_interaction(id)` — the server preserves thought context automatically. For stateless mode, signatures are not needed since thoughts cannot be echoed back.
+
+**Recommendation**: Document the Interactions API signature behavior separately from `generateContent`.
+
+- [`docs/MULTI_TURN_FUNCTION_CALLING.md`](./MULTI_TURN_FUNCTION_CALLING.md#thought-signatures) - Documents our findings
+- [`examples/thought_echo.rs`](../examples/thought_echo.rs) - Demonstrates the API limitation
 
 ---
 
