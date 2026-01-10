@@ -418,55 +418,54 @@ The model remembers available tools within the same interaction chain. Only new 
 
 ## Thought Signatures
 
-> **⚠️ Documentation Gap**: The [Thought Signatures Guide](https://ai.google.dev/gemini-api/docs/thought-signatures.md.txt) documents behavior for the `generateContent` API, not the Interactions API. This section documents our empirical findings; official behavior may differ.
+> **Key Finding**: Thought signatures ARE present in Interactions API responses, but in a **different location** than the `generateContent` docs describe. See [INTERACTIONS_API_FEEDBACK.md](./INTERACTIONS_API_FEEDBACK.md#1-thought-signatures-location-differs-from-generatecontent) for details.
 
 The Gemini API returns "thought" outputs when thinking is enabled. Here's what we know:
 
 ### What They Are
 
-Thought signatures are cryptographic proofs that thoughts haven't been modified. Per `generateContent` docs, they appear as:
+Thought signatures are cryptographic proofs that thoughts haven't been modified. In the **Interactions API**, they appear on the `thought` output:
 
 ```json
 {
   "outputs": [
     {
       "type": "thought",
-      "signature": "EtYFCtMF..."
+      "signature": "EtYFCtMF..."    // <-- Signature is HERE
     },
     {
-      "type": "text",
-      "text": "The answer is 42"
+      "type": "function_call",
+      "name": "get_weather",        // <-- NOT here (differs from generateContent)
+      "arguments": {"city": "Paris"}
     }
   ]
 }
 ```
 
-### Current Understanding: Interactions API
+### Interactions API vs generateContent
 
-We've tested thought signatures across various Interactions API configurations. **Key finding: we observe no `thought_signature` on function calls in any configuration**.
+| API | Signature Location |
+|-----|-------------------|
+| `generateContent` (per docs) | On `function_call` as `thought_signature` field |
+| Interactions API (actual) | On `thought` output as `signature` field |
 
-| Configuration | Signature on FC? | Thoughts in Output? | Test/Example |
-|---------------|------------------|---------------------|--------------|
-| `store: true` (stateful) | ❌ No | ✅ Yes | `test_thought_signature_parallel_only_first` |
-| `store: false` (stateless) | ❌ No | ✅ Yes | `test_stateless_with_thinking_thought_signatures` |
-| Parallel function calls | ❌ No | ✅ Yes | `test_thought_signature_parallel_only_first` |
-| Sequential function calls | ❌ No | ✅ Yes | `test_thought_signature_sequential_each_step` |
-| ThinkingLevel::High | ❌ No | ✅ Yes | `test_thinking_level_high_thought_signatures` |
-| FunctionCallingMode::Any | ❌ No | ✅ Yes | `test_function_calling_mode_any_thought_signatures` |
-| `background: true` (async) | N/A | ✅ Yes | `deep_research.rs` (agents don't use user-defined FC) |
-| Streaming + FC | ❌ No | ✅ Yes | `test_streaming_with_thinking_and_function_calling` |
+Our testing confirms signatures are present on thought outputs across all configurations:
 
-**Interpretation**: Either:
-1. The Interactions API doesn't support thought signatures on function calls (different from `generateContent`)
-2. A specific configuration we haven't found is required
-3. The feature is in development
+| Configuration | Sig on Thought? | Sig on FC? | Test |
+|---------------|-----------------|------------|------|
+| `store: true` (stateful) | ✅ Yes | ❌ No | `test_thought_signature_parallel_only_first` |
+| `store: false` (stateless) | ✅ Yes | ❌ No | `test_stateless_with_thinking_thought_signatures` |
+| Parallel function calls | ✅ Yes | ❌ No | `test_thought_signature_parallel_only_first` |
+| Sequential function calls | ✅ Yes | ❌ No | `test_thought_signature_sequential_each_step` |
+| ThinkingLevel::High | ✅ Yes | ❌ No | `test_thinking_level_high_thought_signatures` |
+| FunctionCallingMode::Any | ✅ Yes | ❌ No | `test_function_calling_mode_any_thought_signatures` |
 
 ### Practical Implications
 
-**For function calling**: You do NOT need to handle thought signatures:
+**For function calling**: You do NOT need to handle thought signatures on function calls:
 
 ```rust,ignore
-// This works fine - no thought signature needed
+// This works fine - no thought signature needed on FC
 for call in response.function_calls() {
     let call_id = call.id.ok_or("Missing call_id")?;
 
@@ -481,7 +480,7 @@ for call in response.function_calls() {
 
 **For thought echo**: Echoing thoughts back to the model works **without** including signatures. See `test_thought_echo_manual_history` in `tests/interactions_api_tests.rs`.
 
-**For compliance/auditing**: If you need to prove thoughts weren't modified, capture `ThoughtOutput::signature` from responses. This field IS populated on thought outputs, just not on function calls.
+**For compliance/auditing**: Capture signatures from `InteractionContent::Thought { signature }`. The signature IS populated on thought outputs.
 
 ### Tests
 

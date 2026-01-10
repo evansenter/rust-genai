@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-01-10
+
+### Fixed
+
+- Doctest compilation failures in `INTERACTIONS_API_FEEDBACK.md` (missing `ignore` annotation)
+- Updated `thought_content()` docstring to clarify it's for testing only (API rejects thought blocks in user input)
+
+### Changed
+
+- `INTERACTIONS_API_FEEDBACK.md`: Downgraded thought signature issue from P0 to P2, clarified that signatures ARE present on `Thought` outputs (not `FunctionCall`), and documented that API rejects thought blocks in user input
+
 ## [0.5.1] - 2026-01-10
 
 ### Fixed

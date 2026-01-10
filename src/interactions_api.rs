@@ -70,18 +70,31 @@ pub fn text_content(text: impl Into<String>) -> InteractionContent {
     InteractionContent::new_text(text)
 }
 
-/// Creates thought content (internal reasoning visible in agent responses).
+/// Creates thought content (for testing and roundtrip verification only).
 ///
-/// **Prefer:** [`InteractionContent::new_thought()`] for new code.
+/// # ⚠️ API Limitation
 ///
-/// **Note:** Thought content contains a cryptographic signature, not text.
-/// The signature is used for verification of the model's reasoning process.
+/// **The Gemini API does NOT accept thought blocks in user input.**
+/// Attempting to send thoughts returns: `"User turns cannot contain thought blocks."`
+///
+/// For multi-turn conversations with thinking:
+/// - Use `with_previous_interaction(id)` — the server preserves thought context automatically
+/// - For stateless mode, only text content can be included in history
+///
+/// # Valid Uses
+///
+/// This helper exists for:
+/// - Roundtrip serialization testing
+/// - Representing API responses as structured data
+/// - Property-based testing (proptest)
 ///
 /// # Example
 /// ```
 /// use genai_rs::interactions_api::thought_content;
 ///
-/// let thought = thought_content("signature_value_here");
+/// // For testing serialization roundtrip
+/// let thought = thought_content("EosFCogFAXLI2...");
+/// assert!(thought.is_thought());
 /// ```
 pub fn thought_content(signature: impl Into<String>) -> InteractionContent {
     InteractionContent::new_thought(signature)
