@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-01-10
+
+### Added
+
+- `docs/INTERACTIONS_API_FEEDBACK.md`: Comprehensive feedback report for Google Gemini API team documenting 9 issues discovered while building genai-rs
+- Thought signature test coverage across 7 configurations (stateful, stateless, parallel, sequential, ThinkingLevel::High, FunctionCallingMode::Any, streaming)
+- `test_speech_config_nested_format`: Test proving only flat SpeechConfig format works (nested format returns 400)
+
+### Changed
+
+- `docs/ENUM_WIRE_FORMATS.md`: Updated SpeechConfig section - nested format fails with 400 error
+- `docs/MULTI_TURN_FUNCTION_CALLING.md`: Added thought signature matrix with verified test links
 
 ### BREAKING CHANGES
 

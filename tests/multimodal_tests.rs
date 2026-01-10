@@ -1232,4 +1232,168 @@ mod text_to_speech {
         })
         .await;
     }
+
+    /// Tests whether the nested SpeechConfig format from documentation also works.
+    ///
+    /// Documentation shows a nested format:
+    /// ```json
+    /// {"speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Kore"}}}}
+    /// ```
+    ///
+    /// We use a flat format: `{"voice": "Kore", "language": "en-US"}`
+    ///
+    /// This test verifies if the nested format is also accepted by the API.
+    #[tokio::test]
+    #[ignore = "Requires API key and TTS model access"]
+    async fn test_speech_config_nested_format() {
+        use genai_rs::{CreateInteractionRequest, GenerationConfig, InteractionInput};
+        use reqwest::Client as ReqwestClient;
+        use serde_json::json;
+        use std::env;
+
+        let api_key = match env::var("GEMINI_API_KEY") {
+            Ok(key) => key,
+            Err(_) => {
+                println!("Skipping: GEMINI_API_KEY not set");
+                return;
+            }
+        };
+
+        let http_client = ReqwestClient::new();
+        let tts_model = "gemini-2.5-pro-preview-tts";
+        let url = "https://generativelanguage.googleapis.com/v1beta/interactions";
+
+        // Test the nested format by constructing raw JSON
+        // The docs show: speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName
+        let nested_speech_config: serde_json::Value = json!({
+            "voiceConfig": {
+                "prebuiltVoiceConfig": {
+                    "voiceName": "Kore"
+                }
+            }
+        });
+
+        println!("=== Testing NESTED SpeechConfig format ===");
+        println!("Format: {}", nested_speech_config);
+
+        // Build request with nested speech config via serde_json
+        let request = CreateInteractionRequest {
+            model: Some(tts_model.to_string()),
+            agent: None,
+            agent_config: None,
+            input: InteractionInput::Text("Hello from nested config test.".to_string()),
+            previous_interaction_id: None,
+            tools: None,
+            response_modalities: Some(vec!["AUDIO".to_string()]),
+            response_format: None,
+            response_mime_type: None,
+            generation_config: None,
+            stream: None,
+            background: None,
+            store: None,
+            system_instruction: None,
+        };
+
+        let mut request_json = serde_json::to_value(&request).expect("Serialize request");
+
+        // Add generationConfig with nested speechConfig
+        request_json["generationConfig"] = json!({
+            "speechConfig": nested_speech_config
+        });
+
+        println!(
+            "Request:\n{}",
+            serde_json::to_string_pretty(&request_json).unwrap()
+        );
+
+        let response = http_client
+            .post(url)
+            .header("x-goog-api-key", &api_key)
+            .header("Content-Type", "application/json")
+            .json(&request_json)
+            .send()
+            .await;
+
+        match response {
+            Ok(resp) => {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                println!("Response status: {}", status);
+
+                if status.is_success() {
+                    println!("✅ NESTED FORMAT WORKS!");
+                    println!("Response (truncated): {}...", &body[..body.len().min(300)]);
+                } else {
+                    println!("❌ Nested format FAILED with status {}", status);
+                    println!("Error: {}", body);
+                }
+            }
+            Err(e) => {
+                println!("Request error: {:?}", e);
+            }
+        }
+
+        // Now test the flat format for comparison
+        println!("\n=== Testing FLAT SpeechConfig format ===");
+
+        let flat_gen_config = GenerationConfig {
+            speech_config: Some(genai_rs::SpeechConfig::with_voice_and_language(
+                "Kore", "en-US",
+            )),
+            ..Default::default()
+        };
+
+        let flat_request = CreateInteractionRequest {
+            model: Some(tts_model.to_string()),
+            agent: None,
+            agent_config: None,
+            input: InteractionInput::Text("Hello from flat config test.".to_string()),
+            previous_interaction_id: None,
+            tools: None,
+            response_modalities: Some(vec!["AUDIO".to_string()]),
+            response_format: None,
+            response_mime_type: None,
+            generation_config: Some(flat_gen_config),
+            stream: None,
+            background: None,
+            store: None,
+            system_instruction: None,
+        };
+
+        let flat_json = serde_json::to_value(&flat_request).expect("Serialize flat request");
+        println!(
+            "Request:\n{}",
+            serde_json::to_string_pretty(&flat_json).unwrap()
+        );
+
+        let flat_response = http_client
+            .post(url)
+            .header("x-goog-api-key", &api_key)
+            .header("Content-Type", "application/json")
+            .json(&flat_json)
+            .send()
+            .await;
+
+        match flat_response {
+            Ok(resp) => {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                println!("Response status: {}", status);
+
+                if status.is_success() {
+                    println!("✅ FLAT FORMAT WORKS!");
+                    println!("Response (truncated): {}...", &body[..body.len().min(300)]);
+                } else {
+                    println!("❌ Flat format FAILED with status {}", status);
+                    println!("Error: {}", body);
+                }
+            }
+            Err(e) => {
+                println!("Request error: {:?}", e);
+            }
+        }
+
+        println!("\n=== SUMMARY ===");
+        println!("Run this test with --nocapture to see which formats work.");
+    }
 }
