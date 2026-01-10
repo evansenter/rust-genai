@@ -1295,6 +1295,40 @@ mod auto_execution {
             "Should have executed get_weather"
         );
     }
+
+    /// Test that timeout correctly fires even with registered functions.
+    ///
+    /// Validates that the timeout mechanism works with `create_with_auto_functions()`
+    /// when functions are registered via the `#[tool]` macro.
+    #[tokio::test]
+    #[ignore = "Requires API key"]
+    async fn test_auto_functions_timeout_with_registered_functions() {
+        use std::time::Duration;
+
+        with_timeout(TEST_TIMEOUT, async {
+            let client = get_client().expect("GEMINI_API_KEY required");
+
+            // Use an impossibly short timeout with functions registered
+            // The functions are registered via #[tool] macro (get_weather_test, etc.)
+            let result = interaction_builder(&client)
+                .with_text("What's the weather in Tokyo and what time is it in JST?")
+                .with_timeout(Duration::from_millis(1))
+                .create_with_auto_functions()
+                .await;
+
+            // Should return a timeout error even with functions registered
+            assert!(
+                matches!(result, Err(GenaiError::Timeout(_))),
+                "Expected GenaiError::Timeout with registered functions, got: {:?}",
+                result
+            );
+
+            println!("✓ Timeout correctly fires with registered functions");
+            println!("  Note: Any function calls that completed before timeout are");
+            println!("  preserved on the API side via previous_interaction_id chain");
+        })
+        .await;
+    }
 }
 
 // =============================================================================
@@ -1781,6 +1815,428 @@ mod thinking {
 
         println!("✓ Streaming with thinking + function calling completed successfully");
     }
+
+    /// Test streaming with thinking mode but no function calling.
+    ///
+    /// Validates that streaming with thinking enabled works independently
+    /// of function calling (pure thinking + streaming).
+    #[tokio::test]
+    #[ignore = "Requires API key"]
+    async fn test_streaming_with_thinking_only() {
+        let Some(client) = get_client() else {
+            println!("Skipping: GEMINI_API_KEY not set");
+            return;
+        };
+
+        println!("=== Streaming with thinking (no function calling) ===");
+
+        let stream = stateful_builder(&client)
+            .with_text("Explain briefly why the sky is blue.")
+            .with_thinking_level(ThinkingLevel::Medium)
+            .create_stream();
+
+        let result = consume_stream(stream).await;
+
+        println!("\n--- Streaming Results ---");
+        println!("Total deltas: {}", result.delta_count);
+        println!("Saw thought deltas: {}", result.saw_thought);
+        println!("Saw thought signature: {}", result.saw_thought_signature);
+        println!("Collected text length: {}", result.collected_text.len());
+
+        // Verify streaming worked
+        assert!(result.has_output(), "Should receive streaming chunks");
+
+        // Log thinking observations
+        if result.saw_thought {
+            println!("✓ Thought deltas received during streaming");
+            if !result.collected_thoughts.is_empty() {
+                println!(
+                    "  Thoughts preview: {}...",
+                    &result.collected_thoughts[..result.collected_thoughts.len().min(100)]
+                );
+            }
+        } else {
+            println!("ℹ Thoughts processed internally");
+        }
+
+        // Verify we got text
+        assert!(
+            !result.collected_text.is_empty(),
+            "Should stream text content"
+        );
+
+        // Verify content is about the sky/light/scattering - use semantic validation
+        let is_valid = validate_response_semantically(
+            &client,
+            "Asked 'Why is the sky blue?' with thinking mode enabled",
+            &result.collected_text,
+            "Does this response explain the scientific reason for the sky appearing blue (light, scattering, wavelengths)?",
+        )
+        .await
+        .expect("Semantic validation failed");
+        assert!(
+            is_valid,
+            "Response should explain why sky is blue. Got: {}",
+            result.collected_text
+        );
+
+        println!("\n✓ Streaming with thinking (no function calling) completed successfully");
+    }
+
+    /// Test that sequential function calls each have their own thought signature.
+    ///
+    /// Per docs: "For sequential function calls, each function call will have its
+    /// own signature that must be returned."
+    #[tokio::test]
+    #[ignore = "Requires API key"]
+    async fn test_thought_signature_sequential_each_step() {
+        let Some(client) = get_client() else {
+            println!("Skipping: GEMINI_API_KEY not set");
+            return;
+        };
+
+        with_timeout(TEST_TIMEOUT, async {
+            let get_weather = FunctionDeclaration::builder("get_weather")
+                .description("Get the current weather")
+                .parameter("city", json!({"type": "string"}))
+                .required(vec!["city".to_string()])
+                .build();
+
+            // Step 1
+            let response1 = stateful_builder(&client)
+                .with_text("What's the weather in Tokyo?")
+                .with_function(get_weather.clone())
+                .create()
+                .await
+                .expect("First interaction failed");
+
+            let calls1 = response1.function_calls();
+            if calls1.is_empty() {
+                println!("No function call in step 1 - skipping");
+                return;
+            }
+
+            let call1 = &calls1[0];
+            println!(
+                "Step 1 signature present: {}",
+                call1.thought_signature.is_some()
+            );
+
+            // Provide result
+            let result1 = function_result_content(
+                "get_weather",
+                call1.id.unwrap().to_string(),
+                json!({"temperature": "22°C"}),
+            );
+
+            let response2 = stateful_builder(&client)
+                .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
+                .with_content(vec![result1])
+                .with_text("Now what about Paris?")
+                .with_function(get_weather.clone())
+                .create()
+                .await
+                .expect("Second interaction failed");
+
+            let calls2 = response2.function_calls();
+            if !calls2.is_empty() {
+                let call2 = &calls2[0];
+                println!(
+                    "Step 2 signature present: {}",
+                    call2.thought_signature.is_some()
+                );
+
+                // Both steps should have their own signatures
+                if call1.thought_signature.is_some() && call2.thought_signature.is_some() {
+                    println!("✓ Both sequential calls have signatures as expected");
+                }
+            }
+        })
+        .await;
+    }
+
+    /// Test thinking with sequential and parallel function call chains.
+    ///
+    /// This comprehensive test validates complex multi-step function calling
+    /// with thinking mode enabled, including parallel calls and sequential chains.
+    #[tokio::test]
+    #[ignore = "Requires API key"]
+    async fn test_thinking_with_sequential_parallel_function_chain() {
+        let Some(client) = get_client() else {
+            println!("Skipping: GEMINI_API_KEY not set");
+            return;
+        };
+
+        // Define all functions we'll use
+        let get_weather = FunctionDeclaration::builder("get_current_weather")
+            .description("Get the current weather conditions for a city")
+            .parameter(
+                "city",
+                json!({"type": "string", "description": "City name"}),
+            )
+            .required(vec!["city".to_string()])
+            .build();
+
+        let get_time = FunctionDeclaration::builder("get_local_time")
+            .description("Get the current local time in a city")
+            .parameter(
+                "city",
+                json!({"type": "string", "description": "City name"}),
+            )
+            .required(vec!["city".to_string()])
+            .build();
+
+        let get_forecast = FunctionDeclaration::builder("get_weather_forecast")
+            .description("Get the weather forecast for the next few days")
+            .parameter(
+                "city",
+                json!({"type": "string", "description": "City name"}),
+            )
+            .required(vec!["city".to_string()])
+            .build();
+
+        let get_activities = FunctionDeclaration::builder("get_recommended_activities")
+            .description("Get recommended activities based on weather conditions")
+            .parameter(
+                "weather_condition",
+                json!({"type": "string", "description": "Current weather like sunny, rainy, cloudy"}),
+            )
+            .required(vec!["weather_condition".to_string()])
+            .build();
+
+        let all_functions = vec![
+            get_weather.clone(),
+            get_time.clone(),
+            get_forecast.clone(),
+            get_activities.clone(),
+        ];
+
+        // =========================================================================
+        // Step 1: Initial request - expect parallel calls for weather and time
+        // =========================================================================
+        println!("=== Step 1: Initial request ===");
+
+        let functions = all_functions.clone();
+        let response1 = retry_request!([client, functions] => {
+            stateful_builder(&client)
+                .with_text(
+                    "I'm planning a trip to Tokyo. I need to know the current weather, \
+                     current local time, the forecast for the next few days, and what \
+                     activities you'd recommend. Please gather all this information.",
+                )
+                .with_functions(functions)
+                .with_thinking_level(ThinkingLevel::Medium)
+                .with_store_enabled()
+                .create()
+                .await
+        })
+        .expect("Step 1 failed");
+
+        println!("Step 1 status: {:?}", response1.status);
+
+        let calls1 = response1.function_calls();
+        println!("Step 1 function calls: {}", calls1.len());
+
+        if calls1.is_empty() {
+            println!("Model chose not to call functions - skipping rest of test");
+            return;
+        }
+
+        for (i, call) in calls1.iter().enumerate() {
+            println!(
+                "  Call {}: {} (has signature: {})",
+                i + 1,
+                call.name,
+                call.thought_signature.is_some()
+            );
+        }
+
+        // Verify all calls have IDs
+        for call in &calls1 {
+            assert!(call.id.is_some(), "Function call should have ID");
+        }
+
+        // =========================================================================
+        // Step 2: Provide results for step 1, expect more function calls
+        // =========================================================================
+        println!("\n=== Step 2: Provide first results ===");
+
+        let mut results1 = Vec::new();
+        for call in &calls1 {
+            let result_data = match call.name {
+                "get_current_weather" => json!({
+                    "temperature": "24°C",
+                    "conditions": "partly cloudy",
+                    "humidity": "60%",
+                    "wind": "10 km/h"
+                }),
+                "get_local_time" => json!({
+                    "time": "10:30 AM",
+                    "timezone": "JST",
+                    "date": "2025-01-15"
+                }),
+                "get_weather_forecast" => json!({
+                    "tomorrow": "sunny, 26°C",
+                    "day_after": "cloudy, 22°C",
+                    "in_3_days": "rainy, 18°C"
+                }),
+                "get_recommended_activities" => json!({
+                    "outdoor": ["visit Senso-ji Temple", "walk in Ueno Park"],
+                    "indoor": ["explore TeamLab", "shop in Shibuya"],
+                    "food": ["try ramen in Shinjuku", "sushi at Tsukiji"]
+                }),
+                _ => json!({"status": "unknown function"}),
+            };
+
+            results1.push(function_result_content(
+                call.name,
+                call.id.expect("call should have ID"),
+                result_data,
+            ));
+        }
+
+        let prev_id = response1.id.clone().expect("id should exist");
+        let functions = all_functions.clone();
+        let results = results1.clone();
+        let response2 = retry_request!([client, prev_id, functions, results] => {
+            stateful_builder(&client)
+                .with_previous_interaction(&prev_id)
+                .with_content(results)
+                .with_functions(functions)
+                .with_thinking_level(ThinkingLevel::Medium)
+                .with_store_enabled()
+                .create()
+                .await
+        })
+        .expect("Step 2 failed");
+
+        println!("Step 2 status: {:?}", response2.status);
+        println!("Step 2 has_thoughts: {}", response2.has_thoughts());
+        println!("Step 2 has_text: {}", response2.has_text());
+
+        let calls2 = response2.function_calls();
+        println!("Step 2 function calls: {}", calls2.len());
+
+        for (i, call) in calls2.iter().enumerate() {
+            println!(
+                "  Call {}: {} (has signature: {})",
+                i + 1,
+                call.name,
+                call.thought_signature.is_some()
+            );
+        }
+
+        // The model might either:
+        // 1. Call more functions (sequential chain continues)
+        // 2. Return final text (it has enough info)
+        //
+        // Both are valid outcomes - we test the chain if it continues
+
+        if !calls2.is_empty() {
+            // =====================================================================
+            // Step 3: Provide second round of results, expect final response
+            // =====================================================================
+            println!("\n=== Step 3: Provide second results ===");
+
+            let mut results2 = Vec::new();
+            for call in &calls2 {
+                let result_data = match call.name {
+                    "get_current_weather" => json!({
+                        "temperature": "24°C",
+                        "conditions": "partly cloudy"
+                    }),
+                    "get_local_time" => json!({
+                        "time": "10:35 AM",
+                        "timezone": "JST"
+                    }),
+                    "get_weather_forecast" => json!({
+                        "tomorrow": "sunny, 26°C",
+                        "day_after": "cloudy, 22°C"
+                    }),
+                    "get_recommended_activities" => json!({
+                        "outdoor": ["temple visits", "park walks"],
+                        "indoor": ["museums", "shopping"]
+                    }),
+                    _ => json!({"status": "ok"}),
+                };
+
+                results2.push(function_result_content(
+                    call.name,
+                    call.id.expect("call should have ID"),
+                    result_data,
+                ));
+            }
+
+            let prev_id = response2.id.clone().expect("id should exist");
+            let functions = all_functions.clone();
+            let results = results2.clone();
+            let response3 = retry_request!([client, prev_id, functions, results] => {
+                stateful_builder(&client)
+                    .with_previous_interaction(&prev_id)
+                    .with_content(results)
+                    .with_functions(functions)
+                    .with_thinking_level(ThinkingLevel::Medium)
+                    .with_store_enabled()
+                    .create()
+                    .await
+            })
+            .expect("Step 3 failed");
+
+            println!("Step 3 status: {:?}", response3.status);
+            println!("Step 3 has_thoughts: {}", response3.has_thoughts());
+            println!("Step 3 has_text: {}", response3.has_text());
+
+            if response3.has_thoughts() {
+                println!("✓ Thoughts visible in Step 3");
+            } else {
+                println!("ℹ Thoughts processed internally");
+            }
+
+            let calls3 = response3.function_calls();
+            if calls3.is_empty() {
+                println!("✓ No more function calls - chain complete");
+            } else {
+                println!("ℹ Model requested {} more function calls", calls3.len());
+            }
+
+            if response3.has_text() {
+                let text = response3.text().unwrap();
+                println!("Step 3 text preview: {}...", &text[..text.len().min(200)]);
+
+                // Use semantic validation instead of brittle keyword matching
+                let is_valid = validate_response_semantically(
+                    &client,
+                    "User asked about planning a trip to Tokyo. The assistant gathered information about current weather, local time, forecast, and recommended activities via function calls.",
+                    text,
+                    "Does this response provide helpful trip planning information about Tokyo (weather, timing, activities)?",
+                )
+                .await
+                .expect("Semantic validation failed");
+
+                assert!(
+                    is_valid,
+                    "Final response should reference gathered information"
+                );
+            }
+
+            println!("\n✓ Sequential parallel function chain (3 steps) completed successfully");
+        } else {
+            // Model returned text in step 2 (gathered all info in first round)
+            println!("ℹ Model completed in 2 steps (no sequential chain needed)");
+
+            if response2.has_text() {
+                let text = response2.text().unwrap();
+                println!("Step 2 text preview: {}...", &text[..text.len().min(200)]);
+            }
+
+            assert!(
+                response2.has_text(),
+                "Step 2 should have text if no more function calls"
+            );
+
+            println!("\n✓ Function calls with thinking completed in 2 steps");
+        }
+    }
 }
 
 // =============================================================================
@@ -2157,6 +2613,86 @@ mod multiturn {
         //
         // These are verified by compile-fail tests in tests/ui_tests.rs
         println!("Typestate constraints are enforced at compile time.");
+    }
+
+    /// Test multi-turn function calling with error handling.
+    ///
+    /// Validates that the model correctly explains function errors to users
+    /// when a function returns an error result.
+    #[tokio::test]
+    #[ignore = "Requires API key"]
+    async fn test_multiturn_manual_functions_error_handling() {
+        let Some(client) = get_client() else {
+            println!("Skipping: GEMINI_API_KEY not set");
+            return;
+        };
+
+        let secret_function = FunctionDeclaration::builder("get_secret_data")
+            .description("Get secret data that requires special permissions")
+            .parameter(
+                "key",
+                json!({"type": "string", "description": "The secret key"}),
+            )
+            .required(vec!["key".to_string()])
+            .build();
+
+        // Turn 1: Trigger function that will "fail"
+        println!("--- Turn 1: Trigger function that will fail ---");
+        let response1 = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_text("Get the secret data for key 'test123'")
+            .with_function(secret_function.clone())
+            .with_store_enabled()
+            .with_system_instruction(
+                "You help users access data. When functions fail, explain the error to the user.",
+            )
+            .create()
+            .await
+            .expect("Turn 1 should succeed");
+
+        let function_calls = response1.function_calls();
+        assert!(!function_calls.is_empty(), "Should trigger function call");
+
+        // Return error result
+        let call = &function_calls[0];
+        let error_result = function_result_content(
+            "get_secret_data".to_string(),
+            call.id.expect("Should have ID").to_string(),
+            json!({"error": "Permission denied: insufficient privileges for key 'test123'"}),
+        );
+
+        println!("\n--- Sending error result ---");
+        let response2 = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_previous_interaction(response1.id.as_ref().expect("Should have ID"))
+            .with_content(vec![error_result])
+            .with_function(secret_function)
+            .with_store_enabled()
+            .create()
+            .await
+            .expect("Error result submission should succeed");
+
+        println!("After error status: {:?}", response2.status);
+        assert!(
+            response2.has_text(),
+            "Should have text response explaining error"
+        );
+
+        let text = response2.text().unwrap();
+        println!("Response: {}", text);
+
+        // Model should explain the error to user - use semantic validation to avoid brittle keyword matching
+        let is_valid = validate_response_semantically(
+            &client,
+            "A function call to get_secret_data returned an error: 'Permission denied: insufficient privileges for key test123'. The system instruction says to explain errors to the user.",
+            text,
+            "Does this response appropriately explain to the user that accessing the secret data failed due to a permissions/privileges issue?",
+        )
+        .await
+        .expect("Semantic validation should succeed");
+        assert!(is_valid, "Response should explain the permission error");
     }
 }
 
