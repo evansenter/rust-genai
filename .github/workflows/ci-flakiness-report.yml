@@ -74,11 +74,12 @@ jobs:
               LOGS=$(gh run view "$RUN_ID" --log-failed 2>/dev/null || echo "")
 
               # Extract failed test names from Rust test output
-              # Pattern matches: "test <test_name> ... FAILED"
+              # Log lines are prefixed with job name and timestamp, e.g.:
+              # "Integration Tests (functions)\t...\ttest test_name ... FAILED"
               while IFS= read -r test_name; do
                 if [ -n "$test_name" ]; then
-                  # Clean up the test name
-                  test_name=$(echo "$test_name" | sed 's/^test //' | sed 's/ \.\.\..*$//')
+                  # Clean up the test name (strip prefix and suffix)
+                  test_name=$(echo "$test_name" | sed 's/.*test //' | sed 's/ \.\.\..*$//')
 
                   # Increment failure count
                   if [ -n "${TEST_FAILURES[$test_name]:-}" ]; then
