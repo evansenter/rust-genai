@@ -31,7 +31,7 @@ fn test_interaction_builder_with_complex_content_input() {
             annotations: None,
         },
         InteractionContent::Thought {
-            text: Some("Internal reasoning".to_string()),
+            signature: Some("Eq0JCq...signature".to_string()),
         },
     ]);
 

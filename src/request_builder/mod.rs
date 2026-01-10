@@ -1926,9 +1926,9 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .await?;
     ///
     /// if response.has_thoughts() {
-    ///     for thought in response.thoughts() {
-    ///         println!("Reasoning: {}", thought);
-    ///     }
+    ///     // Thoughts contain cryptographic signatures, not readable text
+    ///     let sig_count = response.thought_signatures().count();
+    ///     println!("Model used reasoning ({} thought signatures)", sig_count);
     /// }
     /// # Ok(())
     /// # }

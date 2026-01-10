@@ -74,14 +74,17 @@ pub fn text_content(text: impl Into<String>) -> InteractionContent {
 ///
 /// **Prefer:** [`InteractionContent::new_thought()`] for new code.
 ///
+/// **Note:** Thought content contains a cryptographic signature, not text.
+/// The signature is used for verification of the model's reasoning process.
+///
 /// # Example
 /// ```
 /// use genai_rs::interactions_api::thought_content;
 ///
-/// let thought = thought_content("I need to search for weather data");
+/// let thought = thought_content("signature_value_here");
 /// ```
-pub fn thought_content(text: impl Into<String>) -> InteractionContent {
-    InteractionContent::new_thought(text)
+pub fn thought_content(signature: impl Into<String>) -> InteractionContent {
+    InteractionContent::new_thought(signature)
 }
 
 // ----------------------------------------------------------------------------
@@ -571,7 +574,7 @@ pub fn code_execution_call_content(
     code: impl Into<String>,
 ) -> InteractionContent {
     InteractionContent::CodeExecutionCall {
-        id: id.into(),
+        id: Some(id.into()),
         language,
         code: code.into(),
     }
@@ -594,7 +597,7 @@ pub fn code_execution_result_content(
     output: impl Into<String>,
 ) -> InteractionContent {
     InteractionContent::CodeExecutionResult {
-        call_id: call_id.into(),
+        call_id: Some(call_id.into()),
         outcome,
         output: output.into(),
     }
@@ -724,65 +727,81 @@ pub fn file_search_result_content(
 /// ```
 /// use genai_rs::interactions_api::url_context_call_content;
 ///
-/// let fetch = url_context_call_content("https://example.com");
+/// let fetch = url_context_call_content("ctx_123", vec!["https://example.com"]);
 /// ```
-pub fn url_context_call_content(url: impl Into<String>) -> InteractionContent {
-    InteractionContent::UrlContextCall { url: url.into() }
+pub fn url_context_call_content(
+    id: impl Into<String>,
+    urls: impl IntoIterator<Item = impl Into<String>>,
+) -> InteractionContent {
+    InteractionContent::UrlContextCall {
+        id: id.into(),
+        urls: urls.into_iter().map(Into::into).collect(),
+    }
 }
 
 /// Creates URL context result content
 ///
-/// Contains the content retrieved by the `UrlContext` built-in tool.
+/// Contains the results retrieved by the `UrlContext` built-in tool.
 ///
 /// # Example
 /// ```
 /// use genai_rs::interactions_api::url_context_result_content;
+/// use genai_rs::UrlContextResultItem;
 ///
 /// let result = url_context_result_content(
-///     "https://example.com",
-///     Some("<html>...</html>".to_string())
+///     "ctx_123",
+///     vec![UrlContextResultItem::new("https://example.com", "success")]
 /// );
 /// ```
 pub fn url_context_result_content(
-    url: impl Into<String>,
-    content: Option<String>,
+    call_id: impl Into<String>,
+    result: Vec<crate::UrlContextResultItem>,
 ) -> InteractionContent {
     InteractionContent::UrlContextResult {
-        url: url.into(),
-        content,
+        call_id: call_id.into(),
+        result,
     }
 }
 
-/// Creates a successful URL context result (convenience helper)
+/// Creates a successful URL context result for a single URL (convenience helper)
 ///
-/// Shorthand for creating a result where the URL content was successfully fetched.
+/// Shorthand for creating a result where a single URL was successfully fetched.
 ///
 /// # Example
 /// ```
 /// use genai_rs::interactions_api::url_context_success;
 ///
-/// let result = url_context_success("https://example.com", "<html>...</html>");
+/// let result = url_context_success("ctx_123", "https://example.com");
 /// ```
 pub fn url_context_success(
+    call_id: impl Into<String>,
     url: impl Into<String>,
-    content: impl Into<String>,
 ) -> InteractionContent {
-    url_context_result_content(url, Some(content.into()))
+    url_context_result_content(
+        call_id,
+        vec![crate::UrlContextResultItem::new(url, "success")],
+    )
 }
 
-/// Creates a failed URL context result (convenience helper)
+/// Creates a failed URL context result for a single URL (convenience helper)
 ///
-/// Shorthand for creating a result where the URL content could not be fetched
+/// Shorthand for creating a result where a single URL fetch failed
 /// (e.g., network errors, blocked URLs, timeouts, or access restrictions).
 ///
 /// # Example
 /// ```
 /// use genai_rs::interactions_api::url_context_failure;
 ///
-/// let result = url_context_failure("https://example.com/blocked");
+/// let result = url_context_failure("ctx_123", "https://example.com/blocked");
 /// ```
-pub fn url_context_failure(url: impl Into<String>) -> InteractionContent {
-    url_context_result_content(url, None)
+pub fn url_context_failure(
+    call_id: impl Into<String>,
+    url: impl Into<String>,
+) -> InteractionContent {
+    url_context_result_content(
+        call_id,
+        vec![crate::UrlContextResultItem::new(url, "error")],
+    )
 }
 
 // ============================================================================
@@ -805,10 +824,11 @@ mod tests {
 
     #[test]
     fn test_thought_content() {
-        let content = thought_content("Thinking...");
+        // Thought content now contains a signature, not text
+        let content = thought_content("EosFCogFAXLI2...");
         match content {
-            InteractionContent::Thought { text } => {
-                assert_eq!(text, Some("Thinking...".to_string()))
+            InteractionContent::Thought { signature } => {
+                assert_eq!(signature, Some("EosFCogFAXLI2...".to_string()))
             }
             _ => panic!("Expected Thought variant"),
         }
@@ -834,10 +854,12 @@ mod tests {
                 name,
                 call_id,
                 result,
+                is_error,
             } => {
-                assert_eq!(name, "test");
+                assert_eq!(name, Some("test".to_string()));
                 assert_eq!(call_id, "call_123");
                 assert_eq!(result, json!({"result": "ok"}));
+                assert_eq!(is_error, None);
             }
             _ => panic!("Expected FunctionResult variant"),
         }
@@ -1119,7 +1141,7 @@ mod tests {
             code_execution_call_content("call_123", CodeExecutionLanguage::Python, "print(42)");
         match content {
             InteractionContent::CodeExecutionCall { id, language, code } => {
-                assert_eq!(id, "call_123");
+                assert_eq!(id, Some("call_123".to_string()));
                 assert_eq!(language, CodeExecutionLanguage::Python);
                 assert_eq!(code, "print(42)");
             }
@@ -1136,7 +1158,7 @@ mod tests {
                 outcome,
                 output,
             } => {
-                assert_eq!(call_id, "call_123");
+                assert_eq!(call_id, Some("call_123".to_string()));
                 assert_eq!(outcome, CodeExecutionOutcome::Ok);
                 assert_eq!(output, "42\n");
             }
@@ -1203,10 +1225,14 @@ mod tests {
 
     #[test]
     fn test_url_context_call_content() {
-        let content = url_context_call_content("https://docs.rs");
+        let content =
+            url_context_call_content("ctx_123", vec!["https://docs.rs", "https://crates.io"]);
         match content {
-            InteractionContent::UrlContextCall { url } => {
-                assert_eq!(url, "https://docs.rs");
+            InteractionContent::UrlContextCall { id, urls } => {
+                assert_eq!(id, "ctx_123");
+                assert_eq!(urls.len(), 2);
+                assert_eq!(urls[0], "https://docs.rs");
+                assert_eq!(urls[1], "https://crates.io");
             }
             _ => panic!("Expected UrlContextCall variant"),
         }
@@ -1215,13 +1241,18 @@ mod tests {
     #[test]
     fn test_url_context_result_content() {
         let content = url_context_result_content(
-            "https://example.com",
-            Some("<html>test</html>".to_string()),
+            "ctx_123",
+            vec![crate::UrlContextResultItem::new(
+                "https://example.com",
+                "success",
+            )],
         );
         match content {
-            InteractionContent::UrlContextResult { url, content: c } => {
-                assert_eq!(url, "https://example.com");
-                assert_eq!(c, Some("<html>test</html>".to_string()));
+            InteractionContent::UrlContextResult { call_id, result } => {
+                assert_eq!(call_id, "ctx_123");
+                assert_eq!(result.len(), 1);
+                assert_eq!(result[0].url, "https://example.com");
+                assert!(result[0].is_success());
             }
             _ => panic!("Expected UrlContextResult variant"),
         }
@@ -1229,11 +1260,13 @@ mod tests {
 
     #[test]
     fn test_url_context_success() {
-        let content = url_context_success("https://example.com", "<html>...</html>");
+        let content = url_context_success("ctx_123", "https://example.com");
         match content {
-            InteractionContent::UrlContextResult { url, content: c } => {
-                assert_eq!(url, "https://example.com");
-                assert_eq!(c, Some("<html>...</html>".to_string()));
+            InteractionContent::UrlContextResult { call_id, result } => {
+                assert_eq!(call_id, "ctx_123");
+                assert_eq!(result.len(), 1);
+                assert_eq!(result[0].url, "https://example.com");
+                assert!(result[0].is_success());
             }
             _ => panic!("Expected UrlContextResult variant"),
         }
@@ -1241,11 +1274,13 @@ mod tests {
 
     #[test]
     fn test_url_context_failure() {
-        let content = url_context_failure("https://blocked.com");
+        let content = url_context_failure("ctx_123", "https://blocked.com");
         match content {
-            InteractionContent::UrlContextResult { url, content: c } => {
-                assert_eq!(url, "https://blocked.com");
-                assert_eq!(c, None);
+            InteractionContent::UrlContextResult { call_id, result } => {
+                assert_eq!(call_id, "ctx_123");
+                assert_eq!(result.len(), 1);
+                assert_eq!(result[0].url, "https://blocked.com");
+                assert!(result[0].is_error());
             }
             _ => panic!("Expected UrlContextResult variant"),
         }

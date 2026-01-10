@@ -257,6 +257,16 @@ pub struct UsageMetadata {
         deserialize_with = "deserialize_optional_token_count"
     )]
     pub total_reasoning_tokens: Option<u32>,
+    /// Total number of thought tokens (thinking model internal reasoning, distinct from reasoning_tokens)
+    ///
+    /// This field appears in API responses for models using the thinking/reasoning features.
+    /// Note: This may overlap with or complement `total_reasoning_tokens` - both are included
+    /// to accurately reflect the wire format returned by the API.
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional_token_count"
+    )]
+    pub total_thought_tokens: Option<u32>,
     /// Total number of tokens used for tool/function calling overhead
     #[serde(
         skip_serializing_if = "Option::is_none",
@@ -301,11 +311,21 @@ impl UsageMetadata {
             || self.total_output_tokens.is_some()
             || self.total_cached_tokens.is_some()
             || self.total_reasoning_tokens.is_some()
+            || self.total_thought_tokens.is_some()
             || self.total_tool_use_tokens.is_some()
             || self.input_tokens_by_modality.is_some()
             || self.output_tokens_by_modality.is_some()
             || self.cached_tokens_by_modality.is_some()
             || self.tool_use_tokens_by_modality.is_some()
+    }
+
+    /// Returns total thought tokens (thinking model internal reasoning)
+    ///
+    /// This may be populated for thinking models. See also `total_reasoning_tokens`
+    /// which may contain related but distinct token counts.
+    #[must_use]
+    pub fn thought_tokens(&self) -> Option<u32> {
+        self.total_thought_tokens
     }
 
     /// Returns the input token count for a specific modality.
@@ -765,17 +785,21 @@ pub struct OwnedFunctionCallInfo {
 /// # use genai_rs::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// for result in response.function_results() {
-///     println!("Function {} returned: {}", result.name, result.result);
+///     if let Some(name) = result.name {
+///         println!("Function {} returned: {}", name, result.result);
+///     }
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct FunctionResultInfo<'a> {
-    /// Name of the function that was called
-    pub name: &'a str,
+    /// Name of the function that was called (optional per API spec)
+    pub name: Option<&'a str>,
     /// The call_id from the FunctionCall this result responds to
     pub call_id: &'a str,
     /// The result returned by the function
     pub result: &'a serde_json::Value,
+    /// Whether this result indicates an error
+    pub is_error: Option<bool>,
 }
 
 /// Information about a code execution call requested by the model.
@@ -793,15 +817,15 @@ pub struct FunctionResultInfo<'a> {
 /// # use genai_rs::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// for call in response.code_execution_calls() {
-///     println!("Executing {} code (id: {})", call.language, call.id);
+///     println!("Executing {} code (id: {:?})", call.language, call.id);
 ///     println!("Code: {}", call.code);
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct CodeExecutionCallInfo<'a> {
-    /// Unique identifier for this code execution call
-    pub id: &'a str,
+    /// Unique identifier for this code execution call (optional per API spec)
+    pub id: Option<&'a str>,
     /// Programming language (currently only Python is supported)
     pub language: CodeExecutionLanguage,
     /// Source code to execute
@@ -823,7 +847,7 @@ pub struct CodeExecutionCallInfo<'a> {
 /// # use genai_rs::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// for result in response.code_execution_results() {
-///     println!("Call {} completed with outcome: {}", result.call_id, result.outcome);
+///     println!("Call {:?} completed with outcome: {}", result.call_id, result.outcome);
 ///     if result.outcome.is_success() {
 ///         println!("Output: {}", result.output);
 ///     }
@@ -832,8 +856,8 @@ pub struct CodeExecutionCallInfo<'a> {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct CodeExecutionResultInfo<'a> {
-    /// The call_id matching the CodeExecutionCall this result is for
-    pub call_id: &'a str,
+    /// The call_id matching the CodeExecutionCall this result is for (optional per API spec)
+    pub call_id: Option<&'a str>,
     /// Execution outcome (OK, FAILED, DEADLINE_EXCEEDED, etc.)
     pub outcome: CodeExecutionOutcome,
     /// The output of the code execution (stdout for success, error message for failure)
@@ -855,21 +879,19 @@ pub struct CodeExecutionResultInfo<'a> {
 /// # use genai_rs::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// for result in response.url_context_results() {
-///     println!("URL: {}", result.url);
-///     if let Some(content) = result.content {
-///         println!("Content: {}", content);
-///     } else {
-///         println!("(fetch failed)");
+///     println!("Call ID: {}", result.call_id);
+///     for item in result.items {
+///         println!("  URL: {} - Status: {}", item.url, item.status);
 ///     }
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct UrlContextResultInfo<'a> {
-    /// The URL that was fetched
-    pub url: &'a str,
-    /// The fetched content, or `None` if the fetch failed
-    pub content: Option<&'a str>,
+    /// The ID of the corresponding UrlContextCall
+    pub call_id: &'a str,
+    /// The result items containing URL and status for each fetched URL
+    pub items: &'a [crate::UrlContextResultItem],
 }
 
 /// Response from creating or retrieving an interaction
@@ -1359,7 +1381,7 @@ impl InteractionResponse {
     /// # let response: InteractionResponse = todo!();
     /// if response.has_function_results() {
     ///     for result in response.function_results() {
-    ///         println!("Function {} returned data", result.name);
+    ///         println!("Function {:?} returned data", result.name);
     ///     }
     /// }
     /// ```
@@ -1381,7 +1403,7 @@ impl InteractionResponse {
     /// # use genai_rs::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// for result in response.function_results() {
-    ///     println!("Function {} (call_id: {}) returned: {}",
+    ///     println!("Function {:?} (call_id: {}) returned: {}",
     ///         result.name, result.call_id, result.result);
     /// }
     /// ```
@@ -1394,12 +1416,14 @@ impl InteractionResponse {
                     name,
                     call_id,
                     result,
+                    is_error,
                 } = content
                 {
                     Some(FunctionResultInfo {
-                        name: name.as_str(),
+                        name: name.as_deref(),
                         call_id: call_id.as_str(),
                         result,
+                        is_error: *is_error,
                     })
                 } else {
                     None
@@ -1414,31 +1438,34 @@ impl InteractionResponse {
 
     /// Check if response contains thoughts (internal reasoning)
     ///
-    /// Returns true if any output contains thought content.
+    /// Returns true if any output contains thought content with a signature.
     #[must_use]
     pub fn has_thoughts(&self) -> bool {
         self.outputs
             .iter()
-            .any(|c| matches!(c, InteractionContent::Thought { text: Some(_) }))
+            .any(|c| matches!(c, InteractionContent::Thought { signature: Some(_) }))
     }
 
-    /// Get an iterator over all thought content (internal reasoning).
+    /// Get an iterator over all thought signatures (internal reasoning verification).
     ///
-    /// Returns the text content of each `Thought` variant in the outputs.
-    /// Thoughts represent the model's chain-of-thought reasoning when
+    /// Returns the cryptographic signature of each `Thought` variant in the outputs.
+    /// These signatures are used to verify the model's reasoning process when
     /// thinking mode is enabled via `with_thinking_level()`.
+    ///
+    /// **Note:** The actual thought text is not exposed by the API - only signatures
+    /// for verification purposes.
     ///
     /// # Example
     /// ```no_run
     /// # use genai_rs::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
-    /// for thought in response.thoughts() {
-    ///     println!("Reasoning: {}", thought);
+    /// for signature in response.thought_signatures() {
+    ///     println!("Thought signature: {}", signature);
     /// }
     /// ```
-    pub fn thoughts(&self) -> impl Iterator<Item = &str> {
+    pub fn thought_signatures(&self) -> impl Iterator<Item = &str> {
         self.outputs.iter().filter_map(|c| match c {
-            InteractionContent::Thought { text: Some(t) } => Some(t.as_str()),
+            InteractionContent::Thought { signature: Some(s) } => Some(s.as_str()),
             _ => None,
         })
     }
@@ -1624,7 +1651,7 @@ impl InteractionResponse {
     /// # use genai_rs::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(call) = response.code_execution_call() {
-    ///     println!("Model wants to run {} code (id: {}):\n{}", call.language, call.id, call.code);
+    ///     println!("Model wants to run {} code (id: {:?}):\n{}", call.language, call.id, call.code);
     /// }
     /// ```
     #[must_use]
@@ -1632,7 +1659,7 @@ impl InteractionResponse {
         self.outputs.iter().find_map(|content| {
             if let InteractionContent::CodeExecutionCall { id, language, code } = content {
                 Some(CodeExecutionCallInfo {
-                    id: id.as_str(),
+                    id: id.as_deref(),
                     language: *language,
                     code: code.as_str(),
                 })
@@ -1654,8 +1681,8 @@ impl InteractionResponse {
     /// # let response: InteractionResponse = todo!();
     /// for call in response.code_execution_calls() {
     ///     match call.language {
-    ///         CodeExecutionLanguage::Python => println!("Python (id: {}):\n{}", call.id, call.code),
-    ///         _ => println!("Other (id: {}):\n{}", call.id, call.code),
+    ///         CodeExecutionLanguage::Python => println!("Python (id: {:?}):\n{}", call.id, call.code),
+    ///         _ => println!("Other (id: {:?}):\n{}", call.id, call.code),
     ///     }
     /// }
     /// ```
@@ -1666,7 +1693,7 @@ impl InteractionResponse {
             .filter_map(|content| {
                 if let InteractionContent::CodeExecutionCall { id, language, code } = content {
                     Some(CodeExecutionCallInfo {
-                        id: id.as_str(),
+                        id: id.as_deref(),
                         language: *language,
                         code: code.as_str(),
                     })
@@ -1697,7 +1724,7 @@ impl InteractionResponse {
     /// # let response: InteractionResponse = todo!();
     /// for result in response.code_execution_results() {
     ///     if result.outcome.is_success() {
-    ///         println!("Code output (call_id: {}): {}", result.call_id, result.output);
+    ///         println!("Code output (call_id: {:?}): {}", result.call_id, result.output);
     ///     } else {
     ///         eprintln!("Code failed ({}): {}", result.outcome, result.output);
     ///     }
@@ -1715,7 +1742,7 @@ impl InteractionResponse {
                 } = content
                 {
                     Some(CodeExecutionResultInfo {
-                        call_id: call_id.as_str(),
+                        call_id: call_id.as_deref(),
                         outcome: *outcome,
                         output: output.as_str(),
                     })
@@ -1876,7 +1903,8 @@ impl InteractionResponse {
     /// # use genai_rs::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if response.has_url_context_calls() {
-    ///     println!("Model fetched: {:?}", response.url_context_calls());
+    ///     let urls = response.url_context_call_urls();
+    ///     println!("Model fetched: {:?}", urls);
     /// }
     /// ```
     #[must_use]
@@ -1886,55 +1914,56 @@ impl InteractionResponse {
             .any(|c| matches!(c, InteractionContent::UrlContextCall { .. }))
     }
 
-    /// Get the first URL context call, if any.
+    /// Get the ID of the first URL context call, if any.
     ///
-    /// Convenience method for the common case where you just want to see
-    /// the first URL the model requested.
+    /// Convenience method for the common case where you just want to get
+    /// the call ID for the first URL context call.
     ///
     /// # Example
     ///
     /// ```no_run
     /// # use genai_rs::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
-    /// if let Some(url) = response.url_context_call() {
-    ///     println!("Model fetched: {}", url);
+    /// if let Some(call_id) = response.url_context_call_id() {
+    ///     println!("URL context call ID: {}", call_id);
     /// }
     /// ```
     #[must_use]
-    pub fn url_context_call(&self) -> Option<&str> {
+    pub fn url_context_call_id(&self) -> Option<&str> {
         self.outputs.iter().find_map(|content| {
-            if let InteractionContent::UrlContextCall { url } = content {
-                Some(url.as_str())
+            if let InteractionContent::UrlContextCall { id, .. } = content {
+                Some(id.as_str())
             } else {
                 None
             }
         })
     }
 
-    /// Extract URL context calls (URLs) from outputs
+    /// Extract URL context call URLs from outputs
     ///
-    /// Returns a vector of URL strings that were requested for fetching.
+    /// Returns a vector of all URLs that were requested for fetching across all UrlContextCalls.
     ///
     /// # Example
     ///
     /// ```no_run
     /// # use genai_rs::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
-    /// for url in response.url_context_calls() {
-    ///     println!("Fetched: {}", url);
+    /// for url in response.url_context_call_urls() {
+    ///     println!("Requested URL: {}", url);
     /// }
     /// ```
     #[must_use]
-    pub fn url_context_calls(&self) -> Vec<&str> {
+    pub fn url_context_call_urls(&self) -> Vec<&str> {
         self.outputs
             .iter()
             .filter_map(|content| {
-                if let InteractionContent::UrlContextCall { url } = content {
-                    Some(url.as_str())
+                if let InteractionContent::UrlContextCall { urls, .. } = content {
+                    Some(urls.iter().map(String::as_str).collect::<Vec<_>>())
                 } else {
                     None
                 }
             })
+            .flatten()
             .collect()
     }
 
@@ -1957,9 +1986,9 @@ impl InteractionResponse {
     /// # use genai_rs::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// for result in response.url_context_results() {
-    ///     println!("URL: {}", result.url);
-    ///     if let Some(content) = result.content {
-    ///         println!("Content: {}", content);
+    ///     println!("Call ID: {}", result.call_id);
+    ///     for item in result.items {
+    ///         println!("  URL: {} - Status: {}", item.url, item.status);
     ///     }
     /// }
     /// ```
@@ -1968,10 +1997,10 @@ impl InteractionResponse {
         self.outputs
             .iter()
             .filter_map(|content| {
-                if let InteractionContent::UrlContextResult { url, content } = content {
+                if let InteractionContent::UrlContextResult { call_id, result } = content {
                     Some(UrlContextResultInfo {
-                        url: url.as_str(),
-                        content: content.as_deref(),
+                        call_id: call_id.as_str(),
+                        items: result,
                     })
                 } else {
                     None

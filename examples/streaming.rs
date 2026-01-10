@@ -113,10 +113,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             total_chars += text.len();
                         }
                         // Handle thought deltas (thinking mode)
-                        if delta.is_thought()
-                            && let Some(thought_text) = delta.thought()
-                        {
-                            eprintln!("[Thought] {}", thought_text);
+                        // Note: Thoughts contain cryptographic signatures, not readable text
+                        if delta.is_thought() && delta.thought_signature().is_some() {
+                            eprintln!("[Thought] (signature present)");
                         }
                     }
                     StreamChunk::ContentStop { index } => {

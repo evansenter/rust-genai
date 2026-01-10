@@ -129,9 +129,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             print!("{}", t);
                             stdout().flush()?;
                         }
-                        // Show thoughts if present
-                        if let Some(t) = content.thought() {
-                            print!("\n[Thinking: {}...]", &t[..t.len().min(50)]);
+                        // Show thoughts if present (signatures are verification tokens, not readable)
+                        if content.thought_signature().is_some() {
+                            print!("\n[Thinking...]");
                             stdout().flush()?;
                         }
                     }

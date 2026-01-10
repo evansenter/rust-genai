@@ -142,6 +142,7 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
         proptest::option::of(any::<u32>()),
         proptest::option::of(any::<u32>()),
         proptest::option::of(any::<u32>()),
+        proptest::option::of(any::<u32>()),
         arb_modality_tokens_vec(),
         arb_modality_tokens_vec(),
         arb_modality_tokens_vec(),
@@ -154,6 +155,7 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
                 total_tokens,
                 total_cached_tokens,
                 total_reasoning_tokens,
+                total_thought_tokens,
                 total_tool_use_tokens,
                 input_tokens_by_modality,
                 output_tokens_by_modality,
@@ -166,6 +168,7 @@ fn arb_usage_metadata() -> impl Strategy<Value = UsageMetadata> {
                     total_tokens,
                     total_cached_tokens,
                     total_reasoning_tokens,
+                    total_thought_tokens,
                     total_tool_use_tokens,
                     input_tokens_by_modality,
                     output_tokens_by_modality,
@@ -197,8 +200,9 @@ fn arb_interaction_content() -> impl Strategy<Value = InteractionContent> {
             proptest::option::of(proptest::collection::vec(arb_annotation(), 0..3))
         )
             .prop_map(|(text, annotations)| InteractionContent::Text { text, annotations }),
-        // Thought content
-        proptest::option::of(arb_text()).prop_map(|text| InteractionContent::Thought { text }),
+        // Thought content (signature is a cryptographic value, not readable text)
+        proptest::option::of(arb_text())
+            .prop_map(|signature| InteractionContent::Thought { signature }),
         // FunctionCall content
         (
             proptest::option::of(arb_identifier()),

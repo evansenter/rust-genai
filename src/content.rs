@@ -202,6 +202,63 @@ impl GoogleSearchResultItem {
 }
 
 // =============================================================================
+// URL Context Result Item
+// =============================================================================
+
+/// A single result from a URL Context fetch.
+///
+/// Contains the status of the URL fetch operation.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_rs::{InteractionContent, UrlContextResultItem};
+/// # let content: InteractionContent = todo!();
+/// if let InteractionContent::UrlContextResult { result, .. } = content {
+///     for item in result {
+///         println!("URL: {} - Status: {}", item.url, item.status);
+///     }
+/// }
+/// ```
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct UrlContextResultItem {
+    /// The URL that was fetched
+    pub url: String,
+    /// Status of the fetch operation (e.g., "success", "error", "unsafe")
+    pub status: String,
+}
+
+impl UrlContextResultItem {
+    /// Creates a new UrlContextResultItem.
+    #[must_use]
+    pub fn new(url: impl Into<String>, status: impl Into<String>) -> Self {
+        Self {
+            url: url.into(),
+            status: status.into(),
+        }
+    }
+
+    /// Returns `true` if the fetch was successful.
+    #[must_use]
+    pub fn is_success(&self) -> bool {
+        self.status == "success"
+    }
+
+    /// Returns `true` if the fetch failed with an error.
+    #[must_use]
+    pub fn is_error(&self) -> bool {
+        self.status == "error"
+    }
+
+    /// Returns `true` if the URL was blocked as unsafe.
+    #[must_use]
+    pub fn is_unsafe(&self) -> bool {
+        self.status == "unsafe"
+    }
+}
+
+// =============================================================================
 // File Search Result Item
 // =============================================================================
 
@@ -590,9 +647,14 @@ pub enum InteractionContent {
     },
     /// Thought content (internal reasoning).
     ///
-    /// The `text` field is `Option<String>` for the same streaming reason as [`Text`](Self::Text):
-    /// `content.start` events announce the type before content arrives via `content.delta`.
-    Thought { text: Option<String> },
+    /// Contains a cryptographic signature for verification of the thinking process.
+    /// The actual thought text is not exposed in the API response - only the signature
+    /// which can be used to validate that the response was generated through the
+    /// model's reasoning process.
+    ///
+    /// The `signature` field is `Option<String>` because `content.start` events
+    /// announce the type before the signature arrives via `content.delta`.
+    Thought { signature: Option<String> },
     /// Thought signature (cryptographic signature for thought verification)
     ///
     /// This variant typically appears only during streaming responses, providing
@@ -639,10 +701,13 @@ pub enum InteractionContent {
     },
     /// Function result (input to model with execution result)
     FunctionResult {
-        name: String,
+        /// Function name (optional per API spec)
+        name: Option<String>,
         /// The call_id from the FunctionCall being responded to
         call_id: String,
         result: serde_json::Value,
+        /// Indicates if the function execution resulted in an error
+        is_error: Option<bool>,
     },
     /// Code execution call (model requesting code execution)
     ///
@@ -655,12 +720,12 @@ pub enum InteractionContent {
     /// # use genai_rs::{InteractionContent, CodeExecutionLanguage};
     /// # let content: InteractionContent = todo!();
     /// if let InteractionContent::CodeExecutionCall { id, language, code } = content {
-    ///     println!("Executing {:?} code (id: {}): {}", language, id, code);
+    ///     println!("Executing {:?} code (id: {:?}): {}", language, id, code);
     /// }
     /// ```
     CodeExecutionCall {
-        /// Unique identifier for this code execution call
-        id: String,
+        /// Unique identifier for this code execution call (optional per API spec)
+        id: Option<String>,
         /// Programming language (currently only Python is supported)
         language: CodeExecutionLanguage,
         /// Source code to execute
@@ -691,8 +756,8 @@ pub enum InteractionContent {
     /// }
     /// ```
     CodeExecutionResult {
-        /// The call_id matching the CodeExecutionCall this result is for
-        call_id: String,
+        /// The call_id matching the CodeExecutionCall this result is for (optional per API spec)
+        call_id: Option<String>,
         /// Execution outcome (OK, FAILED, DEADLINE_EXCEEDED, etc.)
         outcome: CodeExecutionOutcome,
         /// The output of the code execution (stdout for success, error message for failure)
@@ -722,20 +787,19 @@ pub enum InteractionContent {
     ///
     /// Appears when the model requests URL content via the `UrlContext` tool.
     UrlContextCall {
-        /// URL to fetch
-        url: String,
+        /// Unique identifier for this URL context call
+        id: String,
+        /// URLs to fetch (extracted from arguments.urls in wire format)
+        urls: Vec<String>,
     },
     /// URL Context result (fetched content from URL)
     ///
-    /// Contains the content retrieved by the `UrlContext` built-in tool.
-    ///
-    /// The `content` field may be `None` if the URL could not be fetched
-    /// (e.g., network errors, blocked URLs, timeouts, or access restrictions).
+    /// Contains the results from the `UrlContext` built-in tool.
     UrlContextResult {
-        /// The URL that was fetched
-        url: String,
-        /// The fetched content, or `None` if the fetch failed
-        content: Option<String>,
+        /// ID of the corresponding UrlContextCall
+        call_id: String,
+        /// Results for each URL that was fetched
+        result: Vec<UrlContextResultItem>,
     },
     /// File Search result (semantic search results from document stores)
     ///
@@ -960,11 +1024,11 @@ impl Serialize for InteractionContent {
                 }
                 map.end()
             }
-            Self::Thought { text } => {
+            Self::Thought { signature } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "thought")?;
-                if let Some(t) = text {
-                    map.serialize_entry("text", t)?;
+                if let Some(s) = signature {
+                    map.serialize_entry("signature", s)?;
                 }
                 map.end()
             }
@@ -1076,18 +1140,26 @@ impl Serialize for InteractionContent {
                 name,
                 call_id,
                 result,
+                is_error,
             } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "function_result")?;
-                map.serialize_entry("name", name)?;
+                if let Some(n) = name {
+                    map.serialize_entry("name", n)?;
+                }
                 map.serialize_entry("call_id", call_id)?;
                 map.serialize_entry("result", result)?;
+                if let Some(err) = is_error {
+                    map.serialize_entry("is_error", err)?;
+                }
                 map.end()
             }
             Self::CodeExecutionCall { id, language, code } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "code_execution_call")?;
-                map.serialize_entry("id", id)?;
+                if let Some(i) = id {
+                    map.serialize_entry("id", i)?;
+                }
                 map.serialize_entry("language", language)?;
                 map.serialize_entry("code", code)?;
                 map.end()
@@ -1099,7 +1171,9 @@ impl Serialize for InteractionContent {
             } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "code_execution_result")?;
-                map.serialize_entry("call_id", call_id)?;
+                if let Some(cid) = call_id {
+                    map.serialize_entry("call_id", cid)?;
+                }
                 map.serialize_entry("outcome", outcome)?;
                 map.serialize_entry("output", output)?;
                 map.end()
@@ -1120,19 +1194,20 @@ impl Serialize for InteractionContent {
                 map.serialize_entry("result", result)?;
                 map.end()
             }
-            Self::UrlContextCall { url } => {
+            Self::UrlContextCall { id, urls } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "url_context_call")?;
-                map.serialize_entry("url", url)?;
+                map.serialize_entry("id", id)?;
+                // Wire format nests urls inside arguments object
+                let arguments = serde_json::json!({ "urls": urls });
+                map.serialize_entry("arguments", &arguments)?;
                 map.end()
             }
-            Self::UrlContextResult { url, content } => {
+            Self::UrlContextResult { call_id, result } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "url_context_result")?;
-                map.serialize_entry("url", url)?;
-                if let Some(c) = content {
-                    map.serialize_entry("content", c)?;
-                }
+                map.serialize_entry("call_id", call_id)?;
+                map.serialize_entry("result", result)?;
                 map.end()
             }
             Self::FileSearchResult { call_id, result } => {
@@ -1248,14 +1323,17 @@ impl InteractionContent {
         }
     }
 
-    /// Extract the thought content, if this is a Thought variant with non-empty text.
+    /// Extract the thought signature, if this is a Thought variant with a signature.
     ///
-    /// Returns `Some` only for `Thought` variants with non-empty text.
-    /// Returns `None` for all other variants including `Text`.
+    /// The signature is a cryptographic value used for verification of the thinking
+    /// process. The actual thought text is not exposed in API responses.
+    ///
+    /// Returns `Some` only for `Thought` variants with a non-empty signature.
+    /// Returns `None` for all other variants including `ThoughtSignature`.
     #[must_use]
-    pub fn thought(&self) -> Option<&str> {
+    pub fn thought_signature(&self) -> Option<&str> {
         match self {
-            Self::Thought { text: Some(t) } if !t.is_empty() => Some(t),
+            Self::Thought { signature: Some(s) } if !s.is_empty() => Some(s),
             _ => None,
         }
     }
@@ -1394,20 +1472,24 @@ impl InteractionContent {
         }
     }
 
-    /// Creates thought content (internal reasoning visible in agent responses).
+    /// Creates thought content with a signature.
+    ///
+    /// **Note:** Thought content is typically OUTPUT from the model, not user input.
+    /// The signature is a cryptographic value for verification. This constructor
+    /// is provided for completeness but rarely needed in typical usage.
     ///
     /// # Example
     ///
     /// ```
     /// use genai_rs::InteractionContent;
     ///
-    /// let thought = InteractionContent::new_thought("I need to search for weather data");
+    /// let thought = InteractionContent::new_thought("signature_value_here");
     /// assert!(thought.is_thought());
     /// ```
     #[must_use]
-    pub fn new_thought(text: impl Into<String>) -> Self {
+    pub fn new_thought(signature: impl Into<String>) -> Self {
         Self::Thought {
-            text: Some(text.into()),
+            signature: Some(signature.into()),
         }
     }
 
@@ -1524,9 +1606,44 @@ impl InteractionContent {
         }
 
         Self::FunctionResult {
-            name: function_name,
+            name: Some(function_name),
             call_id: call_id_str,
             result,
+            is_error: None,
+        }
+    }
+
+    /// Creates function result content indicating an error.
+    ///
+    /// Use this when function execution fails and you need to report the error
+    /// back to the model.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use genai_rs::InteractionContent;
+    /// use serde_json::json;
+    ///
+    /// let error_result = InteractionContent::new_function_result_error(
+    ///     "get_weather",
+    ///     "call_abc123",
+    ///     json!({"error": "API rate limit exceeded"})
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_function_result_error(
+        name: impl Into<String>,
+        call_id: impl Into<String>,
+        result: serde_json::Value,
+    ) -> Self {
+        let function_name = name.into();
+        let call_id_str = call_id.into();
+
+        Self::FunctionResult {
+            name: Some(function_name),
+            call_id: call_id_str,
+            result,
+            is_error: Some(true),
         }
     }
 
@@ -1973,7 +2090,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 annotations: Option<Vec<Annotation>>,
             },
             Thought {
-                text: Option<String>,
+                signature: Option<String>,
             },
             ThoughtSignature {
                 #[serde(default)]
@@ -2010,12 +2127,14 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 thought_signature: Option<String>,
             },
             FunctionResult {
-                name: String,
+                name: Option<String>,
                 call_id: String,
                 result: serde_json::Value,
+                is_error: Option<bool>,
             },
             CodeExecutionCall {
-                id: String,
+                #[serde(default)]
+                id: Option<String>,
                 // API returns language/code in the arguments object
                 #[serde(default)]
                 language: Option<CodeExecutionLanguage>,
@@ -2026,7 +2145,8 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 arguments: Option<serde_json::Value>,
             },
             CodeExecutionResult {
-                call_id: String,
+                #[serde(default)]
+                call_id: Option<String>,
                 // New typed outcome
                 #[serde(default)]
                 outcome: Option<CodeExecutionOutcome>,
@@ -2050,11 +2170,14 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 result: Vec<GoogleSearchResultItem>,
             },
             UrlContextCall {
-                url: String,
+                id: String,
+                #[serde(default)]
+                arguments: Option<serde_json::Value>,
             },
             UrlContextResult {
-                url: String,
-                content: Option<String>,
+                call_id: String,
+                #[serde(default)]
+                result: Vec<UrlContextResultItem>,
             },
             FileSearchResult {
                 #[serde(rename = "callId")]
@@ -2086,7 +2209,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 KnownContent::Text { text, annotations } => {
                     InteractionContent::Text { text, annotations }
                 }
-                KnownContent::Thought { text } => InteractionContent::Thought { text },
+                KnownContent::Thought { signature } => InteractionContent::Thought { signature },
                 KnownContent::ThoughtSignature { signature } => {
                     InteractionContent::ThoughtSignature { signature }
                 }
@@ -2145,10 +2268,12 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     name,
                     call_id,
                     result,
+                    is_error,
                 } => InteractionContent::FunctionResult {
                     name,
                     call_id,
                     result,
+                    is_error,
                 },
                 KnownContent::CodeExecutionCall {
                     id,
@@ -2170,7 +2295,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                             Some(code) => code.to_string(),
                             None => {
                                 log::warn!(
-                                    "CodeExecutionCall arguments missing required 'code' field for id: {}. \
+                                    "CodeExecutionCall arguments missing required 'code' field for id: {:?}. \
                                      Treating as Unknown variant to preserve data for debugging.",
                                     id
                                 );
@@ -2190,7 +2315,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                                     Ok(lang) => lang,
                                     Err(e) => {
                                         log::warn!(
-                                            "CodeExecutionCall has invalid language value for id: {}, \
+                                            "CodeExecutionCall has invalid language value for id: {:?}, \
                                              defaulting to Python. Parse error: {}",
                                             id,
                                             e
@@ -2212,7 +2337,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                         // per Evergreen philosophy (see CLAUDE.md). This avoids silently
                         // degrading to an empty code string which could cause subtle bugs.
                         log::warn!(
-                            "CodeExecutionCall missing both direct fields and arguments for id: {}. \
+                            "CodeExecutionCall missing both direct fields and arguments for id: {:?}. \
                              Treating as Unknown variant to preserve data for debugging.",
                             id
                         );
@@ -2232,10 +2357,11 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     // Prefer new fields, fall back to old fields
                     let exec_outcome = outcome.unwrap_or(
                         // Convert old is_error boolean to outcome
+                        // When is_error is None, default to Ok (success) since the absence
+                        // of error typically indicates success in API responses
                         match is_error {
                             Some(true) => CodeExecutionOutcome::Failed,
-                            Some(false) => CodeExecutionOutcome::Ok,
-                            None => CodeExecutionOutcome::Unspecified,
+                            Some(false) | None => CodeExecutionOutcome::Ok,
                         },
                     );
 
@@ -2265,9 +2391,23 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 KnownContent::GoogleSearchResult { call_id, result } => {
                     InteractionContent::GoogleSearchResult { call_id, result }
                 }
-                KnownContent::UrlContextCall { url } => InteractionContent::UrlContextCall { url },
-                KnownContent::UrlContextResult { url, content } => {
-                    InteractionContent::UrlContextResult { url, content }
+                KnownContent::UrlContextCall { id, arguments } => {
+                    // Extract urls from arguments.urls
+                    let urls = arguments
+                        .as_ref()
+                        .and_then(|args| args.get("urls"))
+                        .and_then(|u| u.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+
+                    InteractionContent::UrlContextCall { id, urls }
+                }
+                KnownContent::UrlContextResult { call_id, result } => {
+                    InteractionContent::UrlContextResult { call_id, result }
                 }
                 KnownContent::FileSearchResult { call_id, result } => {
                     InteractionContent::FileSearchResult { call_id, result }

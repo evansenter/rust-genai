@@ -278,7 +278,7 @@ async fn test_code_execution() {
             // Test the new typed helper methods
             for call in response.code_execution_calls() {
                 println!(
-                    "Executed {} code (id: {}): {}",
+                    "Executed {} code (id: {:?}): {}",
                     call.language,
                     call.id,
                     &call.code[..call.code.len().min(100)]
@@ -287,7 +287,7 @@ async fn test_code_execution() {
 
             for result in response.code_execution_results() {
                 println!(
-                    "Outcome: {} (success: {}, call_id: {})",
+                    "Outcome: {} (success: {}, call_id: {:?})",
                     result.outcome,
                     result.outcome.is_success(),
                     result.call_id
