@@ -501,16 +501,12 @@ async fn test_explicit_turns_basic() {
     let text = response.text().unwrap();
     println!("Response: {}", text);
 
-    // Model should compute 4 * 3 = 12
-    let is_valid = validate_response_semantically(
-        &client,
-        "User asked 2+2, model said 4, then user asked 'what's that times 3'",
-        text,
-        "Does this response correctly state that the answer is 12 (4 times 3)?",
-    )
-    .await
-    .expect("Semantic validation failed");
-    assert!(is_valid, "Response should compute 4 * 3 = 12");
+    // Model should compute 4 * 3 = 12 - deterministic value, use .contains()
+    assert!(
+        text.contains("12") || text.contains("twelve"),
+        "Response should contain the answer 12. Got: {}",
+        text
+    );
 }
 
 #[tokio::test]
