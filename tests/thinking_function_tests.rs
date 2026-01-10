@@ -1098,10 +1098,17 @@ async fn test_function_calling_without_thinking() {
     let text = response2.text().unwrap();
     println!("Turn 2 text: {}", text);
 
-    // Response should reference the weather
-    let text_lower = text.to_lowercase();
+    // Response should reference the weather - use semantic validation
+    let is_valid = validate_response_semantically(
+        &client,
+        "Function returned Tokyo weather: 22°C, clear. Asked about the weather.",
+        text,
+        "Does this response describe weather conditions (temperature, conditions, or location)?",
+    )
+    .await
+    .expect("Semantic validation failed");
     assert!(
-        text_lower.contains("22") || text_lower.contains("clear") || text_lower.contains("tokyo"),
+        is_valid,
         "Response should reference weather data. Got: {}",
         text
     );
@@ -1351,13 +1358,17 @@ async fn test_streaming_with_thinking_only() {
         "Should stream text content"
     );
 
-    // Verify content is about the sky/light/scattering
-    let text_lower = result.collected_text.to_lowercase();
+    // Verify content is about the sky/light/scattering - use semantic validation
+    let is_valid = validate_response_semantically(
+        &client,
+        "Asked 'Why is the sky blue?' with thinking mode enabled",
+        &result.collected_text,
+        "Does this response explain the scientific reason for the sky appearing blue (light, scattering, wavelengths)?",
+    )
+    .await
+    .expect("Semantic validation failed");
     assert!(
-        text_lower.contains("light")
-            || text_lower.contains("scatter")
-            || text_lower.contains("blue")
-            || text_lower.contains("wavelength"),
+        is_valid,
         "Response should explain why sky is blue. Got: {}",
         result.collected_text
     );

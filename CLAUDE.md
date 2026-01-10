@@ -148,7 +148,24 @@ See `InteractionContent` in `src/content.rs` for reference implementation.
 
 - **Structural**: Verify API mechanics (status, field presence) - default for most tests
 - **Semantic**: Use `validate_response_semantically()` for behavioral tests (adds ~1-2s API call)
-- **Avoid**: Brittle `text.contains("word")` assertions - LLM outputs vary
+- **Avoid**: Brittle `text.contains("word")` assertions on LLM output - responses vary
+
+**Decision rule**: Is it checking LLM text content with a non-deterministic expected value? → Use semantic validation.
+
+```rust
+// BAD - LLM might rephrase
+assert!(text.contains("paris"));
+assert!(text.contains("red") || text.contains("crimson"));
+
+// GOOD - Handles natural language variability
+validate_response_semantically(&client, context, text, "Does this identify Paris?").await?;
+
+// OK - Deterministic values (error messages, code execution results)
+assert!(text.contains("3628800"));  // factorial(10) - exact computed value
+assert!(error.to_string().contains("invalid"));  // library error message
+```
+
+See `docs/TESTING.md` for the full decision flowchart and examples.
 
 ## CI/CD
 

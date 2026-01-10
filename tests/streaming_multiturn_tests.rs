@@ -61,10 +61,17 @@ async fn test_streaming_multi_turn_basic() {
     // Verify streaming worked
     assert!(result.has_output(), "Should receive streaming chunks");
 
-    // Verify context was maintained - response should mention Python
-    let text_lower = result.collected_text.to_lowercase();
+    // Verify context was maintained - use semantic validation
+    let is_valid = validate_response_semantically(
+        &client,
+        "Turn 1 established 'My favorite programming language is Python'. Turn 2 asked 'What is my favorite programming language?'",
+        &result.collected_text,
+        "Does this response identify Python as the favorite programming language?",
+    )
+    .await
+    .expect("Semantic validation failed");
     assert!(
-        text_lower.contains("python"),
+        is_valid,
         "Streaming response should recall the fact from Turn 1. Got: {}",
         result.collected_text
     );

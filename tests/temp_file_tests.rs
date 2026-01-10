@@ -18,7 +18,10 @@
 mod common;
 
 use base64::Engine;
-use common::{TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, get_client, stateful_builder};
+use common::{
+    TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, assert_response_semantic, get_client,
+    stateful_builder,
+};
 use genai_rs::{
     InteractionInput, InteractionStatus, audio_from_file, document_from_file, image_from_file,
     text_content,
@@ -68,15 +71,17 @@ async fn test_image_from_temp_file() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Color response: {}", text);
 
-    // The tiny PNG is red
-    assert!(
-        text.contains("red") || text.contains("pink") || text.contains("magenta"),
-        "Response should identify the red color: {}",
-        text
-    );
+    // The tiny PNG is red - use semantic validation
+    assert_response_semantic(
+        &client,
+        "Asked what color a red 1x1 pixel PNG image is",
+        text,
+        "Does this response identify the color as red or a shade of red (like pink, magenta)?",
+    )
+    .await;
 }
 
 /// Tests that image_from_file() handles mismatched content and extension.
@@ -160,15 +165,17 @@ async fn test_pdf_from_temp_file() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("PDF response: {}", text);
 
-    // The minimal PDF contains "Hello World"
-    assert!(
-        text.contains("hello") || text.contains("world"),
-        "Response should mention PDF content: {}",
-        text
-    );
+    // The minimal PDF contains "Hello World" - use semantic validation
+    assert_response_semantic(
+        &client,
+        "Asked about text in a PDF that contains 'Hello World'",
+        text,
+        "Does this response mention 'Hello' or 'World' or indicate those words were found?",
+    )
+    .await;
 }
 
 // =============================================================================
@@ -207,14 +214,17 @@ async fn test_txt_from_temp_file() {
         .expect("TXT interaction failed");
 
     assert_eq!(response.status, InteractionStatus::Completed);
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("TXT response: {}", text);
 
-    assert!(
-        text.contains("fox"),
-        "Response should mention the fox: {}",
-        text
-    );
+    // Use semantic validation - the text asks about which animal jumps
+    assert_response_semantic(
+        &client,
+        "Asked which animal jumps in 'The quick brown fox jumps over the lazy dog'",
+        text,
+        "Does this response identify the fox as the jumping animal?",
+    )
+    .await;
 }
 
 // Note: JSON test removed - Gemini API does not support application/json MIME type
@@ -257,14 +267,17 @@ async fn test_markdown_from_temp_file() {
         .expect("Markdown interaction failed");
 
     assert_eq!(response.status, InteractionStatus::Completed);
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("Markdown response: {}", text);
 
-    assert!(
-        text.contains("3") || text.contains("three"),
-        "Response should mention 3 features: {}",
-        text
-    );
+    // Use semantic validation for the count
+    assert_response_semantic(
+        &client,
+        "Asked how many features are listed in a markdown file with 3 bullet points",
+        text,
+        "Does this response indicate there are 3 features (or 'three')?",
+    )
+    .await;
 }
 
 /// Tests loading a CSV file using document_from_file().
@@ -298,14 +311,17 @@ async fn test_csv_from_temp_file() {
         .expect("CSV interaction failed");
 
     assert_eq!(response.status, InteractionStatus::Completed);
-    let text = response.text().unwrap().to_lowercase();
+    let text = response.text().unwrap();
     println!("CSV response: {}", text);
 
-    assert!(
-        text.contains("alice"),
-        "Response should identify Alice as highest: {}",
-        text
-    );
+    // Use semantic validation - Alice has score 95 (highest)
+    assert_response_semantic(
+        &client,
+        "Asked who has highest score in CSV: Alice=95, Bob=87, Carol=92",
+        text,
+        "Does this response identify Alice as having the highest score?",
+    )
+    .await;
 }
 
 // =============================================================================

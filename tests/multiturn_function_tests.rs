@@ -18,7 +18,8 @@
 mod common;
 
 use common::{get_client, retry_on_any_error, validate_response_semantically};
-use genai_rs::{FunctionDeclaration, InteractionStatus, function_result_content};
+use genai_rs::{CallableFunction, FunctionDeclaration, InteractionStatus, function_result_content};
+use genai_rs_macros::tool;
 use serde_json::json;
 
 // =============================================================================
@@ -28,8 +29,48 @@ use serde_json::json;
 const SYSTEM_INSTRUCTION: &str = "You are a helpful assistant that uses available tools when appropriate. Always respond concisely.";
 
 // =============================================================================
+// Registered Tool Functions (for auto-function calling)
+// =============================================================================
+//
+// These functions are registered via the #[tool] macro and inventory crate.
+// When create_with_auto_functions() is called, it looks up implementations
+// in the global registry by function name.
+//
+// IMPORTANT: The function name must exactly match the FunctionDeclaration name.
+// If you define FunctionDeclaration::builder("get_weather"), you need a
+// #[tool] function named `get_weather` (not `get_weather_test`).
+
+/// Gets the current weather for a city
+#[allow(dead_code)]
+#[tool(city(description = "City name"))]
+fn get_weather(city: String) -> String {
+    // Return deterministic values for testing - model should use these in responses
+    match city.to_lowercase().as_str() {
+        "seattle" => {
+            r#"{"city": "Seattle", "temperature": "65°F", "conditions": "cloudy"}"#.to_string()
+        }
+        "tokyo" => r#"{"city": "Tokyo", "temperature": "72°F", "conditions": "sunny"}"#.to_string(),
+        _ => format!(
+            r#"{{"city": "{}", "temperature": "70°F", "conditions": "partly cloudy"}}"#,
+            city
+        ),
+    }
+}
+
+/// Gets the current time in a timezone
+#[allow(dead_code)]
+#[tool(timezone(description = "Timezone like PST, EST, JST"))]
+fn get_time(timezone: String) -> String {
+    format!(r#"{{"timezone": "{}", "time": "14:00"}}"#, timezone)
+}
+
+// =============================================================================
 // Helper: Create test function declarations
 // =============================================================================
+//
+// Note: These declarations must match the #[tool] function names above.
+// The declarations define the schema sent to the API; the #[tool] functions
+// provide the implementations that execute when the model calls them.
 
 fn get_weather_function() -> FunctionDeclaration {
     FunctionDeclaration::builder("get_weather")
@@ -85,15 +126,21 @@ async fn test_multiturn_auto_functions_happy_path() {
         .await
         .expect("Turn 1 should succeed");
 
-    let response1 = result1.response;
-    println!("Turn 1 status: {:?}", response1.status);
+    println!("Turn 1 status: {:?}", result1.response.status);
     println!("Turn 1 function executions: {}", result1.executions.len());
 
-    // Verify function was called and executed
+    // Verify function was called and executed successfully
     assert!(
         result1.executions.iter().any(|e| e.name == "get_weather"),
         "Should have executed get_weather function"
     );
+    assert!(
+        result1.all_executions_succeeded(),
+        "All function executions should succeed (no missing implementations). Failed: {:?}",
+        result1.failed_executions()
+    );
+
+    let response1 = result1.response;
 
     let turn1_id = response1.id.clone().expect("Turn 1 should have ID");
 
@@ -111,8 +158,7 @@ async fn test_multiturn_auto_functions_happy_path() {
         .await
         .expect("Turn 2 should succeed");
 
-    let response2 = result2.response;
-    println!("Turn 2 status: {:?}", response2.status);
+    println!("Turn 2 status: {:?}", result2.response.status);
     println!("Turn 2 function executions: {}", result2.executions.len());
 
     // Model should understand context and call function again
@@ -120,15 +166,27 @@ async fn test_multiturn_auto_functions_happy_path() {
         result2.executions.iter().any(|e| e.name == "get_weather"),
         "Should have executed get_weather function for Tokyo"
     );
+    assert!(
+        result2.all_executions_succeeded(),
+        "All function executions should succeed. Failed: {:?}",
+        result2.failed_executions()
+    );
+
+    let response2 = result2.response;
 
     // Turn 3: Follow-up question (no function call expected)
+    // Note: The model should remember the weather data from turns 1-2 via previousInteractionId.
+    // If context is lost, it may indicate issues with thought signature handling.
     println!("\n--- Turn 3: Follow-up without function call ---");
     let turn2_id = response2.id.clone().expect("Turn 2 should have ID");
+
+    // Debug: print the turn2_id to see what we're chaining from
+    println!("Chaining from interaction ID: {}", turn2_id);
 
     let result3 = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("Which city is warmer?")
+        .with_text("Based on the weather you just told me about Seattle and Tokyo, which city is warmer right now?")
         .with_functions(functions) // Still resend tools in case needed
         .with_store_enabled()
         .with_previous_interaction(&turn2_id)
@@ -143,13 +201,21 @@ async fn test_multiturn_auto_functions_happy_path() {
     let text = response3.text().unwrap();
     println!("Turn 3 response: {}", text);
 
-    // Model should reference both cities from context
-    let text_lower = text.to_lowercase();
+    // Use semantic validation to verify the model actually uses the function results
+    // from previous turns. If this fails consistently, it indicates an issue with
+    // multi-turn context preservation (possibly related to thought signatures).
+    let is_valid = validate_response_semantically(
+        &client,
+        "Previous turns retrieved weather: Seattle (65°F) and Tokyo (72°F). User asked which city is warmer based on that data.",
+        text,
+        "Does this response correctly identify which city is warmer based on temperature comparison (Tokyo at 72°F is warmer than Seattle at 65°F)?",
+    )
+    .await
+    .expect("Semantic validation failed");
     assert!(
-        text_lower.contains("seattle")
-            || text_lower.contains("tokyo")
-            || text_lower.contains("warm"),
-        "Response should reference the weather comparison context"
+        is_valid,
+        "Response should correctly compare temperatures from previous function calls. Got: {}",
+        text
     );
 }
 
@@ -314,15 +380,18 @@ async fn test_multiturn_manual_functions_happy_path() {
     if response3.has_text() {
         let text = response3.text().unwrap();
         println!("Turn 3 response: {}", text);
-        // Should reference the time context
-        let text_lower = text.to_lowercase();
+        // Should reference the time context - use semantic validation
+        // Note: The function returned 14:30:00 (2:30 PM) GMT
+        let is_valid = validate_response_semantically(
+            &client,
+            "Previous turn got time 14:30 (2:30 PM) in London GMT. Asked 'Is it a good time to call someone there?'",
+            text,
+            "Does this response address whether it's a good time to call (yes/no) or reference the afternoon time?",
+        )
+        .await
+        .expect("Semantic validation failed");
         assert!(
-            text_lower.contains("yes")
-                || text_lower.contains("no")
-                || text_lower.contains("14")
-                || text_lower.contains("afternoon")
-                || text_lower.contains("good")
-                || text_lower.contains("time"),
+            is_valid,
             "Response should address the calling time question"
         );
     }
@@ -405,7 +474,6 @@ async fn test_multiturn_manual_functions_error_handling() {
     )
     .await
     .expect("Semantic validation should succeed");
-
     assert!(is_valid, "Response should explain the permission error");
 }
 
@@ -636,6 +704,117 @@ async fn test_multiturn_streaming_auto_functions() {
 //
 // These cannot be tested at runtime because the code won't compile.
 // See tests/ui_tests.rs for compile-fail tests that verify these constraints.
+
+// =============================================================================
+// Function Execution Error Detection Tests
+// =============================================================================
+//
+// These tests verify that missing function implementations are properly detected.
+// This caught an issue (#324) where tests passed with missing implementations
+// because the assertion only checked if a function was CALLED, not if it SUCCEEDED.
+
+/// Test that the is_error() and is_success() methods work correctly.
+#[test]
+fn test_function_execution_result_error_detection() {
+    use genai_rs::FunctionExecutionResult;
+    use std::time::Duration;
+
+    // Successful execution
+    let success = FunctionExecutionResult::new(
+        "get_weather",
+        "call-123",
+        serde_json::json!({"city": "Seattle", "temp": "65°F"}),
+        Duration::from_millis(100),
+    );
+    assert!(success.is_success(), "Should be marked as success");
+    assert!(!success.is_error(), "Should not be marked as error");
+    assert!(
+        success.error_message().is_none(),
+        "Should have no error message"
+    );
+
+    // Failed execution (function not found)
+    let not_found = FunctionExecutionResult::new(
+        "missing_function",
+        "call-456",
+        serde_json::json!({"error": "Function 'missing_function' is not available or not found."}),
+        Duration::from_millis(1),
+    );
+    assert!(not_found.is_error(), "Should be marked as error");
+    assert!(!not_found.is_success(), "Should not be marked as success");
+    assert_eq!(
+        not_found.error_message(),
+        Some("Function 'missing_function' is not available or not found.")
+    );
+
+    // Failed execution (runtime error)
+    let runtime_error = FunctionExecutionResult::new(
+        "failing_function",
+        "call-789",
+        serde_json::json!({"error": "Connection timeout"}),
+        Duration::from_millis(5000),
+    );
+    assert!(
+        runtime_error.is_error(),
+        "Runtime errors should be detected"
+    );
+    assert_eq!(runtime_error.error_message(), Some("Connection timeout"));
+}
+
+/// Integration test verifying all_executions_succeeded() catches missing implementations.
+///
+/// This test makes a real API call with auto-functions to verify the helper
+/// methods work in practice. If get_weather isn't registered, this will fail.
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_auto_function_result_success_detection() {
+    let Some(client) = get_client() else {
+        println!("Skipping: GEMINI_API_KEY not set");
+        return;
+    };
+
+    let functions = vec![get_weather_function()];
+
+    // This should succeed because we have get_weather registered via #[tool]
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("What's the weather in Seattle?")
+        .with_functions(functions)
+        .with_store_enabled()
+        .create_with_auto_functions()
+        .await
+        .expect("Should succeed");
+
+    // Verify all executions succeeded
+    assert!(
+        result.all_executions_succeeded(),
+        "All executions should succeed with registered function. Failed: {:?}",
+        result.failed_executions()
+    );
+
+    // Verify we actually called a function
+    assert!(
+        result.executions.iter().any(|e| e.name == "get_weather"),
+        "Should have executed get_weather"
+    );
+
+    // Verify the individual execution is marked as success
+    let weather_exec = result
+        .executions
+        .iter()
+        .find(|e| e.name == "get_weather")
+        .expect("Should find get_weather execution");
+    assert!(
+        weather_exec.is_success(),
+        "Weather execution should be success"
+    );
+    assert!(weather_exec.error_message().is_none());
+}
+
+// =============================================================================
+// Typestate Pattern Documentation
+// =============================================================================
 
 /// This test exists to document what CAN'T be tested at runtime.
 /// The typestate pattern prevents these invalid combinations at compile time.
