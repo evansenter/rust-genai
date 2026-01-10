@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `docs/INTERACTIONS_API_FEEDBACK.md`: Comprehensive feedback report for Google Gemini API team documenting 9 issues discovered while building genai-rs
 - Thought signature test coverage across 7 configurations (stateful, stateless, parallel, sequential, ThinkingLevel::High, FunctionCallingMode::Any, streaming)
-- `test_speech_config_nested_format`: Test proving only flat SpeechConfig format works (nested format returns 400)
+- `test_speech_config_nested_format_fails_flat_succeeds`: Test proving only flat SpeechConfig format works (nested format returns 400)
 
 ### Changed
 

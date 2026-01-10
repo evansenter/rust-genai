@@ -214,7 +214,7 @@ Several content types nest data inside `arguments` objects, which requires extra
 **Our workaround**: We use the flat structure and document our findings.
 - [`src/request.rs`](../src/request.rs) - `SpeechConfig` uses flat `voice`/`language` fields
 - [`docs/ENUM_WIRE_FORMATS.md`](./ENUM_WIRE_FORMATS.md#speechconfig) - Documents verified format
-- [`tests/multimodal_tests.rs`](../tests/multimodal_tests.rs) - `test_speech_config_nested_format` verifies both formats
+- [`tests/multimodal_tests.rs`](../tests/multimodal_tests.rs) - `test_speech_config_nested_format_fails_flat_succeeds` verifies both formats
 
 ---
 
