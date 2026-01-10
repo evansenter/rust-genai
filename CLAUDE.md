@@ -169,7 +169,7 @@ See `docs/TESTING.md` for the full decision flowchart and examples.
 
 ## CI/CD
 
-GitHub Actions runs: check, test, test-strict-unknown, test-integration (4 matrix groups), fmt, clippy, doc, security, msrv, cross-platform, coverage, build-metrics. Integration tests require same-repo origin (protects API key).
+GitHub Actions runs: check, test, test-strict-unknown, test-integration (5 matrix groups), fmt, clippy, doc, msrv, cross-platform, coverage, build-metrics. Security audits run in separate `audit.yml` workflow (on Cargo.toml/lock changes + weekly). Integration tests require same-repo origin (protects API key). Release validation includes full integration test suite.
 
 ## Project Conventions
 
