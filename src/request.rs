@@ -1109,9 +1109,22 @@ mod tests {
         let json = serde_json::to_string(&config).expect("Serialization failed");
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
+        // Verify flat format is produced (voice, language at top level)
         assert_eq!(value["voice"], "Fenrir");
         assert_eq!(value["language"], "en-US");
         assert!(value.get("speaker").is_none()); // None fields should be skipped
+
+        // Verify nested format is NOT produced
+        // Google docs suggest voiceConfig.prebuiltVoiceConfig.voiceName but that returns 400.
+        // See docs/ENUM_WIRE_FORMATS.md and docs/INTERACTIONS_API_FEEDBACK.md Issue #7.
+        assert!(
+            value.get("voiceConfig").is_none(),
+            "Should use flat format, not nested voiceConfig"
+        );
+        assert!(
+            value.get("prebuiltVoiceConfig").is_none(),
+            "Should use flat format, not nested prebuiltVoiceConfig"
+        );
     }
 
     #[test]

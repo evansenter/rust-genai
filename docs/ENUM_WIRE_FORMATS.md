@@ -292,9 +292,9 @@ Used in `generationConfig.speechConfig` for text-to-speech audio output.
 *Voice defaults to a system voice if not specified.
 **Language is required by the API when voice is specified.
 
-**Note**: The Google docs suggest a nested structure (`voiceConfig.prebuiltVoiceConfig.voiceName`) but the simpler flat structure shown above works correctly with the TTS model.
+**Important**: The Google docs suggest a nested structure (`voiceConfig.prebuiltVoiceConfig.voiceName`) but **that format returns 400 error**. Only the flat structure shown above works with the Interactions API.
 
-**Verified**: 2026-01-07 - Tested with `LOUD_WIRE=1 cargo run --example text_to_speech`.
+**Verified**: 2026-01-10 - Tested both formats in `test_speech_config_nested_format_fails_flat_succeeds`. Nested format fails with `no such field: 'voiceConfig'`.
 
 ### Audio Response (TTS output)
 

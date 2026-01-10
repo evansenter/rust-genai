@@ -350,11 +350,13 @@ The model can chain functions where output of one becomes input to another:
 
 ### Thought Signatures with Parallel Calls
 
-Per the API documentation:
+> **⚠️ Uncertainty**: The [Thought Signatures Guide](https://ai.google.dev/gemini-api/docs/thought-signatures.md.txt) documents behavior for the `generateContent` API, not the Interactions API. Our testing shows no thought signatures appearing on function calls in the Interactions API. The expected behavior below may not apply.
+
+Per the `generateContent` documentation:
 - **Parallel calls**: Only the first function call in a parallel batch has a thought signature
 - **Sequential calls**: Each step in a sequence has its own thought signature
 
-See `tests/thinking_function_tests.rs` for examples of these patterns.
+See `tests/function_calling_tests.rs` for related tests (`test_thought_signature_*`).
 
 ## API Inheritance Behavior
 
@@ -416,11 +418,13 @@ The model remembers available tools within the same interaction chain. Only new 
 
 ## Thought Signatures
 
-The Gemini API returns "thought" outputs when thinking is enabled. Here's what you need to know:
+> **⚠️ Documentation Gap**: The [Thought Signatures Guide](https://ai.google.dev/gemini-api/docs/thought-signatures.md.txt) documents behavior for the `generateContent` API, not the Interactions API. This section documents our empirical findings; official behavior may differ.
+
+The Gemini API returns "thought" outputs when thinking is enabled. Here's what we know:
 
 ### What They Are
 
-Thought signatures are cryptographic proofs that thoughts haven't been modified. They appear as:
+Thought signatures are cryptographic proofs that thoughts haven't been modified. Per `generateContent` docs, they appear as:
 
 ```json
 {
@@ -437,14 +441,29 @@ Thought signatures are cryptographic proofs that thoughts haven't been modified.
 }
 ```
 
-### Key Finding: Not Required for Function Calling
+### Current Understanding: Interactions API
 
-Through testing, we discovered:
+We've tested thought signatures across various Interactions API configurations. **Key finding: we observe no `thought_signature` on function calls in any configuration**.
 
-1. **Thought signatures are output-only** - they appear in API responses, not in function calls
-2. **The `thought_signature` field on `FunctionCallInfo` is always `None`** - thoughts are separate outputs
-3. **You do NOT need to echo thought signatures in function results**
-4. **Basic stateless multi-turn works without any thought handling**
+| Configuration | Signature on FC? | Thoughts in Output? | Test/Example |
+|---------------|------------------|---------------------|--------------|
+| `store: true` (stateful) | ❌ No | ✅ Yes | `test_thought_signature_parallel_only_first` |
+| `store: false` (stateless) | ❌ No | ✅ Yes | `test_stateless_with_thinking_thought_signatures` |
+| Parallel function calls | ❌ No | ✅ Yes | `test_thought_signature_parallel_only_first` |
+| Sequential function calls | ❌ No | ✅ Yes | `test_thought_signature_sequential_each_step` |
+| ThinkingLevel::High | ❌ No | ✅ Yes | `test_thinking_level_high_thought_signatures` |
+| FunctionCallingMode::Any | ❌ No | ✅ Yes | `test_function_calling_mode_any_thought_signatures` |
+| `background: true` (async) | N/A | ✅ Yes | `deep_research.rs` (agents don't use user-defined FC) |
+| Streaming + FC | ❌ No | ✅ Yes | `test_streaming_with_thinking_and_function_calling` |
+
+**Interpretation**: Either:
+1. The Interactions API doesn't support thought signatures on function calls (different from `generateContent`)
+2. A specific configuration we haven't found is required
+3. The feature is in development
+
+### Practical Implications
+
+**For function calling**: You do NOT need to handle thought signatures:
 
 ```rust,ignore
 // This works fine - no thought signature needed
@@ -460,21 +479,15 @@ for call in response.function_calls() {
 }
 ```
 
-### When Thought Signatures Matter
+**For thought echo**: Echoing thoughts back to the model works **without** including signatures. See `test_thought_echo_manual_history` in `tests/interactions_api_tests.rs`.
 
-Thought signatures are cryptographic proofs that the model's thinking wasn't modified. They appear on responses but are **not required** when echoing thoughts back:
+**For compliance/auditing**: If you need to prove thoughts weren't modified, capture `ThoughtOutput::signature` from responses. This field IS populated on thought outputs, just not on function calls.
 
-1. **`thought_echo` feature**: Our tests confirm that echoing thoughts back to the model works **without** including signatures. You can use plain `thought_content(text)` without signature data. See `test_thought_echo_manual_history` in `tests/interactions_api_tests.rs`.
+### Tests
 
-2. **Compliance/auditing**: If you need to prove that logged thoughts match what the model actually produced, you can capture and store signatures from responses.
-
-**For standard function calling, you can ignore thought signatures entirely.** They're just metadata on the response - you don't need to capture, store, or return them.
-
-> **Verified behavior**: See tests covering thought signatures:
-> - `test_thought_signature_parallel_only_first` in `tests/advanced_function_calling_tests.rs` - Only first parallel call has signature
-> - `test_thought_signature_sequential_each_step` in `tests/advanced_function_calling_tests.rs` - Each sequential call has its own signature
-> - `test_function_calling_without_thinking` in `tests/thinking_function_tests.rs` - No signatures without thinking mode
-> - `test_thought_echo_manual_history` in `tests/interactions_api_tests.rs` - Echoing thoughts
+> - `test_thought_signature_parallel_only_first` in `tests/function_calling_tests.rs` - Tests parallel calls (currently shows no signatures)
+> - `test_thought_signature_sequential_each_step` in `tests/function_calling_tests.rs` - Tests sequential calls (currently shows no signatures)
+> - `test_thought_echo_manual_history` in `tests/interactions_api_tests.rs` - Echoing thoughts back
 
 ## Design Patterns
 

@@ -59,11 +59,11 @@ async fn main() -> Result<(), genai_rs::GenaiError> {
 
 ```toml
 [dependencies]
-genai-rs = "0.4"
+genai-rs = "0.5"
 tokio = { version = "1.0", features = ["full"] }
 
 # Optional
-genai-rs-macros = "0.4"  # For #[tool] macro
+genai-rs-macros = "0.5"  # For #[tool] macro
 futures-util = "0.3"     # For streaming
 ```
 
@@ -131,15 +131,16 @@ let result = client.interaction()
 ### Stateful Conversations
 
 ```rust
-// First turn
+// First turn (enable storage for multi-turn)
 let r1 = client.interaction()
     .with_system_instruction("You are a helpful assistant.")
     .with_text("My name is Alice.")
+    .with_store_enabled()
     .create().await?;
 
-// Continue conversation
+// Continue conversation (r1.id is Option<String>)
 let r2 = client.interaction()
-    .with_previous_interaction(&r1.id)
+    .with_previous_interaction(r1.id.as_ref().expect("stored interactions have IDs"))
     .with_text("What's my name?")  // Remembers: Alice
     .create().await?;
 ```
@@ -154,8 +155,9 @@ let response = client.interaction()
     .with_text("What's 15% of 847?")
     .create().await?;
 
-for thought in response.thoughts() {
-    println!("Reasoning: {}", thought);
+// Check if model used reasoning (thoughts contain cryptographic signatures)
+if response.has_thoughts() {
+    println!("Model used {} thought blocks", response.thought_signatures().count());
 }
 ```
 
