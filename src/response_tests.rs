@@ -743,7 +743,7 @@ fn test_deserialize_url_context_metadata() {
     );
     assert_eq!(
         metadata.url_metadata[0].url_retrieval_status,
-        UrlRetrievalStatus::UrlRetrievalStatusSuccess
+        UrlRetrievalStatus::Success
     );
 
     assert_eq!(
@@ -752,13 +752,13 @@ fn test_deserialize_url_context_metadata() {
     );
     assert_eq!(
         metadata.url_metadata[1].url_retrieval_status,
-        UrlRetrievalStatus::UrlRetrievalStatusUnsafe
+        UrlRetrievalStatus::Unsafe
     );
 
     assert_eq!(metadata.url_metadata[2].retrieved_url, "https://failed.com");
     assert_eq!(
         metadata.url_metadata[2].url_retrieval_status,
-        UrlRetrievalStatus::UrlRetrievalStatusError
+        UrlRetrievalStatus::Error
     );
 }
 
@@ -782,10 +782,10 @@ fn test_deserialize_url_context_metadata_missing_field() {
 fn test_url_retrieval_status_serialization_roundtrip() {
     // Test all enum variants roundtrip correctly
     let statuses = vec![
-        UrlRetrievalStatus::UrlRetrievalStatusUnspecified,
-        UrlRetrievalStatus::UrlRetrievalStatusSuccess,
-        UrlRetrievalStatus::UrlRetrievalStatusUnsafe,
-        UrlRetrievalStatus::UrlRetrievalStatusError,
+        UrlRetrievalStatus::Unspecified,
+        UrlRetrievalStatus::Success,
+        UrlRetrievalStatus::Unsafe,
+        UrlRetrievalStatus::Error,
     ];
 
     for status in statuses {
@@ -794,6 +794,79 @@ fn test_url_retrieval_status_serialization_roundtrip() {
             serde_json::from_str(&serialized).expect("Failed to deserialize");
         assert_eq!(status, deserialized);
     }
+}
+
+#[test]
+fn test_url_retrieval_status_known_variants_wire_format() {
+    // Verify exact wire format for all known variants
+    let variants = [
+        (
+            UrlRetrievalStatus::Unspecified,
+            "URL_RETRIEVAL_STATUS_UNSPECIFIED",
+        ),
+        (UrlRetrievalStatus::Success, "URL_RETRIEVAL_STATUS_SUCCESS"),
+        (UrlRetrievalStatus::Unsafe, "URL_RETRIEVAL_STATUS_UNSAFE"),
+        (UrlRetrievalStatus::Error, "URL_RETRIEVAL_STATUS_ERROR"),
+    ];
+
+    for (status, expected_wire) in variants {
+        let serialized = serde_json::to_string(&status).expect("Should serialize");
+        assert_eq!(serialized, format!(r#""{}""#, expected_wire));
+
+        let deserialized: UrlRetrievalStatus =
+            serde_json::from_str(&serialized).expect("Should deserialize");
+        assert_eq!(deserialized, status);
+        assert!(!deserialized.is_unknown());
+    }
+}
+
+#[test]
+fn test_url_retrieval_status_helper_methods() {
+    assert!(UrlRetrievalStatus::Success.is_success());
+    assert!(!UrlRetrievalStatus::Success.is_error());
+
+    assert!(!UrlRetrievalStatus::Error.is_success());
+    assert!(UrlRetrievalStatus::Error.is_error());
+
+    assert!(!UrlRetrievalStatus::Unsafe.is_success());
+    assert!(UrlRetrievalStatus::Unsafe.is_error());
+
+    assert!(!UrlRetrievalStatus::Unspecified.is_success());
+    assert!(!UrlRetrievalStatus::Unspecified.is_error());
+}
+
+#[cfg(not(feature = "strict-unknown"))]
+#[test]
+fn test_url_retrieval_status_unknown_deserialization() {
+    // Simulate a new status the library doesn't know about
+    let unknown_json = r#""URL_RETRIEVAL_STATUS_PENDING""#;
+    let status: UrlRetrievalStatus =
+        serde_json::from_str(unknown_json).expect("Should deserialize as Unknown");
+
+    assert!(status.is_unknown());
+    assert!(!status.is_success());
+    assert!(!status.is_error()); // Unknown status is neither success nor error
+
+    // Verify helper methods
+    assert_eq!(
+        status.unknown_status_type(),
+        Some("URL_RETRIEVAL_STATUS_PENDING")
+    );
+    assert!(status.unknown_data().is_some());
+
+    // Verify roundtrip serialization preserves the value
+    let reserialized = serde_json::to_string(&status).expect("Should serialize");
+    assert_eq!(reserialized, r#""URL_RETRIEVAL_STATUS_PENDING""#);
+}
+
+#[cfg(not(feature = "strict-unknown"))]
+#[test]
+fn test_url_retrieval_status_unknown_display() {
+    let unknown = UrlRetrievalStatus::Unknown {
+        status_type: "URL_RETRIEVAL_STATUS_FUTURE".to_string(),
+        data: serde_json::Value::String("URL_RETRIEVAL_STATUS_FUTURE".to_string()),
+    };
+    assert_eq!(format!("{}", unknown), "URL_RETRIEVAL_STATUS_FUTURE");
 }
 
 // --- Function Result Helpers ---
@@ -1150,7 +1223,7 @@ fn test_interaction_response_url_context_metadata_helpers() {
         url_context_metadata: Some(UrlContextMetadata {
             url_metadata: vec![UrlMetadataEntry {
                 retrieved_url: "https://example.com".to_string(),
-                url_retrieval_status: UrlRetrievalStatus::UrlRetrievalStatusSuccess,
+                url_retrieval_status: UrlRetrievalStatus::Success,
             }],
         }),
         created: None,
@@ -1169,7 +1242,7 @@ fn test_interaction_response_url_context_metadata_helpers() {
     );
     assert_eq!(
         metadata.url_metadata[0].url_retrieval_status,
-        UrlRetrievalStatus::UrlRetrievalStatusSuccess
+        UrlRetrievalStatus::Success
     );
 }
 
@@ -1551,7 +1624,7 @@ fn test_interaction_response_complex_roundtrip() {
         url_context_metadata: Some(UrlContextMetadata {
             url_metadata: vec![UrlMetadataEntry {
                 retrieved_url: "https://example.com".to_string(),
-                url_retrieval_status: UrlRetrievalStatus::UrlRetrievalStatusSuccess,
+                url_retrieval_status: UrlRetrievalStatus::Success,
             }],
         }),
         created: None,
@@ -1670,7 +1743,7 @@ fn test_interaction_response_complex_roundtrip() {
     );
     assert_eq!(
         url_meta.url_metadata[0].url_retrieval_status,
-        UrlRetrievalStatus::UrlRetrievalStatusSuccess
+        UrlRetrievalStatus::Success
     );
 
     // Verify tools

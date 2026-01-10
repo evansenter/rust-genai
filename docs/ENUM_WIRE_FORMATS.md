@@ -21,6 +21,9 @@ All types below implement graceful handling of unrecognized values via an `Unkno
 | 9 | `ThinkingLevel` | src/request.rs | `level_type` | minimal/low/medium/high |
 | 10 | `ThinkingSummaries` | src/request.rs | `summaries_type` | Context-dependent format |
 | 11 | `InteractionStatus` | src/response.rs | `status_type` | Response status |
+| 12 | `CodeExecutionOutcome` | src/content.rs | `outcome_type` | Code execution result |
+| 13 | `CodeExecutionLanguage` | src/content.rs | `language_type` | Programming language |
+| 14 | `UrlRetrievalStatus` | src/response.rs | `status_type` | URL fetch status |
 
 ### Unknown Variant Pattern
 
@@ -64,6 +67,9 @@ Helper methods on each type:
 | `InteractionContent::Thought` | snake_case + signature | `{"type": "thought", "signature": "..."}` | Cryptographic, not text |
 | `InteractionContent::UrlContextCall` | snake_case + nested args | `{"type": "url_context_call", "id": "...", "arguments": {"urls": [...]}}` | URLs nested in arguments |
 | `InteractionContent::UrlContextResult` | snake_case + result array | `{"type": "url_context_result", "call_id": "...", "result": [...]}` | Array of UrlContextResultItem |
+| `CodeExecutionOutcome` | SCREAMING_SNAKE_CASE | `"OUTCOME_OK"`, `"OUTCOME_FAILED"` | Code execution result status |
+| `CodeExecutionLanguage` | SCREAMING_SNAKE_CASE | `"PYTHON"` | Currently only Python supported |
+| `UrlRetrievalStatus` | SCREAMING_SNAKE_CASE | `"URL_RETRIEVAL_STATUS_SUCCESS"` | URL fetch result status |
 
 ## Details
 
@@ -385,6 +391,86 @@ Returned with the results of URL fetching.
 **Note**: Each item in `result` is a `UrlContextResultItem` with helper methods `is_success()`, `is_error()`, and `is_unsafe()`.
 
 **Verified**: 2026-01-09 - Captured from `LOUD_WIRE=1 cargo run --example url_context`. Previous incorrect assumption was `url`/`content` fields.
+
+### CodeExecutionOutcome (content)
+
+Returned in `code_execution_result` content to indicate the execution status.
+
+```json
+{
+  "type": "code_execution_result",
+  "call_id": "exec_123",
+  "outcome": "OUTCOME_OK",
+  "output": "Hello, World!\n"
+}
+```
+
+| Rust Enum | Wire Value | Notes |
+|-----------|------------|-------|
+| `CodeExecutionOutcome::Ok` | `"OUTCOME_OK"` | Code ran successfully |
+| `CodeExecutionOutcome::Failed` | `"OUTCOME_FAILED"` | Runtime error, syntax error |
+| `CodeExecutionOutcome::DeadlineExceeded` | `"OUTCOME_DEADLINE_EXCEEDED"` | 30-second timeout |
+| `CodeExecutionOutcome::Unspecified` | `"OUTCOME_UNSPECIFIED"` | Default/missing value |
+| `CodeExecutionOutcome::Unknown { ... }` | `"OUTCOME_*"` | Future values preserved |
+
+Helper methods: `is_success()`, `is_error()`, `is_unknown()`, `unknown_outcome_type()`, `unknown_data()`
+
+**Verified**: 2026-01-10 - Wire format matches SCREAMING_SNAKE_CASE with `OUTCOME_` prefix.
+
+### CodeExecutionLanguage (content)
+
+Specifies the programming language for code execution.
+
+```json
+{
+  "type": "code_execution_call",
+  "id": "exec_123",
+  "language": "PYTHON",
+  "code": "print('Hello')"
+}
+```
+
+| Rust Enum | Wire Value | Notes |
+|-----------|------------|-------|
+| `CodeExecutionLanguage::Python` | `"PYTHON"` | Currently only supported language |
+| `CodeExecutionLanguage::Unknown { ... }` | `"*"` | Future languages preserved |
+
+Helper methods: `is_unknown()`, `unknown_language_type()`, `unknown_data()`
+
+**Verified**: 2026-01-10 - Only Python supported; wire format is SCREAMING_SNAKE_CASE.
+
+### UrlRetrievalStatus (response metadata)
+
+Status of URL retrieval attempts in `url_context_metadata`.
+
+```json
+{
+  "urlContextMetadata": {
+    "urlMetadata": [
+      {
+        "retrievedUrl": "https://example.com",
+        "urlRetrievalStatus": "URL_RETRIEVAL_STATUS_SUCCESS"
+      },
+      {
+        "retrievedUrl": "https://blocked.com",
+        "urlRetrievalStatus": "URL_RETRIEVAL_STATUS_UNSAFE"
+      }
+    ]
+  }
+}
+```
+
+| Rust Enum | Wire Value | Notes |
+|-----------|------------|-------|
+| `UrlRetrievalStatus::Unspecified` | `"URL_RETRIEVAL_STATUS_UNSPECIFIED"` | Default/missing |
+| `UrlRetrievalStatus::Success` | `"URL_RETRIEVAL_STATUS_SUCCESS"` | URL fetched OK |
+| `UrlRetrievalStatus::Unsafe` | `"URL_RETRIEVAL_STATUS_UNSAFE"` | Blocked by safety filter |
+| `UrlRetrievalStatus::Error` | `"URL_RETRIEVAL_STATUS_ERROR"` | Fetch failed |
+| `UrlRetrievalStatus::Unknown { ... }` | `"URL_RETRIEVAL_STATUS_*"` | Future values preserved |
+
+Helper methods: `is_success()`, `is_error()`, `is_unknown()`, `unknown_status_type()`, `unknown_data()`
+
+**Verified**: 2026-01-10 - Wire format uses fully-qualified `URL_RETRIEVAL_STATUS_` prefix.
 
 ## Testing New Enums
 

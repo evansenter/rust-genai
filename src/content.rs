@@ -318,6 +318,18 @@ impl FileSearchResultItem {
 /// The API returns these as strings like "OUTCOME_OK", which are deserialized into
 /// this enum.
 ///
+/// # Forward Compatibility (Evergreen Philosophy)
+///
+/// This enum is marked `#[non_exhaustive]`, which means:
+/// - Match statements must include a wildcard arm (`_ => ...`)
+/// - New variants may be added in minor version updates without breaking your code
+///
+/// When the API returns an outcome value that this library doesn't recognize,
+/// it will be captured as `CodeExecutionOutcome::Unknown` rather than causing a
+/// deserialization error. This follows the
+/// [Evergreen spec](https://github.com/google-deepmind/evergreen-spec)
+/// philosophy of graceful degradation.
+///
 /// # Example
 ///
 /// ```no_run
@@ -328,25 +340,36 @@ impl FileSearchResultItem {
 ///         CodeExecutionOutcome::Ok => println!("Success: {}", result.output),
 ///         CodeExecutionOutcome::Failed => eprintln!("Error: {}", result.output),
 ///         CodeExecutionOutcome::DeadlineExceeded => eprintln!("Timeout!"),
-///         _ => eprintln!("Unknown outcome"),
+///         CodeExecutionOutcome::Unknown { outcome_type, .. } => {
+///             eprintln!("Unknown outcome: {}", outcome_type);
+///         }
+///         _ => eprintln!("Other outcome"),
 ///     }
 /// }
 /// ```
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum CodeExecutionOutcome {
     /// Code executed successfully
-    #[serde(rename = "OUTCOME_OK")]
     Ok,
     /// Code execution failed (e.g., syntax error, runtime error)
-    #[serde(rename = "OUTCOME_FAILED")]
     Failed,
     /// Code execution exceeded the 30-second timeout
-    #[serde(rename = "OUTCOME_DEADLINE_EXCEEDED")]
     DeadlineExceeded,
-    /// Unrecognized outcome for forward compatibility
-    #[serde(other)]
+    /// Unknown outcome (for forward compatibility).
+    ///
+    /// This variant captures any unrecognized outcome values from the API,
+    /// allowing the library to handle new outcomes gracefully.
+    ///
+    /// The `outcome_type` field contains the unrecognized outcome string,
+    /// and `data` contains the full JSON value for debugging.
+    Unknown {
+        /// The unrecognized outcome string from the API
+        outcome_type: String,
+        /// The raw JSON value, preserved for debugging
+        data: serde_json::Value,
+    },
+    /// Unspecified outcome (default for missing values)
     #[default]
     Unspecified,
 }
@@ -361,15 +384,100 @@ impl CodeExecutionOutcome {
     pub const fn is_error(&self) -> bool {
         !self.is_success()
     }
+
+    /// Check if this is an unknown outcome.
+    #[must_use]
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown { .. })
+    }
+
+    /// Returns the outcome type name if this is an unknown outcome.
+    ///
+    /// Returns `None` for known outcomes.
+    #[must_use]
+    pub fn unknown_outcome_type(&self) -> Option<&str> {
+        match self {
+            Self::Unknown { outcome_type, .. } => Some(outcome_type),
+            _ => None,
+        }
+    }
+
+    /// Returns the raw JSON data if this is an unknown outcome.
+    ///
+    /// Returns `None` for known outcomes.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::Unknown { data, .. } => Some(data),
+            _ => None,
+        }
+    }
+}
+
+impl Serialize for CodeExecutionOutcome {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Ok => serializer.serialize_str("OUTCOME_OK"),
+            Self::Failed => serializer.serialize_str("OUTCOME_FAILED"),
+            Self::DeadlineExceeded => serializer.serialize_str("OUTCOME_DEADLINE_EXCEEDED"),
+            Self::Unspecified => serializer.serialize_str("OUTCOME_UNSPECIFIED"),
+            Self::Unknown { outcome_type, .. } => serializer.serialize_str(outcome_type),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for CodeExecutionOutcome {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        match value.as_str() {
+            Some("OUTCOME_OK") => Ok(Self::Ok),
+            Some("OUTCOME_FAILED") => Ok(Self::Failed),
+            Some("OUTCOME_DEADLINE_EXCEEDED") => Ok(Self::DeadlineExceeded),
+            Some("OUTCOME_UNSPECIFIED") => Ok(Self::Unspecified),
+            Some(other) => {
+                log::warn!(
+                    "Encountered unknown CodeExecutionOutcome '{}'. \
+                     This may indicate a new API feature. \
+                     The outcome will be preserved in the Unknown variant.",
+                    other
+                );
+                Ok(Self::Unknown {
+                    outcome_type: other.to_string(),
+                    data: value,
+                })
+            }
+            None => {
+                // Non-string value - preserve it in Unknown
+                let outcome_type = format!("<non-string: {}>", value);
+                log::warn!(
+                    "CodeExecutionOutcome received non-string value: {}. \
+                     Preserving in Unknown variant.",
+                    value
+                );
+                Ok(Self::Unknown {
+                    outcome_type,
+                    data: value,
+                })
+            }
+        }
+    }
 }
 
 impl fmt::Display for CodeExecutionOutcome {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Ok => write!(f, "OK"),
-            Self::Failed => write!(f, "FAILED"),
-            Self::DeadlineExceeded => write!(f, "DEADLINE_EXCEEDED"),
-            Self::Unspecified => write!(f, "UNSPECIFIED"),
+            Self::Ok => write!(f, "OUTCOME_OK"),
+            Self::Failed => write!(f, "OUTCOME_FAILED"),
+            Self::DeadlineExceeded => write!(f, "OUTCOME_DEADLINE_EXCEEDED"),
+            Self::Unspecified => write!(f, "OUTCOME_UNSPECIFIED"),
+            Self::Unknown { outcome_type, .. } => write!(f, "{}", outcome_type),
         }
     }
 }
@@ -379,6 +487,18 @@ impl fmt::Display for CodeExecutionOutcome {
 /// This enum represents the programming language used in code execution requests.
 /// Currently only Python is supported by the Gemini API.
 ///
+/// # Forward Compatibility (Evergreen Philosophy)
+///
+/// This enum is marked `#[non_exhaustive]`, which means:
+/// - Match statements must include a wildcard arm (`_ => ...`)
+/// - New variants may be added in minor version updates without breaking your code
+///
+/// When the API returns a language value that this library doesn't recognize,
+/// it will be captured as `CodeExecutionLanguage::Unknown` rather than causing a
+/// deserialization error. This follows the
+/// [Evergreen spec](https://github.com/google-deepmind/evergreen-spec)
+/// philosophy of graceful degradation.
+///
 /// # Example
 ///
 /// ```no_run
@@ -387,27 +507,119 @@ impl fmt::Display for CodeExecutionOutcome {
 /// if let InteractionContent::CodeExecutionCall { language, code, .. } = content {
 ///     match language {
 ///         CodeExecutionLanguage::Python => println!("Python code: {}", code),
+///         CodeExecutionLanguage::Unknown { language_type, .. } => {
+///             println!("Unknown language '{}': {}", language_type, code);
+///         }
 ///         _ => println!("Other language: {}", code),
 ///     }
 /// }
 /// ```
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum CodeExecutionLanguage {
     /// Python programming language
     #[default]
     Python,
-    /// Unrecognized language for forward compatibility
-    #[serde(other)]
-    Unspecified,
+    /// Unknown language (for forward compatibility).
+    ///
+    /// This variant captures any unrecognized language values from the API,
+    /// allowing the library to handle new languages gracefully.
+    ///
+    /// The `language_type` field contains the unrecognized language string,
+    /// and `data` contains the full JSON value for debugging.
+    Unknown {
+        /// The unrecognized language string from the API
+        language_type: String,
+        /// The raw JSON value, preserved for debugging
+        data: serde_json::Value,
+    },
+}
+
+impl CodeExecutionLanguage {
+    /// Check if this is an unknown language.
+    #[must_use]
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown { .. })
+    }
+
+    /// Returns the language type name if this is an unknown language.
+    ///
+    /// Returns `None` for known languages.
+    #[must_use]
+    pub fn unknown_language_type(&self) -> Option<&str> {
+        match self {
+            Self::Unknown { language_type, .. } => Some(language_type),
+            _ => None,
+        }
+    }
+
+    /// Returns the raw JSON data if this is an unknown language.
+    ///
+    /// Returns `None` for known languages.
+    #[must_use]
+    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::Unknown { data, .. } => Some(data),
+            _ => None,
+        }
+    }
+}
+
+impl Serialize for CodeExecutionLanguage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Python => serializer.serialize_str("PYTHON"),
+            Self::Unknown { language_type, .. } => serializer.serialize_str(language_type),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for CodeExecutionLanguage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        match value.as_str() {
+            Some("PYTHON") => Ok(Self::Python),
+            Some(other) => {
+                log::warn!(
+                    "Encountered unknown CodeExecutionLanguage '{}'. \
+                     This may indicate a new API feature. \
+                     The language will be preserved in the Unknown variant.",
+                    other
+                );
+                Ok(Self::Unknown {
+                    language_type: other.to_string(),
+                    data: value,
+                })
+            }
+            None => {
+                // Non-string value - preserve it in Unknown
+                let language_type = format!("<non-string: {}>", value);
+                log::warn!(
+                    "CodeExecutionLanguage received non-string value: {}. \
+                     Preserving in Unknown variant.",
+                    value
+                );
+                Ok(Self::Unknown {
+                    language_type,
+                    data: value,
+                })
+            }
+        }
+    }
 }
 
 impl fmt::Display for CodeExecutionLanguage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Python => write!(f, "PYTHON"),
-            Self::Unspecified => write!(f, "UNSPECIFIED"),
+            Self::Unknown { language_type, .. } => write!(f, "{}", language_type),
         }
     }
 }
