@@ -560,6 +560,43 @@ impl FunctionExecutionResult {
             duration,
         }
     }
+
+    /// Returns true if this execution resulted in an error.
+    ///
+    /// Errors occur when:
+    /// - The function was not found in the registry or tool service
+    /// - The function execution failed (panicked or returned an error)
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let result = client.interaction()
+    ///     .with_text("What's the weather?")
+    ///     .create_with_auto_functions()
+    ///     .await?;
+    ///
+    /// for execution in &result.executions {
+    ///     if execution.is_error() {
+    ///         eprintln!("Function {} failed: {:?}", execution.name, execution.result);
+    ///     }
+    /// }
+    /// ```
+    #[must_use]
+    pub fn is_error(&self) -> bool {
+        self.result.get("error").is_some()
+    }
+
+    /// Returns true if this execution succeeded (no error).
+    #[must_use]
+    pub fn is_success(&self) -> bool {
+        !self.is_error()
+    }
+
+    /// Returns the error message if this execution failed, None otherwise.
+    #[must_use]
+    pub fn error_message(&self) -> Option<&str> {
+        self.result.get("error").and_then(|v| v.as_str())
+    }
 }
 
 /// Serialize Duration as milliseconds for JSON compatibility
@@ -652,6 +689,38 @@ pub struct AutoFunctionResult {
     /// partial results that may still be useful.
     #[serde(default)]
     pub reached_max_loops: bool,
+}
+
+impl AutoFunctionResult {
+    /// Returns true if all function executions succeeded (no errors).
+    ///
+    /// This is useful for detecting missing function implementations or
+    /// function execution failures that would otherwise be silently
+    /// sent to the model as error results.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let result = client.interaction()
+    ///     .with_text("What's the weather?")
+    ///     .with_functions(vec![get_weather_function()])
+    ///     .create_with_auto_functions()
+    ///     .await?;
+    ///
+    /// assert!(result.all_executions_succeeded(),
+    ///     "Function executions failed: {:?}",
+    ///     result.failed_executions());
+    /// ```
+    #[must_use]
+    pub fn all_executions_succeeded(&self) -> bool {
+        self.executions.iter().all(|e| e.is_success())
+    }
+
+    /// Returns all executions that failed (had errors).
+    #[must_use]
+    pub fn failed_executions(&self) -> Vec<&FunctionExecutionResult> {
+        self.executions.iter().filter(|e| e.is_error()).collect()
+    }
 }
 
 /// Accumulator for building [`AutoFunctionResult`] from a stream of [`AutoFunctionStreamChunk`].

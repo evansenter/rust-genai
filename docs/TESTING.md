@@ -247,6 +247,40 @@ let is_valid = validate_response_semantically(
 assert!(is_valid);
 ```
 
+### Function Execution Error Detection
+
+When testing `create_with_auto_functions()`, always verify executions succeeded:
+
+```rust,ignore
+let result = client
+    .interaction()
+    .with_text("What's the weather?")
+    .with_functions(vec![get_weather_function()])
+    .create_with_auto_functions()
+    .await?;
+
+// ✓ Check function was called AND succeeded
+assert!(result.all_executions_succeeded(),
+    "Executions failed: {:?}", result.failed_executions());
+
+// ✗ Don't just check if function was called (misses missing implementations)
+assert!(result.executions.iter().any(|e| e.name == "get_weather"));
+```
+
+**Why this matters**: If you declare a `FunctionDeclaration` but forget to register
+the implementation via `#[tool]` or `ToolService`, the library sends an error to
+the model instead of failing. The old assertion pattern passes silently!
+
+**Available helpers**:
+
+| Method | Description |
+|--------|-------------|
+| `result.all_executions_succeeded()` | Returns `true` if no executions have errors |
+| `result.failed_executions()` | Returns vec of failed `FunctionExecutionResult`s |
+| `execution.is_error()` | Returns `true` if this execution resulted in an error |
+| `execution.is_success()` | Returns `true` if this execution succeeded |
+| `execution.error_message()` | Returns the error message if any |
+
 ## Writing New Tests
 
 ### Integration Test Template
