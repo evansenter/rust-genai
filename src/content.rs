@@ -701,10 +701,13 @@ pub enum InteractionContent {
     },
     /// Function result (input to model with execution result)
     FunctionResult {
-        name: String,
+        /// Function name (optional per API spec)
+        name: Option<String>,
         /// The call_id from the FunctionCall being responded to
         call_id: String,
         result: serde_json::Value,
+        /// Indicates if the function execution resulted in an error
+        is_error: Option<bool>,
     },
     /// Code execution call (model requesting code execution)
     ///
@@ -717,12 +720,12 @@ pub enum InteractionContent {
     /// # use genai_rs::{InteractionContent, CodeExecutionLanguage};
     /// # let content: InteractionContent = todo!();
     /// if let InteractionContent::CodeExecutionCall { id, language, code } = content {
-    ///     println!("Executing {:?} code (id: {}): {}", language, id, code);
+    ///     println!("Executing {:?} code (id: {:?}): {}", language, id, code);
     /// }
     /// ```
     CodeExecutionCall {
-        /// Unique identifier for this code execution call
-        id: String,
+        /// Unique identifier for this code execution call (optional per API spec)
+        id: Option<String>,
         /// Programming language (currently only Python is supported)
         language: CodeExecutionLanguage,
         /// Source code to execute
@@ -753,8 +756,8 @@ pub enum InteractionContent {
     /// }
     /// ```
     CodeExecutionResult {
-        /// The call_id matching the CodeExecutionCall this result is for
-        call_id: String,
+        /// The call_id matching the CodeExecutionCall this result is for (optional per API spec)
+        call_id: Option<String>,
         /// Execution outcome (OK, FAILED, DEADLINE_EXCEEDED, etc.)
         outcome: CodeExecutionOutcome,
         /// The output of the code execution (stdout for success, error message for failure)
@@ -1137,18 +1140,26 @@ impl Serialize for InteractionContent {
                 name,
                 call_id,
                 result,
+                is_error,
             } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "function_result")?;
-                map.serialize_entry("name", name)?;
+                if let Some(n) = name {
+                    map.serialize_entry("name", n)?;
+                }
                 map.serialize_entry("call_id", call_id)?;
                 map.serialize_entry("result", result)?;
+                if let Some(err) = is_error {
+                    map.serialize_entry("is_error", err)?;
+                }
                 map.end()
             }
             Self::CodeExecutionCall { id, language, code } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "code_execution_call")?;
-                map.serialize_entry("id", id)?;
+                if let Some(i) = id {
+                    map.serialize_entry("id", i)?;
+                }
                 map.serialize_entry("language", language)?;
                 map.serialize_entry("code", code)?;
                 map.end()
@@ -1160,7 +1171,9 @@ impl Serialize for InteractionContent {
             } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "code_execution_result")?;
-                map.serialize_entry("call_id", call_id)?;
+                if let Some(cid) = call_id {
+                    map.serialize_entry("call_id", cid)?;
+                }
                 map.serialize_entry("outcome", outcome)?;
                 map.serialize_entry("output", output)?;
                 map.end()
@@ -1593,9 +1606,44 @@ impl InteractionContent {
         }
 
         Self::FunctionResult {
-            name: function_name,
+            name: Some(function_name),
             call_id: call_id_str,
             result,
+            is_error: None,
+        }
+    }
+
+    /// Creates function result content indicating an error.
+    ///
+    /// Use this when function execution fails and you need to report the error
+    /// back to the model.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use genai_rs::InteractionContent;
+    /// use serde_json::json;
+    ///
+    /// let error_result = InteractionContent::new_function_result_error(
+    ///     "get_weather",
+    ///     "call_abc123",
+    ///     json!({"error": "API rate limit exceeded"})
+    /// );
+    /// ```
+    #[must_use]
+    pub fn new_function_result_error(
+        name: impl Into<String>,
+        call_id: impl Into<String>,
+        result: serde_json::Value,
+    ) -> Self {
+        let function_name = name.into();
+        let call_id_str = call_id.into();
+
+        Self::FunctionResult {
+            name: Some(function_name),
+            call_id: call_id_str,
+            result,
+            is_error: Some(true),
         }
     }
 
@@ -2079,12 +2127,14 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 thought_signature: Option<String>,
             },
             FunctionResult {
-                name: String,
+                name: Option<String>,
                 call_id: String,
                 result: serde_json::Value,
+                is_error: Option<bool>,
             },
             CodeExecutionCall {
-                id: String,
+                #[serde(default)]
+                id: Option<String>,
                 // API returns language/code in the arguments object
                 #[serde(default)]
                 language: Option<CodeExecutionLanguage>,
@@ -2095,7 +2145,8 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 arguments: Option<serde_json::Value>,
             },
             CodeExecutionResult {
-                call_id: String,
+                #[serde(default)]
+                call_id: Option<String>,
                 // New typed outcome
                 #[serde(default)]
                 outcome: Option<CodeExecutionOutcome>,
@@ -2217,10 +2268,12 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     name,
                     call_id,
                     result,
+                    is_error,
                 } => InteractionContent::FunctionResult {
                     name,
                     call_id,
                     result,
+                    is_error,
                 },
                 KnownContent::CodeExecutionCall {
                     id,
@@ -2242,7 +2295,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                             Some(code) => code.to_string(),
                             None => {
                                 log::warn!(
-                                    "CodeExecutionCall arguments missing required 'code' field for id: {}. \
+                                    "CodeExecutionCall arguments missing required 'code' field for id: {:?}. \
                                      Treating as Unknown variant to preserve data for debugging.",
                                     id
                                 );
@@ -2262,7 +2315,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                                     Ok(lang) => lang,
                                     Err(e) => {
                                         log::warn!(
-                                            "CodeExecutionCall has invalid language value for id: {}, \
+                                            "CodeExecutionCall has invalid language value for id: {:?}, \
                                              defaulting to Python. Parse error: {}",
                                             id,
                                             e
@@ -2284,7 +2337,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                         // per Evergreen philosophy (see CLAUDE.md). This avoids silently
                         // degrading to an empty code string which could cause subtle bugs.
                         log::warn!(
-                            "CodeExecutionCall missing both direct fields and arguments for id: {}. \
+                            "CodeExecutionCall missing both direct fields and arguments for id: {:?}. \
                              Treating as Unknown variant to preserve data for debugging.",
                             id
                         );

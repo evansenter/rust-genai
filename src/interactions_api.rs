@@ -574,7 +574,7 @@ pub fn code_execution_call_content(
     code: impl Into<String>,
 ) -> InteractionContent {
     InteractionContent::CodeExecutionCall {
-        id: id.into(),
+        id: Some(id.into()),
         language,
         code: code.into(),
     }
@@ -597,7 +597,7 @@ pub fn code_execution_result_content(
     output: impl Into<String>,
 ) -> InteractionContent {
     InteractionContent::CodeExecutionResult {
-        call_id: call_id.into(),
+        call_id: Some(call_id.into()),
         outcome,
         output: output.into(),
     }
@@ -854,10 +854,12 @@ mod tests {
                 name,
                 call_id,
                 result,
+                is_error,
             } => {
-                assert_eq!(name, "test");
+                assert_eq!(name, Some("test".to_string()));
                 assert_eq!(call_id, "call_123");
                 assert_eq!(result, json!({"result": "ok"}));
+                assert_eq!(is_error, None);
             }
             _ => panic!("Expected FunctionResult variant"),
         }
@@ -1139,7 +1141,7 @@ mod tests {
             code_execution_call_content("call_123", CodeExecutionLanguage::Python, "print(42)");
         match content {
             InteractionContent::CodeExecutionCall { id, language, code } => {
-                assert_eq!(id, "call_123");
+                assert_eq!(id, Some("call_123".to_string()));
                 assert_eq!(language, CodeExecutionLanguage::Python);
                 assert_eq!(code, "print(42)");
             }
@@ -1156,7 +1158,7 @@ mod tests {
                 outcome,
                 output,
             } => {
-                assert_eq!(call_id, "call_123");
+                assert_eq!(call_id, Some("call_123".to_string()));
                 assert_eq!(outcome, CodeExecutionOutcome::Ok);
                 assert_eq!(output, "42\n");
             }

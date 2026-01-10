@@ -785,17 +785,21 @@ pub struct OwnedFunctionCallInfo {
 /// # use genai_rs::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// for result in response.function_results() {
-///     println!("Function {} returned: {}", result.name, result.result);
+///     if let Some(name) = result.name {
+///         println!("Function {} returned: {}", name, result.result);
+///     }
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct FunctionResultInfo<'a> {
-    /// Name of the function that was called
-    pub name: &'a str,
+    /// Name of the function that was called (optional per API spec)
+    pub name: Option<&'a str>,
     /// The call_id from the FunctionCall this result responds to
     pub call_id: &'a str,
     /// The result returned by the function
     pub result: &'a serde_json::Value,
+    /// Whether this result indicates an error
+    pub is_error: Option<bool>,
 }
 
 /// Information about a code execution call requested by the model.
@@ -813,15 +817,15 @@ pub struct FunctionResultInfo<'a> {
 /// # use genai_rs::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// for call in response.code_execution_calls() {
-///     println!("Executing {} code (id: {})", call.language, call.id);
+///     println!("Executing {} code (id: {:?})", call.language, call.id);
 ///     println!("Code: {}", call.code);
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct CodeExecutionCallInfo<'a> {
-    /// Unique identifier for this code execution call
-    pub id: &'a str,
+    /// Unique identifier for this code execution call (optional per API spec)
+    pub id: Option<&'a str>,
     /// Programming language (currently only Python is supported)
     pub language: CodeExecutionLanguage,
     /// Source code to execute
@@ -843,7 +847,7 @@ pub struct CodeExecutionCallInfo<'a> {
 /// # use genai_rs::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// for result in response.code_execution_results() {
-///     println!("Call {} completed with outcome: {}", result.call_id, result.outcome);
+///     println!("Call {:?} completed with outcome: {}", result.call_id, result.outcome);
 ///     if result.outcome.is_success() {
 ///         println!("Output: {}", result.output);
 ///     }
@@ -852,8 +856,8 @@ pub struct CodeExecutionCallInfo<'a> {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct CodeExecutionResultInfo<'a> {
-    /// The call_id matching the CodeExecutionCall this result is for
-    pub call_id: &'a str,
+    /// The call_id matching the CodeExecutionCall this result is for (optional per API spec)
+    pub call_id: Option<&'a str>,
     /// Execution outcome (OK, FAILED, DEADLINE_EXCEEDED, etc.)
     pub outcome: CodeExecutionOutcome,
     /// The output of the code execution (stdout for success, error message for failure)
@@ -1377,7 +1381,7 @@ impl InteractionResponse {
     /// # let response: InteractionResponse = todo!();
     /// if response.has_function_results() {
     ///     for result in response.function_results() {
-    ///         println!("Function {} returned data", result.name);
+    ///         println!("Function {:?} returned data", result.name);
     ///     }
     /// }
     /// ```
@@ -1399,7 +1403,7 @@ impl InteractionResponse {
     /// # use genai_rs::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// for result in response.function_results() {
-    ///     println!("Function {} (call_id: {}) returned: {}",
+    ///     println!("Function {:?} (call_id: {}) returned: {}",
     ///         result.name, result.call_id, result.result);
     /// }
     /// ```
@@ -1412,12 +1416,14 @@ impl InteractionResponse {
                     name,
                     call_id,
                     result,
+                    is_error,
                 } = content
                 {
                     Some(FunctionResultInfo {
-                        name: name.as_str(),
+                        name: name.as_deref(),
                         call_id: call_id.as_str(),
                         result,
+                        is_error: *is_error,
                     })
                 } else {
                     None
@@ -1645,7 +1651,7 @@ impl InteractionResponse {
     /// # use genai_rs::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// if let Some(call) = response.code_execution_call() {
-    ///     println!("Model wants to run {} code (id: {}):\n{}", call.language, call.id, call.code);
+    ///     println!("Model wants to run {} code (id: {:?}):\n{}", call.language, call.id, call.code);
     /// }
     /// ```
     #[must_use]
@@ -1653,7 +1659,7 @@ impl InteractionResponse {
         self.outputs.iter().find_map(|content| {
             if let InteractionContent::CodeExecutionCall { id, language, code } = content {
                 Some(CodeExecutionCallInfo {
-                    id: id.as_str(),
+                    id: id.as_deref(),
                     language: *language,
                     code: code.as_str(),
                 })
@@ -1675,8 +1681,8 @@ impl InteractionResponse {
     /// # let response: InteractionResponse = todo!();
     /// for call in response.code_execution_calls() {
     ///     match call.language {
-    ///         CodeExecutionLanguage::Python => println!("Python (id: {}):\n{}", call.id, call.code),
-    ///         _ => println!("Other (id: {}):\n{}", call.id, call.code),
+    ///         CodeExecutionLanguage::Python => println!("Python (id: {:?}):\n{}", call.id, call.code),
+    ///         _ => println!("Other (id: {:?}):\n{}", call.id, call.code),
     ///     }
     /// }
     /// ```
@@ -1687,7 +1693,7 @@ impl InteractionResponse {
             .filter_map(|content| {
                 if let InteractionContent::CodeExecutionCall { id, language, code } = content {
                     Some(CodeExecutionCallInfo {
-                        id: id.as_str(),
+                        id: id.as_deref(),
                         language: *language,
                         code: code.as_str(),
                     })
@@ -1718,7 +1724,7 @@ impl InteractionResponse {
     /// # let response: InteractionResponse = todo!();
     /// for result in response.code_execution_results() {
     ///     if result.outcome.is_success() {
-    ///         println!("Code output (call_id: {}): {}", result.call_id, result.output);
+    ///         println!("Code output (call_id: {:?}): {}", result.call_id, result.output);
     ///     } else {
     ///         eprintln!("Code failed ({}): {}", result.outcome, result.output);
     ///     }
@@ -1736,7 +1742,7 @@ impl InteractionResponse {
                 } = content
                 {
                     Some(CodeExecutionResultInfo {
-                        call_id: call_id.as_str(),
+                        call_id: call_id.as_deref(),
                         outcome: *outcome,
                         output: output.as_str(),
                     })

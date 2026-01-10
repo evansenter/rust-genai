@@ -534,17 +534,17 @@ fn test_content_summary_with_built_in_tools() {
         input: vec![],
         outputs: vec![
             InteractionContent::CodeExecutionCall {
-                id: "call_1".to_string(),
+                id: Some("call_1".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print(1)".to_string(),
             },
             InteractionContent::CodeExecutionCall {
-                id: "call_2".to_string(),
+                id: Some("call_2".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print(2)".to_string(),
             },
             InteractionContent::CodeExecutionResult {
-                call_id: "call_1".to_string(),
+                call_id: Some("call_1".to_string()),
                 outcome: CodeExecutionOutcome::Ok,
                 output: "1\n2\n".to_string(),
             },
@@ -601,12 +601,12 @@ fn test_interaction_response_code_execution_helpers() {
                 annotations: None,
             },
             InteractionContent::CodeExecutionCall {
-                id: "call_123".to_string(),
+                id: Some("call_123".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print(42)".to_string(),
             },
             InteractionContent::CodeExecutionResult {
-                call_id: "call_123".to_string(),
+                call_id: Some("call_123".to_string()),
                 outcome: CodeExecutionOutcome::Ok,
                 output: "42\n".to_string(),
             },
@@ -628,14 +628,14 @@ fn test_interaction_response_code_execution_helpers() {
     // Test code_execution_calls helper
     let code_blocks = response.code_execution_calls();
     assert_eq!(code_blocks.len(), 1);
-    assert_eq!(code_blocks[0].id, "call_123");
+    assert_eq!(code_blocks[0].id, Some("call_123"));
     assert_eq!(code_blocks[0].language, CodeExecutionLanguage::Python);
     assert_eq!(code_blocks[0].code, "print(42)");
 
     // Test code_execution_results helper
     let results = response.code_execution_results();
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].call_id, "call_123");
+    assert_eq!(results[0].call_id, Some("call_123"));
     assert_eq!(results[0].outcome, CodeExecutionOutcome::Ok);
     assert_eq!(results[0].output, "42\n");
 
@@ -807,14 +807,16 @@ fn test_interaction_response_function_results() {
         input: vec![],
         outputs: vec![
             InteractionContent::FunctionResult {
-                name: "get_weather".to_string(),
+                name: Some("get_weather".to_string()),
                 call_id: "call_001".to_string(),
                 result: serde_json::json!({"temp": 72, "unit": "F"}),
+                is_error: None,
             },
             InteractionContent::FunctionResult {
-                name: "get_time".to_string(),
+                name: Some("get_time".to_string()),
                 call_id: "call_002".to_string(),
                 result: serde_json::json!({"time": "14:30", "zone": "UTC"}),
+                is_error: None,
             },
             InteractionContent::Text {
                 text: Some("Here are the results".to_string()),
@@ -836,10 +838,10 @@ fn test_interaction_response_function_results() {
 
     let results = response.function_results();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0].name, "get_weather");
+    assert_eq!(results[0].name, Some("get_weather"));
     assert_eq!(results[0].call_id, "call_001");
     assert_eq!(results[0].result["temp"], 72);
-    assert_eq!(results[1].name, "get_time");
+    assert_eq!(results[1].name, Some("get_time"));
     assert_eq!(results[1].call_id, "call_002");
 }
 
@@ -1021,12 +1023,12 @@ fn test_interaction_response_code_execution_call_singular() {
         input: vec![],
         outputs: vec![
             InteractionContent::CodeExecutionCall {
-                id: "call_first".to_string(),
+                id: Some("call_first".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print('first')".to_string(),
             },
             InteractionContent::CodeExecutionCall {
-                id: "call_second".to_string(),
+                id: Some("call_second".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print('second')".to_string(),
             },
@@ -1045,7 +1047,7 @@ fn test_interaction_response_code_execution_call_singular() {
     let call = response.code_execution_call();
     assert!(call.is_some());
     let call = call.unwrap();
-    assert_eq!(call.id, "call_first");
+    assert_eq!(call.id, Some("call_first"));
     assert_eq!(call.language, CodeExecutionLanguage::Python);
     assert_eq!(call.code, "print('first')");
 }
@@ -1202,12 +1204,12 @@ fn test_interaction_response_code_execution_calls_plural() {
         input: vec![],
         outputs: vec![
             InteractionContent::CodeExecutionCall {
-                id: "call_1".to_string(),
+                id: Some("call_1".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print('first')".to_string(),
             },
             InteractionContent::CodeExecutionCall {
-                id: "call_2".to_string(),
+                id: Some("call_2".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print('second')".to_string(),
             },
@@ -1230,10 +1232,10 @@ fn test_interaction_response_code_execution_calls_plural() {
 
     let calls = response.code_execution_calls();
     assert_eq!(calls.len(), 2);
-    assert_eq!(calls[0].id, "call_1");
+    assert_eq!(calls[0].id, Some("call_1"));
     assert_eq!(calls[0].language, CodeExecutionLanguage::Python);
     assert_eq!(calls[0].code, "print('first')");
-    assert_eq!(calls[1].id, "call_2");
+    assert_eq!(calls[1].id, Some("call_2"));
     assert_eq!(calls[1].language, CodeExecutionLanguage::Python);
     assert_eq!(calls[1].code, "print('second')");
 }
@@ -1247,12 +1249,12 @@ fn test_interaction_response_code_execution_results() {
         input: vec![],
         outputs: vec![
             InteractionContent::CodeExecutionResult {
-                call_id: "call_1".to_string(),
+                call_id: Some("call_1".to_string()),
                 outcome: CodeExecutionOutcome::Ok,
                 output: "first output".to_string(),
             },
             InteractionContent::CodeExecutionResult {
-                call_id: "call_2".to_string(),
+                call_id: Some("call_2".to_string()),
                 outcome: CodeExecutionOutcome::Failed,
                 output: "error message".to_string(),
             },
@@ -1271,10 +1273,10 @@ fn test_interaction_response_code_execution_results() {
 
     let results = response.code_execution_results();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0].call_id, "call_1");
+    assert_eq!(results[0].call_id, Some("call_1"));
     assert_eq!(results[0].outcome, CodeExecutionOutcome::Ok);
     assert_eq!(results[0].output, "first output");
-    assert_eq!(results[1].call_id, "call_2");
+    assert_eq!(results[1].call_id, Some("call_2"));
     assert_eq!(results[1].outcome, CodeExecutionOutcome::Failed);
     assert_eq!(results[1].output, "error message");
 
@@ -1481,17 +1483,18 @@ fn test_interaction_response_complex_roundtrip() {
             // Function result
             InteractionContent::FunctionResult {
                 call_id: "call-func-001".to_string(),
-                name: "get_weather".to_string(),
+                name: Some("get_weather".to_string()),
                 result: serde_json::json!({"temp": 22, "conditions": "sunny"}),
+                is_error: None,
             },
             // Code execution
             InteractionContent::CodeExecutionCall {
-                id: "code-exec-001".to_string(),
+                id: Some("code-exec-001".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print(2 + 2)".to_string(),
             },
             InteractionContent::CodeExecutionResult {
-                call_id: "code-exec-001".to_string(),
+                call_id: Some("code-exec-001".to_string()),
                 outcome: CodeExecutionOutcome::Ok,
                 output: "4".to_string(),
             },
@@ -2251,7 +2254,7 @@ fn test_interaction_response_all_annotations_skips_non_text() {
                 resolution: None,
             },
             InteractionContent::CodeExecutionResult {
-                call_id: "call_1".to_string(),
+                call_id: Some("call_1".to_string()),
                 outcome: CodeExecutionOutcome::Ok,
                 output: "result".to_string(),
             },

@@ -568,25 +568,42 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
                 }
             }),
         // FunctionResult content
-        (arb_identifier(), arb_identifier(), arb_json_value()).prop_map(
-            |(name, call_id, result)| InteractionContent::FunctionResult {
-                name,
-                call_id,
-                result
-            }
-        ),
+        (
+            proptest::option::of(arb_identifier()),
+            arb_identifier(),
+            arb_json_value(),
+            proptest::option::of(proptest::bool::ANY),
+        )
+            .prop_map(|(name, call_id, result, is_error)| {
+                InteractionContent::FunctionResult {
+                    name,
+                    call_id,
+                    result,
+                    is_error,
+                }
+            }),
         // CodeExecutionCall content
-        (arb_identifier(), arb_code_execution_language(), arb_text()).prop_map(
-            |(id, language, code)| InteractionContent::CodeExecutionCall { id, language, code }
-        ),
+        (
+            proptest::option::of(arb_identifier()),
+            arb_code_execution_language(),
+            arb_text(),
+        )
+            .prop_map(
+                |(id, language, code)| InteractionContent::CodeExecutionCall { id, language, code }
+            ),
         // CodeExecutionResult content
-        (arb_identifier(), arb_code_execution_outcome(), arb_text()).prop_map(
-            |(call_id, outcome, output)| InteractionContent::CodeExecutionResult {
-                call_id,
-                outcome,
-                output
-            }
-        ),
+        (
+            proptest::option::of(arb_identifier()),
+            arb_code_execution_outcome(),
+            arb_text(),
+        )
+            .prop_map(|(call_id, outcome, output)| {
+                InteractionContent::CodeExecutionResult {
+                    call_id,
+                    outcome,
+                    output,
+                }
+            }),
         // GoogleSearchCall content
         (arb_text(), proptest::collection::vec(arb_text(), 0..3))
             .prop_map(|(id, queries)| InteractionContent::GoogleSearchCall { id, queries }),
@@ -1217,9 +1234,10 @@ proptest! {
         });
 
         let content = InteractionContent::FunctionResult {
-            name: "deep_function".to_string(),
+            name: Some("deep_function".to_string()),
             call_id: "call_123".to_string(),
             result: nested_result,
+            is_error: None,
         };
 
         let json = serde_json::to_string(&content).expect("Serialization should succeed");

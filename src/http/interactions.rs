@@ -199,6 +199,14 @@ pub fn create_interaction_stream<'a>(
                                 InteractionContent::Text { .. } => Some("text".to_string()),
                                 InteractionContent::Thought { .. } => Some("thought".to_string()),
                                 InteractionContent::FunctionCall { .. } => Some("function_call".to_string()),
+                                InteractionContent::FunctionResult { .. } => Some("function_result".to_string()),
+                                InteractionContent::CodeExecutionCall { .. } => Some("code_execution_call".to_string()),
+                                InteractionContent::CodeExecutionResult { .. } => Some("code_execution_result".to_string()),
+                                InteractionContent::GoogleSearchCall { .. } => Some("google_search_call".to_string()),
+                                InteractionContent::GoogleSearchResult { .. } => Some("google_search_result".to_string()),
+                                InteractionContent::UrlContextCall { .. } => Some("url_context_call".to_string()),
+                                InteractionContent::UrlContextResult { .. } => Some("url_context_result".to_string()),
+                                InteractionContent::Unknown { content_type, .. } => Some(content_type.clone()),
                                 _ => None,
                             }
                         });

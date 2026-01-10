@@ -382,7 +382,7 @@ fn test_deserialize_code_execution_call() {
 
     match &content {
         InteractionContent::CodeExecutionCall { id, language, code } => {
-            assert_eq!(id, "call_123");
+            assert_eq!(*id, Some("call_123".to_string()));
             assert_eq!(*language, CodeExecutionLanguage::Python);
             assert_eq!(code, "print(42)");
         }
@@ -401,7 +401,7 @@ fn test_deserialize_code_execution_call_direct_fields() {
 
     match &content {
         InteractionContent::CodeExecutionCall { id, language, code } => {
-            assert_eq!(id, "call_123");
+            assert_eq!(*id, Some("call_123".to_string()));
             assert_eq!(*language, CodeExecutionLanguage::Python);
             assert_eq!(code, "print(42)");
         }
@@ -496,7 +496,7 @@ fn test_deserialize_code_execution_call_arguments_valid() {
 
     match &content {
         InteractionContent::CodeExecutionCall { id, language, code } => {
-            assert_eq!(id, "call_valid");
+            assert_eq!(*id, Some("call_valid".to_string()));
             assert_eq!(*language, CodeExecutionLanguage::Python);
             assert_eq!(code, "print('hi')");
         }
@@ -519,7 +519,7 @@ fn test_deserialize_code_execution_result() {
             outcome,
             output,
         } => {
-            assert_eq!(call_id, "call_123");
+            assert_eq!(*call_id, Some("call_123".to_string()));
             assert!(outcome.is_success());
             assert_eq!(output, "42\n");
         }
@@ -542,7 +542,7 @@ fn test_deserialize_code_execution_result_with_outcome() {
             outcome,
             output,
         } => {
-            assert_eq!(call_id, "call_123");
+            assert_eq!(*call_id, Some("call_123".to_string()));
             assert_eq!(*outcome, CodeExecutionOutcome::Ok);
             assert_eq!(output, "42\n");
         }
@@ -561,7 +561,7 @@ fn test_deserialize_code_execution_result_error() {
             outcome,
             output,
         } => {
-            assert_eq!(call_id, "call_456");
+            assert_eq!(*call_id, Some("call_456".to_string()));
             assert!(outcome.is_error());
             assert!(output.contains("NameError"));
         }
@@ -581,7 +581,7 @@ fn test_deserialize_code_execution_result_deadline_exceeded() {
             outcome,
             output,
         } => {
-            assert_eq!(call_id, "call_789");
+            assert_eq!(*call_id, Some("call_789".to_string()));
             assert_eq!(*outcome, CodeExecutionOutcome::DeadlineExceeded);
             assert!(outcome.is_error());
             assert!(!outcome.is_success());
@@ -745,7 +745,7 @@ fn test_url_context_result_item_status_helpers() {
 #[test]
 fn test_serialize_code_execution_call() {
     let content = InteractionContent::CodeExecutionCall {
-        id: "call_123".to_string(),
+        id: Some("call_123".to_string()),
         language: CodeExecutionLanguage::Python,
         code: "print(42)".to_string(),
     };
@@ -754,7 +754,7 @@ fn test_serialize_code_execution_call() {
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
     assert_eq!(value["type"], "code_execution_call");
-    assert_eq!(value["id"], "call_123");
+    assert_eq!(value["id"], "call_123"); // serializes without wrapping
     assert_eq!(value["language"], "PYTHON");
     assert_eq!(value["code"], "print(42)");
 }
@@ -762,7 +762,7 @@ fn test_serialize_code_execution_call() {
 #[test]
 fn test_serialize_code_execution_result() {
     let content = InteractionContent::CodeExecutionResult {
-        call_id: "call_123".to_string(),
+        call_id: Some("call_123".to_string()),
         outcome: CodeExecutionOutcome::Ok,
         output: "42".to_string(),
     };
@@ -771,7 +771,7 @@ fn test_serialize_code_execution_result() {
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
     assert_eq!(value["type"], "code_execution_result");
-    assert_eq!(value["call_id"], "call_123");
+    assert_eq!(value["call_id"], "call_123"); // serializes without wrapping
     assert_eq!(value["outcome"], "OUTCOME_OK");
     assert_eq!(value["output"], "42");
 }
@@ -779,7 +779,7 @@ fn test_serialize_code_execution_result() {
 #[test]
 fn test_serialize_code_execution_result_error() {
     let content = InteractionContent::CodeExecutionResult {
-        call_id: "call_456".to_string(),
+        call_id: Some("call_456".to_string()),
         outcome: CodeExecutionOutcome::Failed,
         output: "NameError: x not defined".to_string(),
     };
@@ -797,7 +797,7 @@ fn test_serialize_code_execution_result_error() {
 fn test_roundtrip_built_in_tool_content() {
     // CodeExecutionCall roundtrip
     let original = InteractionContent::CodeExecutionCall {
-        id: "call_123".to_string(),
+        id: Some("call_123".to_string()),
         language: CodeExecutionLanguage::Python,
         code: "print('hello')".to_string(),
     };
@@ -810,7 +810,7 @@ fn test_roundtrip_built_in_tool_content() {
 
     // CodeExecutionResult roundtrip
     let original = InteractionContent::CodeExecutionResult {
-        call_id: "call_123".to_string(),
+        call_id: Some("call_123".to_string()),
         outcome: CodeExecutionOutcome::Ok,
         output: "hello\n".to_string(),
     };
@@ -874,7 +874,7 @@ fn test_roundtrip_built_in_tool_content() {
 fn test_edge_cases_empty_values() {
     // Empty code in CodeExecutionCall
     let content = InteractionContent::CodeExecutionCall {
-        id: "call_empty".to_string(),
+        id: Some("call_empty".to_string()),
         language: CodeExecutionLanguage::Python,
         code: "".to_string(),
     };
@@ -882,7 +882,7 @@ fn test_edge_cases_empty_values() {
     let restored: InteractionContent = serde_json::from_str(&json).unwrap();
     match restored {
         InteractionContent::CodeExecutionCall { id, language, code } => {
-            assert_eq!(id, "call_empty");
+            assert_eq!(id, Some("call_empty".to_string()));
             assert_eq!(language, CodeExecutionLanguage::Python);
             assert!(code.is_empty());
         }
@@ -922,7 +922,7 @@ fn test_edge_cases_empty_values() {
 
     // Empty output string in CodeExecutionResult
     let content = InteractionContent::CodeExecutionResult {
-        call_id: "call_no_output".to_string(),
+        call_id: Some("call_no_output".to_string()),
         outcome: CodeExecutionOutcome::Ok,
         output: "".to_string(),
     };
@@ -932,7 +932,7 @@ fn test_edge_cases_empty_values() {
         InteractionContent::CodeExecutionResult {
             call_id, output, ..
         } => {
-            assert_eq!(call_id, "call_no_output");
+            assert_eq!(call_id, Some("call_no_output".to_string()));
             assert!(output.is_empty());
         }
         _ => panic!("Expected CodeExecutionResult"),
@@ -1885,8 +1885,9 @@ fn test_new_function_result_creates_correct_variant() {
             name,
             call_id,
             result,
+            ..
         } => {
-            assert_eq!(name, "get_weather");
+            assert_eq!(name, Some("get_weather".to_string()));
             assert_eq!(call_id, "call_abc123");
             assert_eq!(result["temperature"], "72F");
             assert_eq!(result["conditions"], "sunny");
