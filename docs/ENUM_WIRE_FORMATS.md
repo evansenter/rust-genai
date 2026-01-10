@@ -342,3 +342,19 @@ pub enum ThinkingSummaries {
 ```
 
 This ensures forward compatibility when Google adds new enum values.
+
+### Structs and `#[non_exhaustive]`
+
+Response structs (e.g., `AutoFunctionResult`, `InteractionResponse`) also use `#[non_exhaustive]` so we can add fields without breaking user code. This has a trade-off:
+
+**Users cannot construct these types directly** (no struct literal syntax outside the crate). This is intentional:
+- Response types represent API responses, not user-constructed data
+- Mocking them in unit tests would give false confidence
+- We can add fields (like `executions` was added to `AutoFunctionResult`) without breaking changes
+
+**For testing**, users should:
+1. Use integration tests with real API calls (recommended)
+2. Mock at the HTTP layer, not the response type layer
+3. Test their own logic separately from API response handling
+
+If a `test-support` feature for constructing mock instances becomes commonly requested, we'll consider adding it.
