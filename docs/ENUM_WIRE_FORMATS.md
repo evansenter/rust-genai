@@ -61,6 +61,9 @@ Helper methods on each type:
 | `InteractionContent::ComputerUseResult` | snake_case | `"computer_use_result"` | **UNVERIFIED** - from docs |
 | `SpeechConfig` | camelCase fields | `{"voice": "Kore", "language": "en-US"}` | Inside generationConfig |
 | Audio MIME type (TTS response) | with params | `"audio/L16;codec=pcm;rate=24000"` | Raw PCM audio |
+| `InteractionContent::Thought` | snake_case + signature | `{"type": "thought", "signature": "..."}` | Cryptographic, not text |
+| `InteractionContent::UrlContextCall` | snake_case + nested args | `{"type": "url_context_call", "id": "...", "arguments": {"urls": [...]}}` | URLs nested in arguments |
+| `InteractionContent::UrlContextResult` | snake_case + result array | `{"type": "url_context_result", "call_id": "...", "result": [...]}` | Array of UrlContextResultItem |
 
 ## Details
 
@@ -308,6 +311,80 @@ TTS responses return audio content with a specific MIME type:
 The `AudioInfo::extension()` method maps this to `"pcm"` for file saving.
 
 **Verified**: 2026-01-07 - Response format captured from live TTS generation.
+
+### Thought (response content)
+
+Returned when the model uses internal reasoning (thinking mode).
+
+```json
+{
+  "type": "thought",
+  "signature": "Eq0JCqoJAXLI2nyuo7yupoglxIQxc5h0..."
+}
+```
+
+| Rust Field | Wire Name | Notes |
+|------------|-----------|-------|
+| `signature` | `signature` | Cryptographic signature for verification, NOT readable text |
+
+**Important**: The `signature` field contains a cryptographic value for thought verification, not human-readable reasoning. Use `response.has_thoughts()` to detect thinking and `response.thought_signatures()` to iterate.
+
+**Verified**: 2026-01-09 - Captured from `LOUD_WIRE=1 cargo run --example thinking`. Previous incorrect assumption was that thoughts had a `text` field.
+
+### UrlContextCall (response content)
+
+Returned when the model requests URL content for context.
+
+```json
+{
+  "type": "url_context_call",
+  "id": "fpo8xd3s",
+  "arguments": {
+    "urls": ["https://example.com", "https://example.org"]
+  }
+}
+```
+
+| Rust Field | Wire Name | Notes |
+|------------|-----------|-------|
+| `id` | `id` | Call identifier for matching results |
+| `urls` | `arguments.urls` | Array of URLs, nested inside `arguments` |
+
+**Note**: The `urls` are nested inside an `arguments` object in the wire format. The library extracts them to a flat `urls: Vec<String>` field for convenience.
+
+**Verified**: 2026-01-09 - Captured from `LOUD_WIRE=1 cargo run --example url_context`. Previous incorrect assumption was a single `url` field.
+
+### UrlContextResult (response content)
+
+Returned with the results of URL fetching.
+
+```json
+{
+  "type": "url_context_result",
+  "call_id": "fpo8xd3s",
+  "result": [
+    {
+      "url": "https://example.com",
+      "status": "success"
+    },
+    {
+      "url": "https://example.org",
+      "status": "error"
+    }
+  ]
+}
+```
+
+| Rust Field | Wire Name | Notes |
+|------------|-----------|-------|
+| `call_id` | `call_id` | Matches the corresponding UrlContextCall |
+| `result` | `result` | Array of UrlContextResultItem |
+| `result[].url` | `url` | The URL that was fetched |
+| `result[].status` | `status` | "success", "error", or "unsafe" |
+
+**Note**: Each item in `result` is a `UrlContextResultItem` with helper methods `is_success()`, `is_error()`, and `is_unsafe()`.
+
+**Verified**: 2026-01-09 - Captured from `LOUD_WIRE=1 cargo run --example url_context`. Previous incorrect assumption was `url`/`content` fields.
 
 ## Testing New Enums
 

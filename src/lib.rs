@@ -69,7 +69,7 @@ pub use errors::GenaiError;
 pub mod content;
 pub use content::{
     Annotation, CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem,
-    GoogleSearchResultItem, InteractionContent, Resolution,
+    GoogleSearchResultItem, InteractionContent, Resolution, UrlContextResultItem,
 };
 
 // Request types (includes agent configuration)

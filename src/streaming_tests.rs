@@ -23,13 +23,14 @@ fn test_deserialize_streaming_text_content() {
 
 #[test]
 fn test_deserialize_streaming_thought_content() {
-    let delta_json = r#"{"type": "thought", "text": "I'm thinking..."}"#;
+    // Thought content contains a signature, not text (per actual wire format)
+    let delta_json = r#"{"type": "thought", "signature": "EosFCogFAXLI2..."}"#;
     let delta: InteractionContent =
         serde_json::from_str(delta_json).expect("Deserialization failed");
 
     match &delta {
-        InteractionContent::Thought { text } => {
-            assert_eq!(text.as_deref(), Some("I'm thinking..."));
+        InteractionContent::Thought { signature } => {
+            assert_eq!(signature.as_deref(), Some("EosFCogFAXLI2..."));
         }
         _ => panic!("Expected Thought content"),
     }
@@ -38,6 +39,8 @@ fn test_deserialize_streaming_thought_content() {
     assert!(delta.is_thought());
     // text() returns None for thoughts (only returns text for Text variant)
     assert_eq!(delta.text(), None);
+    // thought_signature() returns the signature
+    assert_eq!(delta.thought_signature(), Some("EosFCogFAXLI2..."));
 }
 
 #[test]

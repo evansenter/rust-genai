@@ -36,8 +36,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 for output in &response.outputs {
                     if let Some(t) = output.text() {
                         println!("{t}");
-                    } else if let Some(t) = output.thought() {
-                        println!("[Thought] {t}");
+                    } else if output.thought_signature().is_some() {
+                        println!("[Thought] (signature present)");
                     }
                 }
             }

@@ -56,18 +56,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    // Check if model produced thoughts with visible text
-    let thoughts: Vec<_> = response.thoughts().collect();
-    if !thoughts.is_empty() {
-        println!("=== Model's Reasoning Process ===\n");
-        for thought in thoughts {
-            println!("{}\n", thought);
-        }
-        println!("=== End Reasoning ===\n");
-    } else if response.has_thoughts() {
-        // The API returned Thought blocks but text may not be exposed
-        // This can happen when the thinking is processed internally
-        println!("(Model processed reasoning internally)\n");
+    // Check if model produced thoughts
+    // Note: Thought blocks contain cryptographic signatures for verification,
+    // not human-readable reasoning text. Use has_thoughts() to detect thinking.
+    if response.has_thoughts() {
+        let signature_count = response.thought_signatures().count();
+        println!(
+            "=== Model Used Internal Reasoning ({} thought signatures) ===\n",
+            signature_count
+        );
     }
 
     // Print the final answer
@@ -111,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ThinkingSummaries::Auto provides summarized reasoning in outputs
     if response.has_thoughts() {
-        let thought_count = response.thoughts().count();
+        let thought_count = response.thought_signatures().count();
         println!(
             "Received {} thought block(s) with summaries enabled",
             thought_count
@@ -159,15 +156,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let summary = response.content_summary();
 
         if response.has_thoughts() {
-            // Just show first thought for comparison
-            if let Some(first_thought) = response.thoughts().next() {
-                let preview = if first_thought.len() > 200 {
-                    format!("{}...", &first_thought[..200])
-                } else {
-                    first_thought.to_string()
-                };
-                println!("First thought preview: {}\n", preview);
-            }
+            // Thoughts contain cryptographic signatures, not readable text
+            let sig_count = response.thought_signatures().count();
+            println!("Received {} thought signature(s)\n", sig_count);
         }
 
         if let Some(text) = response.text() {
@@ -216,12 +207,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match result {
             Ok(event) => match event.chunk {
                 StreamChunk::Delta(content) => {
-                    if let Some(t) = content.thought() {
+                    // Thoughts contain signatures, not readable text
+                    if content.thought_signature().is_some() {
                         if !in_thought {
-                            print!("\n[THINKING] ");
+                            print!("\n[THINKING] (signature present) ");
                             in_thought = true;
                         }
-                        print!("{}", t);
                         stdout().flush()?;
                     } else if let Some(t) = content.text() {
                         if in_thought {

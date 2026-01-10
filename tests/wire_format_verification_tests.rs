@@ -403,8 +403,9 @@ mod interaction_content {
     fn function_result_uses_snake_case_type() {
         let content = InteractionContent::FunctionResult {
             call_id: "call_123".to_string(),
-            name: "test".to_string(),
+            name: Some("test".to_string()),
             result: json!({"output": "result"}),
+            is_error: None,
         };
         let json = serde_json::to_value(&content).unwrap();
         assert_eq!(json["type"], "function_result");
@@ -413,16 +414,17 @@ mod interaction_content {
     #[test]
     fn thought_uses_snake_case_type() {
         let content = InteractionContent::Thought {
-            text: Some("thinking...".to_string()),
+            signature: Some("Eq0JCqoJ...signature".to_string()),
         };
         let json = serde_json::to_value(&content).unwrap();
         assert_eq!(json["type"], "thought");
+        assert_eq!(json["signature"], "Eq0JCqoJ...signature");
     }
 
     #[test]
     fn code_execution_call_uses_snake_case_type() {
         let content = InteractionContent::CodeExecutionCall {
-            id: "exec_123".to_string(),
+            id: Some("exec_123".to_string()),
             language: genai_rs::CodeExecutionLanguage::Python,
             code: "print('hello')".to_string(),
         };
@@ -433,7 +435,7 @@ mod interaction_content {
     #[test]
     fn code_execution_result_uses_snake_case_type() {
         let content = InteractionContent::CodeExecutionResult {
-            call_id: "exec_123".to_string(),
+            call_id: Some("exec_123".to_string()),
             outcome: genai_rs::CodeExecutionOutcome::Ok,
             output: "hello".to_string(),
         };

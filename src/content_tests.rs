@@ -51,29 +51,29 @@ fn test_content_empty_text_returns_none() {
 }
 
 #[test]
-fn test_content_thought_accessor() {
-    // Non-empty thought returns Some
+fn test_content_thought_signature_accessor() {
+    // Non-empty thought signature returns Some
     let content = InteractionContent::Thought {
-        text: Some("reasoning about the problem".to_string()),
+        signature: Some("EosFCogFAXLI2...".to_string()),
     };
-    assert_eq!(content.thought(), Some("reasoning about the problem"));
+    assert_eq!(content.thought_signature(), Some("EosFCogFAXLI2..."));
 
-    // Empty thought returns None
+    // Empty signature returns None
     let empty = InteractionContent::Thought {
-        text: Some(String::new()),
+        signature: Some(String::new()),
     };
-    assert_eq!(empty.thought(), None);
+    assert_eq!(empty.thought_signature(), None);
 
-    // None thought returns None
-    let none = InteractionContent::Thought { text: None };
-    assert_eq!(none.thought(), None);
+    // None signature returns None
+    let none = InteractionContent::Thought { signature: None };
+    assert_eq!(none.thought_signature(), None);
 
-    // Text variant returns None for thought()
+    // Text variant returns None for thought_signature()
     let text_content = InteractionContent::Text {
         text: Some("hello".to_string()),
         annotations: None,
     };
-    assert_eq!(text_content.thought(), None);
+    assert_eq!(text_content.thought_signature(), None);
 }
 
 // --- Unknown Variant Tests ---
@@ -382,7 +382,7 @@ fn test_deserialize_code_execution_call() {
 
     match &content {
         InteractionContent::CodeExecutionCall { id, language, code } => {
-            assert_eq!(id, "call_123");
+            assert_eq!(*id, Some("call_123".to_string()));
             assert_eq!(*language, CodeExecutionLanguage::Python);
             assert_eq!(code, "print(42)");
         }
@@ -401,7 +401,7 @@ fn test_deserialize_code_execution_call_direct_fields() {
 
     match &content {
         InteractionContent::CodeExecutionCall { id, language, code } => {
-            assert_eq!(id, "call_123");
+            assert_eq!(*id, Some("call_123".to_string()));
             assert_eq!(*language, CodeExecutionLanguage::Python);
             assert_eq!(code, "print(42)");
         }
@@ -496,7 +496,7 @@ fn test_deserialize_code_execution_call_arguments_valid() {
 
     match &content {
         InteractionContent::CodeExecutionCall { id, language, code } => {
-            assert_eq!(id, "call_valid");
+            assert_eq!(*id, Some("call_valid".to_string()));
             assert_eq!(*language, CodeExecutionLanguage::Python);
             assert_eq!(code, "print('hi')");
         }
@@ -519,7 +519,7 @@ fn test_deserialize_code_execution_result() {
             outcome,
             output,
         } => {
-            assert_eq!(call_id, "call_123");
+            assert_eq!(*call_id, Some("call_123".to_string()));
             assert!(outcome.is_success());
             assert_eq!(output, "42\n");
         }
@@ -542,7 +542,7 @@ fn test_deserialize_code_execution_result_with_outcome() {
             outcome,
             output,
         } => {
-            assert_eq!(call_id, "call_123");
+            assert_eq!(*call_id, Some("call_123".to_string()));
             assert_eq!(*outcome, CodeExecutionOutcome::Ok);
             assert_eq!(output, "42\n");
         }
@@ -561,7 +561,7 @@ fn test_deserialize_code_execution_result_error() {
             outcome,
             output,
         } => {
-            assert_eq!(call_id, "call_456");
+            assert_eq!(*call_id, Some("call_456".to_string()));
             assert!(outcome.is_error());
             assert!(output.contains("NameError"));
         }
@@ -581,7 +581,7 @@ fn test_deserialize_code_execution_result_deadline_exceeded() {
             outcome,
             output,
         } => {
-            assert_eq!(call_id, "call_789");
+            assert_eq!(*call_id, Some("call_789".to_string()));
             assert_eq!(*outcome, CodeExecutionOutcome::DeadlineExceeded);
             assert!(outcome.is_error());
             assert!(!outcome.is_success());
@@ -649,12 +649,16 @@ fn test_deserialize_google_search_result() {
 
 #[test]
 fn test_deserialize_url_context_call() {
-    let json = r#"{"type": "url_context_call", "url": "https://example.com"}"#;
+    // Wire format from LOUD_WIRE: {"type": "url_context_call", "id": "...", "arguments": {"urls": [...]}}
+    let json = r#"{"type": "url_context_call", "id": "ctx_123", "arguments": {"urls": ["https://example.com", "https://example.org"]}}"#;
     let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::UrlContextCall { url } => {
-            assert_eq!(url, "https://example.com");
+        InteractionContent::UrlContextCall { id, urls } => {
+            assert_eq!(id, "ctx_123");
+            assert_eq!(urls.len(), 2);
+            assert_eq!(urls[0], "https://example.com");
+            assert_eq!(urls[1], "https://example.org");
         }
         _ => panic!("Expected UrlContextCall variant, got {:?}", content),
     }
@@ -665,13 +669,20 @@ fn test_deserialize_url_context_call() {
 
 #[test]
 fn test_deserialize_url_context_result() {
-    let json = r#"{"type": "url_context_result", "url": "https://example.com", "content": "<html>...</html>"}"#;
+    // Wire format from LOUD_WIRE: {"type": "url_context_result", "call_id": "...", "result": [{"url": "...", "status": "..."}]}
+    let json = r#"{"type": "url_context_result", "call_id": "ctx_123", "result": [{"url": "https://example.com", "status": "success"}, {"url": "https://example.org", "status": "error"}]}"#;
     let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::UrlContextResult { url, content } => {
-            assert_eq!(url, "https://example.com");
-            assert_eq!(content.as_deref(), Some("<html>...</html>"));
+        InteractionContent::UrlContextResult { call_id, result } => {
+            assert_eq!(call_id, "ctx_123");
+            assert_eq!(result.len(), 2);
+            assert_eq!(result[0].url, "https://example.com");
+            assert_eq!(result[0].status, "success");
+            assert!(result[0].is_success());
+            assert_eq!(result[1].url, "https://example.org");
+            assert_eq!(result[1].status, "error");
+            assert!(result[1].is_error());
         }
         _ => panic!("Expected UrlContextResult variant, got {:?}", content),
     }
@@ -681,42 +692,60 @@ fn test_deserialize_url_context_result() {
 }
 
 #[test]
-fn test_url_context_result_with_none_content() {
-    // Test that UrlContextResult with content: None serializes without the content field
-    // (the API omits this field when content is not available, e.g., network errors)
+fn test_url_context_result_with_empty_result_array() {
+    // Test UrlContextResult with empty result array
     let content = InteractionContent::UrlContextResult {
-        url: "https://example.com/blocked".to_string(),
-        content: None,
+        call_id: "ctx_empty".to_string(),
+        result: vec![],
     };
 
-    // Serialize and verify content field is absent
+    // Serialize and verify structure
     let json = serde_json::to_string(&content).expect("Serialization should work");
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
     assert_eq!(value["type"], "url_context_result");
-    assert_eq!(value["url"], "https://example.com/blocked");
-    // content field should be absent (not null)
-    assert!(value.get("content").is_none());
+    assert_eq!(value["call_id"], "ctx_empty");
+    assert!(value["result"].as_array().unwrap().is_empty());
 
-    // Deserialize without content field and verify it works
-    let json_without_content =
-        r#"{"type": "url_context_result", "url": "https://example.com/timeout"}"#;
+    // Deserialize with empty result array
+    let json_empty_result =
+        r#"{"type": "url_context_result", "call_id": "ctx_empty", "result": []}"#;
     let deserialized: InteractionContent =
-        serde_json::from_str(json_without_content).expect("Should deserialize");
+        serde_json::from_str(json_empty_result).expect("Should deserialize");
 
     match &deserialized {
-        InteractionContent::UrlContextResult { url, content } => {
-            assert_eq!(url, "https://example.com/timeout");
-            assert_eq!(*content, None);
+        InteractionContent::UrlContextResult { call_id, result } => {
+            assert_eq!(call_id, "ctx_empty");
+            assert!(result.is_empty());
         }
         _ => panic!("Expected UrlContextResult variant"),
     }
 }
 
 #[test]
+fn test_url_context_result_item_status_helpers() {
+    use crate::UrlContextResultItem;
+
+    let success_item = UrlContextResultItem::new("https://example.com", "success");
+    assert!(success_item.is_success());
+    assert!(!success_item.is_error());
+    assert!(!success_item.is_unsafe());
+
+    let error_item = UrlContextResultItem::new("https://example.org", "error");
+    assert!(!error_item.is_success());
+    assert!(error_item.is_error());
+    assert!(!error_item.is_unsafe());
+
+    let unsafe_item = UrlContextResultItem::new("https://malware.example", "unsafe");
+    assert!(!unsafe_item.is_success());
+    assert!(!unsafe_item.is_error());
+    assert!(unsafe_item.is_unsafe());
+}
+
+#[test]
 fn test_serialize_code_execution_call() {
     let content = InteractionContent::CodeExecutionCall {
-        id: "call_123".to_string(),
+        id: Some("call_123".to_string()),
         language: CodeExecutionLanguage::Python,
         code: "print(42)".to_string(),
     };
@@ -725,7 +754,7 @@ fn test_serialize_code_execution_call() {
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
     assert_eq!(value["type"], "code_execution_call");
-    assert_eq!(value["id"], "call_123");
+    assert_eq!(value["id"], "call_123"); // serializes without wrapping
     assert_eq!(value["language"], "PYTHON");
     assert_eq!(value["code"], "print(42)");
 }
@@ -733,7 +762,7 @@ fn test_serialize_code_execution_call() {
 #[test]
 fn test_serialize_code_execution_result() {
     let content = InteractionContent::CodeExecutionResult {
-        call_id: "call_123".to_string(),
+        call_id: Some("call_123".to_string()),
         outcome: CodeExecutionOutcome::Ok,
         output: "42".to_string(),
     };
@@ -742,7 +771,7 @@ fn test_serialize_code_execution_result() {
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
     assert_eq!(value["type"], "code_execution_result");
-    assert_eq!(value["call_id"], "call_123");
+    assert_eq!(value["call_id"], "call_123"); // serializes without wrapping
     assert_eq!(value["outcome"], "OUTCOME_OK");
     assert_eq!(value["output"], "42");
 }
@@ -750,7 +779,7 @@ fn test_serialize_code_execution_result() {
 #[test]
 fn test_serialize_code_execution_result_error() {
     let content = InteractionContent::CodeExecutionResult {
-        call_id: "call_456".to_string(),
+        call_id: Some("call_456".to_string()),
         outcome: CodeExecutionOutcome::Failed,
         output: "NameError: x not defined".to_string(),
     };
@@ -768,7 +797,7 @@ fn test_serialize_code_execution_result_error() {
 fn test_roundtrip_built_in_tool_content() {
     // CodeExecutionCall roundtrip
     let original = InteractionContent::CodeExecutionCall {
-        id: "call_123".to_string(),
+        id: Some("call_123".to_string()),
         language: CodeExecutionLanguage::Python,
         code: "print('hello')".to_string(),
     };
@@ -781,7 +810,7 @@ fn test_roundtrip_built_in_tool_content() {
 
     // CodeExecutionResult roundtrip
     let original = InteractionContent::CodeExecutionResult {
-        call_id: "call_123".to_string(),
+        call_id: Some("call_123".to_string()),
         outcome: CodeExecutionOutcome::Ok,
         output: "hello\n".to_string(),
     };
@@ -818,7 +847,8 @@ fn test_roundtrip_built_in_tool_content() {
 
     // UrlContextCall roundtrip
     let original = InteractionContent::UrlContextCall {
-        url: "https://example.com".to_string(),
+        id: "ctx_123".to_string(),
+        urls: vec!["https://example.com".to_string()],
     };
     let json = serde_json::to_string(&original).unwrap();
     let restored: InteractionContent = serde_json::from_str(&json).unwrap();
@@ -829,8 +859,8 @@ fn test_roundtrip_built_in_tool_content() {
 
     // UrlContextResult roundtrip
     let original = InteractionContent::UrlContextResult {
-        url: "https://example.com".to_string(),
-        content: Some("content".to_string()),
+        call_id: "ctx_123".to_string(),
+        result: vec![UrlContextResultItem::new("https://example.com", "success")],
     };
     let json = serde_json::to_string(&original).unwrap();
     let restored: InteractionContent = serde_json::from_str(&json).unwrap();
@@ -844,7 +874,7 @@ fn test_roundtrip_built_in_tool_content() {
 fn test_edge_cases_empty_values() {
     // Empty code in CodeExecutionCall
     let content = InteractionContent::CodeExecutionCall {
-        id: "call_empty".to_string(),
+        id: Some("call_empty".to_string()),
         language: CodeExecutionLanguage::Python,
         code: "".to_string(),
     };
@@ -852,7 +882,7 @@ fn test_edge_cases_empty_values() {
     let restored: InteractionContent = serde_json::from_str(&json).unwrap();
     match restored {
         InteractionContent::CodeExecutionCall { id, language, code } => {
-            assert_eq!(id, "call_empty");
+            assert_eq!(id, Some("call_empty".to_string()));
             assert_eq!(language, CodeExecutionLanguage::Python);
             assert!(code.is_empty());
         }
@@ -871,24 +901,28 @@ fn test_edge_cases_empty_values() {
         InteractionContent::GoogleSearchResult { .. }
     ));
 
-    // UrlContextResult with None content (failed fetch)
+    // UrlContextResult with unsafe status item
     let content = InteractionContent::UrlContextResult {
-        url: "https://blocked.example.com".to_string(),
-        content: None,
+        call_id: "ctx_unsafe".to_string(),
+        result: vec![UrlContextResultItem::new(
+            "https://blocked.example.com",
+            "unsafe",
+        )],
     };
     let json = serde_json::to_string(&content).unwrap();
     let restored: InteractionContent = serde_json::from_str(&json).unwrap();
     match restored {
-        InteractionContent::UrlContextResult { url, content } => {
-            assert_eq!(url, "https://blocked.example.com");
-            assert!(content.is_none());
+        InteractionContent::UrlContextResult { call_id, result } => {
+            assert_eq!(call_id, "ctx_unsafe");
+            assert_eq!(result.len(), 1);
+            assert!(result[0].is_unsafe());
         }
         _ => panic!("Expected UrlContextResult"),
     }
 
     // Empty output string in CodeExecutionResult
     let content = InteractionContent::CodeExecutionResult {
-        call_id: "call_no_output".to_string(),
+        call_id: Some("call_no_output".to_string()),
         outcome: CodeExecutionOutcome::Ok,
         output: "".to_string(),
     };
@@ -898,7 +932,7 @@ fn test_edge_cases_empty_values() {
         InteractionContent::CodeExecutionResult {
             call_id, output, ..
         } => {
-            assert_eq!(call_id, "call_no_output");
+            assert_eq!(call_id, Some("call_no_output".to_string()));
             assert!(output.is_empty());
         }
         _ => panic!("Expected CodeExecutionResult"),
@@ -1202,7 +1236,7 @@ fn test_annotations_helper_method() {
 
     // Non-text content returns None
     let thought = InteractionContent::Thought {
-        text: Some("Thinking...".to_string()),
+        signature: Some("sig_thinking".to_string()),
     };
     assert!(thought.annotations().is_none());
 }
@@ -1749,28 +1783,29 @@ fn test_new_text_with_empty_string() {
 
 #[test]
 fn test_new_thought_creates_correct_variant() {
-    let content = InteractionContent::new_thought("I need to search for weather data");
+    // Note: new_thought() now takes a signature value (Thought content contains signature, not text)
+    let content = InteractionContent::new_thought("EosFCogFAXLI2...");
     match &content {
-        InteractionContent::Thought { text } => {
-            assert_eq!(*text, Some("I need to search for weather data".to_string()));
+        InteractionContent::Thought { signature } => {
+            assert_eq!(*signature, Some("EosFCogFAXLI2...".to_string()));
         }
         _ => panic!("Expected Thought variant"),
     }
     assert!(content.is_thought());
-    assert_eq!(content.thought(), Some("I need to search for weather data"));
+    assert_eq!(content.thought_signature(), Some("EosFCogFAXLI2..."));
 }
 
 #[test]
 fn test_new_thought_with_empty_string() {
     let content = InteractionContent::new_thought("");
     match &content {
-        InteractionContent::Thought { text } => {
-            assert_eq!(*text, Some(String::new()));
+        InteractionContent::Thought { signature } => {
+            assert_eq!(*signature, Some(String::new()));
         }
         _ => panic!("Expected Thought variant"),
     }
-    // Empty string returns None from thought() accessor (same as text())
-    assert_eq!(content.thought(), None);
+    // Empty string returns None from thought_signature() accessor
+    assert_eq!(content.thought_signature(), None);
 }
 
 #[test]
@@ -1850,8 +1885,9 @@ fn test_new_function_result_creates_correct_variant() {
             name,
             call_id,
             result,
+            ..
         } => {
-            assert_eq!(name, "get_weather");
+            assert_eq!(name, Some("get_weather".to_string()));
             assert_eq!(call_id, "call_abc123");
             assert_eq!(result["temperature"], "72F");
             assert_eq!(result["conditions"], "sunny");

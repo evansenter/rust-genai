@@ -21,8 +21,8 @@
 
 use futures_util::StreamExt;
 use genai_rs::{
-    AutoFunctionStreamChunk, AutoFunctionStreamEvent, Client, GenaiError, InteractionContent,
-    InteractionResponse, InteractionStatus, StreamChunk, StreamEvent,
+    AutoFunctionStreamChunk, AutoFunctionStreamEvent, Client, GenaiError, InteractionResponse,
+    InteractionStatus, StreamChunk, StreamEvent,
 };
 use std::env;
 use std::future::Future;
@@ -531,8 +531,9 @@ pub async fn consume_stream(
                         }
                         if delta.is_thought() {
                             result.saw_thought = true;
-                            if let InteractionContent::Thought { text: Some(t) } = &delta {
-                                result.collected_thoughts.push_str(t);
+                            // Thoughts contain cryptographic signatures, not readable text
+                            if let Some(sig) = delta.thought_signature() {
+                                result.collected_thoughts.push_str(sig);
                             }
                         }
                         if delta.is_thought_signature() {
@@ -637,8 +638,9 @@ pub async fn consume_auto_function_stream(
                         }
                         if delta.is_thought() {
                             result.saw_thought = true;
-                            if let InteractionContent::Thought { text: Some(t) } = &delta {
-                                result.collected_thoughts.push_str(t);
+                            // Thoughts contain cryptographic signatures, not readable text
+                            if let Some(sig) = delta.thought_signature() {
+                                result.collected_thoughts.push_str(sig);
                             }
                         }
                     }
