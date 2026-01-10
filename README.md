@@ -71,7 +71,7 @@ futures-util = "0.3"     # For streaming
 
 ## Examples
 
-36 runnable examples covering all features (28 core + 8 real-world applications):
+Runnable examples covering all features:
 
 ```bash
 export GEMINI_API_KEY=your-key
@@ -165,7 +165,7 @@ for thought in response.thoughts() {
 
 | Guide | Description |
 |-------|-------------|
-| [Examples Index](docs/EXAMPLES_INDEX.md) | All 36 examples, categorized |
+| [Examples Index](docs/EXAMPLES_INDEX.md) | All examples, categorized |
 | [Function Calling](docs/FUNCTION_CALLING.md) | `#[tool]` macro, ToolService, manual execution |
 | [Multi-Turn Patterns](docs/MULTI_TURN_FUNCTION_CALLING.md) | Stateful/stateless, inheritance rules |
 | [Streaming API](docs/STREAMING_API.md) | Stream types, resume, auto-functions |
@@ -231,7 +231,7 @@ cargo test -- --include-ignored  # Full integration suite (requires GEMINI_API_K
 genai-rs/           # Main crate: Client, InteractionBuilder, types
 genai-rs-macros/    # Procedural macro for #[tool]
 docs/               # Comprehensive guides
-examples/           # 36 runnable examples
+examples/           # Runnable examples
 ```
 
 ## Contributing

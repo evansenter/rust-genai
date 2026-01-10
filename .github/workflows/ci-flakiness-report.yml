@@ -228,7 +228,7 @@ jobs:
 
           > **Note:** \`.contains()\` assertions on LLM output are brittle because model responses vary.
           > Consider using \`validate_response_semantically()\` for behavioral validation.
-          > See [#324](https://github.com/${{ github.repository }}/issues/324) for migration guidance.
+          > See [docs/TESTING.md](https://github.com/${{ github.repository }}/blob/main/docs/TESTING.md#assertion-strategies) for migration guidance.
           EOF
           fi
 
