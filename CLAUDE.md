@@ -205,3 +205,7 @@ See `docs/LOGGING_STRATEGY.md`. Key points:
 - Tokio async runtime
 - API version: Gemini V1Beta (configured in `src/http/common.rs`)
 - See `CHANGELOG.md` for breaking changes and migration guides
+
+### CI Debugging Tips
+
+- **GitHub Actions log parsing**: Logs from `gh run view --log-failed` are prefixed with `JobName\tStepName\tTimestamp\t`. Use `sed 's/.*test //'` (not `sed 's/^test //'`) to extract test names from failure output.
