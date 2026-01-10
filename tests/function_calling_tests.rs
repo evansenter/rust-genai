@@ -1424,6 +1424,8 @@ mod stateless {
     #[tokio::test]
     #[ignore = "requires GEMINI_API_KEY"]
     async fn test_stateless_with_thinking_thought_signatures() {
+        use genai_rs::FunctionCallingMode;
+
         let client = get_client().expect("GEMINI_API_KEY required");
 
         let get_weather = FunctionDeclaration::builder("get_weather")
@@ -1438,13 +1440,14 @@ mod stateless {
         let history: Vec<genai_rs::InteractionContent> =
             vec![text_content("What's the weather in Paris?")];
 
-        // Stateless with thinking enabled
+        // Stateless with thinking enabled, force function calling
         let response = client
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_input(InteractionInput::Content(history))
             .with_function(get_weather)
             .with_thinking_level(ThinkingLevel::Medium)
+            .with_function_calling_mode(FunctionCallingMode::Any)
             .with_store_disabled()
             .create()
             .await
@@ -1453,10 +1456,10 @@ mod stateless {
         println!("Has thoughts in output: {}", response.has_thoughts());
 
         let calls = response.function_calls();
-        if calls.is_empty() {
-            println!("Model didn't call function - cannot verify signature");
-            return;
-        }
+        assert!(
+            !calls.is_empty(),
+            "Model should call function with FunctionCallingMode::Any"
+        );
 
         let call = &calls[0];
         println!(
@@ -1465,12 +1468,12 @@ mod stateless {
             call.thought_signature.is_some()
         );
 
-        // Document finding for matrix
-        if call.thought_signature.is_some() {
-            println!("✓ Thought signature present on FC in stateless + thinking mode");
-        } else {
-            println!("✗ No thought signature on FC in stateless + thinking mode");
-        }
+        // Document current API behavior: no thought signatures on FC in Interactions API
+        // This assertion documents the finding - if API changes, test will fail and alert us
+        assert!(
+            call.thought_signature.is_none(),
+            "Interactions API currently does not return thought signatures on function calls"
+        );
     }
 }
 
@@ -2765,6 +2768,8 @@ mod multiturn {
     #[tokio::test]
     #[ignore = "requires GEMINI_API_KEY"]
     async fn test_thinking_level_high_thought_signatures() {
+        use genai_rs::FunctionCallingMode;
+
         let Some(client) = get_client() else {
             println!("Skipping: GEMINI_API_KEY not set");
             return;
@@ -2779,11 +2784,12 @@ mod multiturn {
             .required(vec!["city".to_string()])
             .build();
 
-        // Stateful with HIGH thinking level
+        // Stateful with HIGH thinking level, force function calling
         let response = stateful_builder(&client)
             .with_text("What's the weather in Berlin?")
             .with_function(get_weather)
             .with_thinking_level(ThinkingLevel::High)
+            .with_function_calling_mode(FunctionCallingMode::Any)
             .create()
             .await
             .expect("High thinking request failed");
@@ -2791,10 +2797,10 @@ mod multiturn {
         println!("Has thoughts in output: {}", response.has_thoughts());
 
         let calls = response.function_calls();
-        if calls.is_empty() {
-            println!("Model didn't call function - cannot verify signature");
-            return;
-        }
+        assert!(
+            !calls.is_empty(),
+            "Model should call function with FunctionCallingMode::Any"
+        );
 
         let call = &calls[0];
         println!(
@@ -2803,11 +2809,11 @@ mod multiturn {
             call.thought_signature.is_some()
         );
 
-        if call.thought_signature.is_some() {
-            println!("✓ Thought signature present with ThinkingLevel::High");
-        } else {
-            println!("✗ No thought signature with ThinkingLevel::High");
-        }
+        // Document current API behavior: no thought signatures on FC in Interactions API
+        assert!(
+            call.thought_signature.is_none(),
+            "Interactions API currently does not return thought signatures on function calls"
+        );
     }
 
     /// Test FunctionCallingMode::Any to verify if forced FC affects signatures.
@@ -2843,10 +2849,10 @@ mod multiturn {
         println!("Has thoughts in output: {}", response.has_thoughts());
 
         let calls = response.function_calls();
-        if calls.is_empty() {
-            println!("No function call despite mode=Any - cannot verify");
-            return;
-        }
+        assert!(
+            !calls.is_empty(),
+            "Model should call function with FunctionCallingMode::Any"
+        );
 
         let call = &calls[0];
         println!(
@@ -2855,11 +2861,11 @@ mod multiturn {
             call.thought_signature.is_some()
         );
 
-        if call.thought_signature.is_some() {
-            println!("✓ Thought signature present with FC mode Any");
-        } else {
-            println!("✗ No thought signature with FC mode Any");
-        }
+        // Document current API behavior: no thought signatures on FC in Interactions API
+        assert!(
+            call.thought_signature.is_none(),
+            "Interactions API currently does not return thought signatures on function calls"
+        );
     }
 }
 

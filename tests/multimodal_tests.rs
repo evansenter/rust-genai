@@ -1233,7 +1233,7 @@ mod text_to_speech {
         .await;
     }
 
-    /// Tests whether the nested SpeechConfig format from documentation also works.
+    /// Verifies that nested SpeechConfig format fails and flat format succeeds.
     ///
     /// Documentation shows a nested format:
     /// ```json
@@ -1242,10 +1242,11 @@ mod text_to_speech {
     ///
     /// We use a flat format: `{"voice": "Kore", "language": "en-US"}`
     ///
-    /// This test verifies if the nested format is also accepted by the API.
+    /// This test documents API behavior: nested format returns 400, flat format works.
+    /// See docs/INTERACTIONS_API_FEEDBACK.md Issue #7.
     #[tokio::test]
     #[ignore = "Requires API key and TTS model access"]
-    async fn test_speech_config_nested_format() {
+    async fn test_speech_config_nested_format_fails_flat_succeeds() {
         use genai_rs::{CreateInteractionRequest, GenerationConfig, InteractionInput};
         use reqwest::Client as ReqwestClient;
         use serde_json::json;
@@ -1263,8 +1264,7 @@ mod text_to_speech {
         let tts_model = "gemini-2.5-pro-preview-tts";
         let url = "https://generativelanguage.googleapis.com/v1beta/interactions";
 
-        // Test the nested format by constructing raw JSON
-        // The docs show: speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName
+        // Test 1: Nested format (should FAIL with 400)
         let nested_speech_config: serde_json::Value = json!({
             "voiceConfig": {
                 "prebuiltVoiceConfig": {
@@ -1274,9 +1274,7 @@ mod text_to_speech {
         });
 
         println!("=== Testing NESTED SpeechConfig format ===");
-        println!("Format: {}", nested_speech_config);
 
-        // Build request with nested speech config via serde_json
         let request = CreateInteractionRequest {
             model: Some(tts_model.to_string()),
             agent: None,
@@ -1295,45 +1293,35 @@ mod text_to_speech {
         };
 
         let mut request_json = serde_json::to_value(&request).expect("Serialize request");
-
-        // Add generationConfig with nested speechConfig
         request_json["generationConfig"] = json!({
             "speechConfig": nested_speech_config
         });
 
-        println!(
-            "Request:\n{}",
-            serde_json::to_string_pretty(&request_json).unwrap()
-        );
-
-        let response = http_client
+        let nested_response = http_client
             .post(url)
             .header("x-goog-api-key", &api_key)
             .header("Content-Type", "application/json")
             .json(&request_json)
             .send()
-            .await;
+            .await
+            .expect("Nested format request failed to send");
 
-        match response {
-            Ok(resp) => {
-                let status = resp.status();
-                let body = resp.text().await.unwrap_or_default();
-                println!("Response status: {}", status);
+        let nested_status = nested_response.status();
+        let nested_body = nested_response.text().await.unwrap_or_default();
+        println!(
+            "Nested format status: {} - {}",
+            nested_status,
+            &nested_body[..nested_body.len().min(200)]
+        );
 
-                if status.is_success() {
-                    println!("✅ NESTED FORMAT WORKS!");
-                    println!("Response (truncated): {}...", &body[..body.len().min(300)]);
-                } else {
-                    println!("❌ Nested format FAILED with status {}", status);
-                    println!("Error: {}", body);
-                }
-            }
-            Err(e) => {
-                println!("Request error: {:?}", e);
-            }
-        }
+        // Assert: Nested format should fail with 400
+        assert!(
+            nested_status.is_client_error(),
+            "Nested SpeechConfig format should return 400 error, got {}",
+            nested_status
+        );
 
-        // Now test the flat format for comparison
+        // Test 2: Flat format (should SUCCEED)
         println!("\n=== Testing FLAT SpeechConfig format ===");
 
         let flat_gen_config = GenerationConfig {
@@ -1361,10 +1349,6 @@ mod text_to_speech {
         };
 
         let flat_json = serde_json::to_value(&flat_request).expect("Serialize flat request");
-        println!(
-            "Request:\n{}",
-            serde_json::to_string_pretty(&flat_json).unwrap()
-        );
 
         let flat_response = http_client
             .post(url)
@@ -1372,28 +1356,19 @@ mod text_to_speech {
             .header("Content-Type", "application/json")
             .json(&flat_json)
             .send()
-            .await;
+            .await
+            .expect("Flat format request failed to send");
 
-        match flat_response {
-            Ok(resp) => {
-                let status = resp.status();
-                let body = resp.text().await.unwrap_or_default();
-                println!("Response status: {}", status);
+        let flat_status = flat_response.status();
+        println!("Flat format status: {}", flat_status);
 
-                if status.is_success() {
-                    println!("✅ FLAT FORMAT WORKS!");
-                    println!("Response (truncated): {}...", &body[..body.len().min(300)]);
-                } else {
-                    println!("❌ Flat format FAILED with status {}", status);
-                    println!("Error: {}", body);
-                }
-            }
-            Err(e) => {
-                println!("Request error: {:?}", e);
-            }
-        }
+        // Assert: Flat format should succeed
+        assert!(
+            flat_status.is_success(),
+            "Flat SpeechConfig format should succeed, got {}",
+            flat_status
+        );
 
-        println!("\n=== SUMMARY ===");
-        println!("Run this test with --nocapture to see which formats work.");
+        println!("\n✓ Verified: Nested format fails (400), flat format succeeds (200)");
     }
 }

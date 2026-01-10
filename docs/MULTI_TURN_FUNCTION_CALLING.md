@@ -447,14 +447,14 @@ We've tested thought signatures across various Interactions API configurations. 
 
 | Configuration | Signature on FC? | Thoughts in Output? | Test/Example |
 |---------------|------------------|---------------------|--------------|
-| `store: true` (stateful) | ❌ No | ✅ Yes | [`test_thought_signature_parallel_only_first`](../tests/function_calling_tests.rs#L434) |
-| `store: false` (stateless) | ❌ No | ✅ Yes | [`test_stateless_with_thinking_thought_signatures`](../tests/function_calling_tests.rs#L1426) |
-| Parallel function calls | ❌ No | ✅ Yes | [`test_thought_signature_parallel_only_first`](../tests/function_calling_tests.rs#L434) |
-| Sequential function calls | ❌ No | ✅ Yes | [`test_thought_signature_sequential_each_step`](../tests/function_calling_tests.rs#L1953) |
-| ThinkingLevel::High | ❌ No | ✅ Yes | [`test_thinking_level_high_thought_signatures`](../tests/function_calling_tests.rs#L2767) |
-| FunctionCallingMode::Any | ❌ No | ✅ Yes | [`test_function_calling_mode_any_thought_signatures`](../tests/function_calling_tests.rs#L2816) |
-| `background: true` (async) | N/A | ✅ Yes | [`deep_research.rs`](../examples/deep_research.rs) (agents don't use user-defined FC) |
-| Streaming + FC | ❌ No | ✅ Yes | [`test_streaming_with_thinking_and_function_calling`](../tests/function_calling_tests.rs#L1807) |
+| `store: true` (stateful) | ❌ No | ✅ Yes | `test_thought_signature_parallel_only_first` |
+| `store: false` (stateless) | ❌ No | ✅ Yes | `test_stateless_with_thinking_thought_signatures` |
+| Parallel function calls | ❌ No | ✅ Yes | `test_thought_signature_parallel_only_first` |
+| Sequential function calls | ❌ No | ✅ Yes | `test_thought_signature_sequential_each_step` |
+| ThinkingLevel::High | ❌ No | ✅ Yes | `test_thinking_level_high_thought_signatures` |
+| FunctionCallingMode::Any | ❌ No | ✅ Yes | `test_function_calling_mode_any_thought_signatures` |
+| `background: true` (async) | N/A | ✅ Yes | `deep_research.rs` (agents don't use user-defined FC) |
+| Streaming + FC | ❌ No | ✅ Yes | `test_streaming_with_thinking_and_function_calling` |
 
 **Interpretation**: Either:
 1. The Interactions API doesn't support thought signatures on function calls (different from `generateContent`)
