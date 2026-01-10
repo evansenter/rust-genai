@@ -10,6 +10,14 @@ fn log_request_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
     }
 }
 
+/// Logs a response body at debug level, preferring JSON format when possible.
+fn log_response_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
+    match serde_json::to_string_pretty(body) {
+        Ok(json) => log::debug!("Response Body (JSON):\n{json}"),
+        Err(_) => log::debug!("Response Body: {body:#?}"),
+    }
+}
+
 /// The main client for interacting with the Google Generative AI API.
 #[derive(Clone)]
 pub struct Client {
@@ -268,6 +276,7 @@ impl Client {
         )
         .await?;
 
+        log_response_body(&response);
         log::debug!("Interaction created: ID={:?}", response.id);
 
         Ok(response)
@@ -388,6 +397,7 @@ impl Client {
         )
         .await?;
 
+        log_response_body(&response);
         log::debug!("Retrieved interaction: status={:?}", response.status);
 
         Ok(response)
@@ -569,6 +579,7 @@ impl Client {
         )
         .await?;
 
+        log_response_body(&response);
         log::debug!("Interaction cancelled: status={:?}", response.status);
 
         Ok(response)
