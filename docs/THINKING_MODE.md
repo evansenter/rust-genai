@@ -61,26 +61,24 @@ if response.has_thoughts() {
 
 ## Accessing Thoughts
 
-### Get All Thoughts
+> **Note**: Thought blocks contain cryptographic signatures for verification, not human-readable reasoning text. See [Thought Signatures](#thought-signatures) for details.
+
+### Check for Thoughts
 
 ```rust,ignore
-// Iterate over thought content
-for thought in response.thoughts() {
-    println!("Reasoning: {}", thought);
+// Check if model used reasoning
+if response.has_thoughts() {
+    println!("Model used {} thought blocks", response.thought_signatures().count());
 }
 ```
 
-### Separate Thoughts from Response
+### Get Thought Signatures
 
 ```rust,ignore
-// Get reasoning
-let thoughts: Vec<_> = response.thoughts().collect();
-if !thoughts.is_empty() {
-    println!("=== Model's Reasoning ===");
-    for thought in &thoughts {
-        println!("{}", thought);
-    }
-    println!("=========================\n");
+// Iterate over thought signatures (cryptographic proofs, not readable text)
+for signature in response.thought_signatures() {
+    // Signatures are for verification, not display
+    println!("Thought signature present");
 }
 
 // Get final answer
@@ -256,16 +254,12 @@ let prompts = [
 ### 3. Handle Missing Thoughts Gracefully
 
 ```rust,ignore
-// Thoughts may not always be exposed
-let thoughts: Vec<_> = response.thoughts().collect();
-if !thoughts.is_empty() {
-    println!("Reasoning:");
-    for thought in thoughts {
-        println!("  {}", thought);
-    }
-} else if response.has_thoughts() {
-    // API returned Thought blocks but text wasn't exposed
-    println!("(Model processed reasoning internally)");
+// Check for thought presence (signatures are cryptographic, not readable)
+if response.has_thoughts() {
+    let sig_count = response.thought_signatures().count();
+    println!("Model used {} thought blocks for reasoning", sig_count);
+} else {
+    println!("No thought blocks in response");
 }
 ```
 
@@ -278,9 +272,14 @@ let response = client.interaction()
     .with_thinking_level(ThinkingLevel::High)
     .create().await?;
 
-// Review reasoning to understand model's approach
-for thought in response.thoughts() {
-    println!("DEBUG - Model thought: {}", thought);
+// Check if model used reasoning (signatures are cryptographic, not readable)
+if response.has_thoughts() {
+    println!("DEBUG - Model used {} thought blocks", response.thought_signatures().count());
+}
+
+// Actual reasoning is reflected in the final response text
+if let Some(text) = response.text() {
+    println!("DEBUG - Model response: {}", text);
 }
 ```
 

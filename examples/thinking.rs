@@ -267,7 +267,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("• with_thinking_level() exposes model's chain-of-thought reasoning");
     println!("• Levels: minimal, low, medium (default), high (extensive reasoning)");
     println!("• with_thinking_summaries(Auto) provides summarized reasoning in output");
-    println!("• response.thoughts() iterates over reasoning blocks");
+    println!("• response.thought_signatures() iterates over thought cryptographic signatures");
     println!("• Higher levels use more tokens but improve complex problem solving\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");
