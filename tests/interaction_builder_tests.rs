@@ -593,8 +593,8 @@ mod edge_cases {
 mod multimodal {
     use crate::common::DEFAULT_MODEL;
     use genai_rs::{
-        Client, FunctionDeclaration, GenerationConfig, InteractionContent, InteractionInput,
-        Tool, detect_mime_type,
+        Client, FunctionDeclaration, GenerationConfig, InteractionContent, InteractionInput, Tool,
+        detect_mime_type,
     };
     use std::path::Path;
 

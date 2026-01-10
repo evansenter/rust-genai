@@ -1579,8 +1579,9 @@ mod multimodal {
             return;
         };
 
-        let image_url = std::env::var("TEST_IMAGE_URL")
-            .unwrap_or_else(|_| "gs://cloud-samples-data/generative-ai/image/scones.jpg".to_string());
+        let image_url = std::env::var("TEST_IMAGE_URL").unwrap_or_else(|_| {
+            "gs://cloud-samples-data/generative-ai/image/scones.jpg".to_string()
+        });
 
         let contents = vec![
             text_content("What is in this image? Describe it briefly."),
@@ -1653,7 +1654,8 @@ mod multimodal {
                         println!("  Base64 length: {} chars", base64_data.len());
 
                         use base64::Engine;
-                        let decoded = base64::engine::general_purpose::STANDARD.decode(base64_data)?;
+                        let decoded =
+                            base64::engine::general_purpose::STANDARD.decode(base64_data)?;
                         println!("  Decoded size: {} bytes", decoded.len());
 
                         return Ok(());

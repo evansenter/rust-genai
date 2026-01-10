@@ -36,7 +36,9 @@ mod image {
         SAMPLE_IMAGE_URL, TEST_TIMEOUT, TINY_BLUE_PNG_BASE64, TINY_RED_PNG_BASE64,
         assert_response_semantic, get_client, stateful_builder, with_timeout,
     };
-    use genai_rs::{InteractionInput, InteractionStatus, image_data_content, image_uri_content, text_content};
+    use genai_rs::{
+        InteractionInput, InteractionStatus, image_data_content, image_uri_content, text_content,
+    };
 
     /// Tests image input via GCS URI (gs://) which may not be supported by the Interactions API.
     /// This test documents the expected "Unsupported file uri" error behavior when the API rejects
@@ -132,7 +134,9 @@ mod image {
 
         // Send two images in a single request (both base64)
         let contents = vec![
-            text_content("I'm showing you two small colored images. What colors are they? List both."),
+            text_content(
+                "I'm showing you two small colored images. What colors are they? List both.",
+            ),
             image_data_content(TINY_RED_PNG_BASE64, "image/png"),
             image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
         ];
@@ -1092,7 +1096,9 @@ mod bytes_loading {
 
         // Use add_document_bytes() with raw bytes
         let result = interaction_builder(&client)
-            .with_text("What text does this PDF document contain? Answer with just the text you find.")
+            .with_text(
+                "What text does this PDF document contain? Answer with just the text you find.",
+            )
             .add_document_bytes(&pdf_bytes, "application/pdf")
             .create()
             .await;

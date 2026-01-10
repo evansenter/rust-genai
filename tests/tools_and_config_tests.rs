@@ -218,7 +218,9 @@ mod google_search {
                         }
                     } else {
                         // Annotations are not guaranteed - Google may not always return them
-                        println!("Note: No annotations returned (varies by API response and query)");
+                        println!(
+                            "Note: No annotations returned (varies by API response and query)"
+                        );
                     }
                 }
 
@@ -433,7 +435,8 @@ mod code_execution {
                             let summary = response.content_summary();
                             println!(
                                 "Complete response code execution: {} calls, {} results",
-                                summary.code_execution_call_count, summary.code_execution_result_count
+                                summary.code_execution_call_count,
+                                summary.code_execution_result_count
                             );
                             has_complete = true;
                         }
@@ -528,7 +531,9 @@ mod url_context {
                         );
                     }
                 } else {
-                    println!("No URL context metadata in response (may be normal for some responses)");
+                    println!(
+                        "No URL context metadata in response (may be normal for some responses)"
+                    );
                 }
 
                 if response.has_text() {
