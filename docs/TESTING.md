@@ -13,7 +13,7 @@ This guide explains the testing infrastructure, philosophy, and how to write tes
 
 ## Test Categories
 
-### Unit Tests (~24k lines)
+### Unit Tests
 
 Inline tests in source files covering serialization, builders, and internal logic.
 
@@ -30,7 +30,7 @@ cargo test --workspace -- test_name       # Run specific test
 - Helper method behavior
 - Error type formatting
 
-### Integration Tests (25 files)
+### Integration Tests
 
 End-to-end tests that call the real Gemini API. Require `GEMINI_API_KEY`.
 
@@ -47,7 +47,7 @@ cargo test --test interactions_api_tests -- --include-ignored  # Single file
 |------|----------|
 | `interactions_api_tests.rs` | Basic API interactions |
 | `multiturn_tests.rs` | Stateful conversations |
-| `streaming_tests.rs` | SSE streaming |
+| `streaming_multiturn_tests.rs` | SSE streaming |
 | `tools_and_config_tests.rs` | Built-in tools configuration |
 | `advanced_function_calling_tests.rs` | `#[tool]` macro, auto-execution |
 | `thinking_function_tests.rs` | Thinking mode + function calling |
@@ -164,7 +164,11 @@ The GitHub Actions workflow runs these jobs:
 | `clippy` | Lint check |
 | `doc` | Documentation build |
 | `security` | `cargo audit` |
+| `msrv` | Minimum supported Rust version check |
+| `cross-platform` | macOS and Windows builds |
+| `coverage` | Code coverage with `cargo llvm-cov` |
 | `build-metrics` | Clean build time measurement |
+| `ci-flakiness-report` | Daily flakiness analysis (creates `ci-health` issues) |
 
 ### Integration Test Matrix
 

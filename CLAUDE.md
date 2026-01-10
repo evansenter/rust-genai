@@ -101,7 +101,7 @@ See `examples/` for full list (multimodal, thinking, files API, image generation
 - `docs/MULTI_TURN_FUNCTION_CALLING.md` - Stateful/stateless, auto/manual execution, thought signatures
 - `docs/STREAMING_API.md` - Stream types, resume capability, auto-function streaming
 - `docs/LOGGING_STRATEGY.md` - Log levels, sensitive data handling
-- `docs/ENUM_WIRE_FORMATS.md` - Wire formats + all 11 Unknown variant types
+- `docs/ENUM_WIRE_FORMATS.md` - Wire formats and Unknown variant catalog
 
 ### Error Types
 
@@ -169,7 +169,7 @@ See `docs/TESTING.md` for the full decision flowchart and examples.
 
 ## CI/CD
 
-GitHub Actions runs: check, test, test-strict-unknown, test-integration (5 matrix groups), fmt, clippy, doc, msrv, cross-platform, coverage, build-metrics. Security audits run in separate `audit.yml` workflow (on Cargo.toml/lock changes + weekly). Integration tests require same-repo origin (protects API key). Release validation includes full integration test suite.
+GitHub Actions runs: check, test, test-strict-unknown, test-integration (5 matrix groups), fmt, clippy, doc, msrv, cross-platform, coverage, build-metrics, ci-flakiness-report (daily). Security audits run in separate `audit.yml` workflow (on Cargo.toml/lock changes + weekly). Integration tests require same-repo origin (protects API key). Release validation includes full integration test suite.
 
 ## Project Conventions
 
@@ -190,6 +190,8 @@ Apply `#[must_use]` to getters, handles, and boolean checks where ignoring the r
 ## Versioning Philosophy
 
 Breaking changes are permitted and preferred when they simplify the API or align with Evergreen principles. Prefer clean breaks over backwards-compatibility shims.
+
+**CHANGELOG**: Update `CHANGELOG.md` for user-facing changes: new features, breaking changes, bug fixes, deprecations. Internal refactors and CI changes don't need entries.
 
 ## Logging
 
