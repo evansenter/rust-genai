@@ -318,9 +318,9 @@ mod common {
         let _: InteractionContent =
             serde_json::from_value(json!({"type": "text", "text": "hello"})).unwrap();
 
-        // Thought
+        // Thought (contains signature, not text - per wire format)
         let _: InteractionContent =
-            serde_json::from_value(json!({"type": "thought", "text": "thinking"})).unwrap();
+            serde_json::from_value(json!({"type": "thought", "signature": "Eq0JCqoJ..."})).unwrap();
 
         // ThoughtSignature
         let _: InteractionContent =
@@ -390,16 +390,20 @@ mod common {
         }))
         .unwrap();
 
-        // UrlContextCall
-        let _: InteractionContent = serde_json::from_value(
-            json!({"type": "url_context_call", "url": "https://example.com"}),
-        )
+        // UrlContextCall (wire format has id + arguments.urls)
+        let _: InteractionContent = serde_json::from_value(json!({
+            "type": "url_context_call",
+            "id": "ctx_123",
+            "arguments": {"urls": ["https://example.com"]}
+        }))
         .unwrap();
 
-        // UrlContextResult
-        let _: InteractionContent = serde_json::from_value(
-            json!({"type": "url_context_result", "url": "https://example.com", "content": "page"}),
-        )
+        // UrlContextResult (wire format has call_id + result array)
+        let _: InteractionContent = serde_json::from_value(json!({
+            "type": "url_context_result",
+            "call_id": "ctx_123",
+            "result": [{"url": "https://example.com", "status": "success"}]
+        }))
         .unwrap();
     }
 

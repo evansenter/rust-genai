@@ -1743,27 +1743,29 @@ async fn test_image_generation() {
 }
 
 // =============================================================================
-// Thought Echo (Manual Multi-Turn)
+// Manual Multi-Turn with Thinking
 // =============================================================================
 
-/// Test thought echo pattern for manual multi-turn conversations.
+/// Test manual multi-turn history with thinking enabled.
 ///
-/// Validates that:
-/// - Thoughts can be echoed back in subsequent turns
-/// - Manual history construction preserves context
-/// - Model responds appropriately to continued conversation
+/// Note: The API does NOT allow thought content in user turns (returns
+/// "User turns cannot contain thought blocks" error). This test verifies
+/// multi-turn works when manually building history with text-only content.
+///
+/// For thought signature propagation, use `with_previous_interaction()` which
+/// handles the protocol correctly.
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_thought_echo_manual_history() {
+async fn test_manual_history_with_thinking() {
     use genai_rs::ThinkingLevel;
-    use genai_rs::interactions_api::{text_content, thought_content};
+    use genai_rs::interactions_api::text_content;
 
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
     };
 
-    println!("=== Testing Thought Echo Pattern ===\n");
+    println!("=== Testing Manual Multi-Turn with Thinking ===\n");
 
     // Turn 1: Initial question with thinking enabled
     let initial_prompt = "What is 15 * 7? Show your work.";
@@ -1782,26 +1784,22 @@ async fn test_thought_echo_manual_history() {
     let answer1 = response1.text().unwrap_or("(no text)");
     println!("Turn 1 answer: {}", answer1);
 
-    // Collect thought signatures (if any)
-    let thought_sigs: Vec<String> = response1.thought_signatures().map(String::from).collect();
-    println!("Thought signatures collected: {} items", thought_sigs.len());
+    // Note: Thought signatures are model output only - cannot be echoed in user turns
+    // The API rejects: "User turns cannot contain thought blocks"
+    let thought_count = response1.thought_signatures().count();
+    println!(
+        "Thought signatures in response: {} (cannot be echoed)",
+        thought_count
+    );
 
-    // Turn 2: Build manual history with thought echo
-    let mut history = vec![text_content(initial_prompt)];
+    // Turn 2: Build manual history with TEXT only (no thoughts)
+    let history = vec![
+        text_content(initial_prompt),
+        text_content(answer1), // Echo the text answer
+        text_content("Now divide that result by 5"),
+    ];
 
-    // Echo back thought signatures
-    for sig in &thought_sigs {
-        history.push(thought_content(sig));
-    }
-
-    // Echo back the answer
-    history.push(text_content(answer1));
-
-    // Add follow-up question
-    let followup = "Now divide that result by 5";
-    history.push(text_content(followup));
-
-    println!("\nTurn 2 prompt: {}", followup);
+    println!("\nTurn 2 prompt: Now divide that result by 5");
 
     let response2 = interaction_builder(&client)
         .with_input(InteractionInput::Content(history))
@@ -1832,7 +1830,7 @@ async fn test_thought_echo_manual_history() {
         "Response should contain result of 105/5. Got: {}",
         answer2
     );
-    println!("✓ Thought echo test passed");
+    println!("✓ Manual multi-turn with thinking test passed");
 }
 
 // =============================================================================

@@ -1,17 +1,15 @@
-//! Example: Echoing Thoughts in Multi-Turn Conversations
+//! Example: Multi-Turn Conversations with Thinking
 //!
-//! This example demonstrates how to use `thought_content()` to manually echo
-//! the model's thoughts when constructing multi-turn conversations without
-//! using `previous_interaction_id`.
+//! This example demonstrates multi-turn conversations when thinking mode is enabled.
 //!
-//! # When to Use This Pattern
+//! # Important API Limitation
 //!
-//! In most cases, you should use `with_previous_interaction(id)` which automatically
-//! handles thought context on the server. However, manual thought echoing is useful when:
+//! The Gemini API does **NOT** allow thought content in user input turns. Attempting to
+//! send thought blocks in user turns returns: "User turns cannot contain thought blocks."
 //!
-//! - You need to filter or modify the conversation history
-//! - You want to store and replay conversations from a database
-//! - You're building custom conversation management
+//! This means the `thought_content()` helper should NOT be used to echo thoughts back
+//! to the API. Instead, use `with_previous_interaction(id)` which handles thought
+//! context automatically on the server side.
 //!
 //! # Running
 //!
@@ -23,7 +21,7 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use genai_rs::interactions_api::{text_content, thought_content};
+use genai_rs::interactions_api::text_content;
 use genai_rs::{Client, InteractionContent, InteractionInput, ThinkingLevel};
 use std::env;
 
@@ -34,16 +32,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = Client::builder(api_key).build()?;
 
-    println!("=== THOUGHT ECHO EXAMPLE ===\n");
+    println!("=== MULTI-TURN WITH THINKING EXAMPLE ===\n");
 
     // ==========================================================================
-    // Step 1: Initial interaction with thinking enabled
+    // Method 1: Using previous_interaction_id (RECOMMENDED)
     // ==========================================================================
-    println!("--- Step 1: Initial Problem ---\n");
+    println!("--- Method 1: Using previous_interaction_id (Recommended) ---\n");
+    println!("This is the correct approach for multi-turn with thinking.\n");
 
     let initial_prompt = "What is 17 * 23? Think through this step by step.";
     println!("User: {}\n", initial_prompt);
 
+    // First interaction - must enable store for multi-turn
     let response1 = client
         .interaction()
         .with_model("gemini-3-flash-preview")
@@ -66,45 +66,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("\nModel's answer: {}\n", text);
     }
 
-    // ==========================================================================
-    // Step 2: Manual multi-turn using thought_content()
-    // ==========================================================================
-    println!("--- Step 2: Follow-up Question (Manual History) ---\n");
+    let interaction_id = response1
+        .id
+        .as_ref()
+        .expect("id should exist when store=true");
+    println!("Interaction ID: {}\n", interaction_id);
 
-    // Build conversation history manually
-    // We include the original prompt, the model's thoughts, and the model's answer
-    let mut history: Vec<InteractionContent> = vec![
-        // User's original message
-        text_content(initial_prompt),
-    ];
-
-    // Echo back the model's thought signatures using thought_content()
-    for signature in response1.thought_signatures() {
-        history.push(thought_content(signature));
-    }
-
-    // Echo back the model's answer
-    if let Some(text) = response1.text() {
-        history.push(text_content(text));
-    }
-
-    // Add the follow-up question
+    // Follow-up using previous_interaction_id - server preserves thought context
     let followup = "Now what is that result divided by 17?";
-    history.push(text_content(followup));
-
     println!("User: {}\n", followup);
 
-    // Create the follow-up request with manual history
     let response2 = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_input(InteractionInput::Content(history))
+        .with_text(followup)
+        .with_previous_interaction(interaction_id)
         .with_thinking_level(ThinkingLevel::Medium)
         .with_store_enabled()
         .create()
         .await?;
 
-    // Display thought count (signatures are cryptographic, not human-readable)
     if response2.has_thoughts() {
         let sig_count = response2.thought_signatures().count();
         println!(
@@ -118,87 +99,75 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // ==========================================================================
-    // Comparison: Using previous_interaction_id (Recommended)
+    // Method 2: Manual History (TEXT ONLY - thoughts NOT allowed)
     // ==========================================================================
-    println!("--- Alternative: Using previous_interaction_id (Recommended) ---\n");
-    println!("Note: In production, prefer using .with_previous_interaction(id)");
-    println!("which handles thought context automatically on the server.\n");
+    println!("--- Method 2: Manual History (Text Only) ---\n");
+    println!("Note: The API does NOT allow thought blocks in user turns.");
+    println!("Only text content can be echoed in manual history.\n");
 
-    // First interaction
-    let response_auto = client
+    let prompt = "What is 13 * 19?";
+    println!("User: {}\n", prompt);
+
+    let resp_manual = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("What is 17 * 23?")
+        .with_text(prompt)
         .with_thinking_level(ThinkingLevel::Low)
-        .with_store_enabled()
         .create()
         .await?;
 
-    println!("First response ID: {:?}", response_auto.id);
+    let answer = resp_manual.text().unwrap_or("(no answer)");
+    println!("Model's answer: {}\n", answer);
 
-    // Follow-up using previous_interaction_id
-    let followup_auto = client
+    // Build manual history - TEXT ONLY (no thoughts!)
+    let history: Vec<InteractionContent> = vec![
+        text_content(prompt),
+        text_content(answer),
+        text_content("Now divide that by 13."),
+    ];
+
+    println!("User: Now divide that by 13.\n");
+
+    let resp_followup = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("Now divide that by 17.")
-        .with_previous_interaction(
-            response_auto
-                .id
-                .as_ref()
-                .expect("id should exist when store=true"),
-        )
+        .with_input(InteractionInput::Content(history))
         .with_thinking_level(ThinkingLevel::Low)
-        .with_store_enabled()
         .create()
         .await?;
 
-    if let Some(text) = followup_auto.text() {
-        println!("Follow-up answer: {}\n", text);
+    if let Some(text) = resp_followup.text() {
+        println!("Model's answer: {}\n", text);
     }
-
-    // ==========================================================================
-    // Usage Notes
-    // ==========================================================================
-    println!("--- Usage Notes ---\n");
-    println!("When to use thought_content():");
-    println!("  - Building custom conversation stores/databases");
-    println!("  - Filtering or modifying conversation history");
-    println!("  - Replaying saved conversations");
-    println!();
-    println!("When to use with_previous_interaction():");
-    println!("  - Simple multi-turn conversations (recommended)");
-    println!("  - Server handles thought signatures automatically");
-    println!("  - No need to manually track conversation content");
 
     // =========================================================================
     // Summary
     // =========================================================================
-    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("✅ Thought Echo Demo Complete\n");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Multi-Turn with Thinking Demo Complete\n");
 
     println!("--- Key Takeaways ---");
-    println!("• thought_content() echoes model thoughts in manual multi-turn");
-    println!("• Useful for custom conversation stores or history filtering");
-    println!("• with_previous_interaction() handles this automatically (preferred)");
-    println!("• Signatures from thought_signatures() can be echoed back\n");
+    println!("• Use with_previous_interaction() for multi-turn with thinking");
+    println!("• The server preserves thought context automatically");
+    println!("• Manual history can only contain TEXT - thoughts are rejected");
+    println!("• Thought signatures are cryptographic, not human-readable text\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");
-    println!("Manual history:");
-    println!("  [REQ#1] POST with input + thinkingConfig");
-    println!("  [RES#1] completed: thoughts + text");
-    println!("  [REQ#2] POST with manual history (text + thoughts + text + followup)");
-    println!("  [RES#2] completed: continuation with context\n");
-    println!("Using previous_interaction_id (recommended):");
-    println!("  [REQ#3] POST with input + thinkingConfig + store:true");
-    println!("  [RES#3] completed: thoughts + text + interaction ID");
-    println!("  [REQ#4] POST with input + previousInteractionId");
-    println!("  [RES#4] completed: server-side thought context preserved\n");
+    println!("Method 1 (previous_interaction_id):");
+    println!("  [REQ#1] POST with input + thinkingConfig + store:true");
+    println!("  [RES#1] completed: thoughts (signature) + text + interaction ID");
+    println!("  [REQ#2] POST with input + previousInteractionId");
+    println!("  [RES#2] completed: server-side thought context preserved\n");
+    println!("Method 2 (manual history, text only):");
+    println!("  [REQ#3] POST with input + thinkingConfig");
+    println!("  [RES#3] completed: thoughts + text");
+    println!("  [REQ#4] POST with manual history (text content only)\n");
 
     println!("--- Production Considerations ---");
-    println!("• Prefer with_previous_interaction() for simplicity");
-    println!("• Manual echoing needed only for custom conversation management");
-    println!("• Thought signatures are handled automatically with previous_interaction_id");
-    println!("• Store conversation history in database for replay scenarios");
+    println!("• Always use with_previous_interaction() for thinking conversations");
+    println!("• Manual history is limited to text - thoughts cannot be echoed");
+    println!("• Enable with_store_enabled() to get interaction IDs for chaining");
+    println!("• Thought signatures are for verification, not user display");
 
     Ok(())
 }
