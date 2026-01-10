@@ -39,6 +39,8 @@ jobs:
           FAILED_RUNS=0
           declare -A TEST_FAILURES
           declare -A TEST_FILES
+          declare -A TEST_LAST_FAILURE  # Track when each test last failed
+          RECENT_RUNS_COUNT=0  # Count of most recent runs to check for "fixed" tests
 
           # Get all workflow runs from the past week
           echo "Fetching workflow runs..."
@@ -81,16 +83,19 @@ jobs:
                   # Clean up the test name (strip prefix and suffix)
                   test_name=$(echo "$test_name" | sed 's/.*test //' | sed 's/ \.\.\..*$//')
 
-                  # Increment failure count
+                  # Increment failure count and track last failure time
                   if [ -n "${TEST_FAILURES[$test_name]:-}" ]; then
                     TEST_FAILURES[$test_name]=$((TEST_FAILURES[$test_name] + 1))
                   else
                     TEST_FAILURES[$test_name]=1
                   fi
+                  # Track timestamp of this failure
+                  TEST_LAST_FAILURE[$test_name]="$RUN_TS"
                 fi
               done < <(echo "$LOGS" | grep -oE "test [a-zA-Z0-9_:]+ \.\.\. FAILED" || true)
 
-              # Also check for panicked tests
+              # Also check for panicked tests using stdout section headers
+              # Pattern: "---- test_name stdout ----" which is more reliable than thread names
               while IFS= read -r test_name; do
                 if [ -n "$test_name" ]; then
                   if [ -n "${TEST_FAILURES[$test_name]:-}" ]; then
@@ -98,10 +103,22 @@ jobs:
                   else
                     TEST_FAILURES[$test_name]=1
                   fi
+                  TEST_LAST_FAILURE[$test_name]="$RUN_TS"
                 fi
-              done < <(echo "$LOGS" | grep -oE "thread '[^']+' panicked" | sed "s/thread '//" | sed "s/' panicked//" || true)
+              done < <(echo "$LOGS" | grep -oE "---- [a-zA-Z0-9_:]+ stdout ----" | sed 's/---- //' | sed 's/ stdout ----//' || true)
             fi
           done < <(echo "$RUNS_JSON" | jq -c '.[]')
+
+          # Identify tests that were fixed (failed earlier but not in recent runs)
+          # A test is "fixed" if its last failure was more than 2 days ago
+          TWO_DAYS_AGO=$(date -u -d "2 days ago" +%s)
+          declare -A FIXED_TESTS
+          for test_name in "${!TEST_FAILURES[@]}"; do
+            last_failure="${TEST_LAST_FAILURE[$test_name]:-0}"
+            if [ "$last_failure" -lt "$TWO_DAYS_AGO" ] && [ "$last_failure" -gt 0 ]; then
+              FIXED_TESTS[$test_name]=1
+            fi
+          done
 
           # Calculate failure rate
           if [ "$TOTAL_RUNS" -gt 0 ]; then
@@ -116,8 +133,8 @@ jobs:
           # Find test file locations
           echo "Locating test files..."
           for test_name in "${!TEST_FAILURES[@]}"; do
-            # Try to find the test file
-            FILE=$(grep -rl "fn $test_name\|fn ${test_name#*::}" tests/ src/ 2>/dev/null | head -1 || echo "unknown")
+            # Try to find the test file (use -E for extended regex alternation)
+            FILE=$(grep -rlE "fn $test_name|fn ${test_name#*::}" tests/ src/ 2>/dev/null | head -1 || echo "unknown")
             if [ -n "$FILE" ] && [ "$FILE" != "unknown" ]; then
               TEST_FILES[$test_name]=$(basename "$FILE")
             else
@@ -181,6 +198,21 @@ jobs:
           EOF
           fi
 
+          # Add tests recently fixed section
+          FIXED_COUNT=${#FIXED_TESTS[@]}
+          if [ "$FIXED_COUNT" -gt 0 ]; then
+            cat >> "$REPORT_FILE" << 'EOF'
+
+          ### Tests Recently Fixed
+
+          These tests failed earlier in the period but haven't failed in the last 2 days:
+
+          EOF
+            for test_name in "${!FIXED_TESTS[@]}"; do
+              echo "- \`$test_name\`" >> "$REPORT_FILE"
+            done
+          fi
+
           # Add brittle pattern section
           cat >> "$REPORT_FILE" << EOF
 
@@ -242,11 +274,9 @@ jobs:
             --jq ".[] | select(.title | startswith(\"CI Flakiness Report - Week of $(date -u +\"%Y-%m-%d\")\")) | .number" \
             2>/dev/null || echo "")
 
-          REPORT_BODY=$(cat "$REPORT_FILE")
-
           if [ -n "$EXISTING_ISSUE" ]; then
             echo "Updating existing issue #$EXISTING_ISSUE"
-            gh issue edit "$EXISTING_ISSUE" --body "$REPORT_BODY"
+            gh issue edit "$EXISTING_ISSUE" --body-file "$REPORT_FILE"
             echo "Updated issue: ${{ github.server_url }}/${{ github.repository }}/issues/$EXISTING_ISSUE"
           else
             echo "Creating new issue"
@@ -258,7 +288,7 @@ jobs:
 
             NEW_ISSUE=$(gh issue create \
               --title "$TITLE" \
-              --body "$REPORT_BODY" \
+              --body-file "$REPORT_FILE" \
               --label "ci-health")
             echo "Created issue: $NEW_ISSUE"
           fi
