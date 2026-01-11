@@ -24,7 +24,8 @@ jobs:
       - name: Run unit tests
         run: cargo test --workspace --verbose
       - name: Run integration tests
-        run: cargo test --workspace --verbose -- --include-ignored
+        # Use --tests to exclude doctests; --include-ignored would compile 'ignore' doctest snippets
+        run: cargo test --workspace --tests --verbose -- --include-ignored
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       - name: Check formatting
