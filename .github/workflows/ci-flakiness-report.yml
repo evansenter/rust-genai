@@ -137,6 +137,7 @@ jobs:
             --argjson rate_limit "$RATE_LIMIT" \
             --argjson assertion_failures "$ASSERTION_FAILURES" \
             --argjson panic "$PANIC" \
+            --argjson unknown "$UNKNOWN" \
             --arg date "$END_DATE" \
             '{
               total_runs: $total_runs,
@@ -146,6 +147,7 @@ jobs:
               rate_limit: $rate_limit,
               assertion_failures: $assertion_failures,
               panic: $panic,
+              unknown: $unknown,
               date: $date
             }' > summary.json
 

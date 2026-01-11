@@ -43,16 +43,15 @@ download_artifact() {
     return 1
   fi
 
-  # Download artifact (zip path set globally for trap cleanup)
-  local zip_file="/tmp/artifact_$$.zip"
+  # Download artifact (uses global ARTIFACT_ZIP for trap cleanup)
   if gh api \
     "/repos/{owner}/{repo}/actions/artifacts/${artifact_id}/zip" \
-    > "$zip_file" 2>/dev/null; then
-    if unzip -p "$zip_file" > "$output_file" 2>/dev/null; then
-      rm -f "$zip_file"
+    > "$ARTIFACT_ZIP" 2>/dev/null; then
+    if unzip -p "$ARTIFACT_ZIP" > "$output_file" 2>/dev/null; then
+      rm -f "$ARTIFACT_ZIP"
       return 0
     fi
-    rm -f "$zip_file"
+    rm -f "$ARTIFACT_ZIP"
   fi
 
   return 1
@@ -131,6 +130,7 @@ CURRENT_API=$(echo "$CURRENT_JSON" | jq -r '.api_errors // 0')
 CURRENT_RATE=$(echo "$CURRENT_JSON" | jq -r '.rate_limit // 0')
 CURRENT_ASSERT=$(echo "$CURRENT_JSON" | jq -r '.assertion_failures // 0')
 CURRENT_PANIC=$(echo "$CURRENT_JSON" | jq -r '.panic // 0')
+CURRENT_UNKNOWN=$(echo "$CURRENT_JSON" | jq -r '.unknown // 0')
 
 # Extract 24hr metrics (if available)
 if [ "$HAS_24H" = true ]; then
@@ -141,9 +141,10 @@ if [ "$HAS_24H" = true ]; then
   PREV_24H_RATE=$(jq -r '.rate_limit // 0' "$PREV_24H_FILE")
   PREV_24H_ASSERT=$(jq -r '.assertion_failures // 0' "$PREV_24H_FILE")
   PREV_24H_PANIC=$(jq -r '.panic // 0' "$PREV_24H_FILE")
+  PREV_24H_UNKNOWN=$(jq -r '.unknown // 0' "$PREV_24H_FILE")
 else
   PREV_24H_TOTAL="" PREV_24H_FAILED="" PREV_24H_FLAKY=""
-  PREV_24H_API="" PREV_24H_RATE="" PREV_24H_ASSERT="" PREV_24H_PANIC=""
+  PREV_24H_API="" PREV_24H_RATE="" PREV_24H_ASSERT="" PREV_24H_PANIC="" PREV_24H_UNKNOWN=""
 fi
 
 # Extract 7-day metrics (if available)
@@ -155,9 +156,10 @@ if [ "$HAS_7D" = true ]; then
   PREV_7D_RATE=$(jq -r '.rate_limit // 0' "$PREV_7D_FILE")
   PREV_7D_ASSERT=$(jq -r '.assertion_failures // 0' "$PREV_7D_FILE")
   PREV_7D_PANIC=$(jq -r '.panic // 0' "$PREV_7D_FILE")
+  PREV_7D_UNKNOWN=$(jq -r '.unknown // 0' "$PREV_7D_FILE")
 else
   PREV_7D_TOTAL="" PREV_7D_FAILED="" PREV_7D_FLAKY=""
-  PREV_7D_API="" PREV_7D_RATE="" PREV_7D_ASSERT="" PREV_7D_PANIC=""
+  PREV_7D_API="" PREV_7D_RATE="" PREV_7D_ASSERT="" PREV_7D_PANIC="" PREV_7D_UNKNOWN=""
 fi
 
 # Build trend output
@@ -170,7 +172,8 @@ cat <<EOF
     "api_errors": $CURRENT_API,
     "rate_limit": $CURRENT_RATE,
     "assertion_failures": $CURRENT_ASSERT,
-    "panic": $CURRENT_PANIC
+    "panic": $CURRENT_PANIC,
+    "unknown": $CURRENT_UNKNOWN
   },
   "trends_24h": {
     "available": $HAS_24H,
@@ -180,7 +183,8 @@ cat <<EOF
     "api_errors": "$(calculate_trend "$CURRENT_API" "$PREV_24H_API")",
     "rate_limit": "$(calculate_trend "$CURRENT_RATE" "$PREV_24H_RATE")",
     "assertion_failures": "$(calculate_trend "$CURRENT_ASSERT" "$PREV_24H_ASSERT")",
-    "panic": "$(calculate_trend "$CURRENT_PANIC" "$PREV_24H_PANIC")"
+    "panic": "$(calculate_trend "$CURRENT_PANIC" "$PREV_24H_PANIC")",
+    "unknown": "$(calculate_trend "$CURRENT_UNKNOWN" "$PREV_24H_UNKNOWN")"
   },
   "deltas_24h": {
     "failed_runs": $(calculate_delta "$CURRENT_FAILED" "$PREV_24H_FAILED"),
@@ -188,7 +192,8 @@ cat <<EOF
     "api_errors": $(calculate_delta "$CURRENT_API" "$PREV_24H_API"),
     "rate_limit": $(calculate_delta "$CURRENT_RATE" "$PREV_24H_RATE"),
     "assertion_failures": $(calculate_delta "$CURRENT_ASSERT" "$PREV_24H_ASSERT"),
-    "panic": $(calculate_delta "$CURRENT_PANIC" "$PREV_24H_PANIC")
+    "panic": $(calculate_delta "$CURRENT_PANIC" "$PREV_24H_PANIC"),
+    "unknown": $(calculate_delta "$CURRENT_UNKNOWN" "$PREV_24H_UNKNOWN")
   },
   "trends_7d": {
     "available": $HAS_7D,
@@ -198,7 +203,8 @@ cat <<EOF
     "api_errors": "$(calculate_trend "$CURRENT_API" "$PREV_7D_API")",
     "rate_limit": "$(calculate_trend "$CURRENT_RATE" "$PREV_7D_RATE")",
     "assertion_failures": "$(calculate_trend "$CURRENT_ASSERT" "$PREV_7D_ASSERT")",
-    "panic": "$(calculate_trend "$CURRENT_PANIC" "$PREV_7D_PANIC")"
+    "panic": "$(calculate_trend "$CURRENT_PANIC" "$PREV_7D_PANIC")",
+    "unknown": "$(calculate_trend "$CURRENT_UNKNOWN" "$PREV_7D_UNKNOWN")"
   },
   "deltas_7d": {
     "failed_runs": $(calculate_delta "$CURRENT_FAILED" "$PREV_7D_FAILED"),
@@ -206,7 +212,8 @@ cat <<EOF
     "api_errors": $(calculate_delta "$CURRENT_API" "$PREV_7D_API"),
     "rate_limit": $(calculate_delta "$CURRENT_RATE" "$PREV_7D_RATE"),
     "assertion_failures": $(calculate_delta "$CURRENT_ASSERT" "$PREV_7D_ASSERT"),
-    "panic": $(calculate_delta "$CURRENT_PANIC" "$PREV_7D_PANIC")
+    "panic": $(calculate_delta "$CURRENT_PANIC" "$PREV_7D_PANIC"),
+    "unknown": $(calculate_delta "$CURRENT_UNKNOWN" "$PREV_7D_UNKNOWN")
   }
 }
 EOF

@@ -59,6 +59,7 @@ API_ERRORS=$(echo "$TRENDS" | jq -r '.current.api_errors')
 RATE_LIMIT=$(echo "$TRENDS" | jq -r '.current.rate_limit')
 ASSERTION_FAILURES=$(echo "$TRENDS" | jq -r '.current.assertion_failures')
 PANIC=$(echo "$TRENDS" | jq -r '.current.panic')
+UNKNOWN=$(echo "$TRENDS" | jq -r '.current.unknown')
 
 # Calculate failure rate
 if [ "$TOTAL_RUNS" -gt 0 ]; then
@@ -136,7 +137,7 @@ cat <<EOF
 EOF
 
 # Add failure breakdown section (only if there are failures)
-TOTAL_CATEGORIZED=$((API_ERRORS + RATE_LIMIT + ASSERTION_FAILURES + PANIC))
+TOTAL_CATEGORIZED=$((API_ERRORS + RATE_LIMIT + ASSERTION_FAILURES + PANIC + UNKNOWN))
 if [ "$TOTAL_CATEGORIZED" -gt 0 ]; then
   cat <<EOF
 
@@ -183,6 +184,7 @@ EOF
   format_category_row "Rate limit (429)" "$RATE_LIMIT" "rate_limit"
   format_category_row "Assertion failures" "$ASSERTION_FAILURES" "assertion_failures"
   format_category_row "Panics" "$PANIC" "panic"
+  format_category_row "Unknown" "$UNKNOWN" "unknown"
 fi
 
 # Add top flaky tests section

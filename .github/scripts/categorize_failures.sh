@@ -59,7 +59,9 @@ PANIC_TESTS=$(echo "$LOGS" | grep -oE "---- [a-zA-Z0-9_:]+ stdout ----" | sed 's
 ALL_TESTS=$(echo -e "$FAILED_TESTS\n$PANIC_TESTS" | sort -u | grep -v '^$' || true)
 
 # Categorize each test based on surrounding log context
-for test_name in $ALL_TESTS; do
+while IFS= read -r test_name; do
+  [ -z "$test_name" ] && continue
+
   # Extract context around the test failure (100 lines before/after)
   CONTEXT=$(echo "$LOGS" | grep -A 100 -B 20 "$test_name" 2>/dev/null || echo "")
 
@@ -75,7 +77,7 @@ for test_name in $ALL_TESTS; do
   else
     UNKNOWN+=("$test_name")
   fi
-done
+done <<< "$ALL_TESTS"
 
 # Helper to convert bash array to JSON array
 to_json_array() {
