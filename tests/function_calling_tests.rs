@@ -29,9 +29,9 @@
 mod common;
 
 use common::{
-    EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_auto_function_stream, consume_stream, get_client,
-    interaction_builder, retry_on_any_error, stateful_builder, validate_response_semantically,
-    with_timeout,
+    consume_auto_function_stream, consume_stream, extended_test_timeout, get_client,
+    interaction_builder, retry_on_any_error, stateful_builder, test_timeout,
+    validate_response_semantically, with_timeout,
 };
 use genai_rs::interactions_api::{function_call_content, text_content};
 use genai_rs::{
@@ -387,7 +387,7 @@ mod parallel {
             return;
         };
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let get_weather = FunctionDeclaration::builder("get_weather")
                 .description("Get the current weather for a city")
                 .parameter(
@@ -437,7 +437,7 @@ mod parallel {
             return;
         };
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let func1 = FunctionDeclaration::builder("get_weather")
                 .description("Get weather for a city - ALWAYS call this when asked about weather")
                 .parameter("city", json!({"type": "string"}))
@@ -488,7 +488,7 @@ mod parallel {
             return;
         };
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let get_weather = FunctionDeclaration::builder("get_weather")
                 .description("Get weather for a city - ALWAYS call this for weather")
                 .parameter("city", json!({"type": "string"}))
@@ -550,7 +550,7 @@ mod parallel {
     #[tokio::test]
     #[ignore = "requires GEMINI_API_KEY"]
     async fn test_parallel_function_result_order_independence() {
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let client = get_client().expect("GEMINI_API_KEY required");
 
             let functions = vec![
@@ -627,7 +627,7 @@ mod parallel {
     #[tokio::test]
     #[ignore = "requires GEMINI_API_KEY"]
     async fn test_parallel_function_partial_failure() {
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let client = get_client().expect("GEMINI_API_KEY required");
 
             let functions = vec![
@@ -720,7 +720,7 @@ mod sequential {
             return;
         };
 
-        with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        with_timeout(extended_test_timeout(), async {
             let get_weather = FunctionDeclaration::builder("get_weather")
                 .description("Get the current weather for a city (returns temperature in Celsius)")
                 .parameter("city", json!({"type": "string"}))
@@ -819,7 +819,7 @@ mod sequential {
             return;
         };
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let get_weather = FunctionDeclaration::builder("get_weather")
                 .description("Get the current weather for a city")
                 .parameter("city", json!({"type": "string"}))
@@ -871,7 +871,7 @@ mod sequential {
             return;
         };
 
-        with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        with_timeout(extended_test_timeout(), async {
             let get_location = FunctionDeclaration::builder("get_current_location")
                 .description("Get the user's current location")
                 .build();
@@ -963,7 +963,7 @@ mod streaming {
             return;
         };
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let get_weather = FunctionDeclaration::builder("get_weather")
                 .description("Get the current weather for a city")
                 .parameter("city", json!({"type": "string"}))
@@ -1008,7 +1008,7 @@ mod streaming {
             return;
         };
 
-        with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        with_timeout(extended_test_timeout(), async {
             let stream = stateful_builder(&client)
                 .with_text("Write a detailed 500-word essay about the history of the Internet.")
                 .create_stream();
@@ -1219,7 +1219,7 @@ mod auto_execution {
     #[tokio::test]
     #[ignore = "requires GEMINI_API_KEY"]
     async fn test_auto_functions_timeout_returns_error() {
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let client = get_client().expect("GEMINI_API_KEY required");
 
             let result = interaction_builder(&client)
@@ -1243,7 +1243,7 @@ mod auto_execution {
     async fn test_auto_functions_stream_timeout_returns_error() {
         use futures_util::StreamExt;
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let client = get_client().expect("GEMINI_API_KEY required");
 
             let mut stream = interaction_builder(&client)
@@ -1310,7 +1310,7 @@ mod auto_execution {
     async fn test_auto_functions_timeout_with_registered_functions() {
         use std::time::Duration;
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let client = get_client().expect("GEMINI_API_KEY required");
 
             // Use an impossibly short timeout with functions registered
@@ -1346,7 +1346,7 @@ mod stateless {
     #[tokio::test]
     #[ignore = "requires GEMINI_API_KEY"]
     async fn test_stateless_function_calling_multi_turn() {
-        with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        with_timeout(extended_test_timeout(), async {
             let client = get_client().expect("GEMINI_API_KEY required");
 
             let functions = vec![
@@ -1959,7 +1959,7 @@ mod thinking {
             return;
         };
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let get_weather = FunctionDeclaration::builder("get_weather")
                 .description("Get the current weather")
                 .parameter("city", json!({"type": "string"}))

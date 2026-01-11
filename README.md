@@ -223,8 +223,8 @@ match content {
 ## Testing
 
 ```bash
-cargo test                       # Unit tests
-cargo test -- --include-ignored  # Full integration suite (requires GEMINI_API_KEY)
+make test      # Unit tests (uses cargo-nextest)
+make test-all  # Full integration suite (requires GEMINI_API_KEY)
 ```
 
 ## Project Structure

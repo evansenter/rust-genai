@@ -327,7 +327,7 @@ response = client.interaction()
 - Model determines parallelism automatically based on the request
 - **Order independence**: The API correlates results to their calls via `call_id`,
   not by position. This behavior is validated in `test_parallel_function_result_order_independence`
-  in `advanced_function_calling_tests.rs`. However, since this is undocumented by Google,
+  in `function_calling_tests.rs`. However, since this is undocumented by Google,
   we recommend maintaining the same order as the original calls as a best practice
 
 ### Compositional (Sequential) Function Calls

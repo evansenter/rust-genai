@@ -30,8 +30,8 @@
 mod common;
 
 use common::{
-    EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_stream, interaction_builder, retry_on_any_error,
-    stateful_builder, validate_response_semantically, with_timeout,
+    consume_stream, extended_test_timeout, interaction_builder, retry_on_any_error,
+    stateful_builder, test_timeout, validate_response_semantically, with_timeout,
 };
 use genai_rs::{
     CallableFunction, Client, FunctionDeclaration, GenaiError, GenerationConfig, InteractionInput,
@@ -109,7 +109,7 @@ mod basic {
             return;
         };
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let response1 = stateful_builder(&client)
                 .with_text("My favorite color is blue.")
                 .create()
@@ -271,7 +271,7 @@ mod streaming {
             return;
         };
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let stream = stateful_builder(&client)
                 .with_text("Count from 1 to 5.")
                 .create_stream();
@@ -301,7 +301,7 @@ mod streaming {
             return;
         };
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let mut stream = stateful_builder(&client)
                 .with_text("Write a haiku about each season: spring, summer, fall, and winter. Label each one.")
                 .create_stream();
@@ -382,7 +382,7 @@ mod streaming {
             return;
         };
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             let request = InteractionRequest {
                 model: Some("gemini-3-flash-preview".to_string()),
                 agent: None,
@@ -520,7 +520,7 @@ mod function_calling {
                 return;
             };
 
-            with_timeout(TEST_TIMEOUT, async {
+            with_timeout(test_timeout(), async {
                 let get_weather = FunctionDeclaration::builder("get_weather")
                     .description("Get the current weather for a location")
                     .parameter(
@@ -602,7 +602,7 @@ mod function_calling {
                 return;
             };
 
-            with_timeout(TEST_TIMEOUT, async {
+            with_timeout(test_timeout(), async {
                 let get_time = FunctionDeclaration::builder("get_current_time")
                     .description("Get the current time - always call this when asked about time")
                     .build();
@@ -669,7 +669,7 @@ mod function_calling {
                 return;
             };
 
-            with_timeout(EXTENDED_TEST_TIMEOUT, async {
+            with_timeout(extended_test_timeout(), async {
                 let weather_func = GetMockWeatherCallable.declaration();
 
                 let result = interaction_builder(&client)
@@ -719,7 +719,7 @@ mod function_calling {
                 return;
             };
 
-            with_timeout(EXTENDED_TEST_TIMEOUT, async {
+            with_timeout(extended_test_timeout(), async {
                 let undefined_func = FunctionDeclaration::builder("undefined_function")
                     .description("A function that doesn't have a registered handler")
                     .parameter("input", json!({"type": "string"}))
@@ -757,7 +757,7 @@ mod function_calling {
                 return;
             };
 
-            with_timeout(TEST_TIMEOUT, async {
+            with_timeout(test_timeout(), async {
                 let get_weather = FunctionDeclaration::builder("get_weather")
                     .description("Get the current weather for a location")
                     .parameter(
@@ -1190,7 +1190,7 @@ mod system_instructions {
             return;
         };
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             println!("=== System Instruction + Streaming ===");
 
             let stream = interaction_builder(&client)
@@ -1435,7 +1435,7 @@ mod conversations {
             return;
         };
 
-        with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        with_timeout(extended_test_timeout(), async {
             let messages = [
                 "My name is Alice.",
                 "I live in New York.",

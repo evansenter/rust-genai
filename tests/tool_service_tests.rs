@@ -15,8 +15,8 @@ mod common;
 
 use async_trait::async_trait;
 use common::{
-    EXTENDED_TEST_TIMEOUT, TEST_TIMEOUT, consume_auto_function_stream, get_client,
-    interaction_builder, with_timeout,
+    consume_auto_function_stream, extended_test_timeout, get_client, interaction_builder,
+    test_timeout, with_timeout,
 };
 use genai_rs::{CallableFunction, FunctionDeclaration, FunctionError, ToolService};
 use serde_json::json;
@@ -126,7 +126,7 @@ async fn test_tool_service_non_streaming() {
         return;
     };
 
-    with_timeout(TEST_TIMEOUT, async {
+    with_timeout(test_timeout(), async {
         // Create a tool service with specific configuration
         let service = Arc::new(MathToolService::new(4)); // 4 decimal places
 
@@ -185,7 +185,7 @@ async fn test_tool_service_streaming() {
         return;
     };
 
-    with_timeout(TEST_TIMEOUT, async {
+    with_timeout(test_timeout(), async {
         // Create a tool service with specific configuration
         let service = Arc::new(MathToolService::new(2)); // 2 decimal places
 
@@ -253,7 +253,7 @@ async fn test_tool_service_overrides_global_registry() {
         return;
     };
 
-    with_timeout(TEST_TIMEOUT, async {
+    with_timeout(test_timeout(), async {
         // Create a custom weather tool that returns a distinct response
         struct CustomWeatherTool;
 
@@ -348,7 +348,7 @@ async fn test_tool_service_streaming_with_multiple_functions() {
         return;
     };
 
-    with_timeout(EXTENDED_TEST_TIMEOUT, async {
+    with_timeout(extended_test_timeout(), async {
         // Create a service with multiple tools
         struct MultiToolService;
 

@@ -10,6 +10,9 @@ This guide explains the testing infrastructure, philosophy, and how to write tes
 - [Test Utilities](#test-utilities)
 - [Writing New Tests](#writing-new-tests)
 - [Assertion Strategies](#assertion-strategies)
+- [Test Data](#test-data)
+- [Debugging Tests](#debugging-tests)
+- [Test Organization Philosophy](#test-organization-philosophy)
 
 ## Test Categories
 
@@ -18,8 +21,8 @@ This guide explains the testing infrastructure, philosophy, and how to write tes
 Inline tests in source files covering serialization, builders, and internal logic.
 
 ```bash
-cargo test --workspace                    # Run all unit tests
-cargo test --workspace -- test_name       # Run specific test
+make test                                 # Run all unit tests (uses cargo-nextest)
+cargo nextest run -E 'test(/test_name/)'  # Run specific test by pattern
 ```
 
 **Location**: `src/*_tests.rs` files and `#[cfg(test)]` modules
@@ -35,8 +38,8 @@ cargo test --workspace -- test_name       # Run specific test
 End-to-end tests that call the real Gemini API. Require `GEMINI_API_KEY`.
 
 ```bash
-cargo test -- --include-ignored           # Run all tests including integration
-cargo test --test interactions_api_tests -- --include-ignored  # Single file
+make test-all                                        # Run all tests including integration
+cargo nextest run --test interactions_api_tests --run-ignored all  # Single file
 ```
 
 **Location**: `tests/*.rs`
@@ -49,8 +52,8 @@ cargo test --test interactions_api_tests -- --include-ignored  # Single file
 | `multiturn_tests.rs` | Stateful conversations |
 | `streaming_multiturn_tests.rs` | SSE streaming |
 | `tools_and_config_tests.rs` | Built-in tools configuration |
-| `advanced_function_calling_tests.rs` | `#[tool]` macro, auto-execution |
-| `thinking_function_tests.rs` | Thinking mode + function calling |
+| `function_calling_tests.rs` | `#[tool]` macro, auto-execution, multi-turn |
+| `agents_tests.rs` | Agent and background task patterns |
 | `multimodal_tests.rs` | Images, audio, video, documents |
 
 ### Property-Based Tests (proptest)
@@ -90,7 +93,7 @@ cargo test --test ui_tests
 Early-warning tests that detect when the API returns new content types.
 
 ```bash
-cargo test --test api_canary_tests -- --include-ignored
+cargo nextest run --test api_canary_tests --run-ignored all
 ```
 
 **Purpose**: When Google adds new content types, these tests fail to alert us to add support.
@@ -120,26 +123,26 @@ cargo test --features strict-unknown
 ### Quick Development Cycle
 
 ```bash
-cargo test                                # Unit tests only (~5s)
+make test                                 # Unit tests only (~5s)
 ```
 
 ### Full Test Suite
 
 ```bash
-cargo test -- --include-ignored           # All tests (~2-5 min with API)
+make test-all                             # All tests (~2-5 min with API)
 ```
 
 ### Specific Categories
 
 ```bash
 # By file
-cargo test --test multiturn_tests -- --include-ignored
+cargo nextest run --test multiturn_tests --run-ignored all
 
 # By name pattern
-cargo test function_calling -- --include-ignored
+cargo nextest run -E 'test(/function_calling/)' --run-ignored all
 
 # With output
-cargo test -- --include-ignored --nocapture
+cargo nextest run --run-ignored all --no-capture
 ```
 
 ### Environment Variables
@@ -149,6 +152,8 @@ cargo test -- --include-ignored --nocapture
 | `GEMINI_API_KEY` | Required for integration tests |
 | `RUST_LOG=genai_rs=debug` | Enable debug logging |
 | `LOUD_WIRE=1` | Show raw HTTP request/response |
+| `TEST_TIMEOUT_SECS` | Override default test timeout (default: 60) |
+| `EXTENDED_TEST_TIMEOUT_SECS` | Override extended test timeout (default: 120) |
 
 ## CI Pipeline
 
@@ -159,11 +164,11 @@ The GitHub Actions workflow runs these jobs:
 | `check` | `cargo check --workspace --all-targets --all-features` |
 | `test` | Unit tests without API key |
 | `test-strict-unknown` | Unit tests with `--features strict-unknown` |
-| `test-integration` | 4 matrix groups with API key (see below) |
+| `test-integration` | 5 matrix groups with API key (see below) |
 | `fmt` | Format check |
 | `clippy` | Lint check |
 | `doc` | Documentation build |
-| `security` | `cargo audit` |
+| `security` | `cargo audit` (runs in separate `audit.yml` workflow) |
 | `msrv` | Minimum supported Rust version check |
 | `cross-platform` | macOS and Windows builds |
 | `coverage` | Code coverage with `cargo llvm-cov` |
@@ -172,14 +177,15 @@ The GitHub Actions workflow runs these jobs:
 
 ### Integration Test Matrix
 
-Tests are split into 4 groups to parallelize and isolate failures:
+Tests are split into 5 groups to parallelize and isolate failures:
 
 | Group | Tests |
 |-------|-------|
 | `core` | interactions_api, multiturn, streaming_multiturn |
-| `tools` | tools_and_config, tools_multiturn, agents |
-| `functions` | advanced_function_calling, thinking_function, multiturn_function |
+| `tools` | tools_and_config, agents |
+| `functions` | function_calling |
 | `multimodal` | multimodal, api_canary, temp_file |
+| `files-and-wire` | api_wire_format_live, files_api |
 
 ## Test Utilities
 
@@ -218,12 +224,16 @@ let response = retry_request!([client] => {
 ### Timeouts
 
 ```rust,ignore
-use common::{TEST_TIMEOUT, with_timeout};
+use common::{test_timeout, with_timeout};
 
-with_timeout(TEST_TIMEOUT, async {
+with_timeout(test_timeout(), async {
     // Test logic that might hang
 }).await;
 ```
+
+**Environment variables** for timeout configuration:
+- `TEST_TIMEOUT_SECS` - Default test timeout (default: 60 seconds)
+- `EXTENDED_TEST_TIMEOUT_SECS` - Extended timeout for multi-turn tests (default: 120 seconds)
 
 ### Stream Consumption
 
@@ -303,7 +313,7 @@ async fn test_feature_name() {
         return;
     };
 
-    with_timeout(TEST_TIMEOUT, async {
+    with_timeout(test_timeout(), async {
         let response = interaction_builder(&client)
             .with_text("Test prompt")
             .create()
@@ -491,17 +501,63 @@ let builder = stateful_builder(&client);
 ### Enable Logging
 
 ```bash
-RUST_LOG=genai_rs=debug cargo test test_name -- --nocapture
+RUST_LOG=genai_rs=debug cargo nextest run -E 'test(/test_name/)' --no-capture
 ```
 
 ### See Wire Traffic
 
 ```bash
-LOUD_WIRE=1 cargo test test_name -- --nocapture --include-ignored
+LOUD_WIRE=1 cargo nextest run -E 'test(/test_name/)' --run-ignored all --no-capture
 ```
 
 ### Run Single Test with Full Output
 
 ```bash
-cargo test test_specific_feature -- --include-ignored --nocapture --test-threads=1
+cargo nextest run -E 'test(/test_specific_feature/)' --run-ignored all --no-capture -j 1
 ```
+
+## Test Organization Philosophy
+
+This section documents intentional design decisions about test organization.
+
+### Tests Organized by Feature, Not Pattern
+
+Multi-turn conversation patterns appear in multiple test files:
+- `multiturn_tests.rs` - Core conversation mechanics (branching, long conversations, explicit turns)
+- `streaming_multiturn_tests.rs` - Streaming behavior in multi-turn contexts
+- `function_calling_tests.rs` - Function calling behavior (some tests use multi-turn)
+- `interactions_api_tests.rs` - Interaction features like thinking mode
+
+**This is intentional.** Tests are organized by **what they primarily test**, not by whether they happen to use multi-turn patterns. A function calling test that uses multi-turn is testing function calling, not conversation mechanics. This organization makes it easy to find all tests for a specific feature.
+
+**Don't consolidate** tests just because they share a pattern like multi-turn. Ask: "What is this test primarily verifying?"
+
+### Dual-Layer Serialization Testing
+
+Serialization is tested at two layers:
+
+| Layer | Location | Purpose |
+|-------|----------|---------|
+| **Proptest** | `src/proptest_tests.rs`, `tests/proptest_roundtrip_tests.rs` | Fuzzing with random inputs to find edge cases |
+| **Manual** | `*_tests.rs` files | Document expected behavior, verify specific scenarios |
+
+**Both are valuable:**
+- Proptest finds unexpected edge cases automatically
+- Manual tests serve as documentation and catch regressions quickly
+- Manual tests run faster (no property generation overhead)
+
+**Don't remove** manual roundtrip tests just because proptest exists. They're complementary, not redundant. For serialization (which is critical for API compatibility), belt-and-suspenders testing is appropriate.
+
+### Integration Test Matrix Groups
+
+Integration tests are split into 5 CI matrix groups for parallelization:
+
+| Group | Tests | Rationale |
+|-------|-------|-----------|
+| `core` | interactions_api, multiturn, streaming_multiturn | Core API functionality |
+| `tools` | tools_and_config, agents | Tool/agent patterns |
+| `functions` | function_calling | Function calling (isolated for flakiness) |
+| `multimodal` | multimodal, api_canary, temp_file | Media handling |
+| `files-and-wire` | api_wire_format_live, files_api | File API and wire format |
+
+Tests are grouped by feature similarity and failure correlation. If one test in a group fails, related tests likely fail too, so grouping them reduces redundant CI runs.

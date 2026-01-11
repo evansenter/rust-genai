@@ -133,6 +133,7 @@ impl<'de> Deserialize<'de> for Role {
 /// ```
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
+#[non_exhaustive]
 pub enum TurnContent {
     /// Simple text content
     Text(String),
