@@ -48,6 +48,14 @@ cargo nextest run --test integration_file        # Single integration test file
 
 **Environment**: `GEMINI_API_KEY` required for integration tests. Tests take 2-5 minutes; some may flake due to LLM variability.
 
+### Nextest vs Cargo Test Flags
+
+| Purpose | cargo test | cargo nextest |
+|---------|-----------|---------------|
+| Include ignored | `-- --include-ignored` | `--run-ignored all` |
+| Single test | `test_name` | `test_name` (or `-E 'test(/regex/)'`) |
+| Release mode | `--release` | `--cargo-profile release` |
+
 ### Quality Checks
 
 ```bash
