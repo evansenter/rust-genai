@@ -8,9 +8,9 @@ use crate::errors::GenaiError;
 use async_stream::try_stream;
 use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
-use log::debug;
 use serde::de::DeserializeOwned;
 use std::str;
+use tracing::debug;
 
 /// Parses an SSE byte stream into a stream of deserialized objects.
 ///

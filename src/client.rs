@@ -5,16 +5,16 @@ use std::time::Duration;
 /// Logs a request body at debug level, preferring JSON format when possible.
 fn log_request_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
     match serde_json::to_string_pretty(body) {
-        Ok(json) => log::debug!("Request Body (JSON):\n{json}"),
-        Err(_) => log::debug!("Request Body: {body:#?}"),
+        Ok(json) => tracing::debug!("Request Body (JSON):\n{json}"),
+        Err(_) => tracing::debug!("Request Body: {body:#?}"),
     }
 }
 
 /// Logs a response body at debug level, preferring JSON format when possible.
 fn log_response_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
     match serde_json::to_string_pretty(body) {
-        Ok(json) => log::debug!("Response Body (JSON):\n{json}"),
-        Err(_) => log::debug!("Response Body: {body:#?}"),
+        Ok(json) => tracing::debug!("Response Body (JSON):\n{json}"),
+        Err(_) => tracing::debug!("Response Body: {body:#?}"),
     }
 }
 
@@ -183,7 +183,7 @@ impl Client {
     ///
     /// This provides a fluent interface for building interactions with models or agents.
     /// Use this method for a more ergonomic API compared to manually constructing
-    /// `CreateInteractionRequest`.
+    /// `InteractionRequest`.
     ///
     /// # Examples
     ///
@@ -235,12 +235,12 @@ impl Client {
     ///
     /// ```no_run
     /// use genai_rs::Client;
-    /// use genai_rs::{CreateInteractionRequest, InteractionInput};
+    /// use genai_rs::{InteractionRequest, InteractionInput};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("your-api-key".to_string());
     ///
-    /// let request = CreateInteractionRequest {
+    /// let request = InteractionRequest {
     ///     model: Some("gemini-3-flash-preview".to_string()),
     ///     agent: None,
     ///     agent_config: None,
@@ -257,54 +257,22 @@ impl Client {
     ///     system_instruction: None,
     /// };
     ///
-    /// let response = client.create_interaction(request).await?;
+    /// let response = client.execute(request).await?;
     /// println!("Interaction ID: {:?}", response.id);
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn create_interaction(
-        &self,
-        request: crate::CreateInteractionRequest,
-    ) -> Result<crate::InteractionResponse, GenaiError> {
-        log::debug!("Creating interaction");
-        log_request_body(&request);
-
-        let response = crate::http::interactions::create_interaction(
-            &self.http_client,
-            &self.api_key,
-            request,
-        )
-        .await?;
-
-        log_response_body(&response);
-        log::debug!("Interaction created: ID={:?}", response.id);
-
-        Ok(response)
-    }
-
-    /// Creates a new interaction with streaming responses.
     ///
-    /// Returns a stream of `StreamChunk` items as they arrive from the server.
-    /// Each chunk can be either:
-    /// - `StreamChunk::Delta`: Incremental content (text or thought)
-    /// - `StreamChunk::Complete`: The final complete interaction response
+    /// # Streaming Example
     ///
-    /// # Arguments
-    ///
-    /// * `request` - The interaction request with streaming enabled.
-    ///
-    /// # Returns
-    /// A boxed stream that yields `StreamChunk` items.
-    ///
-    /// # Example
     /// ```no_run
     /// use genai_rs::{Client, StreamChunk};
-    /// use genai_rs::{CreateInteractionRequest, InteractionInput};
+    /// use genai_rs::{InteractionRequest, InteractionInput};
     /// use futures_util::StreamExt;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api_key".to_string()).build()?;
-    /// let request = CreateInteractionRequest {
+    /// let request = InteractionRequest {
     ///     model: Some("gemini-3-flash-preview".to_string()),
     ///     agent: None,
     ///     agent_config: None,
@@ -322,7 +290,7 @@ impl Client {
     /// };
     ///
     /// let mut last_event_id = None;
-    /// let mut stream = client.create_interaction_stream(request);
+    /// let mut stream = client.execute_stream(request);
     /// while let Some(result) = stream.next().await {
     ///     let event = result?;
     ///     last_event_id = event.event_id.clone();  // Track for resume
@@ -341,13 +309,105 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn create_interaction_stream(
+    ///
+    /// # Retry Example
+    ///
+    /// ```no_run
+    /// use genai_rs::Client;
+    /// use std::time::Duration;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api_key".to_string());
+    /// let request = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Hello!")
+    ///     .build()?;
+    ///
+    /// // Retry loop with exponential backoff
+    /// let mut attempts = 0;
+    /// let response = loop {
+    ///     match client.execute(request.clone()).await {
+    ///         Ok(r) => break r,
+    ///         Err(e) if e.is_retryable() && attempts < 3 => {
+    ///             attempts += 1;
+    ///             tokio::time::sleep(Duration::from_millis(100 * 2u64.pow(attempts))).await;
+    ///         }
+    ///         Err(e) => return Err(e.into()),
+    ///     }
+    /// };
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[tracing::instrument(skip(self), fields(model = ?request.model, agent = ?request.agent))]
+    pub async fn execute(
         &self,
-        request: crate::CreateInteractionRequest,
+        request: crate::InteractionRequest,
+    ) -> Result<crate::InteractionResponse, GenaiError> {
+        tracing::debug!("Creating interaction");
+        log_request_body(&request);
+
+        let response = crate::http::interactions::create_interaction(
+            &self.http_client,
+            &self.api_key,
+            request,
+        )
+        .await?;
+
+        log_response_body(&response);
+        tracing::debug!("Interaction created: ID={:?}", response.id);
+
+        Ok(response)
+    }
+
+    /// Executes a pre-built interaction request with streaming.
+    ///
+    /// This is the streaming variant of [`execute()`](Self::execute).
+    ///
+    /// Returns a stream of [`StreamEvent`](crate::StreamEvent) items as they arrive.
+    /// Each event contains:
+    /// - `chunk`: The content (delta or complete response)
+    /// - `event_id`: Optional ID for resuming interrupted streams
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use genai_rs::{Client, StreamChunk};
+    /// use futures_util::StreamExt;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api_key".to_string());
+    ///
+    /// let request = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Count to 5")
+    ///     .build()?;
+    ///
+    /// let mut stream = client.execute_stream(request);
+    /// while let Some(result) = stream.next().await {
+    ///     let event = result?;
+    ///     match event.chunk {
+    ///         StreamChunk::Delta(delta) => {
+    ///             if let Some(text) = delta.text() {
+    ///                 print!("{}", text);
+    ///             }
+    ///         }
+    ///         StreamChunk::Complete(response) => {
+    ///             println!("\nDone!");
+    ///         }
+    ///         _ => {}
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[tracing::instrument(skip(self), fields(model = ?request.model, agent = ?request.agent))]
+    pub fn execute_stream(
+        &self,
+        request: crate::InteractionRequest,
     ) -> futures_util::stream::BoxStream<'_, Result<crate::StreamEvent, GenaiError>> {
         use futures_util::StreamExt;
 
-        log::debug!("Creating streaming interaction");
+        tracing::debug!("Creating streaming interaction");
         log_request_body(&request);
 
         let stream = crate::http::interactions::create_interaction_stream(
@@ -359,7 +419,7 @@ impl Client {
         stream
             .map(move |result| {
                 result.inspect(|event| {
-                    log::debug!(
+                    tracing::debug!(
                         "Received stream event: chunk={:?}, event_id={:?}",
                         event.chunk,
                         event.event_id
@@ -388,7 +448,7 @@ impl Client {
         &self,
         interaction_id: &str,
     ) -> Result<crate::InteractionResponse, GenaiError> {
-        log::debug!("Getting interaction: ID={interaction_id}");
+        tracing::debug!("Getting interaction: ID={interaction_id}");
 
         let response = crate::http::interactions::get_interaction(
             &self.http_client,
@@ -398,7 +458,7 @@ impl Client {
         .await?;
 
         log_response_body(&response);
-        log::debug!("Retrieved interaction: status={:?}", response.status);
+        tracing::debug!("Retrieved interaction: status={:?}", response.status);
 
         Ok(response)
     }
@@ -459,7 +519,7 @@ impl Client {
     ) -> futures_util::stream::BoxStream<'a, Result<crate::StreamEvent, GenaiError>> {
         use futures_util::StreamExt;
 
-        log::debug!(
+        tracing::debug!(
             "Getting interaction stream: ID={}, resume_from={:?}",
             interaction_id,
             last_event_id
@@ -475,7 +535,7 @@ impl Client {
         stream
             .map(move |result| {
                 result.inspect(|event| {
-                    log::debug!(
+                    tracing::debug!(
                         "Received stream event: chunk={:?}, event_id={:?}",
                         event.chunk,
                         event.event_id
@@ -500,7 +560,7 @@ impl Client {
     /// - The HTTP request fails
     /// - The API returns an error
     pub async fn delete_interaction(&self, interaction_id: &str) -> Result<(), GenaiError> {
-        log::debug!("Deleting interaction: ID={interaction_id}");
+        tracing::debug!("Deleting interaction: ID={interaction_id}");
 
         crate::http::interactions::delete_interaction(
             &self.http_client,
@@ -509,7 +569,7 @@ impl Client {
         )
         .await?;
 
-        log::debug!("Interaction deleted successfully");
+        tracing::debug!("Interaction deleted successfully");
 
         Ok(())
     }
@@ -570,7 +630,7 @@ impl Client {
         &self,
         interaction_id: &str,
     ) -> Result<crate::InteractionResponse, GenaiError> {
-        log::debug!("Cancelling interaction: ID={interaction_id}");
+        tracing::debug!("Cancelling interaction: ID={interaction_id}");
 
         let response = crate::http::interactions::cancel_interaction(
             &self.http_client,
@@ -580,7 +640,7 @@ impl Client {
         .await?;
 
         log_response_body(&response);
-        log::debug!("Interaction cancelled: status={:?}", response.status);
+        tracing::debug!("Interaction cancelled: status={:?}", response.status);
 
         Ok(response)
     }
@@ -634,13 +694,13 @@ impl Client {
 
         // Read file contents
         let file_data = tokio::fs::read(path).await.map_err(|e| {
-            log::warn!("Failed to read file '{}': {}", path.display(), e);
+            tracing::warn!("Failed to read file '{}': {}", path.display(), e);
             GenaiError::InvalidInput(format!("Failed to read file '{}': {}", path.display(), e))
         })?;
 
         // Detect MIME type from extension
         let mime_type = crate::multimodal::detect_mime_type(path).ok_or_else(|| {
-            log::warn!(
+            tracing::warn!(
                 "Could not determine MIME type for '{}' - unknown extension",
                 path.display()
             );
@@ -656,7 +716,7 @@ impl Client {
             .and_then(|s| s.to_str())
             .map(|s| s.to_string());
 
-        log::debug!(
+        tracing::debug!(
             "Uploading file: path={}, size={} bytes, mime_type={}",
             path.display(),
             file_data.len(),
@@ -702,7 +762,7 @@ impl Client {
         let path = path.as_ref();
 
         let file_data = tokio::fs::read(path).await.map_err(|e| {
-            log::warn!("Failed to read file '{}': {}", path.display(), e);
+            tracing::warn!("Failed to read file '{}': {}", path.display(), e);
             GenaiError::InvalidInput(format!("Failed to read file '{}': {}", path.display(), e))
         })?;
 
@@ -711,7 +771,7 @@ impl Client {
             .and_then(|s| s.to_str())
             .map(|s| s.to_string());
 
-        log::debug!(
+        tracing::debug!(
             "Uploading file: path={}, size={} bytes, mime_type={}",
             path.display(),
             file_data.len(),
@@ -758,7 +818,7 @@ impl Client {
         mime_type: &str,
         display_name: Option<&str>,
     ) -> Result<crate::FileMetadata, GenaiError> {
-        log::debug!(
+        tracing::debug!(
             "Uploading file bytes: size={} bytes, mime_type={}, display_name={:?}",
             data.len(),
             mime_type,
@@ -913,7 +973,7 @@ impl Client {
 
         // Detect MIME type from extension
         let mime_type = crate::multimodal::detect_mime_type(path).ok_or_else(|| {
-            log::warn!(
+            tracing::warn!(
                 "Could not determine MIME type for '{}' - unknown extension",
                 path.display()
             );
@@ -929,7 +989,7 @@ impl Client {
             .and_then(|s| s.to_str())
             .map(|s| s.to_string());
 
-        log::debug!(
+        tracing::debug!(
             "Chunked upload: path={}, mime_type={}",
             path.display(),
             mime_type
@@ -981,7 +1041,7 @@ impl Client {
             .and_then(|s| s.to_str())
             .map(|s| s.to_string());
 
-        log::debug!(
+        tracing::debug!(
             "Chunked upload: path={}, mime_type={}",
             path.display(),
             mime_type
@@ -1040,7 +1100,7 @@ impl Client {
             .and_then(|s| s.to_str())
             .map(|s| s.to_string());
 
-        log::debug!(
+        tracing::debug!(
             "Chunked upload: path={}, mime_type={}, chunk_size={}",
             path.display(),
             mime_type,
@@ -1126,7 +1186,7 @@ impl Client {
                     .and_then(|e| e.message.as_deref())
                     .unwrap_or("File processing failed without details");
 
-                log::error!(
+                tracing::error!(
                     "File '{}' processing failed: code={:?}, message={}",
                     file.name,
                     error_code,
@@ -1138,6 +1198,7 @@ impl Client {
                     status_code: error_code.map_or(500, |c| c as u16),
                     message: format!("File processing failed: {}", error_msg),
                     request_id: None,
+                    retry_after: None,
                 });
             }
 
@@ -1145,7 +1206,7 @@ impl Client {
             if let Some(state) = &current.state
                 && state.is_unknown()
             {
-                log::warn!(
+                tracing::warn!(
                     "File '{}' is in unknown state {:?}, continuing to poll. \
                      This may indicate API evolution - consider updating genai-rs.",
                     file.name,
@@ -1169,7 +1230,7 @@ impl Client {
                 )));
             }
 
-            log::debug!(
+            tracing::debug!(
                 "File '{}' still processing, waiting {:?}...",
                 file.name,
                 poll_interval

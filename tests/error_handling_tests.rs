@@ -34,6 +34,7 @@ fn test_genai_error_api_429_rate_limit() {
         status_code: 429,
         message: "Resource exhausted".to_string(),
         request_id: Some("req-abc123".to_string()),
+        retry_after: Some(std::time::Duration::from_secs(60)),
     };
     let display = format!("{}", error);
     assert!(display.contains("429"));
@@ -56,6 +57,7 @@ fn test_genai_error_api_503_service_unavailable() {
         status_code: 503,
         message: "Service temporarily unavailable".to_string(),
         request_id: None,
+        retry_after: None,
     };
     let display = format!("{}", error);
     assert!(display.contains("503"));
@@ -68,6 +70,7 @@ fn test_genai_error_api_400_bad_request() {
         status_code: 400,
         message: "Invalid model name".to_string(),
         request_id: Some("req-xyz789".to_string()),
+        retry_after: None,
     };
     let display = format!("{}", error);
     assert!(display.contains("400"));
@@ -82,6 +85,7 @@ fn test_genai_error_api_request_id_in_debug() {
         status_code: 500,
         message: "Server error".to_string(),
         request_id: Some("req-debug-12345".to_string()),
+        retry_after: None,
     };
 
     // Display is concise - no request_id
@@ -143,6 +147,7 @@ fn test_is_transient_error_spanner_utf8() {
         status_code: 500,
         message: "Spanner UTF-8 encoding error in backend".to_string(),
         request_id: None,
+        retry_after: None,
     };
     assert!(
         is_transient_error(&error),
@@ -157,6 +162,7 @@ fn test_is_transient_error_case_insensitive() {
         status_code: 500,
         message: "SPANNER UTF-8 error".to_string(),
         request_id: None,
+        retry_after: None,
     };
     assert!(
         is_transient_error(&error),
@@ -171,6 +177,7 @@ fn test_is_transient_error_requires_both_keywords() {
         status_code: 500,
         message: "Spanner database error".to_string(),
         request_id: None,
+        retry_after: None,
     };
     assert!(
         !is_transient_error(&error1),
@@ -182,6 +189,7 @@ fn test_is_transient_error_requires_both_keywords() {
         status_code: 500,
         message: "UTF-8 encoding error".to_string(),
         request_id: None,
+        retry_after: None,
     };
     assert!(
         !is_transient_error(&error2),
@@ -224,6 +232,7 @@ fn test_is_transient_error_regular_500() {
         status_code: 500,
         message: "Internal server error".to_string(),
         request_id: None,
+        retry_after: None,
     };
     assert!(
         !is_transient_error(&error),
@@ -295,6 +304,7 @@ async fn test_retry_on_transient_success_after_retry() {
                     status_code: 500,
                     message: "Spanner UTF-8 error".to_string(),
                     request_id: None,
+                    retry_after: None,
                 })
             } else {
                 // Second attempt succeeds
@@ -326,6 +336,7 @@ async fn test_retry_on_transient_exhausted_retries() {
                 status_code: 500,
                 message: "Spanner UTF-8 error".to_string(),
                 request_id: None,
+                retry_after: None,
             })
         }
     })
@@ -353,6 +364,7 @@ async fn test_retry_on_transient_zero_retries() {
                 status_code: 500,
                 message: "Spanner UTF-8 error".to_string(),
                 request_id: None,
+                retry_after: None,
             })
         }
     })
@@ -379,6 +391,7 @@ fn test_error_matching_for_retry_logic() {
                 status_code: 429,
                 message: "Rate limited".to_string(),
                 request_id: None,
+                retry_after: None,
             },
             "rate_limit",
         ),
@@ -387,6 +400,7 @@ fn test_error_matching_for_retry_logic() {
                 status_code: 500,
                 message: "Server error".to_string(),
                 request_id: None,
+                retry_after: None,
             },
             "server_error",
         ),
@@ -395,6 +409,7 @@ fn test_error_matching_for_retry_logic() {
                 status_code: 503,
                 message: "Unavailable".to_string(),
                 request_id: None,
+                retry_after: None,
             },
             "unavailable",
         ),
@@ -427,6 +442,7 @@ fn test_error_request_id_extraction() {
         status_code: 500,
         message: "Error".to_string(),
         request_id: Some("req-abc123".to_string()),
+        retry_after: None,
     };
 
     // Test pattern for extracting request_id for logging/debugging
@@ -455,7 +471,7 @@ fn test_client_with_empty_api_key() {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("test")
-            .build_request()
+            .build()
             .is_ok()
     );
 }
@@ -467,7 +483,7 @@ fn test_interaction_builder_missing_model() {
         .unwrap();
 
     // Building a request without a model should fail
-    let result = client.interaction().with_text("test").build_request();
+    let result = client.interaction().with_text("test").build();
 
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
@@ -488,7 +504,7 @@ fn test_interaction_builder_missing_content() {
     let result = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .build_request();
+        .build();
 
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();

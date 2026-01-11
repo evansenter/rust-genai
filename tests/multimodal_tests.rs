@@ -1247,7 +1247,7 @@ mod text_to_speech {
     #[tokio::test]
     #[ignore = "Requires API key and TTS model access"]
     async fn test_speech_config_nested_format_fails_flat_succeeds() {
-        use genai_rs::{CreateInteractionRequest, GenerationConfig, InteractionInput};
+        use genai_rs::{GenerationConfig, InteractionInput, InteractionRequest};
         use reqwest::Client as ReqwestClient;
         use serde_json::json;
         use std::env;
@@ -1275,7 +1275,7 @@ mod text_to_speech {
 
         println!("=== Testing NESTED SpeechConfig format ===");
 
-        let request = CreateInteractionRequest {
+        let request = InteractionRequest {
             model: Some(tts_model.to_string()),
             agent: None,
             agent_config: None,
@@ -1331,7 +1331,7 @@ mod text_to_speech {
             ..Default::default()
         };
 
-        let flat_request = CreateInteractionRequest {
+        let flat_request = InteractionRequest {
             model: Some(tts_model.to_string()),
             agent: None,
             agent_config: None,

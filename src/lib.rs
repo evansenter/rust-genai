@@ -75,8 +75,8 @@ pub use content::{
 // Request types (includes agent configuration)
 pub mod request;
 pub use request::{
-    AgentConfig, CreateInteractionRequest, DeepResearchConfig, DynamicConfig, GenerationConfig,
-    InteractionInput, Role, SpeechConfig, ThinkingLevel, ThinkingSummaries, Turn, TurnContent,
+    AgentConfig, DeepResearchConfig, DynamicConfig, GenerationConfig, InteractionInput,
+    InteractionRequest, Role, SpeechConfig, ThinkingLevel, ThinkingSummaries, Turn, TurnContent,
 };
 
 // Response types

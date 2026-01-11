@@ -7,11 +7,11 @@ use thiserror::Error;
 /// ```ignore
 /// match client.interaction().create().await {
 ///     Err(GenaiError::Api { status_code: 429, request_id, .. }) => {
-///         log::warn!("Rate limited, request_id: {:?}", request_id);
+///         tracing::warn!("Rate limited, request_id: {:?}", request_id);
 ///         // Retry with backoff
 ///     }
 ///     Err(GenaiError::Api { status_code, message, request_id }) => {
-///         log::error!("API error {}: {} (request: {:?})", status_code, message, request_id);
+///         tracing::error!("API error {}: {} (request: {:?})", status_code, message, request_id);
 ///     }
 ///     // ...
 /// }
@@ -39,6 +39,15 @@ pub enum GenaiError {
         message: String,
         /// Request ID from `x-goog-request-id` header, if available
         request_id: Option<String>,
+        /// Retry delay from `Retry-After` header (for 429 rate limit errors).
+        ///
+        /// When present, this indicates how long to wait before retrying.
+        /// The value is parsed from the `Retry-After` header, which can be:
+        /// - Seconds (e.g., "120" → 120 seconds)
+        /// - HTTP date (e.g., "Wed, 21 Oct 2015 07:28:00 GMT" → duration until then)
+        ///
+        /// This field is typically only populated for 429 (Too Many Requests) errors.
+        retry_after: Option<std::time::Duration>,
     },
     #[error("Internal client error: {0}")]
     Internal(String),
@@ -67,6 +76,121 @@ pub enum GenaiError {
     ClientBuild(String),
 }
 
+impl GenaiError {
+    /// Returns `true` if this error is likely transient and the request may succeed on retry.
+    ///
+    /// This helper identifies errors that are typically recoverable:
+    /// - **HTTP errors**: Network issues, connection resets, TLS errors
+    /// - **Rate limits (429)**: Temporary throttling, retry after backoff
+    /// - **Server errors (5xx)**: Temporary server issues
+    /// - **Timeouts**: Request took too long but may succeed with retry
+    ///
+    /// Errors that return `false` are typically permanent and retrying won't help:
+    /// - **Client errors (4xx except 429)**: Bad request, unauthorized, not found
+    /// - **Parse/JSON errors**: Response format issues
+    /// - **Invalid input**: Request validation failures
+    /// - **Malformed response**: API contract violations
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use genai_rs::GenaiError;
+    /// use std::time::Duration;
+    ///
+    /// fn should_retry(error: &GenaiError, attempt: u32, max_attempts: u32) -> bool {
+    ///     attempt < max_attempts && error.is_retryable()
+    /// }
+    ///
+    /// // Rate limit errors are retryable
+    /// let rate_limited = GenaiError::Api {
+    ///     status_code: 429,
+    ///     message: "Resource exhausted".to_string(),
+    ///     request_id: None,
+    ///     retry_after: Some(std::time::Duration::from_secs(60)),
+    /// };
+    /// assert!(rate_limited.is_retryable());
+    ///
+    /// // Bad request errors are not retryable
+    /// let bad_request = GenaiError::Api {
+    ///     status_code: 400,
+    ///     message: "Invalid model".to_string(),
+    ///     request_id: None,
+    ///     retry_after: None,
+    /// };
+    /// assert!(!bad_request.is_retryable());
+    ///
+    /// // Timeouts are retryable
+    /// let timeout = GenaiError::Timeout(Duration::from_secs(30));
+    /// assert!(timeout.is_retryable());
+    /// ```
+    ///
+    /// # Retry Strategy
+    ///
+    /// When implementing retry logic, consider:
+    /// - Use exponential backoff with jitter
+    /// - Set a maximum number of retries
+    /// - For 429 errors, use the `retry_after` field if available (extracted from `Retry-After` header)
+    /// - Log retries for observability
+    ///
+    /// See `examples/retry_with_backoff.rs` for a complete retry implementation.
+    #[must_use]
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            // Network-level errors are typically transient
+            GenaiError::Http(_) => true,
+
+            // API errors: 429 (rate limit) and 5xx (server errors) are retryable
+            GenaiError::Api { status_code, .. } => *status_code == 429 || *status_code >= 500,
+
+            // Timeouts may succeed on retry
+            GenaiError::Timeout(_) => true,
+
+            // These are permanent errors - retrying won't help
+            GenaiError::Parse(_)
+            | GenaiError::Json(_)
+            | GenaiError::Utf8(_)
+            | GenaiError::Internal(_)
+            | GenaiError::InvalidInput(_)
+            | GenaiError::MalformedResponse(_)
+            | GenaiError::ClientBuild(_) => false,
+        }
+    }
+
+    /// Returns the server-suggested retry delay for rate limit (429) errors.
+    ///
+    /// This extracts the `Retry-After` header value that was parsed when the error
+    /// was created. Only `Api` errors with status code 429 typically have this field set.
+    ///
+    /// # Returns
+    ///
+    /// - `Some(Duration)` if the error has a `retry_after` value
+    /// - `None` for all other error types or if no `Retry-After` header was present
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use genai_rs::GenaiError;
+    /// use std::time::Duration;
+    ///
+    /// async fn with_server_suggested_delay(error: &GenaiError) {
+    ///     if let Some(delay) = error.retry_after() {
+    ///         // Server told us how long to wait
+    ///         tokio::time::sleep(delay).await;
+    ///     } else {
+    ///         // Fall back to our own backoff strategy
+    ///         tokio::time::sleep(Duration::from_secs(1)).await;
+    ///     }
+    /// }
+    /// ```
+    #[must_use]
+    pub fn retry_after(&self) -> Option<std::time::Duration> {
+        match self {
+            GenaiError::Api { retry_after, .. } => *retry_after,
+            _ => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -85,6 +209,7 @@ mod tests {
             status_code: 429,
             message: "Rate limited".to_string(),
             request_id: Some("req-123".to_string()),
+            retry_after: None,
         };
         let display = format!("{}", error);
         assert!(display.contains("429"));
@@ -97,6 +222,7 @@ mod tests {
             status_code: 500,
             message: "Internal error".to_string(),
             request_id: None,
+            retry_after: None,
         };
         let display = format!("{}", error);
         assert!(display.contains("500"));
@@ -144,6 +270,7 @@ mod tests {
             status_code: 400,
             message: "Bad request".to_string(),
             request_id: Some("req-456".to_string()),
+            retry_after: None,
         };
         let debug = format!("{:?}", error);
         assert!(debug.contains("Api"));
@@ -169,6 +296,7 @@ mod tests {
                 status_code: code,
                 message: message.to_string(),
                 request_id: None,
+                retry_after: None,
             };
             let display = format!("{}", error);
             assert!(
@@ -187,6 +315,7 @@ mod tests {
             status_code: 500,
             message: "".to_string(),
             request_id: None,
+            retry_after: None,
         };
         let display = format!("{}", error);
         assert!(display.contains("500"));
@@ -243,5 +372,125 @@ mod tests {
         let debug = format!("{:?}", error);
         assert!(debug.contains("ClientBuild"));
         assert!(debug.contains("some error"));
+    }
+
+    // =============================================================================
+    // is_retryable() Tests
+    // =============================================================================
+
+    #[test]
+    fn test_is_retryable_rate_limit_429() {
+        let error = GenaiError::Api {
+            status_code: 429,
+            message: "Resource exhausted".to_string(),
+            request_id: None,
+            retry_after: Some(std::time::Duration::from_secs(60)),
+        };
+        assert!(error.is_retryable(), "429 errors should be retryable");
+    }
+
+    #[test]
+    fn test_is_retryable_server_errors_5xx() {
+        for status_code in [500, 502, 503, 504] {
+            let error = GenaiError::Api {
+                status_code,
+                message: "Server error".to_string(),
+                request_id: None,
+                retry_after: None,
+            };
+            assert!(
+                error.is_retryable(),
+                "{} errors should be retryable",
+                status_code
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_retryable_client_errors_4xx_not_retryable() {
+        // Client errors (except 429) should NOT be retryable
+        for status_code in [400, 401, 403, 404, 422] {
+            let error = GenaiError::Api {
+                status_code,
+                message: "Client error".to_string(),
+                request_id: None,
+                retry_after: None,
+            };
+            assert!(
+                !error.is_retryable(),
+                "{} errors should NOT be retryable",
+                status_code
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_retryable_timeout() {
+        let error = GenaiError::Timeout(std::time::Duration::from_secs(30));
+        assert!(error.is_retryable(), "Timeout errors should be retryable");
+    }
+
+    #[test]
+    fn test_is_retryable_parse_error_not_retryable() {
+        let error = GenaiError::Parse("Invalid SSE".to_string());
+        assert!(
+            !error.is_retryable(),
+            "Parse errors should NOT be retryable"
+        );
+    }
+
+    #[test]
+    fn test_is_retryable_json_error_not_retryable() {
+        let json_str = "not valid json";
+        let json_err = serde_json::from_str::<serde_json::Value>(json_str).unwrap_err();
+        let error: GenaiError = json_err.into();
+        assert!(!error.is_retryable(), "JSON errors should NOT be retryable");
+    }
+
+    #[test]
+    fn test_is_retryable_invalid_input_not_retryable() {
+        let error = GenaiError::InvalidInput("Missing model".to_string());
+        assert!(
+            !error.is_retryable(),
+            "InvalidInput errors should NOT be retryable"
+        );
+    }
+
+    #[test]
+    fn test_is_retryable_malformed_response_not_retryable() {
+        let error = GenaiError::MalformedResponse("Missing call_id".to_string());
+        assert!(
+            !error.is_retryable(),
+            "MalformedResponse errors should NOT be retryable"
+        );
+    }
+
+    #[test]
+    fn test_is_retryable_internal_error_not_retryable() {
+        let error = GenaiError::Internal("Max loops exceeded".to_string());
+        assert!(
+            !error.is_retryable(),
+            "Internal errors should NOT be retryable"
+        );
+    }
+
+    #[test]
+    fn test_is_retryable_client_build_not_retryable() {
+        let error = GenaiError::ClientBuild("TLS init failed".to_string());
+        assert!(
+            !error.is_retryable(),
+            "ClientBuild errors should NOT be retryable"
+        );
+    }
+
+    #[test]
+    fn test_is_retryable_utf8_error_not_retryable() {
+        let bytes = vec![0xff, 0xfe];
+        let utf8_err = std::str::from_utf8(&bytes).unwrap_err();
+        let error: GenaiError = utf8_err.into();
+        assert!(
+            !error.is_retryable(),
+            "UTF-8 errors should NOT be retryable"
+        );
     }
 }

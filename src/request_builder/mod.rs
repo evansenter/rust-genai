@@ -6,16 +6,16 @@ use crate::GenaiError;
 use crate::client::Client;
 use crate::function_calling::ToolService;
 use base64::Engine;
-use log::debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::debug;
 
 use crate::{
-    AgentConfig, CreateInteractionRequest, DeepResearchConfig, FunctionCallingMode,
-    FunctionDeclaration, GenerationConfig, InteractionContent, InteractionInput,
-    InteractionResponse, Resolution, Role, SpeechConfig, StreamEvent, ThinkingLevel,
-    ThinkingSummaries, Tool as InternalTool, Turn, TurnContent,
+    AgentConfig, DeepResearchConfig, FunctionCallingMode, FunctionDeclaration, GenerationConfig,
+    InteractionContent, InteractionInput, InteractionRequest, InteractionResponse, Resolution,
+    Role, SpeechConfig, StreamEvent, ThinkingLevel, ThinkingSummaries, Tool as InternalTool, Turn,
+    TurnContent,
 };
 use futures_util::{StreamExt, stream::BoxStream};
 
@@ -2169,7 +2169,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     #[must_use]
     pub fn with_max_function_call_loops(mut self, max_loops: usize) -> Self {
         if max_loops == 0 {
-            log::warn!(
+            tracing::warn!(
                 "max_function_call_loops set to 0 - auto function calling will immediately fail \
                  if the model returns any function calls. Consider using create() instead of \
                  create_with_auto_functions() if you don't want automatic function execution."
@@ -2237,9 +2237,9 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     pub async fn create(self) -> Result<InteractionResponse, GenaiError> {
         let client = self.client;
         let timeout = self.timeout;
-        let request = self.build_request()?;
+        let request = self.build()?;
 
-        let future = client.create_interaction(request);
+        let future = client.execute(request);
 
         match timeout {
             Some(duration) => tokio::time::timeout(duration, future).await.map_err(|_| {
@@ -2335,9 +2335,9 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         let client = self.client;
         let timeout = self.timeout;
         Box::pin(async_stream::try_stream! {
-            let mut request = self.build_request()?;
+            let mut request = self.build()?;
             request.stream = Some(true);
-            let mut stream = client.create_interaction_stream(request);
+            let mut stream = client.execute_stream(request);
 
             loop {
                 let next_chunk = stream.next();
@@ -2365,12 +2365,43 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         })
     }
 
-    /// Builds the `CreateInteractionRequest` from the builder state.
+    /// Builds the [`InteractionRequest`] without executing it.
     ///
-    /// This method is primarily for testing validation logic. In normal usage,
-    /// call `.create()` or `.create_stream()` instead, which call this internally.
-    #[doc(hidden)]
-    pub fn build_request(self) -> Result<CreateInteractionRequest, GenaiError> {
+    /// Returns a fully-constructed request that can be:
+    /// - Cloned for retry logic
+    /// - Serialized for logging or replay
+    /// - Inspected for debugging
+    /// - Executed later via [`Client::execute()`](crate::Client::execute)
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_rs::Client;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api_key".to_string());
+    ///
+    /// let request = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Hello!")
+    ///     .build()?;
+    ///
+    /// // Clone, serialize, inspect
+    /// let backup = request.clone();
+    /// println!("{}", serde_json::to_string_pretty(&request)?);
+    ///
+    /// // Execute later
+    /// // let response = client.execute(request).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GenaiError::InvalidInput`] if:
+    /// - No input was provided (via `with_text()`, `with_input()`, etc.)
+    /// - Neither model nor agent was specified
+    /// - Both model and agent were specified (mutually exclusive)
+    pub fn build(self) -> Result<InteractionRequest, GenaiError> {
         // Validate that we have input
         let input = self.input.ok_or_else(|| {
             GenaiError::InvalidInput("Input is required for interaction".to_string())
@@ -2405,7 +2436,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
             (config, None) => config,
         };
 
-        Ok(CreateInteractionRequest {
+        Ok(InteractionRequest {
             model: self.model,
             agent: self.agent,
             agent_config: self.agent_config,

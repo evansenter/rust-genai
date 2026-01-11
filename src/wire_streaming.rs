@@ -297,7 +297,7 @@ impl<'de> Deserialize<'de> for StreamChunk {
         let chunk_type = match value.get("chunk_type") {
             Some(serde_json::Value::String(s)) => s.as_str(),
             Some(other) => {
-                log::warn!(
+                tracing::warn!(
                     "StreamChunk received non-string chunk_type: {}. \
                      This may indicate a malformed API response.",
                     other
@@ -305,7 +305,7 @@ impl<'de> Deserialize<'de> for StreamChunk {
                 "<non-string chunk_type>"
             }
             None => {
-                log::warn!(
+                tracing::warn!(
                     "StreamChunk is missing required chunk_type field. \
                      This may indicate a malformed API response."
                 );
@@ -318,7 +318,7 @@ impl<'de> Deserialize<'de> for StreamChunk {
                 let data = match value.get("data").cloned() {
                     Some(d) => d,
                     None => {
-                        log::warn!(
+                        tracing::warn!(
                             "StreamChunk::Start is missing the 'data' field. \
                              This may indicate a malformed API response."
                         );
@@ -344,7 +344,7 @@ impl<'de> Deserialize<'de> for StreamChunk {
                     .and_then(|v| v.as_str())
                     .map(String::from)
                     .unwrap_or_else(|| {
-                        log::warn!(
+                        tracing::warn!(
                             "StreamChunk::StatusUpdate is missing interaction_id. \
                              This may indicate a malformed API response."
                         );
@@ -362,7 +362,7 @@ impl<'de> Deserialize<'de> for StreamChunk {
                         ))
                     })?
                     .unwrap_or_else(|| {
-                        log::warn!(
+                        tracing::warn!(
                             "StreamChunk::StatusUpdate is missing status. \
                              This may indicate a malformed API response."
                         );
@@ -383,7 +383,7 @@ impl<'de> Deserialize<'de> for StreamChunk {
                     .and_then(|v| v.as_u64())
                     .map(|v| v as usize)
                     .unwrap_or_else(|| {
-                        log::warn!(
+                        tracing::warn!(
                             "StreamChunk::ContentStart is missing index. \
                              This may indicate a malformed API response."
                         );
@@ -402,7 +402,7 @@ impl<'de> Deserialize<'de> for StreamChunk {
                 let data = match value.get("data").cloned() {
                     Some(d) => d,
                     None => {
-                        log::warn!(
+                        tracing::warn!(
                             "StreamChunk::Delta is missing the 'data' field. \
                              This may indicate a malformed API response."
                         );
@@ -427,7 +427,7 @@ impl<'de> Deserialize<'de> for StreamChunk {
                     .and_then(|v| v.as_u64())
                     .map(|v| v as usize)
                     .unwrap_or_else(|| {
-                        log::warn!(
+                        tracing::warn!(
                             "StreamChunk::ContentStop is missing index. \
                              This may indicate a malformed API response."
                         );
@@ -439,7 +439,7 @@ impl<'de> Deserialize<'de> for StreamChunk {
                 let data = match value.get("data").cloned() {
                     Some(d) => d,
                     None => {
-                        log::warn!(
+                        tracing::warn!(
                             "StreamChunk::Complete is missing the 'data' field. \
                              This may indicate a malformed API response."
                         );
@@ -464,7 +464,7 @@ impl<'de> Deserialize<'de> for StreamChunk {
                     .and_then(|v| v.as_str())
                     .map(String::from)
                     .unwrap_or_else(|| {
-                        log::warn!(
+                        tracing::warn!(
                             "StreamChunk::Error is missing message. \
                              This may indicate a malformed API response."
                         );
@@ -474,7 +474,7 @@ impl<'de> Deserialize<'de> for StreamChunk {
                 Ok(Self::Error { message, code })
             }
             other => {
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown StreamChunk type '{}'. \
                      This may indicate a new API feature. \
                      The chunk will be preserved in the Unknown variant.",

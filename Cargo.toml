@@ -11,7 +11,7 @@ tokio = { version = "1.48", features = ["full"] }
 async-stream = "0.3"
 futures-util = "0.3"
 thiserror = "2.0"
-log = "0.4"
+tracing = "0.1"
 async-trait = "0.1"
 inventory = "0.3"
 bytes = "1.11"
@@ -23,7 +23,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 [package]
 name = "genai-rs"
-version = "0.5.3"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT"
@@ -35,7 +35,7 @@ keywords = ["gemini", "google", "ai", "llm", "genai"]
 categories = ["api-bindings", "asynchronous"]
 
 [dependencies]
-genai-rs-macros = { version = "0.5.3", path = "./genai-rs-macros" }
+genai-rs-macros = { version = "0.6.0", path = "./genai-rs-macros" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 reqwest = { workspace = true }
@@ -43,7 +43,7 @@ tokio = { workspace = true }
 async-stream = { workspace = true }
 futures-util = { workspace = true }
 thiserror = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 async-trait = { workspace = true }
 inventory = { workspace = true }
 bytes = { workspace = true }
@@ -65,6 +65,8 @@ futures-util = { workspace = true }
 proptest = "1.9"
 chrono = { workspace = true }
 doc-comment = "0.3"
+rand = "0.9"
+backon = "1.6"
 
 [features]
 ## Strict mode for unknown content types.

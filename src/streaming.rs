@@ -234,7 +234,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
         let chunk_type = match value.get("chunk_type") {
             Some(serde_json::Value::String(s)) => s.as_str(),
             Some(other) => {
-                log::warn!(
+                tracing::warn!(
                     "AutoFunctionStreamChunk received non-string chunk_type: {}. \
                      This may indicate a malformed API response.",
                     other
@@ -242,7 +242,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 "<non-string chunk_type>"
             }
             None => {
-                log::warn!(
+                tracing::warn!(
                     "AutoFunctionStreamChunk is missing required chunk_type field. \
                      This may indicate a malformed API response."
                 );
@@ -255,7 +255,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 let data = match value.get("data").cloned() {
                     Some(d) => d,
                     None => {
-                        log::warn!(
+                        tracing::warn!(
                             "AutoFunctionStreamChunk::Delta is missing the 'data' field. \
                              This may indicate a malformed API response."
                         );
@@ -274,7 +274,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 let data = match value.get("data").cloned() {
                     Some(d) => d,
                     None => {
-                        log::warn!(
+                        tracing::warn!(
                             "AutoFunctionStreamChunk::ExecutingFunctions is missing the 'data' field. \
                              This may indicate a malformed API response."
                         );
@@ -293,7 +293,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 let data = match value.get("data").cloned() {
                     Some(d) => d,
                     None => {
-                        log::warn!(
+                        tracing::warn!(
                             "AutoFunctionStreamChunk::FunctionResults is missing the 'data' field. \
                              This may indicate a malformed API response."
                         );
@@ -313,7 +313,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 let data = match value.get("data").cloned() {
                     Some(d) => d,
                     None => {
-                        log::warn!(
+                        tracing::warn!(
                             "AutoFunctionStreamChunk::Complete is missing the 'data' field. \
                              This may indicate a malformed API response."
                         );
@@ -332,7 +332,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 let data = match value.get("data").cloned() {
                     Some(d) => d,
                     None => {
-                        log::warn!(
+                        tracing::warn!(
                             "AutoFunctionStreamChunk::MaxLoopsReached is missing the 'data' field. \
                              This may indicate a malformed API response."
                         );
@@ -348,7 +348,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 Ok(Self::MaxLoopsReached(response))
             }
             other => {
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown AutoFunctionStreamChunk type '{}'. \
                      This may indicate a new API feature. \
                      The chunk will be preserved in the Unknown variant.",

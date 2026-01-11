@@ -258,7 +258,7 @@ impl<'de> Deserialize<'de> for Tool {
 
                 // Log the actual parse error for debugging - this helps distinguish
                 // between truly unknown types and malformed known types
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown Tool type '{}'. \
                      Parse error: {}. \
                      This may indicate a new API feature or a malformed response. \
@@ -458,7 +458,7 @@ impl FunctionDeclarationBuilder {
     pub fn build(self) -> FunctionDeclaration {
         // Validate function name
         if self.name.trim().is_empty() {
-            log::warn!(
+            tracing::warn!(
                 "FunctionDeclaration built with empty or whitespace-only name. \
                 This will likely be rejected by the API."
             );
@@ -468,7 +468,7 @@ impl FunctionDeclarationBuilder {
         if let serde_json::Value::Object(ref props) = self.properties {
             for req in &self.required {
                 if !props.contains_key(req) {
-                    log::warn!(
+                    tracing::warn!(
                         "FunctionDeclaration '{}' requires parameter '{}' which is not defined in properties. \
                         This will likely cause API errors.",
                         self.name,
@@ -596,7 +596,7 @@ impl<'de> Deserialize<'de> for FunctionCallingMode {
             Some("NONE") => Ok(Self::None),
             Some("VALIDATED") => Ok(Self::Validated),
             Some(other) => {
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown FunctionCallingMode '{}'. \
                      This may indicate a new API feature. \
                      The mode will be preserved in the Unknown variant.",
@@ -610,7 +610,7 @@ impl<'de> Deserialize<'de> for FunctionCallingMode {
             Option::None => {
                 // Non-string value - preserve it in Unknown
                 let mode_type = format!("<non-string: {}>", value);
-                log::warn!(
+                tracing::warn!(
                     "FunctionCallingMode received non-string value: {}. \
                      Preserving in Unknown variant.",
                     value

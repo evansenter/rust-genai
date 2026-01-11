@@ -131,6 +131,7 @@ fn handle_error(e: &GenaiError) -> Result<(), Box<dyn std::error::Error>> {
             status_code,
             message,
             request_id,
+            ..
         } => {
             eprintln!("API Error (HTTP {}): {}", status_code, message);
             if let Some(id) = request_id {

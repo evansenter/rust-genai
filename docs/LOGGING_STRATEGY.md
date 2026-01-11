@@ -2,6 +2,15 @@
 
 This document defines the logging strategy for `genai-rs`, ensuring consistent, secure, and useful log output across the codebase.
 
+## Tracing Framework
+
+This library uses the [`tracing`](https://docs.rs/tracing) crate for structured logging and diagnostics. Tracing provides:
+
+- **Structured logging**: Key-value fields in addition to messages
+- **Spans**: Track execution context across async boundaries
+- **Ecosystem compatibility**: Works with `tracing-subscriber`, OpenTelemetry, and more
+- **Zero-cost when disabled**: No overhead when no subscriber is configured
+
 ## Log Levels
 
 ### `error!` - Unrecoverable failures
@@ -46,13 +55,13 @@ warn!(
 );
 
 // Large file warning (src/multimodal.rs)
-log::warn!(
+tracing::warn!(
     "File '{}' is {:.1}MB which exceeds the recommended 20MB limit for inline data...",
     path.display(), size_mb
 );
 
 // Unknown API type (src/content.rs)
-log::warn!(
+tracing::warn!(
     "Encountered unknown InteractionContent type '{}'. \
      Parse error: {}. \
      This may indicate a new API feature or a malformed response. \
@@ -61,7 +70,7 @@ log::warn!(
 );
 
 // Validation warning (src/tools.rs)
-log::warn!(
+tracing::warn!(
     "FunctionDeclaration '{}' requires parameter '{}' which is not defined in properties...",
     self.name, req
 );
@@ -81,22 +90,22 @@ Use for information useful during development or when diagnosing issues.
 // Request body logging (src/client.rs)
 fn log_request_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
     match serde_json::to_string_pretty(body) {
-        Ok(json) => log::debug!("Request Body (JSON):\n{json}"),
-        Err(_) => log::debug!("Request Body: {body:#?}"),
+        Ok(json) => tracing::debug!("Request Body (JSON):\n{json}"),
+        Err(_) => tracing::debug!("Request Body: {body:#?}"),
     }
 }
 
 // Response body logging (src/client.rs)
 fn log_response_body<T: std::fmt::Debug + serde::Serialize>(body: &T) {
     match serde_json::to_string_pretty(body) {
-        Ok(json) => log::debug!("Response Body (JSON):\n{json}"),
-        Err(_) => log::debug!("Response Body: {body:#?}"),
+        Ok(json) => tracing::debug!("Response Body (JSON):\n{json}"),
+        Err(_) => tracing::debug!("Response Body: {body:#?}"),
     }
 }
 
 // Interaction lifecycle (src/client.rs)
-log::debug!("Creating interaction");
-log::debug!("Interaction created: ID={}", response.id);
+tracing::debug!("Creating interaction");
+tracing::debug!("Interaction created: ID={}", response.id);
 
 // SSE events (src/http/interactions.rs)
 debug!(
@@ -120,6 +129,26 @@ Use for very detailed information that would be overwhelming at debug level.
 
 **Note:** Currently not used in the codebase. Consider adding for SSE parser internals if deeper debugging is needed.
 
+## Instrumented Methods
+
+Key methods use `#[tracing::instrument]` for automatic span creation:
+
+```rust,ignore
+// Client::execute - Creates a span with model/agent context
+#[tracing::instrument(skip(self), fields(model = ?request.model, agent = ?request.agent))]
+pub async fn execute(&self, request: InteractionRequest) -> Result<InteractionResponse, GenaiError>
+
+// Client::execute_stream - Creates a span with model/agent context
+#[tracing::instrument(skip(self), fields(model = ?request.model, agent = ?request.agent))]
+pub fn execute_stream(&self, request: InteractionRequest) -> BoxStream<'_, Result<StreamEvent, GenaiError>>
+```
+
+These spans:
+- Automatically record entry/exit
+- Include the model or agent being used
+- Propagate through async boundaries
+- Enable distributed tracing when used with OpenTelemetry
+
 ## Logging Categories
 
 ### 1. API Request/Response Logging
@@ -130,10 +159,10 @@ Use for very detailed information that would be overwhelming at debug level.
 |-------|-------|----------|
 | Request body | `debug` | `src/client.rs::log_request_body()` |
 | Response body | `debug` | `src/client.rs::log_response_body()` |
-| Interaction created | `debug` | `src/client.rs::create_interaction()` |
+| Interaction created | `debug` | `src/client.rs::execute()` |
 | Interaction retrieved | `debug` | `src/client.rs::get_interaction()` |
 | Interaction deleted | `debug` | `src/client.rs::delete_interaction()` |
-| Stream chunk received | `debug` | `src/client.rs::create_interaction_stream()` |
+| Stream chunk received | `debug` | `src/client.rs::execute_stream()` |
 | SSE event details | `debug` | `src/http/interactions.rs` |
 | Auto-function loop iteration | `debug` | `src/request_builder/auto_functions.rs` |
 | Function execution timing | `debug` | `src/request_builder/auto_functions.rs` |
@@ -205,31 +234,28 @@ The `log_request_body()` function logs full request contents including:
 
 **Consider:** Adding a separate `trace` level for base64 content to keep debug logs more readable.
 
-## Structured Logging Considerations
+## Structured Logging with Tracing
 
-### Current State
-
-The codebase uses string-based log messages. For better machine parseability, consider structured fields in future iterations.
-
-### Potential Improvements
+The library uses tracing's structured logging capabilities:
 
 ```rust,ignore
-// Current style
-log::debug!("Interaction created: ID={}", response.id);
+// Structured fields with spans
+#[tracing::instrument(fields(model = ?request.model))]
+pub async fn execute(&self, request: InteractionRequest) -> Result<InteractionResponse, GenaiError>
 
-// Structured style (future consideration)
-log::debug!(
+// Structured event logging
+tracing::debug!(
     interaction_id = %response.id,
     model = ?response.model,
     "Interaction created"
 );
 ```
 
-This would require:
-1. Enabling `kv` feature in the `log` crate
-2. Subscribers that support structured logging (e.g., `tracing`)
-
-**Decision:** Keep current string-based approach. The library should remain logging-framework-agnostic. Users can use `tracing-log` bridge if they want structured logs.
+Benefits:
+- Machine-parseable log output
+- Correlation across async boundaries via spans
+- Compatible with distributed tracing (OpenTelemetry, Jaeger, etc.)
+- Filterable by field values in some subscribers
 
 ## Guidelines for Adding New Logs
 
@@ -246,48 +272,65 @@ Use consistent message formatting:
 
 ```rust,ignore
 // Good: Action-oriented with key=value context
-log::debug!("Creating interaction");
-log::debug!("Interaction created: ID={}", response.id);
-log::warn!("File '{}' is {:.1}MB which exceeds the recommended 20MB limit...", path, size);
+tracing::debug!("Creating interaction");
+tracing::debug!("Interaction created: ID={}", response.id);
+tracing::warn!("File '{}' is {:.1}MB which exceeds the recommended 20MB limit...", path, size);
 
 // Good: Explains why something is unusual
-log::warn!(
+tracing::warn!(
     "Encountered unknown Tool type '{}'. \
      This may indicate a new API feature or a malformed response.",
     tool_type
 );
 
+// Good: Structured fields for machine parsing
+tracing::debug!(
+    interaction_id = %response.id,
+    status = ?response.status,
+    "Interaction retrieved"
+);
+
 // Bad: Too terse, no context
-log::warn!("Unknown type");
+tracing::warn!("Unknown type");
 
 // Bad: Exposes implementation details without context
-log::debug!("{:?}", internal_state);
+tracing::debug!("{:?}", internal_state);
 ```
 
-### Testing Logs
+### Adding Instrumentation
 
-The `test_log` crate can be used for tests that need to verify logging behavior:
+For key async functions, add `#[tracing::instrument]`:
 
 ```rust,ignore
-#[test_log::test]
-fn test_unknown_type_logs_warning() {
-    // ... test that triggers Unknown variant creation
-    // Verify warning appears in test output
-}
-```
+// Good: Skip self to avoid logging entire struct, add meaningful fields
+#[tracing::instrument(skip(self), fields(file_name = %file.name))]
+pub async fn delete_file(&self, file: &File) -> Result<(), GenaiError>
 
-> **Note**: `test_log` is not currently used in the codebase. The logging changes are straightforward enough that manual verification via `RUST_LOG=genai_rs=debug` is adequate. Consider adding logging tests if regressions become an issue.
+// Good: Skip large arguments, record key identifiers
+#[tracing::instrument(skip(self, request), fields(model = ?request.model))]
+pub async fn execute(&self, request: InteractionRequest) -> Result<InteractionResponse, GenaiError>
+```
 
 ## Integration with User Code
 
-Users can configure logging using any `log`-compatible backend:
+Users configure tracing using `tracing-subscriber` or compatible crates:
 
 ```rust,ignore
-// Simple setup with env_logger
-env_logger::init();
-
-// Or with tracing for structured logs
+// Simple setup with tracing-subscriber
 tracing_subscriber::fmt::init();
+
+// With environment filter
+tracing_subscriber::fmt()
+    .with_env_filter("genai_rs=debug")
+    .init();
+
+// With JSON output for production
+tracing_subscriber::fmt()
+    .json()
+    .init();
+
+// With OpenTelemetry for distributed tracing
+// See: https://docs.rs/tracing-opentelemetry
 ```
 
 Log filtering by level:
@@ -309,11 +352,11 @@ LOUD_WIRE=1 cargo run --example simple_interaction
 | Feature | RUST_LOG | LOUD_WIRE |
 |---------|----------|-----------|
 | **Purpose** | Structured logging for all modules | Raw API traffic inspection |
-| **Output** | Plain text to configured logger | Pretty-printed JSON to stderr |
+| **Output** | Plain text to configured subscriber | Pretty-printed JSON to stderr |
 | **Filtering** | Per-module level control | All-or-nothing |
-| **Colors** | Depends on backend | Always (alternating for visual grouping, blue SSE) |
+| **Colors** | Depends on subscriber | Always (alternating for visual grouping, blue SSE) |
 | **Base64 data** | Full content at debug level | Truncated to 100 chars |
-| **Timestamps** | Depends on backend | Always included with request IDs |
+| **Timestamps** | Depends on subscriber | Always included with request IDs |
 | **SSE streaming** | Individual events at debug | Always included with correlation |
 
 ### When to Use Each

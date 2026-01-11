@@ -251,14 +251,14 @@ fn test_interaction_builder_with_store_enabled() {
 }
 
 #[test]
-fn test_interaction_builder_build_request_success() {
+fn test_interaction_builder_build_success() {
     let client = create_test_client();
     let builder = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Hello");
 
-    let result = builder.build_request();
+    let result = builder.build();
     assert!(result.is_ok());
 
     let request = result.unwrap();
@@ -267,11 +267,11 @@ fn test_interaction_builder_build_request_success() {
 }
 
 #[test]
-fn test_interaction_builder_build_request_missing_input() {
+fn test_interaction_builder_build_missing_input() {
     let client = create_test_client();
     let builder = client.interaction().with_model("gemini-3-flash-preview");
 
-    let result = builder.build_request();
+    let result = builder.build();
     assert!(result.is_err());
     assert!(matches!(
         result.unwrap_err(),
@@ -280,11 +280,11 @@ fn test_interaction_builder_build_request_missing_input() {
 }
 
 #[test]
-fn test_interaction_builder_build_request_missing_model_and_agent() {
+fn test_interaction_builder_build_missing_model_and_agent() {
     let client = create_test_client();
     let builder = client.interaction().with_text("Hello");
 
-    let result = builder.build_request();
+    let result = builder.build();
     assert!(result.is_err());
     assert!(matches!(
         result.unwrap_err(),
@@ -526,7 +526,7 @@ fn test_interaction_builder_with_turns() {
 }
 
 #[test]
-fn test_interaction_builder_build_request_with_turns() {
+fn test_interaction_builder_build_with_turns() {
     use crate::Turn;
 
     let client = create_test_client();
@@ -541,7 +541,7 @@ fn test_interaction_builder_build_request_with_turns() {
         .with_model("gemini-3-flash-preview")
         .with_turns(turns);
 
-    let result = builder.build_request();
+    let result = builder.build();
     assert!(result.is_ok());
 
     let request = result.unwrap();
@@ -561,7 +561,7 @@ fn test_interaction_builder_with_single_turn() {
         .with_model("gemini-3-flash-preview")
         .with_turns(turns);
 
-    let result = builder.build_request();
+    let result = builder.build();
     assert!(result.is_ok());
 }
 
