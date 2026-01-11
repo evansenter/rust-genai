@@ -66,6 +66,7 @@ proptest = "1.9"
 chrono = { workspace = true }
 doc-comment = "0.3"
 rand = "0.9"
+backon = "1.6"
 
 [features]
 ## Strict mode for unknown content types.

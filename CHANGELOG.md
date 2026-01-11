@@ -13,9 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Client::execute()` and `Client::execute_stream()`: Execute pre-built `InteractionRequest` objects
 - `GenaiError::is_retryable()`: Helper to identify transient errors (429, 5xx, timeouts) for retry logic
 - `GenaiError::Api::retry_after`: Extracts `Retry-After` header from 429 rate limit responses (seconds or HTTP date format)
+- `GenaiError::retry_after()`: Accessor method for the retry delay (consistent with `is_retryable()` pattern)
 - `Deserialize` derive on `InteractionRequest`: Enables loading requests from JSON/config files
 - `#[tracing::instrument]` on `execute()` and `execute_stream()`: Automatic span creation with model/agent context
-- `examples/retry_with_backoff.rs`: Demonstrates retry patterns with exponential backoff
+- `docs/RETRY_PATTERNS.md`: Documents retry philosophy and recommended patterns using `backon` crate
+- `examples/retry_with_backoff.rs`: Demonstrates retry patterns using the `backon` crate
 
 ### Changed
 

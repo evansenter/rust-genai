@@ -1,109 +1,24 @@
-//! Demonstrates retry logic with exponential backoff using `is_retryable()`.
+//! Demonstrates retry logic with exponential backoff using the `backon` crate.
 //!
-//! This example shows how to build requests separately from execution, enabling
-//! retry patterns for transient failures like rate limits (429) and server errors (5xx).
+//! This example shows the recommended approach for handling transient failures
+//! like rate limits (429) and server errors (5xx). We use a battle-tested retry
+//! library rather than reimplementing retry logic ourselves.
 //!
 //! Key concepts demonstrated:
 //! - `InteractionBuilder::build()` to create a reusable `InteractionRequest`
 //! - `Client::execute()` to run a pre-built request
 //! - `GenaiError::is_retryable()` to identify transient errors
-//! - Exponential backoff with jitter for retry delays
+//! - `backon` crate for production-grade retry with exponential backoff
+//!
+//! See also: docs/RETRY_PATTERNS.md for our retry philosophy
 //!
 //! Run with: cargo run --example retry_with_backoff
 
-use genai_rs::{Client, GenaiError, InteractionRequest};
-use rand::Rng;
+use backon::{ExponentialBuilder, Retryable};
+use genai_rs::{Client, GenaiError, InteractionRequest, InteractionResponse};
 use std::env;
 use std::error::Error;
 use std::time::Duration;
-
-/// Configuration for retry behavior
-struct RetryConfig {
-    /// Maximum number of retry attempts (not including initial attempt)
-    max_retries: u32,
-    /// Base delay between retries (doubles each attempt)
-    base_delay: Duration,
-    /// Maximum delay between retries
-    max_delay: Duration,
-}
-
-impl Default for RetryConfig {
-    fn default() -> Self {
-        Self {
-            max_retries: 3,
-            base_delay: Duration::from_millis(100),
-            max_delay: Duration::from_secs(30),
-        }
-    }
-}
-
-/// Executes a request with automatic retry on transient errors.
-///
-/// Uses exponential backoff with jitter to spread out retries and avoid
-/// thundering herd problems when multiple clients retry simultaneously.
-async fn execute_with_retry(
-    client: &Client,
-    request: InteractionRequest,
-    config: &RetryConfig,
-) -> Result<genai_rs::InteractionResponse, GenaiError> {
-    let mut attempt = 0;
-
-    loop {
-        // Clone the request for this attempt (original is preserved for retries)
-        let request_clone = request.clone();
-
-        match client.execute(request_clone).await {
-            Ok(response) => {
-                if attempt > 0 {
-                    println!("✓ Request succeeded after {} retry attempt(s)", attempt);
-                }
-                return Ok(response);
-            }
-            Err(e) => {
-                // Check if we should retry
-                if !e.is_retryable() {
-                    println!("✗ Non-retryable error: {}", e);
-                    return Err(e);
-                }
-
-                if attempt >= config.max_retries {
-                    println!(
-                        "✗ Max retries ({}) exceeded. Last error: {}",
-                        config.max_retries, e
-                    );
-                    return Err(e);
-                }
-
-                // Calculate delay with exponential backoff
-                let base_delay_ms = config.base_delay.as_millis() as u64;
-                let delay_ms = base_delay_ms * 2u64.pow(attempt);
-                let delay = Duration::from_millis(delay_ms).min(config.max_delay);
-
-                // Add jitter (±25%) to spread out retries.
-                //
-                // IMPORTANT: Use a proper random number generator here. Poor entropy
-                // (e.g., timestamps) causes multiple clients to compute similar jitter
-                // values, defeating the "thundering herd" mitigation. When a service
-                // recovers from an outage, all waiting clients would retry at nearly
-                // the same time, overwhelming the service again.
-                let jitter_factor = 0.75 + (rand::rng().random::<f64>() * 0.5);
-                let jittered_delay =
-                    Duration::from_millis((delay.as_millis() as f64 * jitter_factor) as u64);
-
-                println!(
-                    "⟳ Retryable error (attempt {}/{}): {}",
-                    attempt + 1,
-                    config.max_retries,
-                    e
-                );
-                println!("  Waiting {:?} before retry...", jittered_delay);
-
-                tokio::time::sleep(jittered_delay).await;
-                attempt += 1;
-            }
-        }
-    }
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -116,7 +31,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let prompt = "What is the Rust programming language known for? Answer in one sentence.";
 
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Retry with Backoff Example");
+    println!("Retry with Backoff Example (using backon crate)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     // Step 1: Build the request (without executing)
@@ -131,18 +46,40 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("  Request is Clone + Serialize + Deserialize");
     println!("  Request can be retried, logged, or persisted\n");
 
-    // Step 2: Execute with retry logic
-    println!("Step 2: Executing with retry logic...");
-    let config = RetryConfig::default();
-    println!(
-        "  Max retries: {}, Base delay: {:?}\n",
-        config.max_retries, config.base_delay
-    );
+    // Step 2: Execute with retry logic using backon
+    println!("Step 2: Executing with backon retry...");
 
-    let response = execute_with_retry(&client, request, &config).await?;
+    // Configure exponential backoff:
+    // - Start with 100ms delay
+    // - Double each attempt (100ms → 200ms → 400ms → ...)
+    // - Cap at 30 seconds max delay
+    // - Jitter is built-in to prevent thundering herd
+    let backoff = ExponentialBuilder::default()
+        .with_min_delay(Duration::from_millis(100))
+        .with_max_delay(Duration::from_secs(30))
+        .with_max_times(3);
+
+    println!("  Backoff: exponential, 100ms-30s, max 3 retries\n");
+
+    // The retry logic in 4 lines:
+    // 1. Wrap the operation in a closure that clones the request
+    // 2. Configure backoff strategy
+    // 3. Specify which errors to retry (.when())
+    // 4. Optionally log retries (.notify())
+    let response: InteractionResponse = (|| async {
+        // Clone request for each attempt (original preserved for retries)
+        client.execute(request.clone()).await
+    })
+    .retry(backoff)
+    .when(|e: &GenaiError| e.is_retryable())
+    .notify(|err, dur| {
+        println!("⟳ Retryable error: {}", err);
+        println!("  Waiting {:?} before retry...", dur);
+    })
+    .await?;
 
     // Step 3: Process response
-    println!("\n--- Response ---");
+    println!("--- Response ---");
     if let Some(text) = response.text() {
         println!("{}", text);
     }
@@ -160,15 +97,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("  [RES#1] completed: text response with usage stats");
     println!("  (If retries occur, you'll see REQ#2, REQ#3, etc.)\n");
 
-    println!("--- Production Considerations ---");
-    println!("• InteractionBuilder::build() creates a reusable InteractionRequest");
-    println!("• InteractionRequest implements Clone for retry patterns");
-    println!("• Client::execute() runs a pre-built request");
-    println!("• GenaiError::is_retryable() identifies transient errors (429, 5xx, timeouts)");
-    println!("• Set appropriate max_retries based on your SLA requirements");
-    println!("• Consider circuit breakers for sustained failures");
-    println!("• For 429 errors, check Retry-After header if available");
-    println!("• Serialize requests for dead-letter queues or audit logs");
+    println!("--- Key Takeaways ---");
+    println!("• Use `backon` crate for production retry logic (battle-tested)");
+    println!("• `InteractionRequest` is Clone - safe to retry");
+    println!("• `is_retryable()` identifies 429, 5xx, and timeout errors");
+    println!("• `retry_after()` provides server-suggested delay for 429s");
+    println!("• See docs/RETRY_PATTERNS.md for our retry philosophy");
 
     Ok(())
 }

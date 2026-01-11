@@ -155,6 +155,40 @@ impl GenaiError {
             | GenaiError::ClientBuild(_) => false,
         }
     }
+
+    /// Returns the server-suggested retry delay for rate limit (429) errors.
+    ///
+    /// This extracts the `Retry-After` header value that was parsed when the error
+    /// was created. Only `Api` errors with status code 429 typically have this field set.
+    ///
+    /// # Returns
+    ///
+    /// - `Some(Duration)` if the error has a `retry_after` value
+    /// - `None` for all other error types or if no `Retry-After` header was present
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use genai_rs::GenaiError;
+    /// use std::time::Duration;
+    ///
+    /// async fn with_server_suggested_delay(error: &GenaiError) {
+    ///     if let Some(delay) = error.retry_after() {
+    ///         // Server told us how long to wait
+    ///         tokio::time::sleep(delay).await;
+    ///     } else {
+    ///         // Fall back to our own backoff strategy
+    ///         tokio::time::sleep(Duration::from_secs(1)).await;
+    ///     }
+    /// }
+    /// ```
+    #[must_use]
+    pub fn retry_after(&self) -> Option<std::time::Duration> {
+        match self {
+            GenaiError::Api { retry_after, .. } => *retry_after,
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
