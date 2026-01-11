@@ -193,6 +193,19 @@ Breaking changes are permitted and preferred when they simplify the API or align
 
 **CHANGELOG**: Update `CHANGELOG.md` for user-facing changes: new features, breaking changes, bug fixes, deprecations. Internal refactors and CI changes don't need entries.
 
+### Version Bump Checklist
+
+When releasing a new version, update these files:
+
+| File | Location |
+|------|----------|
+| `Cargo.toml` | `version = "X.Y.Z"` (line ~3) |
+| `Cargo.toml` | `genai-rs-macros = { version = "X.Y.Z"` (dependencies) |
+| `genai-rs-macros/Cargo.toml` | `version = "X.Y.Z"` (line ~3) |
+| `CHANGELOG.md` | `## [Unreleased]` → `## [X.Y.Z] - YYYY-MM-DD` |
+
+`Cargo.lock` updates automatically—don't edit manually.
+
 ## Logging
 
 See `docs/LOGGING_STRATEGY.md`. Key points:
