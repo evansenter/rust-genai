@@ -23,14 +23,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-### Testing
-
-**Default**: Always run `cargo test -- --include-ignored` for full integration testing.
+Use the Makefile for common operations. Requires [cargo-nextest](https://nexte.st/).
 
 ```bash
-cargo test -- --include-ignored           # Full test suite (requires GEMINI_API_KEY)
-cargo test                                 # Unit tests only
-cargo test test_name -- --include-ignored # Single test by name
+make check     # Pre-push gate: fmt + clippy + test
+make test      # Unit tests only (excludes doctests for speed)
+make test-all  # Full suite including integration tests (requires GEMINI_API_KEY)
+make fmt       # Check formatting
+make clippy    # Lint with warnings as errors
+make docs      # Build docs with warnings as errors
+make clean     # Clean build artifacts
+```
+
+### Testing
+
+**Default**: Always run `make test-all` for full integration testing.
+
+```bash
+make test-all                                    # Full test suite (requires GEMINI_API_KEY)
+make test                                        # Unit tests only
+cargo nextest run -E 'test(/test_name/)'         # Single test by name
+cargo nextest run --test integration_file        # Single integration test file
 ```
 
 **Environment**: `GEMINI_API_KEY` required for integration tests. Tests take 2-5 minutes; some may flake due to LLM variability.
@@ -38,6 +51,9 @@ cargo test test_name -- --include-ignored # Single test by name
 ### Quality Checks
 
 ```bash
+make check  # Run all quality gates (fmt + clippy + test)
+
+# Or individually:
 cargo fmt -- --check                                                 # Check format
 cargo clippy --workspace --all-targets --all-features -- -D warnings # Lint
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items  # Docs
