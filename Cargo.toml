@@ -111,3 +111,13 @@ name = "testing_assistant"
 path = "examples/real_world/testing_assistant/main.rs"
 
 # Workspace-level metadata
+
+[profile.dev]
+opt-level = 1
+debug = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.test]
+inherits = "dev"
