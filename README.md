@@ -178,8 +178,7 @@ let request: InteractionRequest = client.interaction()
 // Execute separately - enables retry loops
 let response = client.execute(request.clone()).await?;
 
-// Check if error is retryable (429, 5xx, timeouts)
-// if let Err(e) = result && e.is_retryable() { ... }
+// On error, check if retryable: error.is_retryable()
 ```
 
 See [`retry_with_backoff`](examples/retry_with_backoff.rs) for a complete retry example using the `backon` crate.
