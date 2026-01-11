@@ -337,6 +337,7 @@ dependencies = [
  "genai-rs-macros",
  "inventory",
  "proptest",
+ "rand",
  "regex",
  "reqwest",
  "serde",

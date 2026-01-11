@@ -113,7 +113,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 GenaiError::Api {
                     status_code,
                     message,
-                    request_id,
+                    request_id, ..
                 } => {
                     eprintln!("API Error (HTTP {}): {}", status_code, message);
                     if let Some(id) = request_id {

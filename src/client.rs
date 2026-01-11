@@ -1198,6 +1198,7 @@ impl Client {
                     status_code: error_code.map_or(500, |c| c as u16),
                     message: format!("File processing failed: {}", error_msg),
                     request_id: None,
+                    retry_after: None,
                 });
             }
 

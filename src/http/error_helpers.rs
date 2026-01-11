@@ -30,17 +30,25 @@ pub async fn check_response(response: Response) -> Result<Response, GenaiError> 
 /// See: <https://cloud.google.com/apis/docs/system-parameters>
 const REQUEST_ID_HEADER: &str = "x-goog-request-id";
 
+/// Standard HTTP header indicating how long to wait before retrying.
+///
+/// Can contain either:
+/// - Seconds as integer (e.g., "120")
+/// - HTTP date (e.g., "Wed, 21 Oct 2015 07:28:00 GMT")
+const RETRY_AFTER_HEADER: &str = "retry-after";
+
 /// Reads error response body and creates a detailed GenaiError::Api with context.
 ///
 /// Extracts:
 /// - HTTP status code for programmatic error handling
 /// - Truncated response body (first 200 chars)
 /// - Request ID from `x-goog-request-id` header for debugging/support
+/// - Retry delay from `Retry-After` header (typically for 429 errors)
 ///
 /// # Returns
 ///
-/// A structured `GenaiError::Api` with status code, message, and optional request ID.
-/// If body cannot be read, the message describes the read failure.
+/// A structured `GenaiError::Api` with status code, message, optional request ID,
+/// and optional retry delay. If body cannot be read, the message describes the read failure.
 pub async fn read_error_with_context(response: Response) -> GenaiError {
     let status_code = response.status().as_u16();
 
@@ -50,6 +58,13 @@ pub async fn read_error_with_context(response: Response) -> GenaiError {
         .get(REQUEST_ID_HEADER)
         .and_then(|v| v.to_str().ok())
         .map(String::from);
+
+    // Extract Retry-After header (primarily for 429 rate limit responses)
+    let retry_after = response
+        .headers()
+        .get(RETRY_AFTER_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .and_then(parse_retry_after);
 
     let error_body = response
         .text()
@@ -62,7 +77,38 @@ pub async fn read_error_with_context(response: Response) -> GenaiError {
         status_code,
         message,
         request_id,
+        retry_after,
     }
+}
+
+/// Parses the Retry-After header value into a Duration.
+///
+/// Supports two formats per HTTP spec:
+/// - Seconds as integer (e.g., "120" → 120 seconds)
+/// - HTTP date (e.g., "Wed, 21 Oct 2015 07:28:00 GMT" → duration until then)
+fn parse_retry_after(value: &str) -> Option<std::time::Duration> {
+    // Try parsing as seconds first (most common for rate limiting)
+    if let Ok(seconds) = value.parse::<u64>() {
+        return Some(std::time::Duration::from_secs(seconds));
+    }
+
+    // Try parsing as HTTP date using chrono
+    // HTTP date format (RFC 7231): "Wed, 21 Oct 2015 07:28:00 GMT"
+    // RFC 2822 (email) format requires numeric offset, so convert "GMT" → "+0000"
+    let normalized = value.replace(" GMT", " +0000");
+    if let Ok(date) = chrono::DateTime::parse_from_rfc2822(&normalized) {
+        let now = chrono::Utc::now();
+        let target = date.with_timezone(&chrono::Utc);
+        if target > now {
+            let duration = target - now;
+            return duration.to_std().ok();
+        }
+        // If target is in the past, return zero duration (retry immediately)
+        return Some(std::time::Duration::ZERO);
+    }
+
+    // Unable to parse - return None
+    None
 }
 
 /// Formats JSON parsing context by including a preview of the raw JSON.
@@ -287,5 +333,62 @@ mod tests {
             "Long JSON should be truncated: {}",
             err_str
         );
+    }
+
+    // =============================================================================
+    // parse_retry_after() Tests
+    // =============================================================================
+
+    #[test]
+    fn test_parse_retry_after_seconds() {
+        // Integer seconds format (most common for rate limiting)
+        assert_eq!(
+            parse_retry_after("60"),
+            Some(std::time::Duration::from_secs(60))
+        );
+        assert_eq!(
+            parse_retry_after("0"),
+            Some(std::time::Duration::from_secs(0))
+        );
+        assert_eq!(
+            parse_retry_after("3600"),
+            Some(std::time::Duration::from_secs(3600))
+        );
+    }
+
+    #[test]
+    fn test_parse_retry_after_invalid() {
+        // Invalid formats should return None
+        assert_eq!(parse_retry_after("not-a-number"), None);
+        assert_eq!(parse_retry_after(""), None);
+        assert_eq!(parse_retry_after("60.5"), None); // Floats not supported
+        assert_eq!(parse_retry_after("-1"), None); // Negative not valid for u64
+    }
+
+    #[test]
+    fn test_parse_retry_after_http_date_future() {
+        // HTTP date format in the future (RFC 7231)
+        // Note: Day-of-week must be correct! Dec 31, 2030 is a Tuesday.
+        let future_date = "Tue, 31 Dec 2030 23:59:59 GMT";
+        let result = parse_retry_after(future_date);
+        assert!(result.is_some(), "Should parse future HTTP date");
+        // Duration should be positive (time until that date)
+        assert!(result.unwrap() > std::time::Duration::ZERO);
+    }
+
+    #[test]
+    fn test_parse_retry_after_http_date_past() {
+        // HTTP date in the past should return zero duration (retry immediately)
+        // Note: Day-of-week must be correct! Jan 1, 2020 was a Wednesday.
+        let past_date = "Wed, 01 Jan 2020 00:00:00 GMT";
+        let result = parse_retry_after(past_date);
+        assert_eq!(result, Some(std::time::Duration::ZERO));
+    }
+
+    #[test]
+    fn test_parse_retry_after_invalid_http_date() {
+        // Malformed HTTP dates should return None
+        assert_eq!(parse_retry_after("Wed, 21 Oct 2015"), None); // Missing time
+        assert_eq!(parse_retry_after("2015-10-21T07:28:00Z"), None); // ISO format not supported
     }
 }

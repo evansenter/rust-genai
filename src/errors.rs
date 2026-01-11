@@ -39,6 +39,15 @@ pub enum GenaiError {
         message: String,
         /// Request ID from `x-goog-request-id` header, if available
         request_id: Option<String>,
+        /// Retry delay from `Retry-After` header (for 429 rate limit errors).
+        ///
+        /// When present, this indicates how long to wait before retrying.
+        /// The value is parsed from the `Retry-After` header, which can be:
+        /// - Seconds (e.g., "120" → 120 seconds)
+        /// - HTTP date (e.g., "Wed, 21 Oct 2015 07:28:00 GMT" → duration until then)
+        ///
+        /// This field is typically only populated for 429 (Too Many Requests) errors.
+        retry_after: Option<std::time::Duration>,
     },
     #[error("Internal client error: {0}")]
     Internal(String),
@@ -97,6 +106,7 @@ impl GenaiError {
     ///     status_code: 429,
     ///     message: "Resource exhausted".to_string(),
     ///     request_id: None,
+    ///     retry_after: Some(std::time::Duration::from_secs(60)),
     /// };
     /// assert!(rate_limited.is_retryable());
     ///
@@ -105,6 +115,7 @@ impl GenaiError {
     ///     status_code: 400,
     ///     message: "Invalid model".to_string(),
     ///     request_id: None,
+    ///     retry_after: None,
     /// };
     /// assert!(!bad_request.is_retryable());
     ///
@@ -118,7 +129,7 @@ impl GenaiError {
     /// When implementing retry logic, consider:
     /// - Use exponential backoff with jitter
     /// - Set a maximum number of retries
-    /// - For 429 errors, check the `Retry-After` header if available
+    /// - For 429 errors, use the `retry_after` field if available (extracted from `Retry-After` header)
     /// - Log retries for observability
     ///
     /// See `examples/retry_with_backoff.rs` for a complete retry implementation.
@@ -164,6 +175,7 @@ mod tests {
             status_code: 429,
             message: "Rate limited".to_string(),
             request_id: Some("req-123".to_string()),
+            retry_after: None,
         };
         let display = format!("{}", error);
         assert!(display.contains("429"));
@@ -176,6 +188,7 @@ mod tests {
             status_code: 500,
             message: "Internal error".to_string(),
             request_id: None,
+            retry_after: None,
         };
         let display = format!("{}", error);
         assert!(display.contains("500"));
@@ -223,6 +236,7 @@ mod tests {
             status_code: 400,
             message: "Bad request".to_string(),
             request_id: Some("req-456".to_string()),
+            retry_after: None,
         };
         let debug = format!("{:?}", error);
         assert!(debug.contains("Api"));
@@ -248,6 +262,7 @@ mod tests {
                 status_code: code,
                 message: message.to_string(),
                 request_id: None,
+                retry_after: None,
             };
             let display = format!("{}", error);
             assert!(
@@ -266,6 +281,7 @@ mod tests {
             status_code: 500,
             message: "".to_string(),
             request_id: None,
+            retry_after: None,
         };
         let display = format!("{}", error);
         assert!(display.contains("500"));
@@ -334,6 +350,7 @@ mod tests {
             status_code: 429,
             message: "Resource exhausted".to_string(),
             request_id: None,
+            retry_after: Some(std::time::Duration::from_secs(60)),
         };
         assert!(error.is_retryable(), "429 errors should be retryable");
     }
@@ -345,6 +362,7 @@ mod tests {
                 status_code,
                 message: "Server error".to_string(),
                 request_id: None,
+                retry_after: None,
             };
             assert!(
                 error.is_retryable(),
@@ -362,6 +380,7 @@ mod tests {
                 status_code,
                 message: "Client error".to_string(),
                 request_id: None,
+                retry_after: None,
             };
             assert!(
                 !error.is_retryable(),

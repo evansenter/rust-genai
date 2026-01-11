@@ -12,6 +12,7 @@
 //! Run with: cargo run --example retry_with_backoff
 
 use genai_rs::{Client, GenaiError, InteractionRequest};
+use rand::Rng;
 use std::env;
 use std::error::Error;
 use std::time::Duration;
@@ -78,8 +79,14 @@ async fn execute_with_retry(
                 let delay_ms = base_delay_ms * 2u64.pow(attempt);
                 let delay = Duration::from_millis(delay_ms).min(config.max_delay);
 
-                // Add jitter (±25%) to spread out retries
-                let jitter_factor = 0.75 + (rand_simple() * 0.5);
+                // Add jitter (±25%) to spread out retries.
+                //
+                // IMPORTANT: Use a proper random number generator here. Poor entropy
+                // (e.g., timestamps) causes multiple clients to compute similar jitter
+                // values, defeating the "thundering herd" mitigation. When a service
+                // recovers from an outage, all waiting clients would retry at nearly
+                // the same time, overwhelming the service again.
+                let jitter_factor = 0.75 + (rand::rng().random::<f64>() * 0.5);
                 let jittered_delay =
                     Duration::from_millis((delay.as_millis() as f64 * jitter_factor) as u64);
 
@@ -96,16 +103,6 @@ async fn execute_with_retry(
             }
         }
     }
-}
-
-/// Simple pseudo-random number generator (for jitter, not cryptographic use).
-fn rand_simple() -> f64 {
-    use std::time::SystemTime;
-    let nanos = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .subsec_nanos();
-    (nanos % 1000) as f64 / 1000.0
 }
 
 #[tokio::main]

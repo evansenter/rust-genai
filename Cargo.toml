@@ -65,6 +65,7 @@ futures-util = { workspace = true }
 proptest = "1.9"
 chrono = { workspace = true }
 doc-comment = "0.3"
+rand = "0.9"
 
 [features]
 ## Strict mode for unknown content types.
