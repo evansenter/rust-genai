@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `InteractionBuilder::build()`: Build requests without executing, enabling retry patterns and request serialization
+- `Client::execute()` and `Client::execute_stream()`: Execute pre-built `InteractionRequest` objects
+- `GenaiError::is_retryable()`: Helper to identify transient errors (429, 5xx, timeouts) for retry logic
+- `Deserialize` derive on `InteractionRequest`: Enables loading requests from JSON/config files
+- `#[tracing::instrument]` on `execute()` and `execute_stream()`: Automatic span creation with model/agent context
+- `examples/retry_with_backoff.rs`: Demonstrates retry patterns with exponential backoff
+
+### Changed
+
+- **BREAKING**: Renamed `CreateInteractionRequest` to `InteractionRequest` for consistency
+- **BREAKING**: Migrated from `log` crate to `tracing` crate for structured logging and spans
+- Updated `docs/LOGGING_STRATEGY.md` to document tracing integration and instrumentation patterns
+
+### Removed
+
+- **BREAKING**: `Client::create_interaction()` - use `Client::execute()` instead
+- **BREAKING**: `Client::create_interaction_stream()` - use `Client::execute_stream()` instead
+
+### Migration Guide
+
+**`create_interaction()` → `execute()`:**
+```rust
+// Before
+let response = client.create_interaction(request).await?;
+let stream = client.create_interaction_stream(request);
+
+// After
+let response = client.execute(request).await?;
+let stream = client.execute_stream(request);
+```
+
+**`CreateInteractionRequest` → `InteractionRequest`:**
+```rust
+// Before
+use genai_rs::CreateInteractionRequest;
+
+// After
+use genai_rs::InteractionRequest;
+```
+
+**`log` → `tracing`:**
+If you were filtering logs with `RUST_LOG=genai_rs=debug`, this continues to work.
+For tracing subscribers, use `tracing_subscriber` instead of `env_logger`:
+
+```rust
+// Before (with env_logger)
+env_logger::init();
+
+// After (with tracing-subscriber)
+tracing_subscriber::fmt::init();
+```
+
 ## [0.5.3] - 2026-01-10
 
 ### Fixed

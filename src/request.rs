@@ -103,7 +103,7 @@ impl<'de> Deserialize<'de> for Role {
             "user" => Ok(Role::User),
             "model" => Ok(Role::Model),
             other => {
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown Role '{}' - using Unknown variant (Evergreen)",
                     other
                 );
@@ -436,7 +436,7 @@ impl<'de> Visitor<'de> for ThinkingLevelVisitor {
             "medium" => Ok(ThinkingLevel::Medium),
             "high" => Ok(ThinkingLevel::High),
             other => {
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown ThinkingLevel '{}' - using Unknown variant (Evergreen)",
                     other
                 );
@@ -461,7 +461,7 @@ impl<'de> Visitor<'de> for ThinkingLevelVisitor {
             .unwrap_or("unknown")
             .to_string();
 
-        log::warn!(
+        tracing::warn!(
             "Encountered unknown ThinkingLevel object '{}' - using Unknown variant (Evergreen)",
             level_type
         );
@@ -584,10 +584,72 @@ impl SpeechConfig {
     }
 }
 
-/// Request body for the Interactions API endpoint
-#[derive(Clone, Serialize, Debug)]
+/// Request body for the Interactions API endpoint.
+///
+/// This type represents a fully-constructed interaction request that can be
+/// cloned, serialized, and executed via [`Client::execute()`](crate::Client::execute).
+///
+/// # Creating Requests
+///
+/// Use [`InteractionBuilder::build()`](crate::InteractionBuilder::build) to create requests:
+///
+/// ```no_run
+/// # use genai_rs::Client;
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let client = Client::new("api_key".to_string());
+///
+/// let request = client.interaction()
+///     .with_model("gemini-3-flash-preview")
+///     .with_text("Hello!")
+///     .build()?;
+///
+/// // Request can be cloned, serialized, inspected
+/// let backup = request.clone();
+/// println!("{}", serde_json::to_string_pretty(&request)?);
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Executing Requests
+///
+/// ```no_run
+/// # use genai_rs::Client;
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// # let client = Client::new("api_key".to_string());
+/// # let request = client.interaction()
+/// #     .with_model("gemini-3-flash-preview")
+/// #     .with_text("Hello!")
+/// #     .build()?;
+/// let response = client.execute(request).await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Retrying Requests
+///
+/// Since `InteractionRequest` is `Clone`, you can retry failed requests:
+///
+/// ```no_run
+/// # use genai_rs::{Client, GenaiError};
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// # let client = Client::new("api_key".to_string());
+/// # let request = client.interaction()
+/// #     .with_model("gemini-3-flash-preview")
+/// #     .with_text("Hello!")
+/// #     .build()?;
+/// let response = loop {
+///     match client.execute(request.clone()).await {
+///         Ok(r) => break r,
+///         Err(e) if e.is_retryable() => continue,
+///         Err(e) => return Err(e.into()),
+///     }
+/// };
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateInteractionRequest {
+pub struct InteractionRequest {
     /// Model name (e.g., "gemini-3-flash-preview") - mutually exclusive with agent
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
@@ -782,7 +844,7 @@ impl<'de> Visitor<'de> for ThinkingSummariesVisitor {
             "THINKING_SUMMARIES_AUTO" | "auto" => Ok(ThinkingSummaries::Auto),
             "THINKING_SUMMARIES_NONE" | "none" => Ok(ThinkingSummaries::None),
             other => {
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown ThinkingSummaries '{}' - using Unknown variant (Evergreen)",
                     other
                 );
@@ -807,7 +869,7 @@ impl<'de> Visitor<'de> for ThinkingSummariesVisitor {
             .unwrap_or("unknown")
             .to_string();
 
-        log::warn!(
+        tracing::warn!(
             "Encountered unknown ThinkingSummaries object '{}' - using Unknown variant (Evergreen)",
             summaries_type
         );

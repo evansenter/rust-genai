@@ -46,7 +46,7 @@ mod basic {
 
         // Verify the builder stored the complex input correctly
         let request = builder
-            .build_request()
+            .build()
             .expect("Builder should create valid request");
 
         // Verify the input is a Content variant with 3 items
@@ -70,7 +70,7 @@ mod basic {
             .with_text("Hello");
 
         // Builder validates that only one of model/agent can be set
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("Cannot specify both model"));
@@ -253,12 +253,12 @@ mod validation {
 
     #[test]
     fn test_interaction_builder_validation_missing_input() {
-        // Verify that build_request fails when no input is provided
+        // Verify that build fails when no input is provided
         let client = Client::new("test-api-key".to_string());
 
         let builder = client.interaction().with_model(DEFAULT_MODEL);
 
-        let result = builder.build_request();
+        let result = builder.build();
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -272,12 +272,12 @@ mod validation {
 
     #[test]
     fn test_interaction_builder_validation_missing_model_and_agent() {
-        // Verify that build_request fails when neither model nor agent is specified
+        // Verify that build fails when neither model nor agent is specified
         let client = Client::new("test-api-key".to_string());
 
         let builder = client.interaction().with_text("Hello"); // Has input but no model/agent
 
-        let result = builder.build_request();
+        let result = builder.build();
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -291,7 +291,7 @@ mod validation {
 
     #[test]
     fn test_interaction_builder_validation_success_with_model() {
-        // Verify that build_request succeeds when model and input are provided
+        // Verify that build succeeds when model and input are provided
         let client = Client::new("test-api-key".to_string());
 
         let builder = client
@@ -299,7 +299,7 @@ mod validation {
             .with_model(DEFAULT_MODEL)
             .with_text("Hello");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -323,7 +323,7 @@ mod tools {
             .with_text("What's the weather today?")
             .with_google_search();
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -351,7 +351,7 @@ mod tools {
             .with_function(func)
             .with_google_search();
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -375,7 +375,7 @@ mod tools {
             .with_text("Calculate the factorial of 10")
             .with_code_execution();
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -399,7 +399,7 @@ mod tools {
             .with_code_execution()
             .with_google_search();
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -423,7 +423,7 @@ mod tools {
             .with_text("Summarize the content from https://example.com")
             .with_url_context();
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -450,7 +450,7 @@ mod tools {
             .with_function(func)
             .with_url_context();
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -476,7 +476,7 @@ mod tools {
             .with_code_execution()
             .with_url_context();
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -505,7 +505,7 @@ mod edge_cases {
             .with_model("second-model")
             .with_text("Hello");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -524,7 +524,7 @@ mod edge_cases {
             .with_agent("second-agent")
             .with_text("Hello");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -542,7 +542,7 @@ mod edge_cases {
 
         let builder = client.interaction().with_model(DEFAULT_MODEL).with_text("");
 
-        let result = builder.build_request();
+        let result = builder.build();
         // Empty text should be accepted at builder level
         assert!(result.is_ok());
     }
@@ -558,7 +558,7 @@ mod edge_cases {
             .with_text("Continue conversation")
             .with_previous_interaction("prev-interaction-123");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -585,7 +585,7 @@ mod edge_cases {
             .with_max_function_call_loops(5);
 
         // The max_function_call_loops is stored in the builder, verified by integration tests
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
     }
 }
@@ -622,7 +622,7 @@ mod multimodal {
             .with_model(DEFAULT_MODEL)
             .add_image_data("base64data", "image/jpeg");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -651,7 +651,7 @@ mod multimodal {
             .with_text("Analyze this image")
             .add_image_data("base64data", "image/png");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -687,7 +687,7 @@ mod multimodal {
             .add_image_data("img2", "image/png")
             .add_audio_data("audio1", "audio/mp3");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -715,7 +715,7 @@ mod multimodal {
             .with_content(initial_content)
             .add_image_data("imagedata", "image/gif");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -737,7 +737,7 @@ mod multimodal {
             .with_text("Describe this image")
             .add_image_uri("gs://bucket/image.jpg", "image/jpeg");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -764,7 +764,7 @@ mod multimodal {
             .with_model(DEFAULT_MODEL)
             .add_audio_data("audiodata", "audio/wav");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -790,7 +790,7 @@ mod multimodal {
             .with_model(DEFAULT_MODEL)
             .add_video_data("videodata", "video/mp4");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -816,7 +816,7 @@ mod multimodal {
             .with_model(DEFAULT_MODEL)
             .add_document_data("pdfdata", "application/pdf");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -843,7 +843,7 @@ mod multimodal {
             .with_text("Summarize this document")
             .add_document_uri("gs://bucket/report.pdf", "application/pdf");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -870,7 +870,7 @@ mod multimodal {
             .with_text("Describe this audio")
             .add_audio_uri("gs://bucket/audio.mp3", "audio/mp3");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -898,7 +898,7 @@ mod multimodal {
             .with_text("Describe this video")
             .add_video_uri("gs://bucket/video.mp4", "video/mp4");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -944,7 +944,7 @@ mod multimodal {
             .with_generation_config(config)
             .with_google_search();
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -984,7 +984,7 @@ mod multimodal {
             .add_audio_data("third", "audio/mp3")
             .add_video_data("fourth", "video/mp4");
 
-        let result = builder.build_request();
+        let result = builder.build();
         assert!(result.is_ok());
 
         let request = result.unwrap();
@@ -1031,7 +1031,7 @@ mod multimodal {
             .with_model(DEFAULT_MODEL)
             .with_file_uri("https://example.com/image.png", "image/png");
 
-        let request = builder.build_request().expect("Should build valid request");
+        let request = builder.build().expect("Should build valid request");
 
         match &request.input {
             InteractionInput::Content(items) => {
@@ -1052,7 +1052,7 @@ mod multimodal {
             .with_model(DEFAULT_MODEL)
             .with_file_uri("https://example.com/video.mp4", "video/mp4");
 
-        let request = builder.build_request().unwrap();
+        let request = builder.build().unwrap();
         match &request.input {
             InteractionInput::Content(items) => {
                 assert!(matches!(
@@ -1071,7 +1071,7 @@ mod multimodal {
             .with_model(DEFAULT_MODEL)
             .with_file_uri("https://example.com/doc.pdf", "application/pdf");
 
-        let request = builder.build_request().unwrap();
+        let request = builder.build().unwrap();
         match &request.input {
             InteractionInput::Content(items) => {
                 assert!(matches!(
@@ -1090,7 +1090,7 @@ mod multimodal {
             .with_model(DEFAULT_MODEL)
             .with_file_uri("https://example.com/file.txt", "text/plain");
 
-        let request = builder.build_request().unwrap();
+        let request = builder.build().unwrap();
         match &request.input {
             InteractionInput::Content(items) => {
                 assert!(matches!(

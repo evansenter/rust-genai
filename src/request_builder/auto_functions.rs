@@ -11,8 +11,8 @@ use std::time::Instant;
 use crate::{InteractionInput, InteractionResponse, StreamChunk};
 use futures_util::StreamExt;
 use futures_util::stream::BoxStream;
-use log::{debug, error, warn};
 use serde_json::{Value, json};
+use tracing::{debug, error, warn};
 
 use crate::GenaiError;
 use crate::ToolService;
@@ -252,7 +252,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
         let timeout = self.timeout;
         let max_loops = self.max_function_call_loops;
         let tool_service = self.tool_service.clone();
-        let mut request = self.build_request()?;
+        let mut request = self.build()?;
 
         // Track all function executions for the result
         let mut all_executions: Vec<FunctionExecutionResult> = Vec::new();
@@ -312,13 +312,13 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
             // Apply per-API-call timeout if set (function execution time not included)
             let response = match timeout {
                 Some(duration) => {
-                    let future = client.create_interaction(request.clone());
+                    let future = client.execute(request.clone());
                     tokio::time::timeout(duration, future).await.map_err(|_| {
                         warn!("Auto-function API call timed out after {:?}", duration);
                         GenaiError::Timeout(duration)
                     })??
                 }
-                None => client.create_interaction(request.clone()).await?,
+                None => client.execute(request.clone()).await?,
             };
 
             // When store != false (validated at function entry), the API should always
@@ -537,7 +537,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
         let timeout = self.timeout;
 
         Box::pin(async_stream::try_stream! {
-            let mut request = self.build_request()?;
+            let mut request = self.build()?;
 
             // Build a map of service-provided functions for lookup during execution
             let service_functions = build_service_function_map(&tool_service);
@@ -592,7 +592,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                 request.stream = Some(true);
 
                 // Stream this iteration's response
-                let mut stream = client.create_interaction_stream(request.clone());
+                let mut stream = client.execute_stream(request.clone());
                 let mut complete_response: Option<InteractionResponse> = None;
                 // Accumulate function calls from deltas (streaming API may not include them in Complete)
                 let mut accumulated_calls: Vec<(Option<String>, String, serde_json::Value)> = Vec::new();
@@ -639,7 +639,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                         }
                         // Log unknown chunk types for observability, but continue for forward compatibility
                         StreamChunk::Unknown { chunk_type, .. } => {
-                            log::warn!(
+                            tracing::warn!(
                                 "Received unknown StreamChunk type '{}' during auto-function streaming. \
                                  This may indicate a new API feature.",
                                 chunk_type

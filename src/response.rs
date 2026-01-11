@@ -30,13 +30,13 @@ where
 {
     let value = i64::deserialize(deserializer)?;
     if value < 0 {
-        log::warn!(
+        tracing::warn!(
             "Received negative token count from API: {}. Clamping to 0.",
             value
         );
         Ok(0)
     } else if value > u32::MAX as i64 {
-        log::warn!(
+        tracing::warn!(
             "Token count exceeds u32::MAX: {}. Clamping to u32::MAX.",
             value
         );
@@ -55,14 +55,14 @@ where
     match value {
         None => Ok(None),
         Some(v) if v < 0 => {
-            log::warn!(
+            tracing::warn!(
                 "Received negative token count from API: {}. Clamping to 0.",
                 v
             );
             Ok(Some(0))
         }
         Some(v) if v > u32::MAX as i64 => {
-            log::warn!("Token count exceeds u32::MAX: {}. Clamping to u32::MAX.", v);
+            tracing::warn!("Token count exceeds u32::MAX: {}. Clamping to u32::MAX.", v);
             Ok(Some(u32::MAX))
         }
         Some(v) => Ok(Some(v as u32)),
@@ -163,7 +163,7 @@ impl<'de> Deserialize<'de> for InteractionStatus {
             Some("failed") => Ok(Self::Failed),
             Some("cancelled") => Ok(Self::Cancelled),
             Some(other) => {
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown InteractionStatus '{}'. \
                      This may indicate a new API feature. \
                      The status will be preserved in the Unknown variant.",
@@ -177,7 +177,7 @@ impl<'de> Deserialize<'de> for InteractionStatus {
             None => {
                 // Non-string value - preserve it in Unknown
                 let status_type = format!("<non-string: {}>", value);
-                log::warn!(
+                tracing::warn!(
                     "InteractionStatus received non-string value: {}. \
                      Preserving in Unknown variant.",
                     value
@@ -592,7 +592,7 @@ impl<'de> Deserialize<'de> for UrlRetrievalStatus {
             Some("URL_RETRIEVAL_STATUS_UNSAFE") => Ok(Self::Unsafe),
             Some("URL_RETRIEVAL_STATUS_ERROR") => Ok(Self::Error),
             Some(other) => {
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown UrlRetrievalStatus '{}'. \
                      This may indicate a new API feature. \
                      The status will be preserved in the Unknown variant.",
@@ -606,7 +606,7 @@ impl<'de> Deserialize<'de> for UrlRetrievalStatus {
             None => {
                 // Non-string value - preserve it in Unknown
                 let status_type = format!("<non-string: {}>", value);
-                log::warn!(
+                tracing::warn!(
                     "UrlRetrievalStatus received non-string value: {}. \
                      Preserving in Unknown variant.",
                     value
@@ -704,7 +704,7 @@ impl ImageInfo<'_> {
             Some("image/webp") => "webp",
             Some("image/gif") => "gif",
             Some(unknown) => {
-                log::warn!(
+                tracing::warn!(
                     "Unknown image MIME type '{}', defaulting to 'png' extension. \
                      Consider updating genai-rs to handle this type.",
                     unknown
@@ -793,7 +793,7 @@ impl AudioInfo<'_> {
             // PCM/L16 format from TTS - raw audio data
             Some(mime) if mime.starts_with("audio/L16") => "pcm",
             Some(unknown) => {
-                log::warn!(
+                tracing::warn!(
                     "Unknown audio MIME type '{}', defaulting to 'wav' extension. \
                      Consider updating genai-rs to handle this type.",
                     unknown
@@ -2445,7 +2445,7 @@ impl InteractionResponse {
 ///
 /// // Check for unexpected content
 /// if summary.unknown_count > 0 {
-///     log::warn!(
+///     tracing::warn!(
 ///         "Response contains {} unknown content types: {:?}",
 ///         summary.unknown_count,
 ///         summary.unknown_types
@@ -2453,7 +2453,7 @@ impl InteractionResponse {
 /// }
 ///
 /// // Log content breakdown
-/// log::debug!(
+/// tracing::debug!(
 ///     "Content: {} text, {} thoughts, {} function calls",
 ///     summary.text_count,
 ///     summary.thought_count,

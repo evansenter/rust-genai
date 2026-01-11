@@ -1,10 +1,10 @@
-//! Unit tests for request types (CreateInteractionRequest, GenerationConfig, etc.)
+//! Unit tests for request types (InteractionRequest, GenerationConfig, etc.)
 
 use super::*;
 
 #[test]
 fn test_serialize_create_interaction_request_with_model() {
-    let request = CreateInteractionRequest {
+    let request = InteractionRequest {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         agent_config: None,
@@ -419,7 +419,7 @@ fn test_create_interaction_request_with_agent_config() {
         .with_thinking_summaries(ThinkingSummaries::Auto)
         .into();
 
-    let request = CreateInteractionRequest {
+    let request = InteractionRequest {
         model: None,
         agent: Some("deep-research-pro-preview-12-2025".to_string()),
         agent_config: Some(config),
@@ -485,5 +485,73 @@ fn test_agent_config_field_naming_conventions() {
         json.contains(r#""THINKING_SUMMARIES_AUTO""#),
         "ThinkingSummaries::Auto should serialize to 'THINKING_SUMMARIES_AUTO', got: {}",
         json
+    );
+}
+
+/// Verifies that `InteractionRequest` roundtrips correctly through JSON.
+///
+/// This test ensures the `Deserialize` derive (added for retry/serialization support)
+/// correctly reconstructs requests from JSON. Important for:
+/// - Loading requests from config files
+/// - Deserializing from dead-letter queues
+/// - Request replay/debugging scenarios
+#[test]
+fn test_interaction_request_roundtrip() {
+    let original = InteractionRequest {
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        agent_config: None,
+        input: InteractionInput::Text("Hello, world!".to_string()),
+        previous_interaction_id: Some("interaction-123".to_string()),
+        tools: None,
+        response_modalities: None,
+        response_format: None,
+        response_mime_type: Some("text/plain".to_string()),
+        generation_config: Some(GenerationConfig {
+            temperature: Some(0.7),
+            max_output_tokens: Some(100),
+            ..Default::default()
+        }),
+        stream: Some(true),
+        background: None,
+        store: Some(true),
+        system_instruction: Some(InteractionInput::Text("Be helpful.".to_string())),
+    };
+
+    // Serialize to JSON
+    let json = serde_json::to_string(&original).expect("Serialization failed");
+
+    // Deserialize back
+    let deserialized: InteractionRequest =
+        serde_json::from_str(&json).expect("Deserialization failed");
+
+    // Verify all fields match
+    assert_eq!(original.model, deserialized.model);
+    assert_eq!(original.agent, deserialized.agent);
+    assert_eq!(
+        original.previous_interaction_id,
+        deserialized.previous_interaction_id
+    );
+    assert_eq!(original.response_mime_type, deserialized.response_mime_type);
+    assert_eq!(original.stream, deserialized.stream);
+    assert_eq!(original.store, deserialized.store);
+
+    // Verify generation_config roundtrips
+    let orig_config = original.generation_config.as_ref().unwrap();
+    let deser_config = deserialized.generation_config.as_ref().unwrap();
+    assert_eq!(orig_config.temperature, deser_config.temperature);
+    assert_eq!(
+        orig_config.max_output_tokens,
+        deser_config.max_output_tokens
+    );
+
+    // Verify input roundtrips (using Debug comparison since InteractionInput doesn't impl PartialEq)
+    assert_eq!(
+        format!("{:?}", original.input),
+        format!("{:?}", deserialized.input)
+    );
+    assert_eq!(
+        format!("{:?}", original.system_instruction),
+        format!("{:?}", deserialized.system_instruction)
     );
 }

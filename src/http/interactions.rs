@@ -4,13 +4,13 @@ use super::loud_wire;
 use super::sse_parser::parse_sse_stream;
 use crate::errors::GenaiError;
 use crate::{
-    CreateInteractionRequest, InteractionContent, InteractionResponse, InteractionStreamEvent,
+    InteractionContent, InteractionRequest, InteractionResponse, InteractionStreamEvent,
     StreamChunk, StreamEvent,
 };
 use async_stream::try_stream;
 use futures_util::{Stream, StreamExt};
-use log::{debug, warn};
 use reqwest::Client as ReqwestClient;
+use tracing::{debug, warn};
 
 /// Creates a new interaction with the Gemini API.
 ///
@@ -26,7 +26,7 @@ use reqwest::Client as ReqwestClient;
 pub async fn create_interaction(
     http_client: &ReqwestClient,
     api_key: &str,
-    request: CreateInteractionRequest,
+    request: InteractionRequest,
 ) -> Result<InteractionResponse, GenaiError> {
     let endpoint = Endpoint::CreateInteraction { stream: false };
     let url = construct_endpoint_url(endpoint);
@@ -36,7 +36,7 @@ pub async fn create_interaction(
     let request_body = match serde_json::to_string(&request) {
         Ok(body) => Some(body),
         Err(e) => {
-            log::warn!("LOUD_WIRE: Failed to serialize request body: {}", e);
+            tracing::warn!("LOUD_WIRE: Failed to serialize request body: {}", e);
             None
         }
     };
@@ -109,7 +109,7 @@ pub async fn create_interaction(
 pub fn create_interaction_stream<'a>(
     http_client: &'a ReqwestClient,
     api_key: &'a str,
-    request: CreateInteractionRequest,
+    request: InteractionRequest,
 ) -> impl Stream<Item = Result<StreamEvent, GenaiError>> + Send + 'a {
     let endpoint = Endpoint::CreateInteraction { stream: true };
     let url = construct_endpoint_url(endpoint);
@@ -119,7 +119,7 @@ pub fn create_interaction_stream<'a>(
     let request_body = match serde_json::to_string(&request) {
         Ok(body) => Some(body),
         Err(e) => {
-            log::warn!("LOUD_WIRE: Failed to serialize request body: {}", e);
+            tracing::warn!("LOUD_WIRE: Failed to serialize request body: {}", e);
             None
         }
     };
@@ -555,7 +555,7 @@ mod tests {
     #[test]
     fn test_create_interaction_request_serialization() {
         // Verify request serialization works correctly
-        let request = CreateInteractionRequest {
+        let request = InteractionRequest {
             model: Some("gemini-3-flash-preview".to_string()),
             agent: None,
             agent_config: None,

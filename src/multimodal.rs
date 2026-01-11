@@ -188,7 +188,7 @@ async fn load_and_encode_file(path: impl AsRef<Path>) -> Result<String, GenaiErr
     if let Ok(metadata) = tokio::fs::metadata(path).await
         && metadata.len() > LARGE_FILE_THRESHOLD
     {
-        log::warn!(
+        tracing::warn!(
             "File '{}' is {:.1}MB which exceeds the recommended 20MB limit for inline data. \
              Consider using URI-based content (e.g., gs:// URLs) or the Files API for large files \
              to reduce memory usage. See: https://ai.google.dev/gemini-api/docs/files",

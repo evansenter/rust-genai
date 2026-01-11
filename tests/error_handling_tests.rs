@@ -455,7 +455,7 @@ fn test_client_with_empty_api_key() {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("test")
-            .build_request()
+            .build()
             .is_ok()
     );
 }
@@ -467,7 +467,7 @@ fn test_interaction_builder_missing_model() {
         .unwrap();
 
     // Building a request without a model should fail
-    let result = client.interaction().with_text("test").build_request();
+    let result = client.interaction().with_text("test").build();
 
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
@@ -488,7 +488,7 @@ fn test_interaction_builder_missing_content() {
     let result = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .build_request();
+        .build();
 
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();

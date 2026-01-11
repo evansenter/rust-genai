@@ -34,9 +34,9 @@ use common::{
     stateful_builder, validate_response_semantically, with_timeout,
 };
 use genai_rs::{
-    CallableFunction, Client, CreateInteractionRequest, FunctionDeclaration, GenaiError,
-    GenerationConfig, InteractionInput, InteractionStatus, function_result_content,
-    image_uri_content, text_content,
+    CallableFunction, Client, FunctionDeclaration, GenaiError, GenerationConfig, InteractionInput,
+    InteractionRequest, InteractionStatus, function_result_content, image_uri_content,
+    text_content,
 };
 use genai_rs_macros::tool;
 use serde_json::json;
@@ -383,7 +383,7 @@ mod streaming {
         };
 
         with_timeout(TEST_TIMEOUT, async {
-            let request = CreateInteractionRequest {
+            let request = InteractionRequest {
                 model: Some("gemini-3-flash-preview".to_string()),
                 agent: None,
                 agent_config: None,
@@ -400,7 +400,7 @@ mod streaming {
                 system_instruction: None,
             };
 
-            let stream = client.create_interaction_stream(request);
+            let stream = client.execute_stream(request);
             let result = consume_stream(stream).await;
 
             println!(

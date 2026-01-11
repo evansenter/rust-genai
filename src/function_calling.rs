@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use inventory;
-use log::warn;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
+use tracing::warn;
 
 use crate::FunctionDeclaration;
 

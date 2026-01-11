@@ -245,7 +245,7 @@ impl<'de> Deserialize<'de> for FileState {
             Some("ACTIVE") => Ok(Self::Active),
             Some("FAILED") => Ok(Self::Failed),
             Some(other) => {
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown FileState '{}'. \
                      This may indicate a new API feature. \
                      The state will be preserved in the Unknown variant.",
@@ -259,7 +259,7 @@ impl<'de> Deserialize<'de> for FileState {
             None => {
                 // Non-string value - preserve it in Unknown
                 let state_type = format!("<non-string: {}>", value);
-                log::warn!(
+                tracing::warn!(
                     "FileState received non-string value: {}. \
                      Preserving in Unknown variant.",
                     value
@@ -367,7 +367,7 @@ pub async fn upload_file(
         )));
     }
 
-    log::debug!(
+    tracing::debug!(
         "Uploading file: size={} bytes, mime_type={}, display_name={:?}",
         file_size,
         mime_type,
@@ -417,7 +417,7 @@ pub async fn upload_file(
         })?
         .to_string();
 
-    log::debug!("Got upload URL, uploading file data...");
+    tracing::debug!("Got upload URL, uploading file data...");
 
     // Step 2: Upload the file bytes
     let upload_response = http_client
@@ -434,7 +434,7 @@ pub async fn upload_file(
     let file_response: FileUploadResponse =
         deserialize_with_context(&response_text, "FileUploadResponse")?;
 
-    log::debug!(
+    tracing::debug!(
         "File uploaded successfully: name={}, uri={}",
         file_response.file.name,
         file_response.file.uri
@@ -537,7 +537,7 @@ impl ResumableUpload {
             .and_then(|v| v.to_str().ok())
             .and_then(|s| s.parse().ok())
             .ok_or_else(|| {
-                log::warn!(
+                tracing::warn!(
                     "Missing or invalid x-goog-upload-size-received header in query response"
                 );
                 GenaiError::InvalidInput(
@@ -547,7 +547,7 @@ impl ResumableUpload {
                 )
             })?;
 
-        log::debug!("Query offset: {} bytes uploaded", offset);
+        tracing::debug!("Query offset: {} bytes uploaded", offset);
 
         Ok(offset)
     }
@@ -582,7 +582,7 @@ impl ResumableUpload {
             ));
         }
 
-        log::debug!(
+        tracing::debug!(
             "Resuming upload from offset {} ({} bytes remaining)",
             offset,
             remaining_size
@@ -608,7 +608,7 @@ impl ResumableUpload {
         let file_response: FileUploadResponse =
             deserialize_with_context(&response_text, "FileUploadResponse")?;
 
-        log::debug!(
+        tracing::debug!(
             "Upload resumed successfully: name={}, uri={}",
             file_response.file.name,
             file_response.file.uri
@@ -727,7 +727,7 @@ pub async fn upload_file_chunked_with_chunk_size(
 
     // Get file metadata to check size
     let metadata = tokio::fs::metadata(path).await.map_err(|e| {
-        log::warn!(
+        tracing::warn!(
             "Failed to get file metadata for '{}': {}",
             path.display(),
             e
@@ -753,7 +753,7 @@ pub async fn upload_file_chunked_with_chunk_size(
         )));
     }
 
-    log::debug!(
+    tracing::debug!(
         "Streaming upload: path={}, size={} bytes, mime_type={}, chunk_size={} bytes",
         path.display(),
         file_size,
@@ -799,7 +799,7 @@ pub async fn upload_file_chunked_with_chunk_size(
         })?
         .to_string();
 
-    log::debug!("Got upload URL, streaming file data...");
+    tracing::debug!("Got upload URL, streaming file data...");
 
     // Create the resumable upload handle
     let resumable_upload = ResumableUpload {
@@ -810,7 +810,7 @@ pub async fn upload_file_chunked_with_chunk_size(
 
     // Step 2: Open the file and create a streaming body
     let file = tokio::fs::File::open(path).await.map_err(|e| {
-        log::warn!("Failed to open file '{}': {}", path.display(), e);
+        tracing::warn!("Failed to open file '{}': {}", path.display(), e);
         GenaiError::InvalidInput(format!("Failed to open file '{}': {}", path.display(), e))
     })?;
 
@@ -833,7 +833,7 @@ pub async fn upload_file_chunked_with_chunk_size(
     let file_response: FileUploadResponse =
         deserialize_with_context(&response_text, "FileUploadResponse")?;
 
-    log::debug!(
+    tracing::debug!(
         "File streamed successfully: name={}, uri={}",
         file_response.file.name,
         file_response.file.uri
@@ -861,7 +861,7 @@ pub async fn get_file(
     api_key: &str,
     file_name: &str,
 ) -> Result<FileMetadata, GenaiError> {
-    log::debug!("Getting file metadata: {}", file_name);
+    tracing::debug!("Getting file metadata: {}", file_name);
 
     let url = format!("{BASE_URL}/{API_VERSION}/{file_name}");
 
@@ -886,7 +886,7 @@ pub async fn get_file(
 
     let file: FileMetadata = deserialize_with_context(&response_text, "FileMetadata")?;
 
-    log::debug!("Got file: state={:?}", file.state);
+    tracing::debug!("Got file: state={:?}", file.state);
 
     Ok(file)
 }
@@ -909,7 +909,7 @@ pub async fn list_files(
     page_size: Option<u32>,
     page_token: Option<&str>,
 ) -> Result<ListFilesResponse, GenaiError> {
-    log::debug!(
+    tracing::debug!(
         "Listing files: page_size={:?}, page_token={:?}",
         page_size,
         page_token
@@ -950,7 +950,7 @@ pub async fn list_files(
     let list_response: ListFilesResponse =
         deserialize_with_context(&response_text, "ListFilesResponse")?;
 
-    log::debug!("Listed {} files", list_response.files.len());
+    tracing::debug!("Listed {} files", list_response.files.len());
 
     Ok(list_response)
 }
@@ -971,7 +971,7 @@ pub async fn delete_file(
     api_key: &str,
     file_name: &str,
 ) -> Result<(), GenaiError> {
-    log::debug!("Deleting file: {}", file_name);
+    tracing::debug!("Deleting file: {}", file_name);
 
     let url = format!("{BASE_URL}/{API_VERSION}/{file_name}");
 
@@ -990,7 +990,7 @@ pub async fn delete_file(
 
     check_response(response).await?;
 
-    log::debug!("File deleted successfully");
+    tracing::debug!("File deleted successfully");
 
     Ok(())
 }

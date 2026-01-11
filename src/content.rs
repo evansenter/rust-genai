@@ -451,7 +451,7 @@ impl<'de> Deserialize<'de> for CodeExecutionOutcome {
             Some("OUTCOME_DEADLINE_EXCEEDED") => Ok(Self::DeadlineExceeded),
             Some("OUTCOME_UNSPECIFIED") => Ok(Self::Unspecified),
             Some(other) => {
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown CodeExecutionOutcome '{}'. \
                      This may indicate a new API feature. \
                      The outcome will be preserved in the Unknown variant.",
@@ -465,7 +465,7 @@ impl<'de> Deserialize<'de> for CodeExecutionOutcome {
             None => {
                 // Non-string value - preserve it in Unknown
                 let outcome_type = format!("<non-string: {}>", value);
-                log::warn!(
+                tracing::warn!(
                     "CodeExecutionOutcome received non-string value: {}. \
                      Preserving in Unknown variant.",
                     value
@@ -596,7 +596,7 @@ impl<'de> Deserialize<'de> for CodeExecutionLanguage {
         match value.as_str() {
             Some("PYTHON") => Ok(Self::Python),
             Some(other) => {
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown CodeExecutionLanguage '{}'. \
                      This may indicate a new API feature. \
                      The language will be preserved in the Unknown variant.",
@@ -610,7 +610,7 @@ impl<'de> Deserialize<'de> for CodeExecutionLanguage {
             None => {
                 // Non-string value - preserve it in Unknown
                 let language_type = format!("<non-string: {}>", value);
-                log::warn!(
+                tracing::warn!(
                     "CodeExecutionLanguage received non-string value: {}. \
                      Preserving in Unknown variant.",
                     value
@@ -763,7 +763,7 @@ impl<'de> Deserialize<'de> for Resolution {
             Some("high") => Ok(Self::High),
             Some("ultra_high") => Ok(Self::UltraHigh),
             Some(other) => {
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown Resolution '{}'. \
                      This may indicate a new API feature. \
                      The resolution will be preserved in the Unknown variant.",
@@ -777,7 +777,7 @@ impl<'de> Deserialize<'de> for Resolution {
             None => {
                 // Non-string value - preserve it in Unknown
                 let resolution_type = format!("<non-string: {}>", value);
-                log::warn!(
+                tracing::warn!(
                     "Resolution received non-string value: {}. \
                      Preserving in Unknown variant.",
                     value
@@ -1750,7 +1750,7 @@ impl InteractionContent {
         if let Some(ref sig) = thought_signature
             && sig.trim().is_empty()
         {
-            log::warn!(
+            tracing::warn!(
                 "Empty thought signature provided for function call '{}'. \
                  This may cause issues with Gemini 3 multi-turn conversations.",
                 function_name
@@ -1819,7 +1819,7 @@ impl InteractionContent {
 
         // Validate call_id is not empty
         if call_id_str.trim().is_empty() {
-            log::warn!(
+            tracing::warn!(
                 "Empty call_id provided for function result '{}'. \
                  This may cause the API to fail to match the result to its function call.",
                 function_name
@@ -2515,7 +2515,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                         let source = match args.get("code").and_then(|v| v.as_str()) {
                             Some(code) => code.to_string(),
                             None => {
-                                log::warn!(
+                                tracing::warn!(
                                     "CodeExecutionCall arguments missing required 'code' field for id: {:?}. \
                                      Treating as Unknown variant to preserve data for debugging.",
                                     id
@@ -2535,7 +2535,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                                 ) {
                                     Ok(lang) => lang,
                                     Err(e) => {
-                                        log::warn!(
+                                        tracing::warn!(
                                             "CodeExecutionCall has invalid language value for id: {:?}, \
                                              defaulting to Python. Parse error: {}",
                                             id,
@@ -2557,7 +2557,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                         // Malformed CodeExecutionCall - treat as Unknown to preserve data
                         // per Evergreen philosophy (see CLAUDE.md). This avoids silently
                         // degrading to an empty code string which could cause subtle bugs.
-                        log::warn!(
+                        tracing::warn!(
                             "CodeExecutionCall missing both direct fields and arguments for id: {:?}. \
                              Treating as Unknown variant to preserve data for debugging.",
                             id
@@ -2666,7 +2666,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
 
                 // Log the actual parse error for debugging - this helps distinguish
                 // between truly unknown types and malformed known types
-                log::warn!(
+                tracing::warn!(
                     "Encountered unknown InteractionContent type '{}'. \
                      Parse error: {}. \
                      This may indicate a new API feature or a malformed response. \
