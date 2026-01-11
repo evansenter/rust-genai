@@ -131,6 +131,11 @@ impl<'de> Deserialize<'de> for Role {
 /// // From string reference
 /// let content: TurnContent = "Hello!".into();
 /// ```
+// Note: Unlike tagged enums (e.g., InteractionContent), this untagged enum cannot
+// have an Unknown variant. Untagged enums have no type discriminator field, so Serde
+// tries variants in order - there's no way to detect "unknown" content. The
+// #[non_exhaustive] attribute provides forward compatibility at the Rust level by
+// preventing exhaustive matches.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 #[non_exhaustive]
