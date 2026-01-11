@@ -226,6 +226,7 @@ When releasing a new version, update these files:
 | `Cargo.toml` | `version = "X.Y.Z"` (line ~3) |
 | `Cargo.toml` | `genai-rs-macros = { version = "X.Y.Z"` (dependencies) |
 | `genai-rs-macros/Cargo.toml` | `version = "X.Y.Z"` (line ~3) |
+| `README.md` | `genai-rs = "X.Y"` and `genai-rs-macros = "X.Y"` (Installation section) |
 | `CHANGELOG.md` | `## [Unreleased]` → `## [X.Y.Z] - YYYY-MM-DD` |
 
 `Cargo.lock` updates automatically—don't edit manually.
