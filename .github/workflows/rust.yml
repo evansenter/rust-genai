@@ -29,11 +29,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-nextest
       - uses: Swatinem/rust-cache@v2
       - name: Install mold linker
         run: sudo apt-get update && sudo apt-get install -y mold
       - name: Run unit tests
-        run: cargo test --workspace --verbose
+        run: cargo nextest run --workspace
+      - name: Run doctests
+        run: cargo test --workspace --doc
 
   test-strict-unknown:
     name: Test Suite (strict-unknown)
@@ -41,11 +44,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-nextest
       - uses: Swatinem/rust-cache@v2
       - name: Install mold linker
         run: sudo apt-get update && sudo apt-get install -y mold
       - name: Run unit tests with strict-unknown feature
-        run: cargo test --workspace --features strict-unknown --verbose
+        run: cargo nextest run --workspace --features strict-unknown
+      - name: Run doctests with strict-unknown feature
+        run: cargo test --workspace --features strict-unknown --doc
 
   test-integration:
     name: Integration Tests (${{ matrix.group }})
@@ -69,6 +75,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-nextest
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: integration-${{ matrix.group }}
@@ -79,7 +86,7 @@ jobs:
           set -e
           for test in ${{ matrix.tests }}; do
             echo "::group::Running $test"
-            cargo test --test $test --verbose -- --include-ignored
+            cargo nextest run --test $test --run-ignored all
             echo "::endgroup::"
           done
         env:
@@ -152,6 +159,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
+      - uses: taiki-e/install-action@cargo-nextest
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: ${{ matrix.os }}-${{ matrix.rust }}
@@ -162,7 +170,9 @@ jobs:
         run: cargo build --workspace --release
       - name: Run tests
         # Use release mode on Windows to avoid linker resource exhaustion (error 1318)
-        run: cargo test --workspace --release --verbose
+        run: cargo nextest run --workspace --cargo-profile release
+      - name: Run doctests
+        run: cargo test --workspace --release --doc
 
   coverage:
     name: Code Coverage
