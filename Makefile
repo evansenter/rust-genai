@@ -11,11 +11,12 @@ fmt:
 clippy:
 	cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-# Unit tests only (nextest does not run doctests)
+# Unit tests only (doctests run in CI - excluded locally for speed)
 test:
 	cargo nextest run
 
 # Full test suite including integration tests (requires GEMINI_API_KEY)
+# Doctests excluded locally - they add compile overhead and CI catches them
 test-all:
 	cargo nextest run --run-ignored all
 

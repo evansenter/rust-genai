@@ -27,7 +27,7 @@ Use the Makefile for common operations. Requires [cargo-nextest](https://nexte.s
 
 ```bash
 make check     # Pre-push gate: fmt + clippy + test
-make test      # Unit tests only (cargo nextest run)
+make test      # Unit tests only (excludes doctests for speed)
 make test-all  # Full suite including integration tests (requires GEMINI_API_KEY)
 make fmt       # Check formatting
 make clippy    # Lint with warnings as errors
