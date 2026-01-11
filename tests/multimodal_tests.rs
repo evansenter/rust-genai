@@ -33,8 +33,8 @@ mod common;
 
 mod image {
     use crate::common::{
-        SAMPLE_IMAGE_URL, TEST_TIMEOUT, TINY_BLUE_PNG_BASE64, TINY_RED_PNG_BASE64,
-        assert_response_semantic, get_client, stateful_builder, with_timeout,
+        SAMPLE_IMAGE_URL, TINY_BLUE_PNG_BASE64, TINY_RED_PNG_BASE64, assert_response_semantic,
+        get_client, stateful_builder, test_timeout, with_timeout,
     };
     use genai_rs::{
         InteractionInput, InteractionStatus, image_data_content, image_uri_content, text_content,
@@ -171,7 +171,7 @@ mod image {
             return;
         };
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             // First turn: describe the base64 image
             let contents = vec![
                 text_content("What color is this image?"),
@@ -708,8 +708,8 @@ mod document {
 
 mod streaming {
     use crate::common::{
-        TEST_TIMEOUT, TINY_RED_PNG_BASE64, assert_response_semantic, consume_stream, get_client,
-        interaction_builder, with_timeout,
+        TINY_RED_PNG_BASE64, assert_response_semantic, consume_stream, get_client,
+        interaction_builder, test_timeout, with_timeout,
     };
     use genai_rs::{InteractionInput, InteractionStatus, image_data_content, text_content};
 
@@ -727,7 +727,7 @@ mod streaming {
             return;
         };
 
-        with_timeout(TEST_TIMEOUT, async {
+        with_timeout(test_timeout(), async {
             println!("=== Multimodal + Streaming ===");
 
             // Create content with text and image
@@ -1143,7 +1143,7 @@ mod bytes_loading {
 }
 
 mod text_to_speech {
-    use crate::common::{EXTENDED_TEST_TIMEOUT, get_client, with_timeout};
+    use crate::common::{extended_test_timeout, get_client, with_timeout};
 
     /// Tests basic text-to-speech audio output
     #[tokio::test]
@@ -1158,7 +1158,7 @@ mod text_to_speech {
         let tts_model = "gemini-2.5-pro-preview-tts";
 
         // TTS can be slow - use extended timeout
-        with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        with_timeout(extended_test_timeout(), async {
             let response = client
                 .interaction()
                 .with_model(tts_model)
@@ -1204,7 +1204,7 @@ mod text_to_speech {
         let tts_model = "gemini-2.5-pro-preview-tts";
 
         // TTS can be slow - use extended timeout
-        with_timeout(EXTENDED_TEST_TIMEOUT, async {
+        with_timeout(extended_test_timeout(), async {
             let config = SpeechConfig {
                 voice: Some("Puck".to_string()),
                 language: Some("en-US".to_string()),

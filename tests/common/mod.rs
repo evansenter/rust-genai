@@ -267,18 +267,36 @@ pub fn get_client() -> Option<Client> {
 // Timeout Utilities
 // =============================================================================
 
-/// Default timeout for long-running integration tests (60 seconds).
+/// Default timeout for long-running integration tests.
+///
+/// Defaults to 60 seconds. Override via `TEST_TIMEOUT_SECS` environment variable.
 ///
 /// This provides a safety net to prevent tests from hanging indefinitely
 /// when interacting with external APIs.
 #[allow(dead_code)]
-pub const TEST_TIMEOUT: Duration = Duration::from_secs(60);
+pub fn test_timeout() -> Duration {
+    Duration::from_secs(
+        std::env::var("TEST_TIMEOUT_SECS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(60),
+    )
+}
 
-/// Extended timeout for tests that make many sequential API calls (120 seconds).
+/// Extended timeout for tests that make many sequential API calls.
+///
+/// Defaults to 120 seconds. Override via `EXTENDED_TEST_TIMEOUT_SECS` environment variable.
 ///
 /// Use this for tests like multi-turn conversations that make 10+ API calls.
 #[allow(dead_code)]
-pub const EXTENDED_TEST_TIMEOUT: Duration = Duration::from_secs(120);
+pub fn extended_test_timeout() -> Duration {
+    Duration::from_secs(
+        std::env::var("EXTENDED_TEST_TIMEOUT_SECS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(120),
+    )
+}
 
 /// Wraps a future with a timeout, panicking if the timeout is exceeded.
 ///
@@ -297,7 +315,7 @@ pub const EXTENDED_TEST_TIMEOUT: Duration = Duration::from_secs(120);
 /// # Example
 ///
 /// ```ignore
-/// use common::{TEST_TIMEOUT, get_client, with_timeout};
+/// use common::{test_timeout, get_client, with_timeout};
 ///
 /// #[tokio::test]
 /// #[ignore = "Requires API key"]
@@ -307,7 +325,7 @@ pub const EXTENDED_TEST_TIMEOUT: Duration = Duration::from_secs(120);
 ///         return;
 ///     };
 ///
-///     with_timeout(TEST_TIMEOUT, async {
+///     with_timeout(test_timeout(), async {
 ///         // test logic that might hang
 ///         let response = interaction_builder(&client)
 ///             .with_text("Hello")
@@ -833,7 +851,7 @@ pub fn stateful_builder(client: &Client) -> genai_rs::InteractionBuilder<'_> {
 ///
 /// # See Also
 ///
-/// * Example usage in `tests/thinking_function_tests.rs` and `tests/interactions_api_tests.rs`
+/// * Example usage in `tests/function_calling_tests.rs` and `tests/interactions_api_tests.rs`
 /// * CLAUDE.md "Test Assertion Strategies" section for when to use this vs structural assertions
 #[allow(dead_code)]
 pub async fn validate_response_semantically(

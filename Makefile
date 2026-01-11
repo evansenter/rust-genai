@@ -5,7 +5,7 @@ check: fmt clippy test
 
 # Check formatting
 fmt:
-	cargo fmt -- --check
+	cargo fmt --all -- --check
 
 # Lint with warnings as errors
 clippy:
