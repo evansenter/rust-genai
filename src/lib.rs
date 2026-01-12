@@ -199,6 +199,7 @@ mod doc_tests {
     use doc_comment::doc_comment;
 
     // Root-level documentation
+    doc_comment!(include_str!("../README.md"));
     doc_comment!(include_str!("../TROUBLESHOOTING.md"));
 
     // Detailed guides in docs/

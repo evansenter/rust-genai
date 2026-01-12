@@ -10,7 +10,7 @@ A Rust client library for Google's Generative AI (Gemini) API using the [Interac
 
 ## Quick Start
 
-```rust
+```rust,no_run
 use genai_rs::Client;
 
 #[tokio::main]
@@ -59,11 +59,11 @@ async fn main() -> Result<(), genai_rs::GenaiError> {
 
 ```toml
 [dependencies]
-genai-rs = "0.5"
+genai-rs = "0.6"
 tokio = { version = "1.0", features = ["full"] }
 
 # Optional
-genai-rs-macros = "0.5"  # For #[tool] macro
+genai-rs-macros = "0.6"  # For #[tool] macro
 futures-util = "0.3"     # For streaming
 ```
 
@@ -89,6 +89,7 @@ cargo run --example simple_interaction
 | Generate images | `image_generation` |
 | Text to speech | `text_to_speech` |
 | Get structured JSON | `structured_output` |
+| Implement retry logic | `retry_with_backoff` |
 
 See [Examples Index](docs/EXAMPLES_INDEX.md) for the complete categorized list.
 
@@ -96,24 +97,26 @@ See [Examples Index](docs/EXAMPLES_INDEX.md) for the complete categorized list.
 
 ### Streaming
 
-```rust
+```rust,ignore
 use futures_util::StreamExt;
+use genai_rs::StreamChunk;
 
-let stream = client.interaction()
+let mut stream = client.interaction()
     .with_text("Write a haiku about Rust.")
     .create_stream();
 
-futures_util::pin_mut!(stream);
-while let Some(Ok(chunk)) = stream.next().await {
-    if let Some(text) = chunk.text() {
-        print!("{}", text);
+while let Some(Ok(event)) = stream.next().await {
+    if let StreamChunk::Delta(delta) = &event.chunk {
+        if let Some(text) = delta.text() {
+            print!("{}", text);
+        }
     }
 }
 ```
 
 ### Function Calling with `#[tool]`
 
-```rust
+```rust,ignore
 use genai_rs_macros::tool;
 
 #[tool(location(description = "City name, e.g. Tokyo"))]
@@ -130,7 +133,7 @@ let result = client.interaction()
 
 ### Stateful Conversations
 
-```rust
+```rust,ignore
 // First turn (enable storage for multi-turn)
 let r1 = client.interaction()
     .with_system_instruction("You are a helpful assistant.")
@@ -147,7 +150,7 @@ let r2 = client.interaction()
 
 ### Thinking Mode
 
-```rust
+```rust,ignore
 use genai_rs::ThinkingLevel;
 
 let response = client.interaction()
@@ -160,6 +163,25 @@ if response.has_thoughts() {
     println!("Model used {} thought blocks", response.thought_signatures().count());
 }
 ```
+
+### Build & Execute (for Retries)
+
+```rust,ignore
+use genai_rs::InteractionRequest;
+
+// Build request without executing (Clone + Serialize)
+let request: InteractionRequest = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text("Hello!")
+    .build()?;
+
+// Execute separately - enables retry loops
+let response = client.execute(request.clone()).await?;
+
+// On error, check if retryable: error.is_retryable()
+```
+
+See [`retry_with_backoff`](examples/retry_with_backoff.rs) for a complete retry example using the `backon` crate.
 
 ## Documentation
 
@@ -213,7 +235,7 @@ See [Logging Strategy](docs/LOGGING_STRATEGY.md) for details.
 
 This library follows the [Evergreen philosophy](https://github.com/google-deepmind/evergreen-spec): unknown API types deserialize into `Unknown` variants instead of failing. Always include wildcard arms:
 
-```rust
+```rust,ignore
 match content {
     InteractionContent::Text { text } => println!("{}", text.unwrap_or_default()),
     _ => {}  // Handles future variants gracefully
@@ -229,7 +251,7 @@ make test-all  # Full integration suite (requires GEMINI_API_KEY)
 
 ## Project Structure
 
-```
+```text
 genai-rs/           # Main crate: Client, InteractionBuilder, types
 genai-rs-macros/    # Procedural macro for #[tool]
 docs/               # Comprehensive guides
