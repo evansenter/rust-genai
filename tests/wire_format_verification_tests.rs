@@ -393,7 +393,6 @@ mod interaction_content {
             id: Some("call_123".to_string()),
             name: "test".to_string(),
             args: json!({}),
-            thought_signature: None,
         };
         let json = serde_json::to_value(&content).unwrap();
         assert_eq!(json["type"], "function_call");
@@ -436,8 +435,8 @@ mod interaction_content {
     fn code_execution_result_uses_snake_case_type() {
         let content = InteractionContent::CodeExecutionResult {
             call_id: Some("exec_123".to_string()),
-            outcome: genai_rs::CodeExecutionOutcome::Ok,
-            output: "hello".to_string(),
+            is_error: false,
+            result: "hello".to_string(),
         };
         let json = serde_json::to_value(&content).unwrap();
         assert_eq!(json["type"], "code_execution_result");

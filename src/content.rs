@@ -172,7 +172,7 @@ impl Annotation {
 /// }
 /// ```
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct GoogleSearchResultItem {
     /// Title of the search result (often the domain name)
     pub title: String,
@@ -279,14 +279,14 @@ impl UrlContextResultItem {
 /// }
 /// ```
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct FileSearchResultItem {
     /// Title of the matched document
     pub title: String,
     /// Extracted text content from the semantic match
     pub text: String,
-    /// Name of the file search store containing this result (wire: `fileSearchStore`)
-    #[serde(rename = "fileSearchStore")]
+    /// Name of the file search store containing this result
+    #[serde(rename = "file_search_store")]
     pub store: String,
 }
 
@@ -309,185 +309,6 @@ impl FileSearchResultItem {
     #[must_use]
     pub fn has_text(&self) -> bool {
         !self.text.is_empty()
-    }
-}
-
-/// Outcome of a code execution operation.
-///
-/// This enum represents the result status of code executed via the CodeExecution tool.
-/// The API returns these as strings like "OUTCOME_OK", which are deserialized into
-/// this enum.
-///
-/// # Forward Compatibility (Evergreen Philosophy)
-///
-/// This enum is marked `#[non_exhaustive]`, which means:
-/// - Match statements must include a wildcard arm (`_ => ...`)
-/// - New variants may be added in minor version updates without breaking your code
-///
-/// When the API returns an outcome value that this library doesn't recognize,
-/// it will be captured as `CodeExecutionOutcome::Unknown` rather than causing a
-/// deserialization error. This follows the
-/// [Evergreen spec](https://github.com/google-deepmind/evergreen-spec)
-/// philosophy of graceful degradation.
-///
-/// # Example
-///
-/// ```no_run
-/// # use genai_rs::{InteractionResponse, CodeExecutionOutcome};
-/// # let response: InteractionResponse = todo!();
-/// for result in response.code_execution_results() {
-///     match result.outcome {
-///         CodeExecutionOutcome::Ok => println!("Success: {}", result.output),
-///         CodeExecutionOutcome::Failed => eprintln!("Error: {}", result.output),
-///         CodeExecutionOutcome::DeadlineExceeded => eprintln!("Timeout!"),
-///         CodeExecutionOutcome::Unknown { outcome_type, .. } => {
-///             eprintln!("Unknown outcome: {}", outcome_type);
-///         }
-///         _ => eprintln!("Other outcome"),
-///     }
-/// }
-/// ```
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum CodeExecutionOutcome {
-    /// Code executed successfully
-    Ok,
-    /// Code execution failed (e.g., syntax error, runtime error)
-    Failed,
-    /// Code execution exceeded the 30-second timeout
-    DeadlineExceeded,
-    /// Unknown outcome (for forward compatibility).
-    ///
-    /// This variant captures any unrecognized outcome values from the API,
-    /// allowing the library to handle new outcomes gracefully.
-    ///
-    /// The `outcome_type` field contains the unrecognized outcome string,
-    /// and `data` contains the full JSON value for debugging.
-    Unknown {
-        /// The unrecognized outcome string from the API
-        outcome_type: String,
-        /// The raw JSON value, preserved for debugging
-        data: serde_json::Value,
-    },
-    /// Unspecified outcome (default for missing values)
-    #[default]
-    Unspecified,
-}
-
-impl CodeExecutionOutcome {
-    /// Returns true if the execution was successful.
-    pub const fn is_success(&self) -> bool {
-        matches!(self, Self::Ok)
-    }
-
-    /// Returns true if the execution failed (any error type).
-    ///
-    /// **Note:** This returns `true` for `Unknown` and `Unspecified` variants
-    /// as a conservative safety measure. In code execution contexts, treating
-    /// unrecognized outcomes as errors is the safer default—code that might
-    /// have failed should not be assumed to have succeeded.
-    ///
-    /// This differs from [`crate::UrlRetrievalStatus::is_error()`], which does NOT
-    /// treat `Unknown` as an error since URL retrieval failures are less
-    /// critical and the `Unknown` status may represent a new success state.
-    pub const fn is_error(&self) -> bool {
-        !self.is_success()
-    }
-
-    /// Check if this is an unknown outcome.
-    #[must_use]
-    pub const fn is_unknown(&self) -> bool {
-        matches!(self, Self::Unknown { .. })
-    }
-
-    /// Returns the outcome type name if this is an unknown outcome.
-    ///
-    /// Returns `None` for known outcomes.
-    #[must_use]
-    pub fn unknown_outcome_type(&self) -> Option<&str> {
-        match self {
-            Self::Unknown { outcome_type, .. } => Some(outcome_type),
-            _ => None,
-        }
-    }
-
-    /// Returns the raw JSON data if this is an unknown outcome.
-    ///
-    /// Returns `None` for known outcomes.
-    #[must_use]
-    pub fn unknown_data(&self) -> Option<&serde_json::Value> {
-        match self {
-            Self::Unknown { data, .. } => Some(data),
-            _ => None,
-        }
-    }
-}
-
-impl Serialize for CodeExecutionOutcome {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Self::Ok => serializer.serialize_str("OUTCOME_OK"),
-            Self::Failed => serializer.serialize_str("OUTCOME_FAILED"),
-            Self::DeadlineExceeded => serializer.serialize_str("OUTCOME_DEADLINE_EXCEEDED"),
-            Self::Unspecified => serializer.serialize_str("OUTCOME_UNSPECIFIED"),
-            Self::Unknown { outcome_type, .. } => serializer.serialize_str(outcome_type),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for CodeExecutionOutcome {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let value = serde_json::Value::deserialize(deserializer)?;
-
-        match value.as_str() {
-            Some("OUTCOME_OK") => Ok(Self::Ok),
-            Some("OUTCOME_FAILED") => Ok(Self::Failed),
-            Some("OUTCOME_DEADLINE_EXCEEDED") => Ok(Self::DeadlineExceeded),
-            Some("OUTCOME_UNSPECIFIED") => Ok(Self::Unspecified),
-            Some(other) => {
-                tracing::warn!(
-                    "Encountered unknown CodeExecutionOutcome '{}'. \
-                     This may indicate a new API feature. \
-                     The outcome will be preserved in the Unknown variant.",
-                    other
-                );
-                Ok(Self::Unknown {
-                    outcome_type: other.to_string(),
-                    data: value,
-                })
-            }
-            None => {
-                // Non-string value - preserve it in Unknown
-                let outcome_type = format!("<non-string: {}>", value);
-                tracing::warn!(
-                    "CodeExecutionOutcome received non-string value: {}. \
-                     Preserving in Unknown variant.",
-                    value
-                );
-                Ok(Self::Unknown {
-                    outcome_type,
-                    data: value,
-                })
-            }
-        }
-    }
-}
-
-impl fmt::Display for CodeExecutionOutcome {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Ok => write!(f, "OUTCOME_OK"),
-            Self::Failed => write!(f, "OUTCOME_FAILED"),
-            Self::DeadlineExceeded => write!(f, "OUTCOME_DEADLINE_EXCEEDED"),
-            Self::Unspecified => write!(f, "OUTCOME_UNSPECIFIED"),
-            Self::Unknown { outcome_type, .. } => write!(f, "{}", outcome_type),
-        }
     }
 }
 
@@ -917,8 +738,6 @@ pub enum InteractionContent {
         id: Option<String>,
         name: String,
         args: serde_json::Value,
-        /// Thought signature for Gemini 3 reasoning continuity
-        thought_signature: Option<String>,
     },
     /// Function result (input to model with execution result)
     FunctionResult {
@@ -954,35 +773,34 @@ pub enum InteractionContent {
     },
     /// Code execution result (returned after code runs)
     ///
-    /// Contains the outcome and output of executed code from the `CodeExecution` tool.
+    /// Contains the result of executed code from the `CodeExecution` tool.
     ///
     /// # Security Note
     ///
-    /// When displaying results to end users, check `outcome.is_error()` first. Error
+    /// When displaying results to end users, check `is_error` first. Error
     /// results may contain stack traces or system information that shouldn't be exposed
     /// directly to users without sanitization.
     ///
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_rs::{InteractionContent, CodeExecutionOutcome};
+    /// # use genai_rs::InteractionContent;
     /// # let content: InteractionContent = todo!();
-    /// if let InteractionContent::CodeExecutionResult { outcome, output, .. } = content {
-    ///     match outcome {
-    ///         CodeExecutionOutcome::Ok => println!("Result: {}", output),
-    ///         CodeExecutionOutcome::Failed => eprintln!("Error: {}", output),
-    ///         CodeExecutionOutcome::DeadlineExceeded => eprintln!("Timeout!"),
-    ///         _ => {}
+    /// if let InteractionContent::CodeExecutionResult { is_error, result, .. } = content {
+    ///     if is_error {
+    ///         eprintln!("Error: {}", result);
+    ///     } else {
+    ///         println!("Result: {}", result);
     ///     }
     /// }
     /// ```
     CodeExecutionResult {
         /// The call_id matching the CodeExecutionCall this result is for (optional per API spec)
         call_id: Option<String>,
-        /// Execution outcome (OK, FAILED, DEADLINE_EXCEEDED, etc.)
-        outcome: CodeExecutionOutcome,
+        /// Whether the code execution resulted in an error
+        is_error: bool,
         /// The output of the code execution (stdout for success, error message for failure)
-        output: String,
+        result: String,
     },
     /// Google Search call (model requesting a search)
     ///
@@ -1339,12 +1157,7 @@ impl Serialize for InteractionContent {
                 }
                 map.end()
             }
-            Self::FunctionCall {
-                id,
-                name,
-                args,
-                thought_signature,
-            } => {
+            Self::FunctionCall { id, name, args } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "function_call")?;
                 if let Some(i) = id {
@@ -1352,9 +1165,6 @@ impl Serialize for InteractionContent {
                 }
                 map.serialize_entry("name", name)?;
                 map.serialize_entry("arguments", args)?;
-                if let Some(sig) = thought_signature {
-                    map.serialize_entry("thoughtSignature", sig)?;
-                }
                 map.end()
             }
             Self::FunctionResult {
@@ -1381,22 +1191,26 @@ impl Serialize for InteractionContent {
                 if let Some(i) = id {
                     map.serialize_entry("id", i)?;
                 }
-                map.serialize_entry("language", language)?;
-                map.serialize_entry("code", code)?;
+                // Wire format nests language and code inside arguments object
+                let arguments = serde_json::json!({
+                    "language": language,
+                    "code": code
+                });
+                map.serialize_entry("arguments", &arguments)?;
                 map.end()
             }
             Self::CodeExecutionResult {
                 call_id,
-                outcome,
-                output,
+                is_error,
+                result,
             } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "code_execution_result")?;
                 if let Some(cid) = call_id {
                     map.serialize_entry("call_id", cid)?;
                 }
-                map.serialize_entry("outcome", outcome)?;
-                map.serialize_entry("output", output)?;
+                map.serialize_entry("is_error", is_error)?;
+                map.serialize_entry("result", result)?;
                 map.end()
             }
             Self::GoogleSearchCall { id, queries } => {
@@ -1434,7 +1248,7 @@ impl Serialize for InteractionContent {
             Self::FileSearchResult { call_id, result } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "file_search_result")?;
-                map.serialize_entry("callId", call_id)?;
+                map.serialize_entry("call_id", call_id)?;
                 map.serialize_entry("result", result)?;
                 map.end()
             }
@@ -1714,14 +1528,10 @@ impl InteractionContent {
         }
     }
 
-    /// Creates a function call content with optional thought signature and call ID.
+    /// Creates a function call content with an optional ID.
     ///
-    /// For Gemini 3 models, thought signatures are required for multi-turn function calling.
-    /// Extract them from the interaction response and pass them here when building conversation history.
-    ///
-    /// See <https://ai.google.dev/gemini-api/docs/thought-signatures> for details.
-    ///
-    /// **Note**: When using `previous_interaction_id`, the server manages signatures automatically.
+    /// Use this when you need to specify a call ID, typically when echoing function calls back
+    /// in manual conversation construction.
     ///
     /// # Example
     ///
@@ -1729,45 +1539,27 @@ impl InteractionContent {
     /// use genai_rs::InteractionContent;
     /// use serde_json::json;
     ///
-    /// let call = InteractionContent::new_function_call_with_signature(
+    /// let call = InteractionContent::new_function_call_with_id(
     ///     Some("call_123"),
     ///     "get_weather",
-    ///     json!({"location": "San Francisco"}),
-    ///     Some("encrypted_signature_token".to_string())
+    ///     json!({"location": "San Francisco"})
     /// );
     /// assert!(call.is_function_call());
     /// ```
     #[must_use]
-    pub fn new_function_call_with_signature(
+    pub fn new_function_call_with_id(
         id: Option<impl Into<String>>,
         name: impl Into<String>,
         args: serde_json::Value,
-        thought_signature: Option<String>,
     ) -> Self {
-        let function_name = name.into();
-
-        // Validate that signature is not empty if provided
-        if let Some(ref sig) = thought_signature
-            && sig.trim().is_empty()
-        {
-            tracing::warn!(
-                "Empty thought signature provided for function call '{}'. \
-                 This may cause issues with Gemini 3 multi-turn conversations.",
-                function_name
-            );
-        }
-
         Self::FunctionCall {
             id: id.map(|s| s.into()),
-            name: function_name,
+            name: name.into(),
             args,
-            thought_signature,
         }
     }
 
-    /// Creates a function call content (without thought signature or call ID).
-    ///
-    /// For Gemini 3 models, prefer using [`new_function_call_with_signature`](Self::new_function_call_with_signature) instead.
+    /// Creates a function call content (without call ID).
     ///
     /// # Example
     ///
@@ -1783,7 +1575,7 @@ impl InteractionContent {
     /// ```
     #[must_use]
     pub fn new_function_call(name: impl Into<String>, args: serde_json::Value) -> Self {
-        Self::new_function_call_with_signature(None::<String>, name, args, None)
+        Self::new_function_call_with_id(None::<String>, name, args)
     }
 
     /// Creates a function result content.
@@ -2344,8 +2136,6 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 name: String,
                 #[serde(rename = "arguments")]
                 args: serde_json::Value,
-                #[serde(rename = "thoughtSignature")]
-                thought_signature: Option<String>,
             },
             FunctionResult {
                 name: Option<String>,
@@ -2368,13 +2158,6 @@ impl<'de> Deserialize<'de> for InteractionContent {
             CodeExecutionResult {
                 #[serde(default)]
                 call_id: Option<String>,
-                // New typed outcome
-                #[serde(default)]
-                outcome: Option<CodeExecutionOutcome>,
-                // New output field
-                #[serde(default)]
-                output: Option<String>,
-                // Old API format fallback
                 #[serde(default)]
                 is_error: Option<bool>,
                 #[serde(default)]
@@ -2401,7 +2184,6 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 result: Vec<UrlContextResultItem>,
             },
             FileSearchResult {
-                #[serde(rename = "callId")]
                 call_id: String,
                 #[serde(default)]
                 result: Vec<FileSearchResultItem>,
@@ -2474,17 +2256,9 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     uri,
                     mime_type,
                 },
-                KnownContent::FunctionCall {
-                    id,
-                    name,
-                    args,
-                    thought_signature,
-                } => InteractionContent::FunctionCall {
-                    id,
-                    name,
-                    args,
-                    thought_signature,
-                },
+                KnownContent::FunctionCall { id, name, args } => {
+                    InteractionContent::FunctionCall { id, name, args }
+                }
                 KnownContent::FunctionResult {
                     name,
                     call_id,
@@ -2570,30 +2344,14 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 }
                 KnownContent::CodeExecutionResult {
                     call_id,
-                    outcome,
-                    output,
                     is_error,
                     result,
-                } => {
-                    // Prefer new fields, fall back to old fields
-                    let exec_outcome = outcome.unwrap_or(
-                        // Convert old is_error boolean to outcome
-                        // When is_error is None, default to Ok (success) since the absence
-                        // of error typically indicates success in API responses
-                        match is_error {
-                            Some(true) => CodeExecutionOutcome::Failed,
-                            Some(false) | None => CodeExecutionOutcome::Ok,
-                        },
-                    );
-
-                    let exec_output = output.or(result).unwrap_or_default();
-
-                    InteractionContent::CodeExecutionResult {
-                        call_id,
-                        outcome: exec_outcome,
-                        output: exec_output,
-                    }
-                }
+                } => InteractionContent::CodeExecutionResult {
+                    call_id,
+                    // Default to false (success) when is_error is not provided
+                    is_error: is_error.unwrap_or(false),
+                    result: result.unwrap_or_default(),
+                },
                 KnownContent::GoogleSearchCall { id, arguments } => {
                     // Extract queries from arguments.queries
                     let queries = arguments

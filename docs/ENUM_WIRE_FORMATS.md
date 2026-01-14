@@ -21,9 +21,8 @@ All types below implement graceful handling of unrecognized values via an `Unkno
 | 9 | `ThinkingLevel` | src/request.rs | `level_type` | minimal/low/medium/high |
 | 10 | `ThinkingSummaries` | src/request.rs | `summaries_type` | Context-dependent format |
 | 11 | `InteractionStatus` | src/response.rs | `status_type` | Response status |
-| 12 | `CodeExecutionOutcome` | src/content.rs | `outcome_type` | Code execution result |
-| 13 | `CodeExecutionLanguage` | src/content.rs | `language_type` | Programming language |
-| 14 | `UrlRetrievalStatus` | src/response.rs | `status_type` | URL fetch status |
+| 12 | `CodeExecutionLanguage` | src/content.rs | `language_type` | Programming language |
+| 13 | `UrlRetrievalStatus` | src/response.rs | `status_type` | URL fetch status |
 
 ### Unknown Variant Pattern
 
@@ -58,16 +57,21 @@ Helper methods on each type:
 | `InteractionStatus` | snake_case | `"in_progress"`, `"requires_action"` | Response-only |
 | `Resolution` | snake_case | `"low"`, `"medium"`, `"high"`, `"ultra_high"` | Image/video content |
 | `Tool::FileSearch` | snake_case object | `{"type": "file_search", ...}` | Rust: `store_names`, Wire: `file_search_store_names` |
-| `FileSearchResult` | camelCase fields | `{"type": "file_search_result", "callId": ...}` | Rust: `store`, Wire: `fileSearchStore` |
+| `FileSearchResult` | snake_case | `{"type": "file_search_result", "call_id": ...}` | Rust: `store`, Wire: `file_search_store` |
 | `Tool::ComputerUse` | snake_case | `"computer_use"` | **UNVERIFIED** - from docs |
 | `InteractionContent::ComputerUseCall` | snake_case | `"computer_use_call"` | **UNVERIFIED** - from docs |
 | `InteractionContent::ComputerUseResult` | snake_case | `"computer_use_result"` | **UNVERIFIED** - from docs |
 | `SpeechConfig` | camelCase fields | `{"voice": "Kore", "language": "en-US"}` | Inside generationConfig |
 | Audio MIME type (TTS response) | with params | `"audio/L16;codec=pcm;rate=24000"` | Raw PCM audio |
 | `InteractionContent::Thought` | snake_case + signature | `{"type": "thought", "signature": "..."}` | Cryptographic, not text |
-| `InteractionContent::UrlContextCall` | snake_case + nested args | `{"type": "url_context_call", "id": "...", "arguments": {"urls": [...]}}` | URLs nested in arguments |
-| `InteractionContent::UrlContextResult` | snake_case + result array | `{"type": "url_context_result", "call_id": "...", "result": [...]}` | Array of UrlContextResultItem |
-| `CodeExecutionOutcome` | SCREAMING_SNAKE_CASE | `"OUTCOME_OK"`, `"OUTCOME_FAILED"` | Code execution result status |
+| `InteractionContent::GoogleSearchCall` | snake_case + nested args | `{"type": "google_search_call", "id": "...", "arguments": {"queries": [...]}}` | Verified 2026-01-13 |
+| `InteractionContent::GoogleSearchResult` | snake_case | `{"type": "google_search_result", "call_id": "...", "result": [...]}` | Verified 2026-01-13 |
+| `GoogleSearchResultItem` | snake_case | `{"title": "...", "url": "...", "rendered_content": "..."}` | Verified 2026-01-13 - all snake_case |
+| `InteractionContent::UrlContextCall` | snake_case + nested args | `{"type": "url_context_call", "id": "...", "arguments": {"urls": [...]}}` | Verified 2026-01-13 |
+| `InteractionContent::UrlContextResult` | snake_case + result array | `{"type": "url_context_result", "call_id": "...", "result": [...]}` | Verified 2026-01-13 |
+| `UrlContextResultItem` | snake_case | `{"url": "...", "status": "success"}` | Verified 2026-01-13 - no paywall field |
+| `InteractionContent::CodeExecutionCall` | snake_case + nested args | `{"type": "code_execution_call", "id": "...", "arguments": {"language": "...", "code": "..."}}` | Verified 2026-01-13 |
+| `InteractionContent::CodeExecutionResult` | snake_case + is_error/result | `{"type": "code_execution_result", "call_id": "...", "is_error": false, "result": "..."}` | Verified 2026-01-13 - no signature field |
 | `CodeExecutionLanguage` | SCREAMING_SNAKE_CASE | `"PYTHON"` | Currently only Python supported |
 | `UrlRetrievalStatus` | SCREAMING_SNAKE_CASE | `"URL_RETRIEVAL_STATUS_SUCCESS"` | URL fetch result status |
 
@@ -75,13 +79,13 @@ Helper methods on each type:
 
 ### ThinkingSummaries (agent_config)
 
-Used in `agent_config.thinkingSummaries` for Deep Research agent.
+Used in `agent_config.thinking_summaries` for Deep Research agent.
 
 ```json
 {
   "agent_config": {
     "type": "deep-research",
-    "thinkingSummaries": "THINKING_SUMMARIES_AUTO"
+    "thinking_summaries": "THINKING_SUMMARIES_AUTO"
   }
 }
 ```
@@ -199,12 +203,12 @@ Returned when the model retrieves documents from file search stores.
 ```json
 {
   "type": "file_search_result",
-  "callId": "call_abc123",
+  "call_id": "call_abc123",
   "result": [
     {
       "title": "Document.pdf",
       "text": "Relevant content from the document...",
-      "fileSearchStore": "stores/my-store-123"
+      "file_search_store": "stores/my-store-123"
     }
   ]
 }
@@ -212,11 +216,11 @@ Returned when the model retrieves documents from file search stores.
 
 | Rust Field | Wire Name | Notes |
 |------------|-----------|-------|
-| `call_id` | `callId` | camelCase in JSON |
+| `call_id` | `call_id` | snake_case in JSON |
 | `result` | `result` | Array of FileSearchResultItem |
 | `result[].title` | `title` | Document title |
 | `result[].text` | `text` | Retrieved text snippet |
-| `result[].store` | `fileSearchStore` | camelCase in JSON |
+| `result[].store` | `file_search_store` | snake_case in JSON |
 
 **Added**: 2026-01-05 - Response format based on API documentation. Response cannot be verified without configured file search stores.
 
@@ -392,30 +396,28 @@ Returned with the results of URL fetching.
 
 **Verified**: 2026-01-09 - Captured from `LOUD_WIRE=1 cargo run --example url_context`. Previous incorrect assumption was `url`/`content` fields.
 
-### CodeExecutionOutcome (content)
+### CodeExecutionResult (content)
 
-Returned in `code_execution_result` content to indicate the execution status.
+Returned when code execution completes. Uses simple `is_error` boolean and `result` string fields.
 
 ```json
 {
   "type": "code_execution_result",
   "call_id": "exec_123",
-  "outcome": "OUTCOME_OK",
-  "output": "Hello, World!\n"
+  "is_error": false,
+  "result": "Hello, World!\n"
 }
 ```
 
-| Rust Enum | Wire Value | Notes |
-|-----------|------------|-------|
-| `CodeExecutionOutcome::Ok` | `"OUTCOME_OK"` | Code ran successfully |
-| `CodeExecutionOutcome::Failed` | `"OUTCOME_FAILED"` | Runtime error, syntax error |
-| `CodeExecutionOutcome::DeadlineExceeded` | `"OUTCOME_DEADLINE_EXCEEDED"` | 30-second timeout |
-| `CodeExecutionOutcome::Unspecified` | `"OUTCOME_UNSPECIFIED"` | Default/missing value |
-| `CodeExecutionOutcome::Unknown { ... }` | `"OUTCOME_*"` | Future values preserved |
+| Rust Field | Wire Name | Type | Notes |
+|------------|-----------|------|-------|
+| `call_id` | `call_id` | `Option<String>` | Matches the CodeExecutionCall id |
+| `is_error` | `is_error` | `bool` | `false` = success, `true` = error |
+| `result` | `result` | `String` | Output text (stdout) or error message |
 
-Helper methods: `is_success()`, `is_error()`, `is_unknown()`, `unknown_outcome_type()`, `unknown_data()`
+**Important**: The official API documentation mentions `outcome` enum with values like `OUTCOME_OK`, but the **actual wire format** uses `is_error: bool` and `result: String`. This was discovered via `LOUD_WIRE=1` testing.
 
-**Verified**: 2026-01-10 - Wire format matches SCREAMING_SNAKE_CASE with `OUTCOME_` prefix.
+**Verified**: 2026-01-12 - Captured from `LOUD_WIRE=1 cargo test test_code_execution -- --include-ignored --nocapture`. Actual wire format is `{"is_error": false, "result": "3628800\n"}`, NOT `{"outcome": "OUTCOME_OK", "output": "..."}` as docs suggest.
 
 ### CodeExecutionLanguage (content)
 

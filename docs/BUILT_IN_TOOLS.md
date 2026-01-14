@@ -119,14 +119,10 @@ if response.has_code_execution() {
 
     // Get execution results
     for result in response.code_execution_results() {
-        match result.outcome {
-            CodeExecutionOutcome::Ok => {
-                println!("Output: {}", result.output.as_deref().unwrap_or("(none)"));
-            }
-            CodeExecutionOutcome::Failed => {
-                println!("Error: {}", result.output.as_deref().unwrap_or("unknown"));
-            }
-            _ => {}
+        if result.is_error {
+            println!("Error: {}", result.result);
+        } else {
+            println!("Output: {}", result.result);
         }
     }
 }
@@ -173,8 +169,8 @@ let response = client
 // Check URL retrieval status
 if let Some(metadata) = response.url_context_metadata() {
     for entry in &metadata.url_metadata {
-        println!("URL: {}", entry.url);
-        println!("Status: {:?}", entry.status);
+        println!("URL: {}", entry.retrieved_url);
+        println!("Status: {:?}", entry.url_retrieval_status);
     }
 }
 ```
@@ -196,12 +192,12 @@ let response = client
 ```rust,ignore
 if let Some(metadata) = response.url_context_metadata() {
     for entry in &metadata.url_metadata {
-        match entry.status {
+        match entry.url_retrieval_status {
             UrlRetrievalStatus::Success => {
-                println!("Retrieved: {}", entry.url);
+                println!("Retrieved: {}", entry.retrieved_url);
             }
-            UrlRetrievalStatus::Failed => {
-                println!("Failed to retrieve: {}", entry.url);
+            UrlRetrievalStatus::Error => {
+                println!("Failed to retrieve: {}", entry.retrieved_url);
             }
             _ => {}
         }
@@ -283,8 +279,9 @@ let response = client
 
 // Access search results
 for result in response.file_search_results() {
-    println!("Found in: {}", result.file_name);
-    println!("Snippet: {}", result.snippet);
+    println!("Title: {}", result.title);
+    println!("Text: {}", result.text);
+    println!("Store: {}", result.store);
 }
 ```
 

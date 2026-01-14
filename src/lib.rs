@@ -68,8 +68,8 @@ pub use errors::GenaiError;
 // Content types (InteractionContent and related)
 pub mod content;
 pub use content::{
-    Annotation, CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem,
-    GoogleSearchResultItem, InteractionContent, Resolution, UrlContextResultItem,
+    Annotation, CodeExecutionLanguage, FileSearchResultItem, GoogleSearchResultItem,
+    InteractionContent, Resolution, UrlContextResultItem,
 };
 
 // Request types (includes agent configuration)
@@ -149,7 +149,7 @@ pub use streaming::{
 pub mod interactions_api;
 pub use interactions_api::{
     audio_data_content, audio_uri_content, document_data_content, document_uri_content,
-    file_uri_content, function_call_content, function_call_content_with_signature,
+    file_uri_content, function_call_content, function_call_content_with_id,
     function_result_content, image_data_content, image_data_content_with_resolution,
     image_uri_content, image_uri_content_with_resolution, text_content, thought_content,
     video_data_content, video_data_content_with_resolution, video_uri_content,

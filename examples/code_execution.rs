@@ -8,7 +8,7 @@
 //! Run with: cargo run --example code_execution
 
 use futures_util::StreamExt;
-use genai_rs::{Client, CodeExecutionOutcome, GenaiError, StreamChunk};
+use genai_rs::{Client, GenaiError, StreamChunk};
 use std::env;
 use std::error::Error;
 use std::io::{Write, stdout};
@@ -56,26 +56,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("```python\n{}\n```\n", call.code);
             }
 
-            // 6. Display the code execution results with typed outcomes
+            // 6. Display the code execution results
             println!("--- Execution Results ---");
             for result in response.code_execution_results() {
-                match result.outcome {
-                    CodeExecutionOutcome::Ok => {
-                        println!("Status: SUCCESS");
-                        println!("Output:\n{}", result.output);
-                    }
-                    CodeExecutionOutcome::Failed => {
-                        println!("Status: FAILED");
-                        println!("Error:\n{}", result.output);
-                    }
-                    CodeExecutionOutcome::DeadlineExceeded => {
-                        println!("Status: TIMEOUT");
-                        println!("The code execution exceeded the 30-second limit.");
-                    }
-                    _ => {
-                        println!("Status: UNKNOWN");
-                        println!("Output:\n{}", result.output);
-                    }
+                if result.is_error {
+                    println!("Status: FAILED");
+                    println!("Error:\n{}", result.result);
+                } else {
+                    println!("Status: SUCCESS");
+                    println!("Output:\n{}", result.result);
                 }
             }
 
@@ -190,7 +179,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("• with_code_execution() enables server-side Python execution");
     println!("• response.code_execution_calls() shows executed code");
     println!("• response.code_execution_results() shows output/errors");
-    println!("• CodeExecutionOutcome enum: Ok, Failed, DeadlineExceeded\n");
+    println!("• Use result.is_error to check if execution failed\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");
     println!("Non-streaming:");

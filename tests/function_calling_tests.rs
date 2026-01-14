@@ -431,7 +431,7 @@ mod parallel {
 
     #[tokio::test]
     #[ignore = "Requires API key"]
-    async fn test_thought_signature_parallel_only_first() {
+    async fn test_parallel_function_calls_with_thinking() {
         let Some(client) = get_client() else {
             println!("Skipping: GEMINI_API_KEY not set");
             return;
@@ -450,7 +450,6 @@ mod parallel {
                 .required(vec!["timezone".to_string()])
                 .build();
 
-            // Must enable thinking mode to get thought signatures
             let response = stateful_builder(&client)
                 .with_text("I need BOTH the weather in Paris AND the current time in CET. Call both functions.")
                 .with_functions(vec![func1, func2])
@@ -466,15 +465,9 @@ mod parallel {
                 let call1 = &function_calls[0];
                 let call2 = &function_calls[1];
 
-                println!("First call: {} (has_signature: {})", call1.name, call1.thought_signature.is_some());
-                println!("Second call: {} (has_signature: {})", call2.name, call2.thought_signature.is_some());
-
-                // Per Google docs: parallel calls only have signature on first call
-                if call1.thought_signature.is_some() && call2.thought_signature.is_none() {
-                    println!("✓ Matches expected pattern: only first call has signature");
-                } else if call1.thought_signature.is_none() && call2.thought_signature.is_none() {
-                    println!("Note: No signatures present (thinking mode may not be active for this model)");
-                }
+                println!("First call: {} (id: {:?})", call1.name, call1.id);
+                println!("Second call: {} (id: {:?})", call2.name, call2.id);
+                println!("✓ Model made parallel function calls");
             }
         })
         .await;
@@ -1417,13 +1410,12 @@ mod stateless {
         .await;
     }
 
-    /// Test stateless mode with thinking enabled to check thought signatures on FC.
+    /// Test stateless mode with thinking enabled for function calling.
     ///
-    /// This verifies whether thought signatures appear on function calls when using
-    /// stateless mode (store: false) with thinking enabled.
+    /// Note: Thought signatures appear on Thought content blocks, not on function calls.
     #[tokio::test]
     #[ignore = "requires GEMINI_API_KEY"]
-    async fn test_stateless_with_thinking_thought_signatures() {
+    async fn test_stateless_with_thinking_function_calling() {
         use genai_rs::FunctionCallingMode;
 
         let client = get_client().expect("GEMINI_API_KEY required");
@@ -1463,16 +1455,8 @@ mod stateless {
 
         let call = &calls[0];
         println!(
-            "Stateless + thinking: {} (has_signature: {})",
-            call.name,
-            call.thought_signature.is_some()
-        );
-
-        // Document current API behavior: no thought signatures on FC in Interactions API
-        // This assertion documents the finding - if API changes, test will fail and alert us
-        assert!(
-            call.thought_signature.is_none(),
-            "Interactions API currently does not return thought signatures on function calls"
+            "Stateless + thinking function call: {} (id: {:?})",
+            call.name, call.id
         );
     }
 }
@@ -1522,11 +1506,7 @@ mod thinking {
         }
 
         let call = &function_calls[0];
-        println!(
-            "Turn 1 function call: {} (has thought_signature: {})",
-            call.name,
-            call.thought_signature.is_some()
-        );
+        println!("Turn 1 function call: {} (id: {:?})", call.name, call.id);
         assert!(call.id.is_some(), "Function call must have an id");
 
         // Turn 2: Provide function result
@@ -1774,9 +1754,7 @@ mod thinking {
         }
 
         let call = &function_calls[0];
-        if call.thought_signature.is_none() {
-            println!("✓ No thought_signature (expected without thinking mode)");
-        }
+        println!("Function call: {} (id: {:?})", call.name, call.id);
 
         // Turn 2: Provide result
         let function_result = function_result_content(
@@ -1953,7 +1931,7 @@ mod thinking {
     /// own signature that must be returned."
     #[tokio::test]
     #[ignore = "Requires API key"]
-    async fn test_thought_signature_sequential_each_step() {
+    async fn test_sequential_function_calls_with_thinking() {
         let Some(client) = get_client() else {
             println!("Skipping: GEMINI_API_KEY not set");
             return;
@@ -1966,7 +1944,7 @@ mod thinking {
                 .required(vec!["city".to_string()])
                 .build();
 
-            // Step 1 - must enable thinking mode to get thought signatures
+            // Step 1
             let response1 = stateful_builder(&client)
                 .with_text("What's the weather in Tokyo?")
                 .with_function(get_weather.clone())
@@ -1982,10 +1960,7 @@ mod thinking {
             }
 
             let call1 = &calls1[0];
-            println!(
-                "Step 1 signature present: {}",
-                call1.thought_signature.is_some()
-            );
+            println!("Step 1 function call: {} (id: {:?})", call1.name, call1.id);
 
             // Provide result
             let result1 = function_result_content(
@@ -1994,7 +1969,7 @@ mod thinking {
                 json!({"temperature": "22°C"}),
             );
 
-            // Step 2 - also needs thinking mode for signatures
+            // Step 2
             let response2 = stateful_builder(&client)
                 .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
                 .with_content(vec![result1])
@@ -2008,17 +1983,8 @@ mod thinking {
             let calls2 = response2.function_calls();
             if !calls2.is_empty() {
                 let call2 = &calls2[0];
-                println!(
-                    "Step 2 signature present: {}",
-                    call2.thought_signature.is_some()
-                );
-
-                // Per Google docs: sequential calls each have their own signature
-                if call1.thought_signature.is_some() && call2.thought_signature.is_some() {
-                    println!("✓ Both sequential calls have signatures as expected");
-                } else if call1.thought_signature.is_none() && call2.thought_signature.is_none() {
-                    println!("Note: No signatures present (thinking mode may not be active for this model)");
-                }
+                println!("Step 2 function call: {} (id: {:?})", call2.name, call2.id);
+                println!("✓ Sequential function calls with thinking completed");
             }
         })
         .await;
@@ -2112,12 +2078,7 @@ mod thinking {
         }
 
         for (i, call) in calls1.iter().enumerate() {
-            println!(
-                "  Call {}: {} (has signature: {})",
-                i + 1,
-                call.name,
-                call.thought_signature.is_some()
-            );
+            println!("  Call {}: {} (id: {:?})", i + 1, call.name, call.id);
         }
 
         // Verify all calls have IDs
@@ -2187,12 +2148,7 @@ mod thinking {
         println!("Step 2 function calls: {}", calls2.len());
 
         for (i, call) in calls2.iter().enumerate() {
-            println!(
-                "  Call {}: {} (has signature: {})",
-                i + 1,
-                call.name,
-                call.thought_signature.is_some()
-            );
+            println!("  Call {}: {} (id: {:?})", i + 1, call.name, call.id);
         }
 
         // The model might either:
@@ -2764,10 +2720,10 @@ mod multiturn {
         assert!(is_valid, "Response should explain the permission error");
     }
 
-    /// Test ThinkingLevel::High to verify if higher thinking levels produce signatures.
+    /// Test ThinkingLevel::High with function calling.
     #[tokio::test]
     #[ignore = "requires GEMINI_API_KEY"]
-    async fn test_thinking_level_high_thought_signatures() {
+    async fn test_thinking_level_high_function_calling() {
         use genai_rs::FunctionCallingMode;
 
         let Some(client) = get_client() else {
@@ -2804,22 +2760,15 @@ mod multiturn {
 
         let call = &calls[0];
         println!(
-            "ThinkingLevel::High: {} (has_signature: {})",
-            call.name,
-            call.thought_signature.is_some()
-        );
-
-        // Document current API behavior: no thought signatures on FC in Interactions API
-        assert!(
-            call.thought_signature.is_none(),
-            "Interactions API currently does not return thought signatures on function calls"
+            "ThinkingLevel::High function call: {} (id: {:?})",
+            call.name, call.id
         );
     }
 
-    /// Test FunctionCallingMode::Any to verify if forced FC affects signatures.
+    /// Test FunctionCallingMode::Any forces function calling.
     #[tokio::test]
     #[ignore = "requires GEMINI_API_KEY"]
-    async fn test_function_calling_mode_any_thought_signatures() {
+    async fn test_function_calling_mode_any() {
         use genai_rs::FunctionCallingMode;
 
         let Some(client) = get_client() else {
@@ -2856,15 +2805,8 @@ mod multiturn {
 
         let call = &calls[0];
         println!(
-            "FunctionCallingMode::Any: {} (has_signature: {})",
-            call.name,
-            call.thought_signature.is_some()
-        );
-
-        // Document current API behavior: no thought signatures on FC in Interactions API
-        assert!(
-            call.thought_signature.is_none(),
-            "Interactions API currently does not return thought signatures on function calls"
+            "FunctionCallingMode::Any function call: {} (id: {:?})",
+            call.name, call.id
         );
     }
 }
@@ -3103,7 +3045,7 @@ mod builtins_multiturn {
                 }
                 // Check for the expected calculation (5! * 2 = 240)
                 let results = response2.code_execution_results();
-                let has_correct_result = results.iter().any(|r| r.output.contains("240"))
+                let has_correct_result = results.iter().any(|r| r.result.contains("240"))
                     || response2.text().is_some_and(|t| t.contains("240"));
                 assert!(has_correct_result, "Turn 2 should calculate 120 * 2 = 240");
                 assert_eq!(
