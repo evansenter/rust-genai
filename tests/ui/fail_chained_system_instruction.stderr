@@ -13,8 +13,8 @@ error[E0599]: no method named `with_system_instruction` found for struct `Intera
 19 | |         .with_system_instruction("Be helpful"); // ERROR: method not found
    | |_________-^^^^^^^^^^^^^^^^^^^^^^^
    |
-help: there is a method `with_function` with a similar name
+help: there is a method `with_developer_instruction` with a similar name
    |
 19 -         .with_system_instruction("Be helpful"); // ERROR: method not found
-19 +         .with_function("Be helpful"); // ERROR: method not found
+19 +         .with_developer_instruction("Be helpful"); // ERROR: method not found
    |

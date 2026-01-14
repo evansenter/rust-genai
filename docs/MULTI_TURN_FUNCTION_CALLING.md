@@ -362,36 +362,71 @@ See `tests/function_calling_tests.rs` for related tests (`test_thought_signature
 
 When using `previous_interaction_id` (stateful mode), some settings are inherited:
 
-| Setting | Inherited? | Implication |
-|---------|-----------|-------------|
-| System instruction | ✅ Yes | Only send on first turn |
+| Setting | Inherited? | SDK Behavior |
+|---------|-----------|--------------|
+| System instruction | ❌ No | SDK auto-carries forward from first turn |
 | Conversation history | ✅ Yes | Model remembers context |
 | Tools/Functions | ❌ No | Must resend on new user message turns (not function result turns) |
 | Model | ❌ No | Must specify each request |
 
-> **Note:** The inheritance behavior for system instructions and tools is based on observed behavior through testing. Google's API documentation does not explicitly document what settings are inherited via `previousInteractionId`.
+> **Note:** Despite what you might expect, `system_instruction` is NOT inherited by the API when `store: true`. The SDK automatically carries forward the system instruction set on the first turn to all subsequent turns. This is handled transparently by the builder.
 
-This leads to the recommended pattern:
+### System Instruction vs Developer Instruction
+
+The SDK provides two methods for instructions that both use the `system_instruction` wire field:
+
+| Method | Scope | Purpose |
+|--------|-------|---------|
+| `with_system_instruction()` | First turn only | Set once, auto-carried to all turns |
+| `with_developer_instruction()` | Any turn | Per-turn instructions |
+
+**`with_system_instruction()`**: Set on the first turn only. The SDK automatically carries this forward to all subsequent turns. Cannot be called on `Chained` state (compile-time enforced).
+
+**`with_developer_instruction()`**: Available on any turn. Use for per-turn context or instructions that shouldn't persist. If both are set, they are concatenated (system first, then developer) with a warning logged.
+
+```rust,ignore
+// First turn: set system instruction (auto-carried forward)
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text("Hello!")
+    .with_system_instruction("You are a helpful assistant")
+    .with_store_enabled()
+    .create()
+    .await?;
+
+// Subsequent turn: system instruction is auto-carried, add per-turn instruction
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text("What can you help me with?")
+    .with_previous_interaction(&response.id.unwrap())
+    .with_developer_instruction("Focus on coding topics for this turn")  // Optional per-turn
+    .with_store_enabled()
+    .create()
+    .await?;
+```
+
+### Recommended Pattern
 
 ```rust,ignore
 match &self.last_interaction_id {
     Some(prev_id) => {
-        // Subsequent turns: chain, tools required, system inherited
+        // Subsequent turns: system instruction auto-carried, tools required
         client.interaction()
             .with_model("gemini-3-flash-preview")
             .with_text(message)
             .with_functions(functions)  // Must resend
             .with_previous_interaction(prev_id)
+            // with_developer_instruction() available here if needed
             .create()
             .await?
     }
     None => {
-        // First turn: set system instruction
+        // First turn: set system instruction (auto-carried to all future turns)
         client.interaction()
             .with_model("gemini-3-flash-preview")
             .with_text(message)
             .with_functions(functions)
-            .with_system_instruction(system_prompt)  // Only here
+            .with_system_instruction(system_prompt)  // Set once
             .create()
             .await?
     }

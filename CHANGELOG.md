@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `InteractionBuilder::with_developer_instruction()`: Per-turn instructions available on all builder states. Use for turn-specific context while `with_system_instruction()` handles persistent instructions
+- System instruction auto-carry-forward: The SDK now automatically carries forward `system_instruction` to all subsequent turns in stateful mode (`store: true`). This fixes a behavioral issue where the API does NOT inherit `system_instruction` via `previousInteractionId`
+
 ### Fixed
 
 - `AgentConfig` (DeepResearchConfig) now serializes `thinking_summaries` with snake_case per API spec, not camelCase `thinkingSummaries`

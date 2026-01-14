@@ -168,6 +168,8 @@ pub struct InteractionBuilder<'a, State = FirstTurn> {
     background: Option<bool>,
     store: Option<bool>,
     system_instruction: Option<InteractionInput>,
+    /// Per-turn developer instruction (concatenated with system_instruction on wire)
+    developer_instruction: Option<InteractionInput>,
     /// Maximum iterations for auto function calling loop
     max_function_call_loops: usize,
     /// Tool service for dependency-injected functions
@@ -195,6 +197,7 @@ impl<State> std::fmt::Debug for InteractionBuilder<'_, State> {
             .field("background", &self.background)
             .field("store", &self.store)
             .field("system_instruction", &self.system_instruction)
+            .field("developer_instruction", &self.developer_instruction)
             .field("max_function_call_loops", &self.max_function_call_loops)
             .field("tool_service", &self.tool_service.as_ref().map(|_| "..."))
             .field("timeout", &self.timeout)
@@ -225,6 +228,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             background: None,
             store: None,
             system_instruction: None,
+            developer_instruction: None,
             max_function_call_loops: DEFAULT_MAX_FUNCTION_CALL_LOOPS,
             tool_service: None,
             timeout: None,
@@ -263,6 +267,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             background: self.background,
             store: self.store,
             system_instruction: self.system_instruction,
+            developer_instruction: self.developer_instruction,
             max_function_call_loops: self.max_function_call_loops,
             tool_service: self.tool_service,
             timeout: self.timeout,
@@ -312,6 +317,7 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             background: None, // Reset - can't be true with store disabled
             store: Some(false),
             system_instruction: self.system_instruction,
+            developer_instruction: self.developer_instruction,
             max_function_call_loops: self.max_function_call_loops,
             tool_service: self.tool_service,
             timeout: self.timeout,
@@ -493,6 +499,59 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     #[must_use]
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
         self.input = Some(InteractionInput::Text(text.into()));
+        self
+    }
+
+    /// Sets a per-turn developer instruction for this interaction.
+    ///
+    /// Unlike `with_system_instruction()` (which is only available on the first turn
+    /// and is automatically carried forward to subsequent turns), developer instructions
+    /// can be set on any turn and apply only to that specific turn.
+    ///
+    /// Both system instruction and developer instruction use the same `system_instruction`
+    /// wire field in the API request.
+    ///
+    /// # Combination Behavior
+    ///
+    /// When both system instruction (from first turn) and developer instruction are set
+    /// on the same turn, they are concatenated in the wire format:
+    /// - System instruction first
+    /// - Newline separator
+    /// - Developer instruction second
+    ///
+    /// A warning is emitted at build time when both are set.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_rs::Client;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// // First turn - set system instruction
+    /// let first = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_system_instruction("You are a helpful assistant")
+    ///     .with_text("Hello!")
+    ///     .with_store_enabled()
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // Second turn - add developer instruction for this turn only
+    /// let second = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Help me with code")
+    ///     .with_developer_instruction("Focus on Rust examples for this response")
+    ///     .with_previous_interaction(first.id.as_ref().unwrap())
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn with_developer_instruction(mut self, instruction: impl Into<String>) -> Self {
+        self.developer_instruction = Some(InteractionInput::Text(instruction.into()));
         self
     }
 
@@ -2436,6 +2495,29 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
             (config, None) => config,
         };
 
+        // Combine system_instruction and developer_instruction for the wire format
+        let final_system_instruction = match (&self.system_instruction, &self.developer_instruction)
+        {
+            (Some(InteractionInput::Text(sys)), Some(InteractionInput::Text(dev))) => {
+                // Both set - concatenate with warning
+                tracing::warn!(
+                    "Both system_instruction and developer_instruction are set. \
+                     They will be concatenated (system first, then developer)."
+                );
+                Some(InteractionInput::Text(format!("{}\n{}", sys, dev)))
+            }
+            (Some(_sys), Some(_dev)) => {
+                // system_instruction is not Text but developer_instruction was set
+                return Err(GenaiError::InvalidInput(
+                    "Cannot combine non-text system_instruction with developer_instruction"
+                        .to_string(),
+                ));
+            }
+            (Some(sys), None) => Some(sys.clone()),
+            (None, Some(dev)) => Some(dev.clone()),
+            (None, None) => None,
+        };
+
         Ok(InteractionRequest {
             model: self.model,
             agent: self.agent,
@@ -2450,7 +2532,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
             stream: None, // Set by create() vs create_stream()
             background: self.background,
             store: self.store,
-            system_instruction: self.system_instruction,
+            system_instruction: final_system_instruction,
         })
     }
 }
