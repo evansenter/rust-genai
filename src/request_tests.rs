@@ -309,7 +309,7 @@ fn test_deep_research_config_serialization() {
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
     assert_eq!(value["type"], "deep-research");
-    assert_eq!(value["thinkingSummaries"], "THINKING_SUMMARIES_AUTO");
+    assert_eq!(value["thinking_summaries"], "THINKING_SUMMARIES_AUTO");
 }
 
 #[test]
@@ -320,7 +320,7 @@ fn test_deep_research_config_without_thinking_summaries() {
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
     assert_eq!(value["type"], "deep-research");
-    assert!(value.get("thinkingSummaries").is_none());
+    assert!(value.get("thinking_summaries").is_none());
 }
 
 #[test]
@@ -408,7 +408,7 @@ fn test_agent_config_helper_methods() {
     let value = config.as_value();
     assert_eq!(value.get("type").unwrap(), "deep-research");
     assert_eq!(
-        value.get("thinkingSummaries").unwrap(),
+        value.get("thinking_summaries").unwrap(),
         "THINKING_SUMMARIES_AUTO"
     );
 }
@@ -442,7 +442,7 @@ fn test_create_interaction_request_with_agent_config() {
     assert_eq!(value["agent"], "deep-research-pro-preview-12-2025");
     assert_eq!(value["agent_config"]["type"], "deep-research");
     assert_eq!(
-        value["agent_config"]["thinkingSummaries"],
+        value["agent_config"]["thinking_summaries"],
         "THINKING_SUMMARIES_AUTO"
     );
     assert_eq!(value["background"], true);
@@ -453,11 +453,11 @@ fn test_create_interaction_request_with_agent_config() {
 ///
 /// This test explicitly documents the casing decisions:
 /// - `type` key uses kebab-case for values: "deep-research", "dynamic"
-/// - `thinkingSummaries` key uses camelCase (consistent with other Gemini API fields like
-///   `maxOutputTokens`, `topP`, `topK` in GenerationConfig)
+/// - `thinking_summaries` key uses snake_case per API documentation
+/// - Values use SCREAMING_SNAKE_CASE: "THINKING_SUMMARIES_AUTO", "THINKING_SUMMARIES_NONE"
 ///
-/// The outer `agent_config` field is snake_case per API documentation, while inner
-/// fields follow the camelCase convention used throughout the Gemini Interactions API.
+/// Note: The Gemini Interactions API uses snake_case for field names, which differs from
+/// the camelCase used in GenerationConfig (which has `#[serde(rename_all = "camelCase")]`).
 #[test]
 fn test_agent_config_field_naming_conventions() {
     // Verify the exact JSON structure matches API expectations
@@ -467,16 +467,15 @@ fn test_agent_config_field_naming_conventions() {
 
     let json = serde_json::to_string(&config).expect("Serialization failed");
 
-    // Expected: {"type":"deep-research","thinkingSummaries":"THINKING_SUMMARIES_AUTO"}
-    // NOT: {"type":"deep-research","thinking_summaries":"auto"}
+    // Expected: {"type":"deep-research","thinking_summaries":"THINKING_SUMMARIES_AUTO"}
     assert!(
-        json.contains("thinkingSummaries"),
-        "Field should be camelCase 'thinkingSummaries', got: {}",
+        json.contains("thinking_summaries"),
+        "Field should be snake_case 'thinking_summaries', got: {}",
         json
     );
     assert!(
-        !json.contains("thinking_summaries"),
-        "Field should NOT be snake_case 'thinking_summaries', got: {}",
+        !json.contains("thinkingSummaries"),
+        "Field should NOT be camelCase 'thinkingSummaries', got: {}",
         json
     );
 

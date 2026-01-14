@@ -10,7 +10,7 @@
 ///
 /// These are for content YOU send to the API:
 /// - **Text & Thought**: `text_content`, `thought_content`
-/// - **Function Calling**: `function_call_content`, `function_call_content_with_signature`, `function_result_content`
+/// - **Function Calling**: `function_call_content`, `function_call_content_with_id`, `function_result_content`
 /// - **Multimodal**: `image_*`, `audio_*`, `video_*`, `document_*`
 ///
 /// ## Model Output Constructors (internal use)
@@ -23,25 +23,14 @@
 ///
 /// # Thought Signatures
 ///
-/// When using function calling with Gemini 3 models, thought signatures are critical for
-/// maintaining reasoning context across multi-turn interactions. Per Google's documentation
-/// (<https://ai.google.dev/gemini-api/docs/thought-signatures>):
-///
-/// - **What they are**: Encrypted representations of the model's internal thought process
-/// - **When they appear**: On function calls (first call in each step), and sometimes on final content
-/// - **Requirement**: For Gemini 3 models, signatures MUST be echoed back during function calling
-///   or you will receive a 400 validation error
-///
-/// ## Interactions API Handling
+/// Thought signatures are encrypted representations of the model's internal reasoning.
+/// They appear on `Thought` content blocks, NOT on function calls.
 ///
 /// When using `previous_interaction_id` with the Interactions API, thought signatures are
 /// managed automatically by the server. You don't need to manually extract and echo them.
-///
-/// For manual conversation construction (without `previous_interaction_id`), use
-/// [`function_call_content_with_signature`] to include the signature when echoing function calls.
 use crate::{
-    CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem, GoogleSearchResultItem,
-    InteractionContent, Resolution,
+    CodeExecutionLanguage, FileSearchResultItem, GoogleSearchResultItem, InteractionContent,
+    Resolution,
 };
 use serde_json::Value;
 
@@ -104,43 +93,39 @@ pub fn thought_content(signature: impl Into<String>) -> InteractionContent {
 // Function Calling
 // ----------------------------------------------------------------------------
 
-/// Creates a function call content with optional thought signature and call ID.
+/// Creates a function call content with optional call ID.
 ///
-/// **Prefer:** [`InteractionContent::new_function_call_with_signature()`] for new code.
+/// **Prefer:** [`InteractionContent::new_function_call_with_id()`] for new code.
 ///
-/// For Gemini 3 models, thought signatures are required for multi-turn function calling.
-/// Extract them from the interaction response and pass them here when building conversation history.
+/// Use this when you need to specify a call ID, typically when echoing function calls back
+/// in manual conversation construction.
 ///
-/// See <https://ai.google.dev/gemini-api/docs/thought-signatures> for details on thought signatures.
-///
-/// **Note**: When using `previous_interaction_id`, the server manages signatures automatically.
+/// **Note**: When using `previous_interaction_id`, the server manages conversation state automatically.
 ///
 /// # Example
 /// ```
-/// use genai_rs::interactions_api::function_call_content_with_signature;
+/// use genai_rs::interactions_api::function_call_content_with_id;
 /// use serde_json::json;
 ///
-/// let call = function_call_content_with_signature(
+/// let call = function_call_content_with_id(
 ///     Some("call_123"),
 ///     "get_weather",
-///     json!({"location": "San Francisco"}),
-///     Some("encrypted_signature_token".to_string())
+///     json!({"location": "San Francisco"})
 /// );
 /// ```
-pub fn function_call_content_with_signature(
+pub fn function_call_content_with_id(
     id: Option<impl Into<String>>,
     name: impl Into<String>,
     args: Value,
-    thought_signature: Option<String>,
 ) -> InteractionContent {
-    InteractionContent::new_function_call_with_signature(id, name, args, thought_signature)
+    InteractionContent::new_function_call_with_id(id, name, args)
 }
 
-/// Creates a function call content (without thought signature or call ID).
+/// Creates a function call content (without call ID).
 ///
 /// **Prefer:** [`InteractionContent::new_function_call()`] for new code.
 ///
-/// For Gemini 3 models, prefer using `function_call_content_with_signature` instead.
+/// Use `function_call_content_with_id` when you need to specify a call ID.
 ///
 /// # Example
 /// ```
@@ -595,30 +580,29 @@ pub fn code_execution_call_content(
 
 /// Creates code execution result content
 ///
-/// Contains the outcome and output of executed code from the `CodeExecution` tool.
+/// Contains the result of executed code from the `CodeExecution` tool.
 ///
 /// # Example
 /// ```
 /// use genai_rs::interactions_api::code_execution_result_content;
-/// use genai_rs::CodeExecutionOutcome;
 ///
-/// let result = code_execution_result_content("call_123", CodeExecutionOutcome::Ok, "42");
+/// let result = code_execution_result_content("call_123", false, "42");
 /// ```
 pub fn code_execution_result_content(
     call_id: impl Into<String>,
-    outcome: CodeExecutionOutcome,
-    output: impl Into<String>,
+    is_error: bool,
+    result: impl Into<String>,
 ) -> InteractionContent {
     InteractionContent::CodeExecutionResult {
         call_id: Some(call_id.into()),
-        outcome,
-        output: output.into(),
+        is_error,
+        result: result.into(),
     }
 }
 
 /// Creates a successful code execution result (convenience helper)
 ///
-/// Shorthand for creating an `OUTCOME_OK` result.
+/// Shorthand for creating a successful (is_error=false) result.
 ///
 /// # Example
 /// ```
@@ -628,14 +612,14 @@ pub fn code_execution_result_content(
 /// ```
 pub fn code_execution_success(
     call_id: impl Into<String>,
-    output: impl Into<String>,
+    result: impl Into<String>,
 ) -> InteractionContent {
-    code_execution_result_content(call_id, CodeExecutionOutcome::Ok, output)
+    code_execution_result_content(call_id, false, result)
 }
 
 /// Creates a failed code execution result (convenience helper)
 ///
-/// Shorthand for creating an `OUTCOME_FAILED` result.
+/// Shorthand for creating a failed (is_error=true) result.
 ///
 /// # Example
 /// ```
@@ -645,9 +629,9 @@ pub fn code_execution_success(
 /// ```
 pub fn code_execution_error(
     call_id: impl Into<String>,
-    error_output: impl Into<String>,
+    error_result: impl Into<String>,
 ) -> InteractionContent {
-    code_execution_result_content(call_id, CodeExecutionOutcome::Failed, error_output)
+    code_execution_result_content(call_id, true, error_result)
 }
 
 // ----------------------------------------------------------------------------
@@ -959,41 +943,28 @@ mod tests {
     }
 
     #[test]
-    fn test_function_call_content_with_signature() {
-        let content = function_call_content_with_signature(
+    fn test_function_call_content_with_id() {
+        let content = function_call_content_with_id(
             Some("call_abc"),
             "get_weather",
             json!({"city": "Tokyo"}),
-            Some("sig_xyz".to_string()),
         );
         match content {
-            InteractionContent::FunctionCall {
-                id,
-                name,
-                args,
-                thought_signature,
-            } => {
+            InteractionContent::FunctionCall { id, name, args } => {
                 assert_eq!(id, Some("call_abc".to_string()));
                 assert_eq!(name, "get_weather");
                 assert_eq!(args, json!({"city": "Tokyo"}));
-                assert_eq!(thought_signature, Some("sig_xyz".to_string()));
             }
             _ => panic!("Expected FunctionCall variant"),
         }
     }
 
     #[test]
-    fn test_function_call_content_without_signature() {
-        let content =
-            function_call_content_with_signature(None::<String>, "test_fn", json!({}), None);
+    fn test_function_call_content_without_id() {
+        let content = function_call_content_with_id(None::<String>, "test_fn", json!({}));
         match content {
-            InteractionContent::FunctionCall {
-                id,
-                thought_signature,
-                ..
-            } => {
+            InteractionContent::FunctionCall { id, .. } => {
                 assert_eq!(id, None);
-                assert_eq!(thought_signature, None);
             }
             _ => panic!("Expected FunctionCall variant"),
         }
@@ -1164,16 +1135,16 @@ mod tests {
 
     #[test]
     fn test_code_execution_result_content() {
-        let content = code_execution_result_content("call_123", CodeExecutionOutcome::Ok, "42\n");
+        let content = code_execution_result_content("call_123", false, "42\n");
         match content {
             InteractionContent::CodeExecutionResult {
                 call_id,
-                outcome,
-                output,
+                is_error,
+                result,
             } => {
                 assert_eq!(call_id, Some("call_123".to_string()));
-                assert_eq!(outcome, CodeExecutionOutcome::Ok);
-                assert_eq!(output, "42\n");
+                assert!(!is_error);
+                assert_eq!(result, "42\n");
             }
             _ => panic!("Expected CodeExecutionResult variant"),
         }
@@ -1184,10 +1155,10 @@ mod tests {
         let content = code_execution_success("call_456", "Hello World");
         match content {
             InteractionContent::CodeExecutionResult {
-                outcome, output, ..
+                is_error, result, ..
             } => {
-                assert_eq!(outcome, CodeExecutionOutcome::Ok);
-                assert_eq!(output, "Hello World");
+                assert!(!is_error);
+                assert_eq!(result, "Hello World");
             }
             _ => panic!("Expected CodeExecutionResult variant"),
         }
@@ -1198,10 +1169,10 @@ mod tests {
         let content = code_execution_error("call_789", "NameError: x not defined");
         match content {
             InteractionContent::CodeExecutionResult {
-                outcome, output, ..
+                is_error, result, ..
             } => {
-                assert_eq!(outcome, CodeExecutionOutcome::Failed);
-                assert!(output.contains("NameError"));
+                assert!(is_error);
+                assert!(result.contains("NameError"));
             }
             _ => panic!("Expected CodeExecutionResult variant"),
         }

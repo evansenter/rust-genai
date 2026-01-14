@@ -10,8 +10,8 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::content::{
-    Annotation, CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem,
-    GoogleSearchResultItem, InteractionContent,
+    Annotation, CodeExecutionLanguage, FileSearchResultItem, GoogleSearchResultItem,
+    InteractionContent,
 };
 use crate::errors::GenaiError;
 use crate::tools::Tool;
@@ -554,10 +554,6 @@ impl UrlRetrievalStatus {
     /// The `Unknown` variant is NOT treated as an error because:
     /// 1. URL retrieval failures are non-critical (graceful degradation)
     /// 2. An `Unknown` status may represent a new success state from the API
-    ///
-    /// This differs from [`crate::CodeExecutionOutcome::is_error()`], which treats
-    /// `Unknown` as an error since code execution failures have more serious
-    /// implications and require conservative handling.
     #[must_use]
     pub const fn is_error(&self) -> bool {
         matches!(self, Self::Error | Self::Unsafe)
@@ -838,8 +834,6 @@ pub struct FunctionCallInfo<'a> {
     pub name: &'a str,
     /// Arguments to pass to the function
     pub args: &'a serde_json::Value,
-    /// Thought signature for Gemini 3 reasoning continuity
-    pub thought_signature: Option<&'a str>,
 }
 
 impl FunctionCallInfo<'_> {
@@ -866,7 +860,6 @@ impl FunctionCallInfo<'_> {
             id: self.id.map(String::from),
             name: self.name.to_string(),
             args: self.args.clone(),
-            thought_signature: self.thought_signature.map(String::from),
         }
     }
 }
@@ -901,8 +894,6 @@ pub struct OwnedFunctionCallInfo {
     pub name: String,
     /// Arguments to pass to the function
     pub args: serde_json::Value,
-    /// Thought signature for Gemini 3 reasoning continuity
-    pub thought_signature: Option<String>,
 }
 
 /// Information about a function result in the response.
@@ -982,9 +973,9 @@ pub struct CodeExecutionCallInfo<'a> {
 /// # use genai_rs::InteractionResponse;
 /// # let response: InteractionResponse = todo!();
 /// for result in response.code_execution_results() {
-///     println!("Call {:?} completed with outcome: {}", result.call_id, result.outcome);
-///     if result.outcome.is_success() {
-///         println!("Output: {}", result.output);
+///     println!("Call {:?} completed: is_error={}", result.call_id, result.is_error);
+///     if !result.is_error {
+///         println!("Output: {}", result.result);
 ///     }
 /// }
 /// ```
@@ -993,10 +984,10 @@ pub struct CodeExecutionCallInfo<'a> {
 pub struct CodeExecutionResultInfo<'a> {
     /// The call_id matching the CodeExecutionCall this result is for (optional per API spec)
     pub call_id: Option<&'a str>,
-    /// Execution outcome (OK, FAILED, DEADLINE_EXCEEDED, etc.)
-    pub outcome: CodeExecutionOutcome,
+    /// Whether the code execution resulted in an error
+    pub is_error: bool,
     /// The output of the code execution (stdout for success, error message for failure)
-    pub output: &'a str,
+    pub result: &'a str,
 }
 
 /// Information about a URL context result.
@@ -1465,18 +1456,11 @@ impl InteractionResponse {
         self.outputs
             .iter()
             .filter_map(|content| {
-                if let InteractionContent::FunctionCall {
-                    id,
-                    name,
-                    args,
-                    thought_signature,
-                } = content
-                {
+                if let InteractionContent::FunctionCall { id, name, args } = content {
                     Some(FunctionCallInfo {
                         id: id.as_ref().map(|s| s.as_str()),
                         name: name.as_str(),
                         args,
-                        thought_signature: thought_signature.as_ref().map(|s| s.as_str()),
                     })
                 } else {
                     None
@@ -1855,13 +1839,13 @@ impl InteractionResponse {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_rs::{InteractionResponse, CodeExecutionOutcome};
+    /// # use genai_rs::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
     /// for result in response.code_execution_results() {
-    ///     if result.outcome.is_success() {
-    ///         println!("Code output (call_id: {:?}): {}", result.call_id, result.output);
+    ///     if !result.is_error {
+    ///         println!("Code output (call_id: {:?}): {}", result.call_id, result.result);
     ///     } else {
-    ///         eprintln!("Code failed ({}): {}", result.outcome, result.output);
+    ///         eprintln!("Code failed: {}", result.result);
     ///     }
     /// }
     /// ```
@@ -1872,14 +1856,14 @@ impl InteractionResponse {
             .filter_map(|content| {
                 if let InteractionContent::CodeExecutionResult {
                     call_id,
-                    outcome,
-                    output,
+                    is_error,
+                    result,
                 } = content
                 {
                     Some(CodeExecutionResultInfo {
                         call_id: call_id.as_deref(),
-                        outcome: outcome.clone(),
-                        output: output.as_str(),
+                        is_error: *is_error,
+                        result: result.as_str(),
                     })
                 } else {
                     None
@@ -1906,11 +1890,11 @@ impl InteractionResponse {
     pub fn successful_code_output(&self) -> Option<&str> {
         self.outputs.iter().find_map(|content| {
             if let InteractionContent::CodeExecutionResult {
-                outcome, output, ..
+                is_error, result, ..
             } = content
             {
-                if outcome.is_success() {
-                    Some(output.as_str())
+                if !is_error {
+                    Some(result.as_str())
                 } else {
                     None
                 }

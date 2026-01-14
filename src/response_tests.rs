@@ -197,13 +197,11 @@ fn test_interaction_response_function_calls() {
                 id: Some("call_001".to_string()),
                 name: "get_weather".to_string(),
                 args: serde_json::json!({"location": "Paris"}),
-                thought_signature: Some("sig123".to_string()),
             },
             InteractionContent::FunctionCall {
                 id: Some("call_002".to_string()),
                 name: "get_time".to_string(),
                 args: serde_json::json!({"timezone": "UTC"}),
-                thought_signature: None,
             },
         ],
         status: InteractionStatus::Completed,
@@ -222,10 +220,8 @@ fn test_interaction_response_function_calls() {
     assert_eq!(calls[0].id, Some("call_001"));
     assert_eq!(calls[0].name, "get_weather");
     assert_eq!(calls[0].args["location"], "Paris");
-    assert_eq!(calls[0].thought_signature, Some("sig123"));
     assert_eq!(calls[1].id, Some("call_002"));
     assert_eq!(calls[1].name, "get_time");
-    assert_eq!(calls[1].thought_signature, None);
     assert!(response.has_function_calls());
     assert!(!response.has_text());
 }
@@ -244,7 +240,6 @@ fn test_function_call_missing_id() {
             id: None, // Missing call_id - should be captured correctly
             name: "get_weather".to_string(),
             args: serde_json::json!({"location": "Tokyo"}),
-            thought_signature: None,
         }],
         status: InteractionStatus::RequiresAction,
         usage: None,
@@ -284,7 +279,6 @@ fn test_interaction_response_mixed_content() {
                 id: Some("call_mixed".to_string()),
                 name: "check_status".to_string(),
                 args: serde_json::json!({}),
-                thought_signature: None,
             },
             InteractionContent::Text {
                 text: Some("Done!".to_string()),
@@ -425,7 +419,6 @@ fn test_content_summary() {
                 id: Some("call_1".to_string()),
                 name: "test_fn".to_string(),
                 args: serde_json::json!({}),
-                thought_signature: None,
             },
             InteractionContent::Unknown {
                 content_type: "type_a".to_string(),
@@ -545,8 +538,8 @@ fn test_content_summary_with_built_in_tools() {
             },
             InteractionContent::CodeExecutionResult {
                 call_id: Some("call_1".to_string()),
-                outcome: CodeExecutionOutcome::Ok,
-                output: "1\n2\n".to_string(),
+                is_error: false,
+                result: "1\n2\n".to_string(),
             },
             InteractionContent::GoogleSearchCall {
                 id: "search1".to_string(),
@@ -607,8 +600,8 @@ fn test_interaction_response_code_execution_helpers() {
             },
             InteractionContent::CodeExecutionResult {
                 call_id: Some("call_123".to_string()),
-                outcome: CodeExecutionOutcome::Ok,
-                output: "42\n".to_string(),
+                is_error: false,
+                result: "42\n".to_string(),
             },
         ],
         status: InteractionStatus::Completed,
@@ -636,8 +629,8 @@ fn test_interaction_response_code_execution_helpers() {
     let results = response.code_execution_results();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].call_id, Some("call_123"));
-    assert_eq!(results[0].outcome, CodeExecutionOutcome::Ok);
-    assert_eq!(results[0].output, "42\n");
+    assert!(!results[0].is_error);
+    assert_eq!(results[0].result, "42\n");
 
     // Test successful_code_output helper
     assert_eq!(response.successful_code_output(), Some("42\n"));
@@ -1323,13 +1316,13 @@ fn test_interaction_response_code_execution_results() {
         outputs: vec![
             InteractionContent::CodeExecutionResult {
                 call_id: Some("call_1".to_string()),
-                outcome: CodeExecutionOutcome::Ok,
-                output: "first output".to_string(),
+                is_error: false,
+                result: "first output".to_string(),
             },
             InteractionContent::CodeExecutionResult {
                 call_id: Some("call_2".to_string()),
-                outcome: CodeExecutionOutcome::Failed,
-                output: "error message".to_string(),
+                is_error: true,
+                result: "error message".to_string(),
             },
         ],
         status: InteractionStatus::Completed,
@@ -1347,11 +1340,11 @@ fn test_interaction_response_code_execution_results() {
     let results = response.code_execution_results();
     assert_eq!(results.len(), 2);
     assert_eq!(results[0].call_id, Some("call_1"));
-    assert_eq!(results[0].outcome, CodeExecutionOutcome::Ok);
-    assert_eq!(results[0].output, "first output");
+    assert!(!results[0].is_error);
+    assert_eq!(results[0].result, "first output");
     assert_eq!(results[1].call_id, Some("call_2"));
-    assert_eq!(results[1].outcome, CodeExecutionOutcome::Failed);
-    assert_eq!(results[1].output, "error message");
+    assert!(results[1].is_error);
+    assert_eq!(results[1].result, "error message");
 
     // Test successful_code_output - should return first successful output
     let success = response.successful_code_output();
@@ -1551,7 +1544,6 @@ fn test_interaction_response_complex_roundtrip() {
                 id: Some("call-func-001".to_string()),
                 name: "get_weather".to_string(),
                 args: serde_json::json!({"city": "Tokyo", "units": "celsius"}),
-                thought_signature: Some("thought-sig-for-call".to_string()),
             },
             // Function result
             InteractionContent::FunctionResult {
@@ -1568,8 +1560,8 @@ fn test_interaction_response_complex_roundtrip() {
             },
             InteractionContent::CodeExecutionResult {
                 call_id: Some("code-exec-001".to_string()),
-                outcome: CodeExecutionOutcome::Ok,
-                output: "4".to_string(),
+                is_error: false,
+                result: "4".to_string(),
             },
             // Google search
             InteractionContent::GoogleSearchCall {
@@ -1698,8 +1690,8 @@ fn test_interaction_response_complex_roundtrip() {
     // Verify code execution results
     let code_results = deserialized.code_execution_results();
     assert_eq!(code_results.len(), 1);
-    assert_eq!(code_results[0].outcome, CodeExecutionOutcome::Ok);
-    assert_eq!(code_results[0].output, "4");
+    assert!(!code_results[0].is_error);
+    assert_eq!(code_results[0].result, "4");
 
     // Verify URL context results
     let url_results = deserialized.url_context_results();
@@ -1950,7 +1942,6 @@ fn test_function_call_info_to_owned() {
             id: Some("call_123".to_string()),
             name: "get_weather".to_string(),
             args: serde_json::json!({"city": "Tokyo", "units": "celsius"}),
-            thought_signature: Some("sig_abc".to_string()),
         }],
         status: InteractionStatus::Completed,
         usage: None,
@@ -1973,7 +1964,6 @@ fn test_function_call_info_to_owned() {
     assert_eq!(owned.name, "get_weather");
     assert_eq!(owned.args["city"], "Tokyo");
     assert_eq!(owned.args["units"], "celsius");
-    assert_eq!(owned.thought_signature, Some("sig_abc".to_string()));
 }
 
 #[test]
@@ -1987,7 +1977,6 @@ fn test_function_call_info_to_owned_none_fields() {
             id: None,
             name: "simple_function".to_string(),
             args: serde_json::json!({}),
-            thought_signature: None,
         }],
         status: InteractionStatus::Completed,
         usage: None,
@@ -2005,7 +1994,6 @@ fn test_function_call_info_to_owned_none_fields() {
     assert_eq!(owned.id, None);
     assert_eq!(owned.name, "simple_function");
     assert_eq!(owned.args, serde_json::json!({}));
-    assert_eq!(owned.thought_signature, None);
 }
 
 #[test]
@@ -2022,13 +2010,11 @@ fn test_owned_function_call_info_outlives_response() {
                     id: Some("call_1".to_string()),
                     name: "func_a".to_string(),
                     args: serde_json::json!({"x": 1}),
-                    thought_signature: None,
                 },
                 InteractionContent::FunctionCall {
                     id: Some("call_2".to_string()),
                     name: "func_b".to_string(),
                     args: serde_json::json!({"y": 2}),
-                    thought_signature: None,
                 },
             ],
             status: InteractionStatus::RequiresAction,
@@ -2063,7 +2049,6 @@ fn test_owned_function_call_info_serialization_roundtrip() {
         id: Some("call_xyz".to_string()),
         name: "my_function".to_string(),
         args: serde_json::json!({"key": "value", "number": 42}),
-        thought_signature: Some("thought_sig".to_string()),
     };
 
     // Serialize to JSON
@@ -2072,7 +2057,6 @@ fn test_owned_function_call_info_serialization_roundtrip() {
     // Verify JSON contains expected data
     assert!(json.contains("call_xyz"));
     assert!(json.contains("my_function"));
-    assert!(json.contains("thought_sig"));
 
     // Deserialize back
     let restored: OwnedFunctionCallInfo =
@@ -2081,7 +2065,6 @@ fn test_owned_function_call_info_serialization_roundtrip() {
     assert_eq!(restored.id, owned.id);
     assert_eq!(restored.name, owned.name);
     assert_eq!(restored.args, owned.args);
-    assert_eq!(restored.thought_signature, owned.thought_signature);
 }
 
 #[test]
@@ -2090,7 +2073,6 @@ fn test_owned_function_call_info_clone() {
         id: Some("call_id".to_string()),
         name: "cloneable".to_string(),
         args: serde_json::json!({"data": [1, 2, 3]}),
-        thought_signature: None,
     };
 
     let cloned = owned.clone();
@@ -2098,7 +2080,6 @@ fn test_owned_function_call_info_clone() {
     assert_eq!(cloned.id, owned.id);
     assert_eq!(cloned.name, owned.name);
     assert_eq!(cloned.args, owned.args);
-    assert_eq!(cloned.thought_signature, owned.thought_signature);
 }
 
 #[test]
@@ -2107,21 +2088,18 @@ fn test_owned_function_call_info_equality() {
         id: Some("same_id".to_string()),
         name: "same_name".to_string(),
         args: serde_json::json!({"same": true}),
-        thought_signature: Some("same_sig".to_string()),
     };
 
     let owned2 = OwnedFunctionCallInfo {
         id: Some("same_id".to_string()),
         name: "same_name".to_string(),
         args: serde_json::json!({"same": true}),
-        thought_signature: Some("same_sig".to_string()),
     };
 
     let different = OwnedFunctionCallInfo {
         id: Some("different_id".to_string()),
         name: "same_name".to_string(),
         args: serde_json::json!({"same": true}),
-        thought_signature: Some("same_sig".to_string()),
     };
 
     assert_eq!(owned1, owned2);
@@ -2294,7 +2272,6 @@ fn test_interaction_response_all_annotations_empty() {
                 id: Some("call_1".to_string()),
                 name: "test".to_string(),
                 args: serde_json::json!({}),
-                thought_signature: None,
             },
         ],
         status: InteractionStatus::Completed,
@@ -2328,8 +2305,8 @@ fn test_interaction_response_all_annotations_skips_non_text() {
             },
             InteractionContent::CodeExecutionResult {
                 call_id: Some("call_1".to_string()),
-                outcome: CodeExecutionOutcome::Ok,
-                output: "result".to_string(),
+                is_error: false,
+                result: "result".to_string(),
             },
             InteractionContent::Text {
                 text: Some("Only text has annotations.".to_string()),
@@ -2833,7 +2810,6 @@ fn test_images_iterator_returns_only_images_with_data() {
                 id: None,
                 name: "test".to_string(),
                 args: serde_json::json!({}),
-                thought_signature: None,
             },
         ],
         status: InteractionStatus::Completed,
@@ -2940,7 +2916,6 @@ fn test_audios_iterator_returns_only_audios_with_data() {
                 id: None,
                 name: "test".to_string(),
                 args: serde_json::json!({}),
-                thought_signature: None,
             },
         ],
         status: InteractionStatus::Completed,

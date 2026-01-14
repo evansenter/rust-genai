@@ -1332,8 +1332,8 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// // Access code execution results
     /// for result in response.code_execution_results() {
-    ///     if result.outcome.is_success() {
-    ///         println!("Code output: {}", result.output);
+    ///     if !result.is_error {
+    ///         println!("Code output: {}", result.result);
     ///     }
     /// }
     /// # Ok(())

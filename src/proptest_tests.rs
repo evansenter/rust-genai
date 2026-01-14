@@ -7,8 +7,8 @@ use chrono::{DateTime, TimeZone, Utc};
 use proptest::prelude::*;
 
 use super::content::{
-    Annotation, CodeExecutionLanguage, CodeExecutionOutcome, FileSearchResultItem,
-    GoogleSearchResultItem, InteractionContent, Resolution, UrlContextResultItem,
+    Annotation, CodeExecutionLanguage, FileSearchResultItem, GoogleSearchResultItem,
+    InteractionContent, Resolution, UrlContextResultItem,
 };
 use super::request::{
     AgentConfig, DeepResearchConfig, DynamicConfig, Role, ThinkingLevel, ThinkingSummaries, Turn,
@@ -393,39 +393,6 @@ fn arb_code_execution_language() -> impl Strategy<Value = CodeExecutionLanguage>
 }
 
 // =============================================================================
-// CodeExecutionOutcome Strategies
-// =============================================================================
-
-/// Strategy for known CodeExecutionOutcome variants only.
-/// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
-#[cfg(feature = "strict-unknown")]
-fn arb_code_execution_outcome() -> impl Strategy<Value = CodeExecutionOutcome> {
-    prop_oneof![
-        Just(CodeExecutionOutcome::Ok),
-        Just(CodeExecutionOutcome::Failed),
-        Just(CodeExecutionOutcome::DeadlineExceeded),
-        Just(CodeExecutionOutcome::Unspecified),
-    ]
-}
-
-/// Strategy for all CodeExecutionOutcome variants including Unknown.
-/// Used in normal mode (Unknown variants are gracefully handled).
-#[cfg(not(feature = "strict-unknown"))]
-fn arb_code_execution_outcome() -> impl Strategy<Value = CodeExecutionOutcome> {
-    prop_oneof![
-        Just(CodeExecutionOutcome::Ok),
-        Just(CodeExecutionOutcome::Failed),
-        Just(CodeExecutionOutcome::DeadlineExceeded),
-        Just(CodeExecutionOutcome::Unspecified),
-        // Unknown variant with preserved data
-        arb_identifier().prop_map(|outcome_type| CodeExecutionOutcome::Unknown {
-            outcome_type: outcome_type.clone(),
-            data: serde_json::Value::String(outcome_type),
-        }),
-    ]
-}
-
-// =============================================================================
 // ModalityTokens Strategy
 // =============================================================================
 
@@ -508,16 +475,8 @@ fn arb_owned_function_call_info() -> impl Strategy<Value = OwnedFunctionCallInfo
         proptest::option::of(arb_identifier()),
         arb_identifier(),
         arb_json_value(),
-        proptest::option::of(arb_text()),
     )
-        .prop_map(
-            |(id, name, args, thought_signature)| OwnedFunctionCallInfo {
-                id,
-                name,
-                args,
-                thought_signature,
-            },
-        )
+        .prop_map(|(id, name, args)| OwnedFunctionCallInfo { id, name, args })
 }
 
 // =============================================================================
@@ -595,16 +554,8 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
             proptest::option::of(arb_identifier()),
             arb_identifier(),
             arb_json_value(),
-            proptest::option::of(arb_text())
         )
-            .prop_map(|(id, name, args, thought_signature)| {
-                InteractionContent::FunctionCall {
-                    id,
-                    name,
-                    args,
-                    thought_signature,
-                }
-            }),
+            .prop_map(|(id, name, args)| { InteractionContent::FunctionCall { id, name, args } }),
         // FunctionResult content
         (
             proptest::option::of(arb_identifier()),
@@ -632,14 +583,14 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
         // CodeExecutionResult content
         (
             proptest::option::of(arb_identifier()),
-            arb_code_execution_outcome(),
+            any::<bool>(),
             arb_text(),
         )
-            .prop_map(|(call_id, outcome, output)| {
+            .prop_map(|(call_id, is_error, result)| {
                 InteractionContent::CodeExecutionResult {
                     call_id,
-                    outcome,
-                    output,
+                    is_error,
+                    result,
                 }
             }),
         // GoogleSearchCall content
@@ -983,14 +934,6 @@ proptest! {
         prop_assert_eq!(lang, restored);
     }
 
-    /// Test that CodeExecutionOutcome roundtrips correctly through JSON.
-    #[test]
-    fn code_execution_outcome_roundtrip(outcome in arb_code_execution_outcome()) {
-        let json = serde_json::to_string(&outcome).expect("Serialization should succeed");
-        let restored: CodeExecutionOutcome = serde_json::from_str(&json).expect("Deserialization should succeed");
-        prop_assert_eq!(outcome, restored);
-    }
-
     /// Test that FunctionCallingMode roundtrips correctly through JSON.
     #[test]
     fn function_calling_mode_roundtrip(mode in arb_function_calling_mode()) {
@@ -1256,7 +1199,6 @@ proptest! {
             id: Some("call_123".to_string()),
             name: "deep_function".to_string(),
             args: nested_args,
-            thought_signature: None,
         };
 
         let json = serde_json::to_string(&content).expect("Serialization should succeed");

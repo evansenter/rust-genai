@@ -746,12 +746,12 @@ mod function_calling {
         }
     }
 
-    mod thought_signatures {
+    mod multi_turn_function_calling {
         use super::*;
 
         #[tokio::test]
         #[ignore = "Requires API key"]
-        async fn test_thought_signatures_in_multi_turn() {
+        async fn test_function_calling_multi_turn() {
             let Some(client) = get_client() else {
                 println!("Skipping: GEMINI_API_KEY not set");
                 return;
@@ -776,15 +776,12 @@ mod function_calling {
 
                 let function_calls = response1.function_calls();
                 if function_calls.is_empty() {
-                    println!("Model chose not to call function - cannot test thought signatures");
+                    println!("Model chose not to call function - skipping test");
                     return;
                 }
 
                 let call = &function_calls[0];
-                println!(
-                    "Function call: {} with signature: {:?}",
-                    call.name, call.thought_signature
-                );
+                println!("Function call: {} (id: {:?})", call.name, call.id);
 
                 assert!(call.id.is_some(), "Function call must have an id");
                 let call_id = call.id.expect("call_id should exist");
@@ -827,7 +824,7 @@ mod function_calling {
 
         #[tokio::test]
         #[ignore = "Requires API key"]
-        async fn test_multiple_function_calls_with_signatures() {
+        async fn test_multiple_parallel_function_calls() {
             let Some(client) = get_client() else {
                 println!("Skipping: GEMINI_API_KEY not set");
                 return;
@@ -862,13 +859,7 @@ mod function_calling {
             println!("Number of function calls: {}", function_calls.len());
 
             for call in &function_calls {
-                println!(
-                    "  - {} (id: {:?}, args: {}, has_signature: {})",
-                    call.name,
-                    call.id,
-                    call.args,
-                    call.thought_signature.is_some()
-                );
+                println!("  - {} (id: {:?}, args: {})", call.name, call.id, call.args);
                 assert!(call.id.is_some(), "Each function call must have an id");
             }
         }

@@ -983,7 +983,7 @@ impl From<DeepResearchConfig> for AgentConfig {
         );
         if let Some(ts) = config.thinking_summaries {
             // Use agent_config format (THINKING_SUMMARIES_*), not generation_config format (auto/none)
-            map.insert("thinkingSummaries".into(), ts.to_agent_config_value());
+            map.insert("thinking_summaries".into(), ts.to_agent_config_value());
         }
         AgentConfig(serde_json::Value::Object(map))
     }
@@ -1098,7 +1098,7 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
         assert_eq!(value["type"], "deep-research");
-        assert_eq!(value["thinkingSummaries"], "THINKING_SUMMARIES_AUTO");
+        assert_eq!(value["thinking_summaries"], "THINKING_SUMMARIES_AUTO");
     }
 
     #[test]
@@ -1109,7 +1109,7 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
         assert_eq!(value["type"], "deep-research");
-        assert!(value.get("thinkingSummaries").is_none());
+        assert!(value.get("thinking_summaries").is_none());
     }
 
     #[test]

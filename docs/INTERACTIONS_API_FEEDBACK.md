@@ -103,7 +103,7 @@ The Deep Research agent (`deep-research-pro-preview`) silently fails without `ba
 | Enum | Documentation Claims | Actual Wire Format |
 |------|---------------------|-------------------|
 | `ThinkingSummaries` | `"auto"`, `"none"` | `"THINKING_SUMMARIES_AUTO"`, `"THINKING_SUMMARIES_NONE"` |
-| `CodeExecutionOutcome` | Generic enum | `"OUTCOME_OK"`, `"OUTCOME_FAILED"`, `"OUTCOME_DEADLINE_EXCEEDED"` |
+| ~~`CodeExecutionOutcome`~~ | Generic enum with `outcome`/`output` | Removed - actual API uses `is_error: bool` + `result: String` |
 | `UrlRetrievalStatus` | Not specified | `"URL_RETRIEVAL_STATUS_SUCCESS"`, `"URL_RETRIEVAL_STATUS_ERROR"` |
 | `CodeExecutionLanguage` | Implies multiple languages | Only `"PYTHON"` is supported |
 

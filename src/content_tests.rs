@@ -204,14 +204,12 @@ fn test_serialize_known_variant_with_none_fields() {
         id: None,
         name: "test_fn".to_string(),
         args: serde_json::json!({"arg": "value"}),
-        thought_signature: None,
     };
     let json = serde_json::to_string(&fc).unwrap();
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(value["type"], "function_call");
     assert_eq!(value["name"], "test_fn");
     assert!(value.get("id").is_none());
-    assert!(value.get("thoughtSignature").is_none());
 }
 
 #[test]
@@ -509,45 +507,25 @@ fn test_deserialize_code_execution_call_arguments_valid() {
 
 #[test]
 fn test_deserialize_code_execution_result() {
-    // Test deserialization from old API format (is_error + result)
+    // Test deserialization from API wire format (is_error + result)
     let json = r#"{"type": "code_execution_result", "call_id": "call_123", "is_error": false, "result": "42\n"}"#;
     let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
         InteractionContent::CodeExecutionResult {
             call_id,
-            outcome,
-            output,
+            is_error,
+            result,
         } => {
             assert_eq!(*call_id, Some("call_123".to_string()));
-            assert!(outcome.is_success());
-            assert_eq!(output, "42\n");
+            assert!(!is_error);
+            assert_eq!(result, "42\n");
         }
         _ => panic!("Expected CodeExecutionResult variant, got {:?}", content),
     }
 
     assert!(content.is_code_execution_result());
     assert!(!content.is_unknown());
-}
-
-#[test]
-fn test_deserialize_code_execution_result_with_outcome() {
-    // Test deserialization from new format (outcome + output)
-    let json = r#"{"type": "code_execution_result", "call_id": "call_123", "outcome": "OUTCOME_OK", "output": "42\n"}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
-
-    match &content {
-        InteractionContent::CodeExecutionResult {
-            call_id,
-            outcome,
-            output,
-        } => {
-            assert_eq!(*call_id, Some("call_123".to_string()));
-            assert_eq!(*outcome, CodeExecutionOutcome::Ok);
-            assert_eq!(output, "42\n");
-        }
-        _ => panic!("Expected CodeExecutionResult variant, got {:?}", content),
-    }
 }
 
 #[test]
@@ -558,113 +536,14 @@ fn test_deserialize_code_execution_result_error() {
     match &content {
         InteractionContent::CodeExecutionResult {
             call_id,
-            outcome,
-            output,
+            is_error,
+            result,
         } => {
             assert_eq!(*call_id, Some("call_456".to_string()));
-            assert!(outcome.is_error());
-            assert!(output.contains("NameError"));
+            assert!(is_error);
+            assert!(result.contains("NameError"));
         }
         _ => panic!("Expected CodeExecutionResult variant, got {:?}", content),
-    }
-}
-
-#[test]
-fn test_deserialize_code_execution_result_deadline_exceeded() {
-    // Test deserialization of OUTCOME_DEADLINE_EXCEEDED (timeout scenario)
-    let json = r#"{"type": "code_execution_result", "call_id": "call_789", "outcome": "OUTCOME_DEADLINE_EXCEEDED", "output": "Execution timed out after 30 seconds"}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
-
-    match &content {
-        InteractionContent::CodeExecutionResult {
-            call_id,
-            outcome,
-            output,
-        } => {
-            assert_eq!(*call_id, Some("call_789".to_string()));
-            assert_eq!(*outcome, CodeExecutionOutcome::DeadlineExceeded);
-            assert!(outcome.is_error());
-            assert!(!outcome.is_success());
-            assert!(output.contains("timed out"));
-        }
-        _ => panic!("Expected CodeExecutionResult variant, got {:?}", content),
-    }
-}
-
-#[test]
-fn test_code_execution_outcome_enum() {
-    assert!(CodeExecutionOutcome::Ok.is_success());
-    assert!(!CodeExecutionOutcome::Ok.is_error());
-
-    assert!(!CodeExecutionOutcome::Failed.is_success());
-    assert!(CodeExecutionOutcome::Failed.is_error());
-
-    assert!(!CodeExecutionOutcome::DeadlineExceeded.is_success());
-    assert!(CodeExecutionOutcome::DeadlineExceeded.is_error());
-
-    assert!(!CodeExecutionOutcome::Unspecified.is_success());
-    assert!(CodeExecutionOutcome::Unspecified.is_error());
-}
-
-// =============================================================================
-// CodeExecutionOutcome Unknown Variant Tests
-// =============================================================================
-
-#[cfg(not(feature = "strict-unknown"))]
-#[test]
-fn test_code_execution_outcome_unknown_deserialization() {
-    // Simulate a new outcome value the library doesn't know about
-    let unknown_json = r#""OUTCOME_FUTURE_STATUS""#;
-    let outcome: CodeExecutionOutcome =
-        serde_json::from_str(unknown_json).expect("Should deserialize as Unknown");
-
-    assert!(outcome.is_unknown());
-    assert!(!outcome.is_success());
-    assert!(outcome.is_error()); // Unknown outcomes are treated as errors
-
-    // Verify helper methods
-    assert_eq!(
-        outcome.unknown_outcome_type(),
-        Some("OUTCOME_FUTURE_STATUS")
-    );
-    assert!(outcome.unknown_data().is_some());
-
-    // Verify roundtrip serialization preserves the value
-    let reserialized = serde_json::to_string(&outcome).expect("Should serialize");
-    assert_eq!(reserialized, r#""OUTCOME_FUTURE_STATUS""#);
-}
-
-#[cfg(not(feature = "strict-unknown"))]
-#[test]
-fn test_code_execution_outcome_unknown_display() {
-    let unknown = CodeExecutionOutcome::Unknown {
-        outcome_type: "OUTCOME_NEW_STATUS".to_string(),
-        data: serde_json::Value::String("OUTCOME_NEW_STATUS".to_string()),
-    };
-    assert_eq!(format!("{}", unknown), "OUTCOME_NEW_STATUS");
-}
-
-#[test]
-fn test_code_execution_outcome_known_variants_serde() {
-    // Verify all known variants roundtrip correctly
-    let variants = [
-        (CodeExecutionOutcome::Ok, "OUTCOME_OK"),
-        (CodeExecutionOutcome::Failed, "OUTCOME_FAILED"),
-        (
-            CodeExecutionOutcome::DeadlineExceeded,
-            "OUTCOME_DEADLINE_EXCEEDED",
-        ),
-        (CodeExecutionOutcome::Unspecified, "OUTCOME_UNSPECIFIED"),
-    ];
-
-    for (outcome, expected_wire) in variants {
-        let serialized = serde_json::to_string(&outcome).expect("Should serialize");
-        assert_eq!(serialized, format!(r#""{}""#, expected_wire));
-
-        let deserialized: CodeExecutionOutcome =
-            serde_json::from_str(&serialized).expect("Should deserialize");
-        assert_eq!(deserialized, outcome);
-        assert!(!deserialized.is_unknown());
     }
 }
 
@@ -737,7 +616,7 @@ fn test_deserialize_google_search_call() {
 #[test]
 fn test_deserialize_google_search_result() {
     // Test the actual API format: result is an array of objects with title/url
-    let json = r#"{"type": "google_search_result", "call_id": "call123", "result": [{"title": "Rust", "url": "https://rust-lang.org", "renderedContent": "Some content"}]}"#;
+    let json = r#"{"type": "google_search_result", "call_id": "call123", "result": [{"title": "Rust", "url": "https://rust-lang.org", "rendered_content": "Some content"}]}"#;
     let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
@@ -862,17 +741,18 @@ fn test_serialize_code_execution_call() {
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
     assert_eq!(value["type"], "code_execution_call");
-    assert_eq!(value["id"], "call_123"); // serializes without wrapping
-    assert_eq!(value["language"], "PYTHON");
-    assert_eq!(value["code"], "print(42)");
+    assert_eq!(value["id"], "call_123");
+    // Wire format nests language and code inside arguments
+    assert_eq!(value["arguments"]["language"], "PYTHON");
+    assert_eq!(value["arguments"]["code"], "print(42)");
 }
 
 #[test]
 fn test_serialize_code_execution_result() {
     let content = InteractionContent::CodeExecutionResult {
         call_id: Some("call_123".to_string()),
-        outcome: CodeExecutionOutcome::Ok,
-        output: "42".to_string(),
+        is_error: false,
+        result: "42".to_string(),
     };
 
     let json = serde_json::to_string(&content).expect("Serialization should work");
@@ -880,16 +760,16 @@ fn test_serialize_code_execution_result() {
 
     assert_eq!(value["type"], "code_execution_result");
     assert_eq!(value["call_id"], "call_123"); // serializes without wrapping
-    assert_eq!(value["outcome"], "OUTCOME_OK");
-    assert_eq!(value["output"], "42");
+    assert_eq!(value["is_error"], false);
+    assert_eq!(value["result"], "42");
 }
 
 #[test]
 fn test_serialize_code_execution_result_error() {
     let content = InteractionContent::CodeExecutionResult {
         call_id: Some("call_456".to_string()),
-        outcome: CodeExecutionOutcome::Failed,
-        output: "NameError: x not defined".to_string(),
+        is_error: true,
+        result: "NameError: x not defined".to_string(),
     };
 
     let json = serde_json::to_string(&content).expect("Serialization should work");
@@ -897,8 +777,8 @@ fn test_serialize_code_execution_result_error() {
 
     assert_eq!(value["type"], "code_execution_result");
     assert_eq!(value["call_id"], "call_456");
-    assert_eq!(value["outcome"], "OUTCOME_FAILED");
-    assert!(value["output"].as_str().unwrap().contains("NameError"));
+    assert_eq!(value["is_error"], true);
+    assert!(value["result"].as_str().unwrap().contains("NameError"));
 }
 
 #[test]
@@ -919,8 +799,8 @@ fn test_roundtrip_built_in_tool_content() {
     // CodeExecutionResult roundtrip
     let original = InteractionContent::CodeExecutionResult {
         call_id: Some("call_123".to_string()),
-        outcome: CodeExecutionOutcome::Ok,
-        output: "hello\n".to_string(),
+        is_error: false,
+        result: "hello\n".to_string(),
     };
     let json = serde_json::to_string(&original).unwrap();
     let restored: InteractionContent = serde_json::from_str(&json).unwrap();
@@ -1028,20 +908,20 @@ fn test_edge_cases_empty_values() {
         _ => panic!("Expected UrlContextResult"),
     }
 
-    // Empty output string in CodeExecutionResult
+    // Empty result string in CodeExecutionResult
     let content = InteractionContent::CodeExecutionResult {
         call_id: Some("call_no_output".to_string()),
-        outcome: CodeExecutionOutcome::Ok,
-        output: "".to_string(),
+        is_error: false,
+        result: "".to_string(),
     };
     let json = serde_json::to_string(&content).unwrap();
     let restored: InteractionContent = serde_json::from_str(&json).unwrap();
     match restored {
         InteractionContent::CodeExecutionResult {
-            call_id, output, ..
+            call_id, result, ..
         } => {
             assert_eq!(call_id, Some("call_no_output".to_string()));
-            assert!(output.is_empty());
+            assert!(result.is_empty());
         }
         _ => panic!("Expected CodeExecutionResult"),
     }
@@ -1734,7 +1614,7 @@ fn test_resolution_unknown_object_form() {
 #[test]
 fn test_deserialize_file_search_result() {
     // Test the actual API format
-    let json = r#"{"type": "file_search_result", "callId": "call123", "result": [{"title": "Document.pdf", "text": "Relevant content", "fileSearchStore": "store-1"}]}"#;
+    let json = r#"{"type": "file_search_result", "call_id": "call123", "result": [{"title": "Document.pdf", "text": "Relevant content", "file_search_store": "store-1"}]}"#;
     let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
@@ -1756,10 +1636,10 @@ fn test_deserialize_file_search_result() {
 fn test_deserialize_file_search_result_multiple_items() {
     let json = r#"{
         "type": "file_search_result",
-        "callId": "call456",
+        "call_id": "call456",
         "result": [
-            {"title": "First.pdf", "text": "First content", "fileSearchStore": "store-a"},
-            {"title": "Second.pdf", "text": "Second content", "fileSearchStore": "store-b"}
+            {"title": "First.pdf", "text": "First content", "file_search_store": "store-a"},
+            {"title": "Second.pdf", "text": "Second content", "file_search_store": "store-b"}
         ]
     }"#;
     let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
@@ -1790,11 +1670,11 @@ fn test_serialize_file_search_result() {
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
     assert_eq!(value["type"], "file_search_result");
-    assert_eq!(value["callId"], "call789");
+    assert_eq!(value["call_id"], "call789");
     assert!(value["result"].is_array());
     assert_eq!(value["result"][0]["title"], "Results.pdf");
     assert_eq!(value["result"][0]["text"], "Found text");
-    assert_eq!(value["result"][0]["fileSearchStore"], "my-store");
+    assert_eq!(value["result"][0]["file_search_store"], "my-store");
 }
 
 #[test]
@@ -1921,16 +1801,10 @@ fn test_new_function_call_creates_correct_variant() {
     let content =
         InteractionContent::new_function_call("get_weather", serde_json::json!({"location": "SF"}));
     match &content {
-        InteractionContent::FunctionCall {
-            id,
-            name,
-            args,
-            thought_signature,
-        } => {
+        InteractionContent::FunctionCall { id, name, args } => {
             assert!(id.is_none());
             assert_eq!(name, "get_weather");
             assert_eq!(args["location"], "SF");
-            assert!(thought_signature.is_none());
         }
         _ => panic!("Expected FunctionCall variant"),
     }
@@ -1938,39 +1812,28 @@ fn test_new_function_call_creates_correct_variant() {
 }
 
 #[test]
-fn test_new_function_call_with_signature_creates_correct_variant() {
-    let content = InteractionContent::new_function_call_with_signature(
+fn test_new_function_call_with_id_creates_correct_variant() {
+    let content = InteractionContent::new_function_call_with_id(
         Some("call_123"),
         "get_weather",
         serde_json::json!({"location": "San Francisco"}),
-        Some("encrypted_signature_token".to_string()),
     );
     match content {
-        InteractionContent::FunctionCall {
-            id,
-            name,
-            args,
-            thought_signature,
-        } => {
+        InteractionContent::FunctionCall { id, name, args } => {
             assert_eq!(id, Some("call_123".to_string()));
             assert_eq!(name, "get_weather");
             assert_eq!(args["location"], "San Francisco");
-            assert_eq!(
-                thought_signature,
-                Some("encrypted_signature_token".to_string())
-            );
         }
         _ => panic!("Expected FunctionCall variant"),
     }
 }
 
 #[test]
-fn test_new_function_call_with_signature_none_id() {
-    let content = InteractionContent::new_function_call_with_signature(
+fn test_new_function_call_with_id_none_id() {
+    let content = InteractionContent::new_function_call_with_id(
         None::<String>,
         "my_func",
         serde_json::json!({}),
-        None,
     );
     match content {
         InteractionContent::FunctionCall { id, name, .. } => {

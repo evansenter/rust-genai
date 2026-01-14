@@ -308,12 +308,10 @@ mod code_execution {
 
                 for result in response.code_execution_results() {
                     println!(
-                        "Outcome: {} (success: {}, call_id: {:?})",
-                        result.outcome,
-                        result.outcome.is_success(),
-                        result.call_id
+                        "is_error: {} (success: {}, call_id: {:?})",
+                        result.is_error, !result.is_error, result.call_id
                     );
-                    println!("Output: {}", &result.output[..result.output.len().min(100)]);
+                    println!("Result: {}", &result.result[..result.result.len().min(100)]);
                 }
 
                 // Test the convenience helper and verify the code output directly

@@ -208,16 +208,8 @@ fn arb_interaction_content() -> impl Strategy<Value = InteractionContent> {
             proptest::option::of(arb_identifier()),
             arb_identifier(),
             arb_json_value(),
-            proptest::option::of(arb_text())
         )
-            .prop_map(|(id, name, args, thought_signature)| {
-                InteractionContent::FunctionCall {
-                    id,
-                    name,
-                    args,
-                    thought_signature,
-                }
-            }),
+            .prop_map(|(id, name, args)| { InteractionContent::FunctionCall { id, name, args } }),
     ]
 }
 

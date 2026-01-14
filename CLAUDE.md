@@ -160,6 +160,8 @@ See `InteractionContent` in `src/content.rs` for reference implementation.
 
 **When adding/updating enums**: Always update `docs/ENUM_WIRE_FORMATS.md` with verified wire format and Unknown variant info. Test with `LOUD_WIRE=1` to confirm actual API format.
 
+**Wire format field naming**: The Gemini Interactions API uses **snake_case** for field names. If the API appears to accept both camelCase and snake_case, always use snake_case in our serialization. Verify actual wire format with `LOUD_WIRE=1` before assuming documentation is correct.
+
 ## Test Organization
 
 - **Unit tests**: Inline in source files

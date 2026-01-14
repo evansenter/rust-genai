@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `AgentConfig` (DeepResearchConfig) now serializes `thinking_summaries` with snake_case per API spec, not camelCase `thinkingSummaries`
+- `FileSearchResult` now serializes `call_id` with snake_case per API spec, not camelCase `callId`
+- `CodeExecutionCall` now serializes with nested `arguments` object containing `language` and `code` per API spec
+- `GoogleSearchResultItem.rendered_content` now uses snake_case per API spec
+
+### Changed
+
+- **BREAKING**: Removed `CodeExecutionOutcome` enum - actual wire format uses `is_error: bool` and `result: String` fields directly, not `outcome`/`output` as documented
+- `CodeExecutionResultInfo` now has `is_error: bool` and `result: &str` fields instead of `outcome: CodeExecutionOutcome` and `output: &str`
+- `InteractionContent::CodeExecutionResult` variant now uses `is_error: bool, result: String` instead of `outcome: CodeExecutionOutcome, output: String`
+- `InteractionResponse::successful_code_output()` now checks `!is_error` instead of `outcome.is_success()`
+- **BREAKING**: `FunctionCallInfo` and `OwnedFunctionCallInfo` no longer have `thought_signature` field - API never sends this on function calls
+- Renamed `InteractionContent::new_function_call_with_signature()` to `new_function_call_with_id()` and removed `thought_signature` parameter
+- Renamed `function_call_content_with_signature()` to `function_call_content_with_id()` and removed `thought_signature` parameter
+
+### Removed
+
+- **BREAKING**: `CodeExecutionOutcome` enum - the actual API wire format doesn't use this enum
+- **BREAKING**: `thought_signature` field from `InteractionContent::FunctionCall` variant - API does not send this field on function calls (thought signatures appear only on `Thought` content blocks)
+
+### Migration Guide
+
+**`CodeExecutionOutcome` removal:**
+```rust
+// Before
+if result.outcome.is_success() {
+    println!("Output: {}", result.output);
+}
+
+// After
+if !result.is_error {
+    println!("Output: {}", result.result);
+}
+```
+
+**`thought_signature` removal from FunctionCall:**
+```rust
+// Before
+let call = InteractionContent::new_function_call_with_signature(
+    Some("call_123"),
+    "get_weather",
+    json!({"location": "SF"}),
+    Some("signature".to_string())  // No longer needed - API doesn't send this
+);
+if let InteractionContent::FunctionCall { thought_signature, .. } = content {
+    // thought_signature was always None
+}
+
+// After
+let call = InteractionContent::new_function_call_with_id(
+    Some("call_123"),
+    "get_weather",
+    json!({"location": "SF"})
+);
+// Note: Thought signatures appear on Thought content blocks, not function calls.
+// Use response.thought_signatures() to iterate over them.
+```
+
 ## [0.6.0] - 2025-01-11
 
 ### Added
