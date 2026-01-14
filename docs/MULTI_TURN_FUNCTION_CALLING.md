@@ -362,30 +362,21 @@ See `tests/function_calling_tests.rs` for related tests (`test_thought_signature
 
 When using `previous_interaction_id` (stateful mode), some settings are inherited:
 
-| Setting | Inherited? | SDK Behavior |
-|---------|-----------|--------------|
-| System instruction | ❌ No | SDK auto-carries forward from first turn |
+| Setting | Inherited? | Notes |
+|---------|-----------|-------|
+| System instruction | ❌ No | Must set explicitly on each turn if needed |
 | Conversation history | ✅ Yes | Model remembers context |
 | Tools/Functions | ❌ No | Must resend on new user message turns (not function result turns) |
 | Model | ❌ No | Must specify each request |
 
-> **Note:** Despite what you might expect, `system_instruction` is NOT inherited by the API when `store: true`. The SDK automatically carries forward the system instruction set on the first turn to all subsequent turns. This is handled transparently by the builder.
+> **Important:** `system_instruction` is NOT inherited by the API via `previousInteractionId`. If you want the same system instruction on every turn, you must set it explicitly.
 
-### System Instruction vs Developer Instruction
+### System Instruction
 
-The SDK provides two methods for instructions that both use the `system_instruction` wire field:
-
-| Method | Scope | Purpose |
-|--------|-------|---------|
-| `with_system_instruction()` | First turn only | Set once, auto-carried to all turns |
-| `with_developer_instruction()` | Any turn | Per-turn instructions |
-
-**`with_system_instruction()`**: Set on the first turn only. The SDK automatically carries this forward to all subsequent turns. Cannot be called on `Chained` state (compile-time enforced).
-
-**`with_developer_instruction()`**: Available on any turn. Use for per-turn context or instructions that shouldn't persist. If both are set, they are concatenated (system first, then developer) with a warning logged.
+`with_system_instruction()` is available on **all builder states** (FirstTurn, Chained, and StoreDisabled). Set it on each turn where you want it to apply.
 
 ```rust,ignore
-// First turn: set system instruction (auto-carried forward)
+// First turn
 let response = client.interaction()
     .with_model("gemini-3-flash-preview")
     .with_text("Hello!")
@@ -394,43 +385,46 @@ let response = client.interaction()
     .create()
     .await?;
 
-// Subsequent turn: system instruction is auto-carried, add per-turn instruction
+// Subsequent turn - set system_instruction again if needed
 let response = client.interaction()
     .with_model("gemini-3-flash-preview")
     .with_text("What can you help me with?")
     .with_previous_interaction(&response.id.unwrap())
-    .with_developer_instruction("Focus on coding topics for this turn")  // Optional per-turn
+    .with_system_instruction("You are a helpful assistant")  // Set explicitly
     .with_store_enabled()
     .create()
     .await?;
 ```
 
-### Recommended Pattern
+### Auto-Function Calling
+
+For `create_with_auto_functions()`, the system instruction is automatically included on all turns within the auto-function loop. The SDK reuses the same request object internally, so you only need to set it once:
 
 ```rust,ignore
-match &self.last_interaction_id {
-    Some(prev_id) => {
-        // Subsequent turns: system instruction auto-carried, tools required
-        client.interaction()
-            .with_model("gemini-3-flash-preview")
-            .with_text(message)
-            .with_functions(functions)  // Must resend
-            .with_previous_interaction(prev_id)
-            // with_developer_instruction() available here if needed
-            .create()
-            .await?
-    }
-    None => {
-        // First turn: set system instruction (auto-carried to all future turns)
-        client.interaction()
-            .with_model("gemini-3-flash-preview")
-            .with_text(message)
-            .with_functions(functions)
-            .with_system_instruction(system_prompt)  // Set once
-            .create()
-            .await?
-    }
-}
+// System instruction is sent on every internal iteration automatically
+let result = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text("What's the weather?")
+    .with_system_instruction("You are a weather assistant")
+    .create_with_auto_functions()
+    .await?;
+```
+
+### Recommended Pattern for Manual Multi-Turn
+
+```rust,ignore
+// Store the system instruction to reuse across turns
+let system_prompt = "You are a helpful assistant";
+
+// Each turn: always include system_instruction and tools
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text(message)
+    .with_functions(functions.clone())
+    .with_system_instruction(system_prompt)
+    .with_previous_interaction(&last_id)  // if not first turn
+    .create()
+    .await?;
 ```
 
 ### Important: Function Result Turns

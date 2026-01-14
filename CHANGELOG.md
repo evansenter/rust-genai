@@ -7,10 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Changed
 
-- `InteractionBuilder::with_developer_instruction()`: Per-turn instructions available on all builder states. Use for turn-specific context while `with_system_instruction()` handles persistent instructions
-- System instruction auto-carry-forward: The SDK now automatically carries forward `system_instruction` to all subsequent turns in stateful mode (`store: true`). This fixes a behavioral issue where the API does NOT inherit `system_instruction` via `previousInteractionId`
+- **BREAKING**: `with_system_instruction()` is now available on ALL builder states (FirstTurn, Chained, StoreDisabled), not just FirstTurn. The API does NOT inherit system instructions via `previousInteractionId`, so users should set it explicitly on each turn if needed. For `create_with_auto_functions()`, the SDK automatically includes system_instruction on all internal turns.
 
 ### Fixed
 

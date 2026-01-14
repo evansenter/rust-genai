@@ -247,8 +247,8 @@ mod basic {
     }
 
     #[test]
-    fn test_developer_instruction_available_on_all_states() {
-        // developer_instruction should be available on FirstTurn, Chained, and StoreDisabled states
+    fn test_system_instruction_available_on_all_states() {
+        // system_instruction should be available on FirstTurn, Chained, and StoreDisabled states
         let client = Client::new("test-api-key".to_string());
 
         // FirstTurn state
@@ -256,7 +256,7 @@ mod basic {
             .interaction()
             .with_model(DEFAULT_MODEL)
             .with_text("Hello")
-            .with_developer_instruction("Focus on Rust");
+            .with_system_instruction("Focus on Rust");
 
         let request = first_turn.build().expect("Should build successfully");
         match request.system_instruction {
@@ -266,13 +266,13 @@ mod basic {
             _ => panic!("Expected Text system_instruction"),
         }
 
-        // Chained state
+        // Chained state - system_instruction IS now available
         let chained = client
             .interaction()
             .with_model(DEFAULT_MODEL)
             .with_text("Continue")
             .with_previous_interaction("prev-id")
-            .with_developer_instruction("Focus on testing");
+            .with_system_instruction("Focus on testing");
 
         let request = chained.build().expect("Should build successfully");
         match request.system_instruction {
@@ -288,7 +288,7 @@ mod basic {
             .with_model(DEFAULT_MODEL)
             .with_text("Quick query")
             .with_store_disabled()
-            .with_developer_instruction("Be concise");
+            .with_system_instruction("Be concise");
 
         let request = store_disabled.build().expect("Should build successfully");
         match request.system_instruction {
@@ -300,84 +300,48 @@ mod basic {
     }
 
     #[test]
-    fn test_system_and_developer_instruction_concatenation() {
-        // When both are set, they should be concatenated (system first, then developer)
+    fn test_system_instruction_on_chained_state() {
+        // Verify system_instruction can be set directly on Chained state
+        // (previously this was blocked at compile time)
+        let client = Client::new("test-api-key".to_string());
+
+        // Set system_instruction AFTER transitioning to Chained state
+        let chained = client
+            .interaction()
+            .with_model(DEFAULT_MODEL)
+            .with_text("Continue")
+            .with_previous_interaction("prev-id")
+            .with_system_instruction("You are a helpful coding assistant");
+
+        let request = chained.build().expect("Should build successfully");
+
+        match request.system_instruction {
+            Some(InteractionInput::Text(text)) => {
+                assert_eq!(text, "You are a helpful coding assistant");
+            }
+            _ => panic!("Expected system_instruction to be set on Chained state"),
+        }
+    }
+
+    #[test]
+    fn test_system_instruction_overwrite() {
+        // Calling with_system_instruction multiple times should overwrite
         let client = Client::new("test-api-key".to_string());
 
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
             .with_text("Hello")
-            .with_system_instruction("You are a helpful assistant")
-            .with_developer_instruction("Focus on Rust examples");
+            .with_system_instruction("First instruction")
+            .with_system_instruction("Second instruction");
 
         let request = builder.build().expect("Should build successfully");
 
         match request.system_instruction {
             Some(InteractionInput::Text(text)) => {
-                assert!(
-                    text.contains("You are a helpful assistant"),
-                    "Should contain system instruction"
-                );
-                assert!(
-                    text.contains("Focus on Rust examples"),
-                    "Should contain developer instruction"
-                );
-                assert!(
-                    text.starts_with("You are a helpful assistant"),
-                    "System instruction should come first"
-                );
-                assert!(
-                    text.contains("\n"),
-                    "Should have newline separator between instructions"
-                );
+                assert_eq!(text, "Second instruction");
             }
-            _ => panic!("Expected Text system_instruction"),
-        }
-    }
-
-    #[test]
-    fn test_system_instruction_carried_forward_in_chained() {
-        // system_instruction set on FirstTurn should be carried forward to Chained state
-        let client = Client::new("test-api-key".to_string());
-
-        // Simulate first turn by setting system instruction, then transitioning to Chained
-        let chained = client
-            .interaction()
-            .with_model(DEFAULT_MODEL)
-            .with_system_instruction("You are a helpful coding assistant")
-            .with_text("Continue")
-            .with_previous_interaction("prev-id");
-
-        let request = chained.build().expect("Should build successfully");
-
-        // The system_instruction should be present even in Chained state
-        match request.system_instruction {
-            Some(InteractionInput::Text(text)) => {
-                assert_eq!(text, "You are a helpful coding assistant");
-            }
-            _ => panic!("Expected system_instruction to be carried forward"),
-        }
-    }
-
-    #[test]
-    fn test_developer_instruction_only_no_system() {
-        // Using only developer_instruction (no system_instruction) should work
-        let client = Client::new("test-api-key".to_string());
-
-        let builder = client
-            .interaction()
-            .with_model(DEFAULT_MODEL)
-            .with_text("Help me")
-            .with_developer_instruction("Be brief");
-
-        let request = builder.build().expect("Should build successfully");
-
-        match request.system_instruction {
-            Some(InteractionInput::Text(text)) => {
-                assert_eq!(text, "Be brief");
-            }
-            _ => panic!("Expected developer_instruction to be set"),
+            _ => panic!("Expected system_instruction to be overwritten"),
         }
     }
 }
