@@ -508,7 +508,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
 
     /// Sets the current user message for this interaction.
     ///
-    /// This can be combined with [`with_history()`] to build a conversation:
+    /// This can be combined with [`with_history()`](Self::with_history) to build a conversation:
     /// - `with_history()` sets the conversation history (previous turns)
     /// - `with_text()` sets the current user message to append
     ///
@@ -621,7 +621,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
 
     /// Sets the conversation history from an explicit array of turns.
     ///
-    /// This can be combined with [`with_text()`] to build a conversation:
+    /// This can be combined with [`with_text()`](Self::with_text) to build a conversation:
     /// - `with_history()` sets the conversation history (previous turns)
     /// - `with_text()` sets the current user message to append
     ///
