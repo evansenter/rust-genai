@@ -192,7 +192,7 @@ mod basic {
 
         let response = stateful_builder(&client)
             .with_text("Check the server status")
-            .with_function(status_func.clone())
+            .add_function(status_func.clone())
             .create()
             .await
             .expect("Interaction failed");
@@ -212,8 +212,8 @@ mod basic {
 
             let response2 = stateful_builder(&client)
                 .with_previous_interaction(response.id.as_ref().expect("id should exist"))
-                .with_content(vec![result])
-                .with_function(status_func)
+                .set_content(vec![result])
+                .add_function(status_func)
                 .create()
                 .await
                 .expect("Second interaction failed");
@@ -256,7 +256,7 @@ mod basic {
             .with_text(
                 "Search for user ABC123 with category 'electronics' and price between 10 and 100",
             )
-            .with_function(search_func)
+            .add_function(search_func)
             .create()
             .await
             .expect("Interaction failed");
@@ -289,7 +289,7 @@ mod basic {
 
         let response1 = stateful_builder(&client)
             .with_text("Get the secret data for key 'test123'")
-            .with_function(failing_func.clone())
+            .add_function(failing_func.clone())
             .create()
             .await
             .expect("First interaction failed");
@@ -309,8 +309,8 @@ mod basic {
 
         let response2 = stateful_builder(&client)
             .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-            .with_content(vec![error_result])
-            .with_function(failing_func)
+            .set_content(vec![error_result])
+            .add_function(failing_func)
             .create()
             .await
             .expect("Second interaction failed");
@@ -408,7 +408,7 @@ mod parallel {
 
             let response = stateful_builder(&client)
                 .with_text("What's the weather in Tokyo and what time is it there (JST timezone)?")
-                .with_functions(vec![get_weather, get_time])
+                .add_functions(vec![get_weather, get_time])
                 .create()
                 .await
                 .expect("Interaction failed");
@@ -452,7 +452,7 @@ mod parallel {
 
             let response = stateful_builder(&client)
                 .with_text("I need BOTH the weather in Paris AND the current time in CET. Call both functions.")
-                .with_functions(vec![func1, func2])
+                .add_functions(vec![func1, func2])
                 .with_thinking_level(ThinkingLevel::Low)
                 .create()
                 .await
@@ -496,7 +496,7 @@ mod parallel {
 
             let response1 = stateful_builder(&client)
                 .with_text("Tell me BOTH the weather in Paris AND the time in CET. Call both functions.")
-                .with_functions(vec![get_weather, get_time])
+                .add_functions(vec![get_weather, get_time])
                 .create()
                 .await
                 .expect("First interaction failed");
@@ -527,7 +527,7 @@ mod parallel {
 
             let response2 = stateful_builder(&client)
                 .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-                .with_content(results)
+                .set_content(results)
                 .create()
                 .await
                 .expect("Parallel results turn failed - tools should not be required");
@@ -561,7 +561,7 @@ mod parallel {
 
             let response1 = stateful_builder(&client)
                 .with_text("What's the weather in Tokyo and what time is it in JST?")
-                .with_functions(functions)
+                .add_functions(functions)
                 .create()
                 .await
                 .expect("Initial request failed");
@@ -600,7 +600,7 @@ mod parallel {
                     .interaction()
                     .with_model("gemini-3-flash-preview")
                     .with_previous_interaction(response1.id.as_ref().expect("id required"))
-                    .with_content(results)
+                    .set_content(results)
                     .create()
                     .await
                     .expect("Function result turn failed - order might matter?");
@@ -640,7 +640,7 @@ mod parallel {
                 .with_text(
                     "What's the weather in Tokyo and what's the stock price of INVALID_STOCK?",
                 )
-                .with_functions(functions)
+                .add_functions(functions)
                 .create()
                 .await
                 .expect("Initial request failed");
@@ -680,7 +680,7 @@ mod parallel {
                     .interaction()
                     .with_model("gemini-3-flash-preview")
                     .with_previous_interaction(response1.id.as_ref().expect("id required"))
-                    .with_content(results)
+                    .set_content(results)
                     .create()
                     .await
                     .expect("Function result turn failed");
@@ -741,7 +741,7 @@ mod sequential {
             // Step 1: Initial request
             let response1 = stateful_builder(&client)
                 .with_text("What's the weather in Tokyo? Tell me the temperature in Fahrenheit.")
-                .with_functions(vec![get_weather.clone(), convert_temp.clone()])
+                .add_functions(vec![get_weather.clone(), convert_temp.clone()])
                 .create()
                 .await
                 .expect("First interaction failed");
@@ -764,8 +764,8 @@ mod sequential {
 
             let response2 = stateful_builder(&client)
                 .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-                .with_content(vec![result1])
-                .with_functions(vec![get_weather.clone(), convert_temp.clone()])
+                .set_content(vec![result1])
+                .add_functions(vec![get_weather.clone(), convert_temp.clone()])
                 .create()
                 .await
                 .expect("Second interaction failed");
@@ -788,8 +788,8 @@ mod sequential {
 
                 let response3 = stateful_builder(&client)
                     .with_previous_interaction(response2.id.as_ref().expect("id should exist"))
-                    .with_content(vec![result2])
-                    .with_functions(vec![get_weather, convert_temp])
+                    .set_content(vec![result2])
+                    .add_functions(vec![get_weather, convert_temp])
                     .create()
                     .await
                     .expect("Third interaction failed");
@@ -822,7 +822,7 @@ mod sequential {
             // Step 1: Initial request WITH tools
             let response1 = stateful_builder(&client)
                 .with_text("What's the weather in Tokyo?")
-                .with_function(get_weather)
+                .add_function(get_weather)
                 .create()
                 .await
                 .expect("First interaction failed");
@@ -843,7 +843,7 @@ mod sequential {
             // Step 2: Provide function result WITHOUT resending tools
             let response2 = stateful_builder(&client)
                 .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-                .with_content(vec![result])
+                .set_content(vec![result])
                 .create()
                 .await
                 .expect("Function result turn failed - tools should not be required");
@@ -877,7 +877,7 @@ mod sequential {
 
             let response1 = stateful_builder(&client)
                 .with_text("What's the weather at my current location?")
-                .with_functions(vec![get_location, get_weather])
+                .add_functions(vec![get_location, get_weather])
                 .create()
                 .await
                 .expect("First interaction failed");
@@ -919,7 +919,7 @@ mod sequential {
 
                 let next_response = stateful_builder(&client)
                     .with_previous_interaction(current_response.id.as_ref().expect("id should exist"))
-                    .with_content(results)
+                    .set_content(results)
                     .create()
                     .await
                     .expect("Compositional chain step failed");
@@ -965,7 +965,7 @@ mod streaming {
 
             let stream = stateful_builder(&client)
                 .with_text("What's the weather in London?")
-                .with_function(get_weather)
+                .add_function(get_weather)
                 .create_stream();
 
             let result = consume_stream(stream).await;
@@ -1035,7 +1035,7 @@ mod streaming {
 
         let stream = interaction_builder(&client)
             .with_text("What's the weather in Tokyo?")
-            .with_function(weather_func)
+            .add_function(weather_func)
             .create_stream_with_auto_functions();
 
         let result = consume_auto_function_stream(stream).await;
@@ -1099,7 +1099,7 @@ mod streaming {
 
         let stream = interaction_builder(&client)
             .with_text("What's the weather in London and what time is it there (GMT timezone)?")
-            .with_functions(vec![weather_func, time_func])
+            .add_functions(vec![weather_func, time_func])
             .create_stream_with_auto_functions();
 
         let result = consume_auto_function_stream(stream).await;
@@ -1123,7 +1123,7 @@ mod streaming {
 
         let stream = interaction_builder(&client)
             .with_text("What's the weather in Paris?")
-            .with_function(weather_func)
+            .add_function(weather_func)
             .with_max_function_call_loops(1)
             .create_stream_with_auto_functions();
 
@@ -1155,7 +1155,7 @@ mod auto_execution {
 
         let result = interaction_builder(&client)
             .with_text("What's the weather in Tokyo?")
-            .with_function(weather_func)
+            .add_function(weather_func)
             .with_max_function_call_loops(1)
             .create_with_auto_functions()
             .await;
@@ -1189,7 +1189,7 @@ mod auto_execution {
                 "What's the weather in Tokyo? I need the temperature in Fahrenheit, not Celsius. \
                  Use the convert_temperature function to convert the result.",
             )
-            .with_functions(vec![weather_func, convert_func])
+            .add_functions(vec![weather_func, convert_func])
             .create_with_auto_functions()
             .await
             .expect("Auto function calling failed");
@@ -1276,7 +1276,7 @@ mod auto_execution {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("What's the weather in Seattle?")
-            .with_functions(functions)
+            .add_functions(functions)
             .with_store_enabled()
             .create_with_auto_functions()
             .await
@@ -1368,7 +1368,7 @@ mod stateless {
                 .interaction()
                 .with_model("gemini-3-flash-preview")
                 .with_input(InteractionInput::Content(history.clone()))
-                .with_functions(functions.clone())
+                .add_functions(functions.clone())
                 .with_store_disabled()
                 .create()
                 .await
@@ -1391,7 +1391,7 @@ mod stateless {
                 .interaction()
                 .with_model("gemini-3-flash-preview")
                 .with_input(InteractionInput::Content(history.clone()))
-                .with_functions(functions.clone())
+                .add_functions(functions.clone())
                 .with_store_disabled()
                 .create()
                 .await
@@ -1437,7 +1437,7 @@ mod stateless {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_input(InteractionInput::Content(history))
-            .with_function(get_weather)
+            .add_function(get_weather)
             .with_thinking_level(ThinkingLevel::Medium)
             .with_function_calling_mode(FunctionCallingMode::Any)
             .with_store_disabled()
@@ -1489,7 +1489,7 @@ mod thinking {
         let response1 = retry_request!([client, get_weather] => {
             stateful_builder(&client)
                 .with_text("What's the weather in Tokyo? Should I bring an umbrella?")
-                .with_function(get_weather)
+                .add_function(get_weather)
                 .with_thinking_level(ThinkingLevel::Medium)
                 .with_store_enabled()
                 .create()
@@ -1520,8 +1520,8 @@ mod thinking {
         let response2 = retry_request!([client, prev_id, get_weather, function_result] => {
             stateful_builder(&client)
                 .with_previous_interaction(&prev_id)
-                .with_content(vec![function_result])
-                .with_function(get_weather)
+                .set_content(vec![function_result])
+                .add_function(get_weather)
                 .with_thinking_level(ThinkingLevel::Medium)
                 .with_store_enabled()
                 .create()
@@ -1578,7 +1578,7 @@ mod thinking {
         let response1 = retry_request!([client, get_weather, get_time] => {
             stateful_builder(&client)
                 .with_text("What's the weather in Tokyo and what time is it there? I need both pieces of information.")
-                .with_functions(vec![get_weather, get_time])
+                .add_functions(vec![get_weather, get_time])
                 .with_thinking_level(ThinkingLevel::Medium)
                 .with_store_enabled()
                 .create()
@@ -1619,8 +1619,8 @@ mod thinking {
         let response2 = retry_request!([client, prev_id, get_weather, get_time, results] => {
             stateful_builder(&client)
                 .with_previous_interaction(&prev_id)
-                .with_content(results)
-                .with_functions(vec![get_weather, get_time])
+                .set_content(results)
+                .add_functions(vec![get_weather, get_time])
                 .with_thinking_level(ThinkingLevel::Medium)
                 .with_store_enabled()
                 .create()
@@ -1666,7 +1666,7 @@ mod thinking {
             let response1 = retry_request!([client, get_weather_fn, level_clone] => {
                 stateful_builder(&client)
                     .with_text("What's the weather in Paris?")
-                    .with_function(get_weather_fn)
+                    .add_function(get_weather_fn)
                     .with_thinking_level(level_clone)
                     .with_store_enabled()
                     .create()
@@ -1695,8 +1695,8 @@ mod thinking {
                 retry_request!([client, prev_id, get_weather_fn, fn_result, level_clone] => {
                     stateful_builder(&client)
                         .with_previous_interaction(&prev_id)
-                        .with_content(vec![fn_result])
-                        .with_function(get_weather_fn)
+                        .set_content(vec![fn_result])
+                        .add_function(get_weather_fn)
                         .with_thinking_level(level_clone)
                         .create()
                         .await
@@ -1738,7 +1738,7 @@ mod thinking {
         let response1 = retry_request!([client, get_weather_fn] => {
             stateful_builder(&client)
                 .with_text("What's the weather in Tokyo?")
-                .with_function(get_weather_fn)
+                .add_function(get_weather_fn)
                 .with_store_enabled()
                 .create()
                 .await
@@ -1769,8 +1769,8 @@ mod thinking {
         let response2 = retry_request!([client, prev_id, get_weather_fn, fn_result] => {
             stateful_builder(&client)
                 .with_previous_interaction(&prev_id)
-                .with_content(vec![fn_result])
-                .with_function(get_weather_fn)
+                .set_content(vec![fn_result])
+                .add_function(get_weather_fn)
                 .create()
                 .await
         })
@@ -1803,7 +1803,7 @@ mod thinking {
         // Turn 1: Stream with thinking + function call
         let stream = stateful_builder(&client)
             .with_text("What's the weather in Tokyo? I need to know if I should bring an umbrella.")
-            .with_function(get_weather.clone())
+            .add_function(get_weather.clone())
             .with_thinking_level(ThinkingLevel::Medium)
             .with_store_enabled()
             .create_stream();
@@ -1840,8 +1840,8 @@ mod thinking {
 
         let stream2 = stateful_builder(&client)
             .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-            .with_content(vec![function_result])
-            .with_function(get_weather)
+            .set_content(vec![function_result])
+            .add_function(get_weather)
             .with_thinking_level(ThinkingLevel::Medium)
             .with_store_enabled()
             .create_stream();
@@ -1947,7 +1947,7 @@ mod thinking {
             // Step 1
             let response1 = stateful_builder(&client)
                 .with_text("What's the weather in Tokyo?")
-                .with_function(get_weather.clone())
+                .add_function(get_weather.clone())
                 .with_thinking_level(ThinkingLevel::Low)
                 .create()
                 .await
@@ -1972,9 +1972,9 @@ mod thinking {
             // Step 2
             let response2 = stateful_builder(&client)
                 .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-                .with_content(vec![result1])
+                .set_content(vec![result1])
                 .with_text("Now what about Paris?")
-                .with_function(get_weather.clone())
+                .add_function(get_weather.clone())
                 .with_thinking_level(ThinkingLevel::Low)
                 .create()
                 .await
@@ -2059,7 +2059,7 @@ mod thinking {
                      current local time, the forecast for the next few days, and what \
                      activities you'd recommend. Please gather all this information.",
                 )
-                .with_functions(functions)
+                .add_functions(functions)
                 .with_thinking_level(ThinkingLevel::Medium)
                 .with_store_enabled()
                 .create()
@@ -2131,8 +2131,8 @@ mod thinking {
         let response2 = retry_request!([client, prev_id, functions, results] => {
             stateful_builder(&client)
                 .with_previous_interaction(&prev_id)
-                .with_content(results)
-                .with_functions(functions)
+                .set_content(results)
+                .add_functions(functions)
                 .with_thinking_level(ThinkingLevel::Medium)
                 .with_store_enabled()
                 .create()
@@ -2198,8 +2198,8 @@ mod thinking {
             let response3 = retry_request!([client, prev_id, functions, results] => {
                 stateful_builder(&client)
                     .with_previous_interaction(&prev_id)
-                    .with_content(results)
-                    .with_functions(functions)
+                    .set_content(results)
+                    .add_functions(functions)
                     .with_thinking_level(ThinkingLevel::Medium)
                     .with_store_enabled()
                     .create()
@@ -2287,7 +2287,7 @@ mod multiturn {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("What's the weather in Seattle?")
-            .with_functions(functions.clone())
+            .add_functions(functions.clone())
             .with_store_enabled()
             .with_system_instruction(SYSTEM_INSTRUCTION)
             .create_with_auto_functions()
@@ -2316,7 +2316,7 @@ mod multiturn {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("How about in Tokyo?")
-            .with_functions(functions.clone())
+            .add_functions(functions.clone())
             .with_store_enabled()
             .with_previous_interaction(&turn1_id)
             .create_with_auto_functions()
@@ -2337,7 +2337,7 @@ mod multiturn {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("Based on the weather you just told me about Seattle and Tokyo, which city is warmer right now?")
-            .with_functions(functions)
+            .add_functions(functions)
             .with_store_enabled()
             .with_previous_interaction(&turn2_id)
             .create_with_auto_functions()
@@ -2374,7 +2374,7 @@ mod multiturn {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("Remember: I'm interested in weather data.")
-            .with_functions(functions)
+            .add_functions(functions)
             .with_store_enabled()
             .create()
             .await
@@ -2417,7 +2417,7 @@ mod multiturn {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("What's the weather in London and what time is it there?")
-            .with_functions(functions.clone())
+            .add_functions(functions.clone())
             .with_store_enabled()
             .with_system_instruction(SYSTEM_INSTRUCTION)
             .create()
@@ -2453,8 +2453,8 @@ mod multiturn {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_previous_interaction(response1.id.as_ref().expect("Should have ID"))
-            .with_content(results)
-            .with_functions(functions.clone())
+            .set_content(results)
+            .add_functions(functions.clone())
             .with_store_enabled()
             .create()
             .await
@@ -2471,7 +2471,7 @@ mod multiturn {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("Is it a good time to call someone there?")
-            .with_functions(functions)
+            .add_functions(functions)
             .with_store_enabled()
             .with_previous_interaction(response2.id.as_ref().expect("Should have ID"))
             .create()
@@ -2565,7 +2565,7 @@ mod multiturn {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("What's the weather in Miami?")
-            .with_functions(functions.clone())
+            .add_functions(functions.clone())
             .with_store_enabled()
             .with_system_instruction(SYSTEM_INSTRUCTION)
             .create_stream_with_auto_functions();
@@ -2604,7 +2604,7 @@ mod multiturn {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("Compare that to New York.")
-            .with_functions(functions)
+            .add_functions(functions)
             .with_store_enabled()
             .with_previous_interaction(response1.id.as_ref().expect("Should have ID"))
             .create_stream_with_auto_functions();
@@ -2664,7 +2664,7 @@ mod multiturn {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_text("Get the secret data for key 'test123'")
-            .with_function(secret_function.clone())
+            .add_function(secret_function.clone())
             .with_store_enabled()
             .with_system_instruction(
                 "You help users access data. When functions fail, explain the error to the user.",
@@ -2689,8 +2689,8 @@ mod multiturn {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_previous_interaction(response1.id.as_ref().expect("Should have ID"))
-            .with_content(vec![error_result])
-            .with_function(secret_function)
+            .set_content(vec![error_result])
+            .add_function(secret_function)
             .with_store_enabled()
             .create()
             .await
@@ -2740,7 +2740,7 @@ mod multiturn {
         // Stateful with HIGH thinking level, force function calling
         let response = stateful_builder(&client)
             .with_text("What's the weather in Berlin?")
-            .with_function(get_weather)
+            .add_function(get_weather)
             .with_thinking_level(ThinkingLevel::High)
             .with_function_calling_mode(FunctionCallingMode::Any)
             .create()
@@ -2785,7 +2785,7 @@ mod multiturn {
         // FC mode ANY forces function calling
         let response = stateful_builder(&client)
             .with_text("What's the weather in Tokyo?")
-            .with_function(get_weather)
+            .add_function(get_weather)
             .with_thinking_level(ThinkingLevel::Medium)
             .with_function_calling_mode(FunctionCallingMode::Any)
             .create()

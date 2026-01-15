@@ -110,7 +110,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut stream = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_content(stream_contents)
+        .set_content(stream_contents)
         .create_stream();
 
     while let Some(result) = stream.next().await {

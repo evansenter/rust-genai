@@ -8,7 +8,9 @@ error[E0599]: the method `create_with_auto_functions` exists for struct `Interac
 17 | |         .with_text("Hello")
 18 | |         .with_store_disabled()
 19 | |         .create_with_auto_functions(); // ERROR: method not found
-   | |_________-^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |         -^^^^^^^^^^^^^^^^^^^^^^^^^^ method cannot be called on `InteractionBuilder<'_, StoreDisabled>` due to unsatisfied trait bounds
+   | |_________|
+   |
    |
   ::: src/request_builder/mod.rs
    |

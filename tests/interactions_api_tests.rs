@@ -488,7 +488,7 @@ mod function_calling {
 
             let response = interaction_builder(&client)
                 .with_text("What time is it?")
-                .with_function(get_time)
+                .add_function(get_time)
                 .create()
                 .await
                 .expect("Interaction failed");
@@ -532,7 +532,7 @@ mod function_calling {
 
                 let response = interaction_builder(&client)
                     .with_text("What's the weather in Tokyo?")
-                    .with_function(get_weather.clone())
+                    .add_function(get_weather.clone())
                     .create()
                     .await
                     .expect("First interaction failed");
@@ -563,8 +563,8 @@ mod function_calling {
 
                 let second_response = interaction_builder(&client)
                     .with_previous_interaction(response.id.as_ref().expect("id should exist"))
-                    .with_content(vec![function_result])
-                    .with_function(get_weather)
+                    .set_content(vec![function_result])
+                    .add_function(get_weather)
                     .create()
                     .await
                     .expect("Second interaction failed");
@@ -609,7 +609,7 @@ mod function_calling {
 
                 let response = interaction_builder(&client)
                     .with_text("What time is it right now?")
-                    .with_function(get_time.clone())
+                    .add_function(get_time.clone())
                     .create()
                     .await
                     .expect("Interaction failed");
@@ -635,8 +635,8 @@ mod function_calling {
 
                     let response2 = interaction_builder(&client)
                         .with_previous_interaction(response.id.as_ref().expect("id should exist"))
-                        .with_content(vec![function_result])
-                        .with_function(get_time)
+                        .set_content(vec![function_result])
+                        .add_function(get_time)
                         .create()
                         .await
                         .expect("Second interaction failed");
@@ -674,7 +674,7 @@ mod function_calling {
 
                 let result = interaction_builder(&client)
                     .with_text("What's the weather like in Seattle?")
-                    .with_function(weather_func)
+                    .add_function(weather_func)
                     .create_with_auto_functions()
                     .await
                     .expect("Auto-function call failed");
@@ -727,7 +727,7 @@ mod function_calling {
 
                 let result = interaction_builder(&client)
                     .with_text("Call the undefined_function with input 'test'")
-                    .with_function(undefined_func)
+                    .add_function(undefined_func)
                     .create_with_auto_functions()
                     .await;
 
@@ -769,7 +769,7 @@ mod function_calling {
 
                 let response1 = interaction_builder(&client)
                     .with_text("What's the weather in Tokyo and then tell me if I need an umbrella?")
-                    .with_function(get_weather.clone())
+                    .add_function(get_weather.clone())
                     .create()
                     .await
                     .expect("First interaction failed");
@@ -794,8 +794,8 @@ mod function_calling {
 
                 let response2 = interaction_builder(&client)
                     .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-                    .with_content(vec![function_result])
-                    .with_function(get_weather)
+                    .set_content(vec![function_result])
+                    .add_function(get_weather)
                     .create()
                     .await
                     .expect("Second interaction failed");
@@ -850,7 +850,7 @@ mod function_calling {
 
             let response = interaction_builder(&client)
                 .with_text("What's the weather in Paris and what time is it there?")
-                .with_functions(vec![get_weather, get_time])
+                .add_functions(vec![get_weather, get_time])
                 .create()
                 .await
                 .expect("Interaction failed");
@@ -890,7 +890,7 @@ mod function_calling {
             let response1 = retry_request!([client, get_info] => {
                 interaction_builder(&client)
                     .with_text("Get info about the weather and tell me about it.")
-                    .with_function(get_info)
+                    .add_function(get_info)
                     .with_store_enabled()
                     .create()
                     .await
@@ -915,12 +915,12 @@ mod function_calling {
             let response2 = retry_request!([client, prev_id, call_id, get_info] => {
                 interaction_builder(&client)
                     .with_previous_interaction(&prev_id)
-                    .with_content(vec![function_result_content(
+                    .set_content(vec![function_result_content(
                         "get_info",
                         call_id,
                         json!({"info": "The weather is sunny and warm, about 25°C with clear skies."}),
                     )])
-                    .with_function(get_info)
+                    .add_function(get_info)
                     .create()
                     .await
             })
@@ -963,7 +963,7 @@ mod function_calling {
             let response = retry_request!([client, get_weather] => {
                 interaction_builder(&client)
                     .with_text("What's the weather in Paris?")
-                    .with_function(get_weather)
+                    .add_function(get_weather)
                     .with_store_enabled()
                     .create()
                     .await
@@ -991,12 +991,12 @@ mod function_calling {
                 let result = retry_request!([client, prev_id, call_id, get_weather] => {
                     interaction_builder(&client)
                         .with_previous_interaction(&prev_id)
-                        .with_content(vec![function_result_content(
+                        .set_content(vec![function_result_content(
                             "get_weather",
                             call_id,
                             json!({"temperature": "22°C", "conditions": "sunny"}),
                         )])
-                        .with_function(get_weather)
+                        .add_function(get_weather)
                         .create()
                         .await
                 });

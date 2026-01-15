@@ -292,7 +292,7 @@ let response = client.interaction()
     .with_model("gemini-3-flash-preview")
     .with_text("What's the weather in Tokyo and should I bring an umbrella?")
     .with_thinking_level(ThinkingLevel::Medium)
-    .with_function(get_weather.declaration())
+    .add_function(get_weather.declaration())
     .create_with_auto_functions()
     .await?;
 

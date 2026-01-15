@@ -506,7 +506,7 @@ pub fn document_uri_content(
 ///
 /// let response = client.interaction()
 ///     .with_model("gemini-3-flash-preview")
-///     .with_content(vec![
+///     .set_content(vec![
 ///         genai_rs::text_content("Describe this video"),
 ///         content,
 ///     ])
@@ -524,7 +524,7 @@ pub fn file_uri_content(file: &crate::FileMetadata) -> InteractionContent {
 /// **Prefer:** [`InteractionContent::from_uri_and_mime()`] for new code.
 ///
 /// This is the shared implementation used by [`file_uri_content`] and
-/// [`crate::InteractionBuilder::with_file_uri`]. The content type is inferred
+/// [`crate::InteractionBuilder::add_file_uri`]. The content type is inferred
 /// from the MIME type:
 ///
 /// - `image/*` → [`InteractionContent::Image`]

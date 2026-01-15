@@ -105,7 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(prompt)
-        .with_functions(vec![weather_func, time_func, convert_func])
+        .add_functions(vec![weather_func, time_func, convert_func])
         .create_stream_with_auto_functions();
 
     let mut function_count = 0;

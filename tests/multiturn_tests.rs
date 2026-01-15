@@ -212,7 +212,7 @@ async fn test_conversation_function_then_text() {
     // Turn 1: Trigger function call
     let response1 = stateful_builder(&client)
         .with_text("What's the weather in Tokyo?")
-        .with_function(get_weather.clone())
+        .add_function(get_weather.clone())
         .create()
         .await
         .expect("Turn 1 failed");
@@ -236,8 +236,8 @@ async fn test_conversation_function_then_text() {
 
     let response2 = stateful_builder(&client)
         .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-        .with_content(vec![result])
-        .with_function(get_weather.clone())
+        .set_content(vec![result])
+        .add_function(get_weather.clone())
         .create()
         .await
         .expect("Turn 2 failed");
@@ -251,7 +251,7 @@ async fn test_conversation_function_then_text() {
     let response3 = stateful_builder(&client)
         .with_previous_interaction(response2.id.as_ref().expect("id should exist"))
         .with_text("Should I bring a jacket?")
-        .with_function(get_weather)
+        .add_function(get_weather)
         .create()
         .await
         .expect("Turn 3 failed");
@@ -490,7 +490,7 @@ async fn test_explicit_turns_basic() {
     ];
 
     let response = interaction_builder(&client)
-        .with_turns(turns)
+        .with_history(turns)
         .create()
         .await
         .expect("Request failed");
@@ -574,7 +574,7 @@ async fn test_explicit_turns_context_preservation() {
     ];
 
     let response = interaction_builder(&client)
-        .with_turns(turns)
+        .with_history(turns)
         .create()
         .await
         .expect("Request failed");
@@ -610,7 +610,7 @@ async fn test_explicit_turns_single_user_message() {
     )];
 
     let response = interaction_builder(&client)
-        .with_turns(turns)
+        .with_history(turns)
         .create()
         .await
         .expect("Request failed");

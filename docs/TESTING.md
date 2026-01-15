@@ -269,7 +269,7 @@ When testing `create_with_auto_functions()`, always verify executions succeeded:
 let result = client
     .interaction()
     .with_text("What's the weather?")
-    .with_functions(vec![get_weather_function()])
+    .add_functions(vec![get_weather_function()])
     .create_with_auto_functions()
     .await?;
 

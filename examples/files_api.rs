@@ -66,7 +66,7 @@ to analyze multiple times without resending the data.
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_file(&ready_file)
+        .add_file(&ready_file)
         .with_text("What are the main points about the Files API in this document?")
         .create()
         .await?;
@@ -84,7 +84,7 @@ to analyze multiple times without resending the data.
     let response2 = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_file(&ready_file)
+        .add_file(&ready_file)
         .with_text("What file types are supported according to this document?")
         .create()
         .await?;

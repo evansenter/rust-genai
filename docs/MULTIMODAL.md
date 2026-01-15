@@ -81,7 +81,7 @@ let contents = vec![
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_content(contents)
+    .set_content(contents)
     .create()
     .await?;
 ```
@@ -98,7 +98,7 @@ let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
     .with_text("What do you see?")
-    .with_content(vec![content])
+    .set_content(vec![content])
     .create()
     .await?;
 ```
@@ -317,7 +317,7 @@ let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
     .with_text("Analyze this file")
-    .with_file_uri(&file.uri, &file.mime_type)
+    .add_file_uri(&file.uri, &file.mime_type)
     .create()
     .await?;
 ```

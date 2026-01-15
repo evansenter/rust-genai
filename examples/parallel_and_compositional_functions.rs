@@ -187,7 +187,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("What's the weather and time in Tokyo, London, and New York?")
-        .with_functions(functions.clone())
+        .add_functions(functions.clone())
         .with_store_enabled()
         .create()
         .await?;
@@ -247,7 +247,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_previous_interaction(response.id.as_ref().unwrap())
-            .with_content(result_contents) // Just the results, no tools needed
+            .set_content(result_contents) // Just the results, no tools needed
             .create()
             .await?;
     }
@@ -270,7 +270,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("What activities do you recommend for my current location based on the weather?")
-        .with_functions(functions.clone())
+        .add_functions(functions.clone())
         .with_store_enabled()
         .create()
         .await?;
@@ -319,7 +319,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_previous_interaction(response.id.as_ref().unwrap())
-            .with_content(result_contents)
+            .set_content(result_contents)
             .create()
             .await?;
     }

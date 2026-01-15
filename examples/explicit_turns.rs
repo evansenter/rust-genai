@@ -4,7 +4,7 @@
 //! relying on server-side storage (`previous_interaction_id`):
 //!
 //! 1. **ConversationBuilder** - Fluent API for inline conversation construction
-//! 2. **with_turns()** - Direct array of Turn objects for external history
+//! 2. **with_history()** - Direct array of Turn objects for external history
 //!
 //! Use these approaches when you need:
 //! - Stateless deployments where interaction storage isn't used
@@ -39,9 +39,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         response.text().unwrap_or("No response")
     );
 
-    // Approach 2: Using with_turns() with pre-built history
+    // Approach 2: Using with_history() with pre-built history
     // This is best when you have conversation history from an external source
-    println!("=== with_turns() Example ===\n");
+    println!("=== with_history() Example ===\n");
 
     let history = vec![
         Turn::user("I'm planning a trip to Paris."),
@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_turns(history)
+        .with_history(history)
         .create()
         .await?;
 
@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let response = client
             .interaction()
             .with_model("gemini-3-flash-preview")
-            .with_turns(history.clone())
+            .with_history(history.clone())
             .create()
             .await?;
 
@@ -107,7 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Example 1: ConversationBuilder");
     println!("  [REQ#1] POST with input as turns array [{{user, model, user}}]");
     println!("  [RES#1] completed: text response\n");
-    println!("Example 2: with_turns()");
+    println!("Example 2: with_history()");
     println!("  [REQ#2] POST with input as turns array [{{user, model, user, model, user}}]");
     println!("  [RES#2] completed: text response\n");
     println!("Example 3: Dynamic history loop");
@@ -119,9 +119,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  [RES#5] completed: text response\n");
 
     println!("--- Production Considerations ---");
-    println!("• Use with_turns() for stateless deployments or custom history management");
+    println!("• Use with_history() for stateless deployments or custom history management");
     println!("• ConversationBuilder is syntactic sugar - both produce the same wire format");
-    println!("• Clone history before passing to with_turns() if you need to reuse it");
+    println!("• Clone history before passing to with_history() if you need to reuse it");
     println!("• No validation of turn alternation - API handles invalid sequences");
     println!("• For very long conversations, consider sliding window or summarization");
     println!("• Turn arrays work with all features: streaming, function calling, thinking");

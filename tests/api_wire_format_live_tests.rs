@@ -145,7 +145,7 @@ async fn canary_function_calling_no_unknown_content() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("What's the weather in Paris?")
-        .with_functions(vec![get_weather])
+        .add_functions(vec![get_weather])
         .create()
         .await
         .expect("API call should succeed");

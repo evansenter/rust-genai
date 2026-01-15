@@ -363,7 +363,7 @@ mod code_execution {
             .with_text(
                 "Using Python, calculate the sum of the first 100 prime numbers. Execute the code to get the answer.",
             )
-            .with_tools(vec![Tool::CodeExecution])
+            .set_tools(vec![Tool::CodeExecution])
             .with_store_enabled()
             .create()
             .await;
@@ -1774,7 +1774,7 @@ mod function_calling_modes {
 
         let result = interaction_builder(&client)
             .with_text("What's the weather like in Tokyo?")
-            .with_functions(vec![weather_fn])
+            .add_functions(vec![weather_fn])
             .with_function_calling_mode(FunctionCallingMode::Validated)
             .create()
             .await;
@@ -1843,7 +1843,7 @@ mod function_calling_modes {
         // Use ANY mode - model MUST call a function
         let response = interaction_builder(&client)
             .with_text("Please greet Alice")
-            .with_functions(vec![greet_fn])
+            .add_functions(vec![greet_fn])
             .with_function_calling_mode(FunctionCallingMode::Any)
             .create()
             .await

@@ -132,7 +132,7 @@ mod basic {
                 .parameter("param", json!({"type": "string"}))
                 .required(vec!["param".to_string()])
                 .build();
-            builder = builder.with_function(func);
+            builder = builder.add_function(func);
         }
 
         // Builder accepts many function declarations without validation
@@ -219,7 +219,7 @@ mod basic {
             .with_model(DEFAULT_MODEL)
             .with_text("Complex query")
             .with_system_instruction("Be helpful")
-            .with_function(func)
+            .add_function(func)
             .with_generation_config(config)
             .with_response_modalities(vec!["TEXT".to_string()])
             .with_background(true)
@@ -447,7 +447,7 @@ mod tools {
             .interaction()
             .with_model(DEFAULT_MODEL)
             .with_text("What's the weather today?")
-            .with_function(func)
+            .add_function(func)
             .with_google_search();
 
         let result = builder.build();
@@ -546,7 +546,7 @@ mod tools {
             .interaction()
             .with_model(DEFAULT_MODEL)
             .with_text("Fetch and analyze https://example.com")
-            .with_function(func)
+            .add_function(func)
             .with_url_context();
 
         let result = builder.build();
@@ -680,7 +680,7 @@ mod edge_cases {
             .interaction()
             .with_model(DEFAULT_MODEL)
             .with_text("Call functions")
-            .with_function(func)
+            .add_function(func)
             .with_max_function_call_loops(5);
 
         // The max_function_call_loops is stored in the builder, verified by integration tests
@@ -811,7 +811,7 @@ mod multimodal {
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .with_content(initial_content)
+            .set_content(initial_content)
             .add_image_data("imagedata", "image/gif");
 
         let result = builder.build();
@@ -1039,7 +1039,7 @@ mod multimodal {
             .with_text("Analyze this image and describe it")
             .add_image_data("imagedata", "image/jpeg")
             .with_system_instruction("Be descriptive")
-            .with_function(func)
+            .add_function(func)
             .with_generation_config(config)
             .with_google_search();
 
@@ -1128,7 +1128,7 @@ mod multimodal {
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .with_file_uri("https://example.com/image.png", "image/png");
+            .add_file_uri("https://example.com/image.png", "image/png");
 
         let request = builder.build().expect("Should build valid request");
 
@@ -1149,7 +1149,7 @@ mod multimodal {
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .with_file_uri("https://example.com/video.mp4", "video/mp4");
+            .add_file_uri("https://example.com/video.mp4", "video/mp4");
 
         let request = builder.build().unwrap();
         match &request.input {
@@ -1168,7 +1168,7 @@ mod multimodal {
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .with_file_uri("https://example.com/doc.pdf", "application/pdf");
+            .add_file_uri("https://example.com/doc.pdf", "application/pdf");
 
         let request = builder.build().unwrap();
         match &request.input {
@@ -1187,7 +1187,7 @@ mod multimodal {
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .with_file_uri("https://example.com/file.txt", "text/plain");
+            .add_file_uri("https://example.com/file.txt", "text/plain");
 
         let request = builder.build().unwrap();
         match &request.input {

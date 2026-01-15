@@ -67,7 +67,7 @@ Uses `create_with_auto_functions()` for seamless tool execution:
 
 ```rust
 let result = builder
-    .with_functions(functions)
+    .add_functions(functions)
     .create_with_auto_functions()
     .await?;
 ```

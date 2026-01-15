@@ -103,7 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(prompt)
-        .with_functions(functions.clone())
+        .add_functions(functions.clone())
         .create() // NOT create_with_auto_functions() - we handle execution
         .await?;
 
@@ -153,8 +153,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_previous_interaction(prev_id) // Continue the conversation
-            .with_content(results)
-            .with_functions(functions.clone()) // Keep functions available
+            .set_content(results)
+            .add_functions(functions.clone()) // Keep functions available
             .create()
             .await?;
     }

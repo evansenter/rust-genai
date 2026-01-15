@@ -5,11 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] - 2026-01-15
+
+### Added
+
+- New `docs/BUILDER_API.md` documenting the InteractionBuilder API, method naming conventions, and validation errors
+- `build()` now validates that `with_agent_config()` requires `with_agent()` - returns error instead of silently ignoring
 
 ### Changed
 
+- **BREAKING**: Method naming consistency overhaul for clearer semantics:
+  - `with_content()` → `set_content()` (replaces content)
+  - `with_tools()` → `set_tools()` (replaces tools)
+  - `with_function()` → `add_function()` (accumulates)
+  - `with_functions()` → `add_functions()` (accumulates)
+  - `with_file()` → `add_file()` (accumulates)
+  - `with_file_uri()` → `add_file_uri()` (accumulates)
+- **BREAKING**: Renamed `with_turns()` to `with_history()`. The new name better reflects that this sets conversation history, and now composes correctly with `with_text()`: calling both produces `[...history, Turn::user(current_message)]` regardless of call order.
+- **BREAKING**: `with_text()` now sets `current_message` instead of replacing `input`. This fixes issue #359 where `with_turns().with_text()` silently overwrote the history.
 - **BREAKING**: `with_system_instruction()` is now available on ALL builder states (FirstTurn, Chained, StoreDisabled), not just FirstTurn. The API does NOT inherit system instructions via `previousInteractionId`, so users should set it explicitly on each turn if needed. For `create_with_auto_functions()`, the SDK automatically includes system_instruction on all internal turns.
+- `set_content()` and `add_*()` methods now compose with `with_text()` in any order - text is prepended to content at build time
+- `build()` now returns an error if content input is combined with history (incompatible modes), with a helpful error message explaining the workaround
 
 ### Fixed
 
@@ -34,6 +50,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING**: `thought_signature` field from `InteractionContent::FunctionCall` variant - API does not send this field on function calls (thought signatures appear only on `Thought` content blocks)
 
 ### Migration Guide
+
+**Method renames for naming consistency:**
+```rust
+// Before (0.6.0)
+.with_content(items)
+.with_tools(tools)
+.with_function(func)
+.with_functions(funcs)
+.with_file(&file)
+.with_file_uri(uri, mime)
+
+// After (0.7.0)
+.set_content(items)    // set_* = replaces
+.set_tools(tools)      // set_* = replaces
+.add_function(func)    // add_* = accumulates
+.add_functions(funcs)  // add_* = accumulates
+.add_file(&file)       // add_* = accumulates
+.add_file_uri(uri, mime) // add_* = accumulates
+```
+
+**`with_turns()` renamed to `with_history()` and composes with `with_text()`:**
+```rust
+// Before (0.6.0)
+// with_turns().with_text() silently overwrote history - bug!
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_turns(history)
+    .create()
+    .await?;
+
+// After (0.7.0)
+// Renamed to with_history(), and now composes correctly with with_text()
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_history(history)
+    .with_text("Current message")  // Appended as final user turn
+    .create()
+    .await?;
+// Produces: [...history, Turn::user("Current message")]
+// Order doesn't matter - with_text().with_history() produces same result
+```
 
 **`CodeExecutionOutcome` removal:**
 ```rust
@@ -370,7 +427,7 @@ if let Some(audio) = response.first_audio() {
 - **Computer Use tool (#298)** - Browser automation via Gemini
   - New `with_computer_use()` method (requires allowlisted API key)
 - **MCP Server convenience (#295)** - Connect to Model Context Protocol servers
-  - New `with_mcp_server(uri)` method
+  - New `add_mcp_server(uri)` method
 
 #### Explicit Multi-Turn Conversations (#296)
 - **New `with_turns(Vec<Turn>)` method** - Provide full conversation history

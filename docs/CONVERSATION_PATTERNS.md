@@ -20,7 +20,7 @@ This guide covers patterns for multi-turn conversations, including stateless app
 |----------|--------------|----------|
 | **Stateful** (`previous_interaction_id`) | Server-side | Simple apps, persistent context |
 | **ConversationBuilder** | Client-side | Inline conversation construction |
-| **Turn Arrays** (`with_turns()`) | Client-side | External history, custom management |
+| **Turn Arrays** (`with_history()`) | Client-side | External history, custom management |
 
 ## Stateful vs Stateless
 
@@ -68,7 +68,7 @@ let history = vec![
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_turns(history)
+    .with_history(history)
     .create()
     .await?;
 ```
@@ -130,7 +130,7 @@ let multimodal_turn = Turn {
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_turns(vec![multimodal_turn])
+    .with_history(vec![multimodal_turn])
     .create()
     .await?;
 ```
@@ -160,7 +160,7 @@ let history = vec![
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_turns(history)
+    .with_history(history)
     .create()
     .await?;
 ```
@@ -185,7 +185,7 @@ let history: Vec<Turn> = db_history
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_turns(history)
+    .with_history(history)
     .create()
     .await?;
 ```
@@ -213,7 +213,7 @@ loop {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_turns(history.clone())
+        .with_history(history.clone())
         .create()
         .await?;
 
@@ -293,7 +293,7 @@ let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
     .with_system_instruction("You are a Python expert. Always provide code examples.")
-    .with_turns(history)
+    .with_history(history)
     .create()
     .await?;
 ```
@@ -313,8 +313,8 @@ fn get_weather(city: String) -> String {
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_turns(history)
-    .with_function(get_weather.declaration())
+    .with_history(history)
+    .add_function(get_weather.declaration())
     .create_with_auto_functions()
     .await?;
 ```
@@ -327,7 +327,7 @@ use futures_util::StreamExt;
 let mut stream = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_turns(history)
+    .with_history(history)
     .create_stream();
 
 while let Some(result) = stream.next().await {
@@ -363,7 +363,7 @@ ts_branch.push(Turn::user("Tell me about TypeScript for web development"));
 |----------|---------------------|
 | Simple chatbot | Stateful (`previous_interaction_id`) |
 | Serverless/Lambda | Stateless (Turn arrays) |
-| Custom history storage | Turn arrays with `with_turns()` |
+| Custom history storage | Turn arrays with `with_history()` |
 | Inline test conversations | ConversationBuilder |
 | Migration from other APIs | Turn arrays (convert existing format) |
 | Context window management | Turn arrays with sliding window |
@@ -378,12 +378,12 @@ Need persistent server storage?
     ├── Building conversation inline?
     │   └── Yes → Use ConversationBuilder
     └── Managing external history?
-        └── Yes → Use with_turns()
+        └── Yes → Use with_history()
 ```
 
 ## Wire Format
 
-Both ConversationBuilder and `with_turns()` produce the same wire format:
+Both ConversationBuilder and `with_history()` produce the same wire format:
 
 ```json
 {

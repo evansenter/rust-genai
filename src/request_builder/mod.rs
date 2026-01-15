@@ -157,7 +157,12 @@ pub struct InteractionBuilder<'a, State = FirstTurn> {
     model: Option<String>,
     agent: Option<String>,
     agent_config: Option<AgentConfig>,
-    input: Option<InteractionInput>,
+    /// Conversation history (set by `with_history()`)
+    history: Vec<Turn>,
+    /// Current user message (set by `with_text()`)
+    current_message: Option<String>,
+    /// Content input for function results (set by `set_content()`)
+    content_input: Option<Vec<InteractionContent>>,
     previous_interaction_id: Option<String>,
     tools: Option<Vec<InternalTool>>,
     response_modalities: Option<Vec<String>>,
@@ -184,7 +189,9 @@ impl<State> std::fmt::Debug for InteractionBuilder<'_, State> {
             .field("model", &self.model)
             .field("agent", &self.agent)
             .field("agent_config", &self.agent_config)
-            .field("input", &self.input)
+            .field("history", &self.history)
+            .field("current_message", &self.current_message)
+            .field("content_input", &self.content_input)
             .field("previous_interaction_id", &self.previous_interaction_id)
             .field("tools", &self.tools)
             .field("response_modalities", &self.response_modalities)
@@ -214,7 +221,9 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             model: None,
             agent: None,
             agent_config: None,
-            input: None,
+            history: Vec::new(),
+            current_message: None,
+            content_input: None,
             previous_interaction_id: None,
             tools: None,
             response_modalities: None,
@@ -255,7 +264,9 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             model: self.model,
             agent: self.agent,
             agent_config: self.agent_config,
-            input: self.input,
+            history: self.history,
+            current_message: self.current_message,
+            content_input: self.content_input,
             previous_interaction_id: Some(id.into()),
             tools: self.tools,
             response_modalities: self.response_modalities,
@@ -291,7 +302,9 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             model: self.model,
             agent: self.agent,
             agent_config: self.agent_config,
-            input: self.input,
+            history: self.history,
+            current_message: self.current_message,
+            content_input: self.content_input,
             previous_interaction_id: None, // Explicitly None
             tools: self.tools,
             response_modalities: self.response_modalities,
@@ -470,19 +483,70 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
 
     /// Sets the input for this interaction from an `InteractionInput`.
     ///
-    /// For simple text input, prefer `with_text()`.
+    /// This is a convenience method that dispatches to the appropriate setter:
+    /// - `InteractionInput::Text(text)` → `with_text(text)`
+    /// - `InteractionInput::Content(content)` → `set_content(content)`
+    /// - `InteractionInput::Turns(turns)` → `with_history(turns)`
+    ///
+    /// For direct usage, prefer the specific methods (`with_text()`, `set_content()`,
+    /// `with_history()`) for clarity.
     #[must_use]
     pub fn with_input(mut self, input: InteractionInput) -> Self {
-        self.input = Some(input);
+        match input {
+            InteractionInput::Text(text) => {
+                self.current_message = Some(text);
+            }
+            InteractionInput::Content(content) => {
+                self.content_input = Some(content);
+            }
+            InteractionInput::Turns(turns) => {
+                self.history = turns;
+            }
+        }
         self
     }
 
-    /// Sets a simple text input for this interaction.
+    /// Sets the current user message for this interaction.
     ///
-    /// This is a convenience method that creates an `InteractionInput::Text`.
+    /// This can be combined with [`with_history()`](Self::with_history) to build a conversation:
+    /// - `with_history()` sets the conversation history (previous turns)
+    /// - `with_text()` sets the current user message to append
+    ///
+    /// The order doesn't matter - at build time, the history and current message
+    /// are composed into `[...history, Turn::user(current_message)]`.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_rs::{Client, Turn};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// // Simple single-turn message
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_text("Hello!")
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // With conversation history - both orders are equivalent
+    /// let history = vec![
+    ///     Turn::user("What is 2+2?"),
+    ///     Turn::model("4"),
+    /// ];
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_history(history)
+    ///     .with_text("And times 3?")  // Appended as final user turn
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     #[must_use]
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
-        self.input = Some(InteractionInput::Text(text.into()));
+        self.current_message = Some(text.into());
         self
     }
 
@@ -523,9 +587,16 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         self
     }
 
-    /// Sets the input from a vector of content objects.
+    /// Sets the input from a vector of content objects, replacing any existing content.
     ///
     /// This is useful for building multi-part inputs or for sending function results.
+    /// Use `add_*` methods (like `add_image_file()`) to accumulate content instead.
+    ///
+    /// # Panics / Errors
+    ///
+    /// Calling `build()` will return an error if `set_content()` is combined with
+    /// `with_history()`. If you need to combine function results with conversation
+    /// history, include them in the history via [`Turn`] objects instead.
     ///
     /// # Example
     /// ```no_run
@@ -539,19 +610,26 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// let response = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
-    ///     .with_content(vec![result])
+    ///     .set_content(vec![result])
     ///     .create()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
     #[must_use]
-    pub fn with_content(mut self, content: Vec<InteractionContent>) -> Self {
-        self.input = Some(InteractionInput::Content(content));
+    pub fn set_content(mut self, content: Vec<InteractionContent>) -> Self {
+        self.content_input = Some(content);
         self
     }
 
-    /// Sets the input from an explicit array of conversation turns.
+    /// Sets the conversation history from an explicit array of turns.
+    ///
+    /// This can be combined with [`with_text()`](Self::with_text) to build a conversation:
+    /// - `with_history()` sets the conversation history (previous turns)
+    /// - `with_text()` sets the current user message to append
+    ///
+    /// The order doesn't matter - at build time, the history and current message
+    /// are composed into `[...history, Turn::user(current_message)]`.
     ///
     /// This enables multi-turn conversations without relying on server-side
     /// storage via `previous_interaction_id`. Useful for:
@@ -569,16 +647,27 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
     ///
+    /// // History-only (last turn must be a user message)
     /// let history = vec![
     ///     Turn::user("What is 2+2?"),
     ///     Turn::model("2+2 equals 4."),
     ///     Turn::user("And what's that times 3?"),
     /// ];
-    ///
-    /// let response = client
-    ///     .interaction()
+    /// let response = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
-    ///     .with_turns(history)
+    ///     .with_history(history)
+    ///     .create()
+    ///     .await?;
+    ///
+    /// // History + current message (order doesn't matter)
+    /// let history = vec![
+    ///     Turn::user("What is 2+2?"),
+    ///     Turn::model("4"),
+    /// ];
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_history(history)
+    ///     .with_text("And times 3?")  // Appended as final user turn
     ///     .create()
     ///     .await?;
     ///
@@ -587,8 +676,8 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # }
     /// ```
     #[must_use]
-    pub fn with_turns(mut self, turns: Vec<Turn>) -> Self {
-        self.input = Some(InteractionInput::Turns(turns));
+    pub fn with_history(mut self, turns: Vec<Turn>) -> Self {
+        self.history = turns;
         self
     }
 
@@ -598,7 +687,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// calls to construct a multi-turn conversation. Call `.done()` to return to
     /// the [`InteractionBuilder`].
     ///
-    /// This is an alternative to [`with_turns()`] that provides a more readable
+    /// This is an alternative to [`with_history()`] that provides a more readable
     /// syntax for constructing conversations inline.
     ///
     /// # Example
@@ -626,7 +715,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # }
     /// ```
     ///
-    /// [`with_turns()`]: InteractionBuilder::with_turns
+    /// [`with_history()`]: InteractionBuilder::with_history
     #[must_use]
     pub fn conversation(self) -> ConversationBuilder<'a, State> {
         ConversationBuilder {
@@ -1081,6 +1170,8 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// is referenced by its URI, which is more efficient than sending the file
     /// data inline for large files or files used across multiple interactions.
     ///
+    /// This method accumulates content - it can be called multiple times.
+    ///
     /// # Example
     ///
     /// ```no_run
@@ -1098,14 +1189,14 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("Describe this video")
-    ///     .with_file(&file)
+    ///     .add_file(&file)
     ///     .create()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
     #[must_use]
-    pub fn with_file(mut self, file: &crate::FileMetadata) -> Self {
+    pub fn add_file(mut self, file: &crate::FileMetadata) -> Self {
         let content = crate::interactions_api::file_uri_content(file);
         self.add_content_item(content);
         self
@@ -1115,6 +1206,8 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// Use this when you have the file URI and MIME type but not the full
     /// `FileMetadata` struct. The content type is inferred from the MIME type.
+    ///
+    /// This method accumulates content - it can be called multiple times.
     ///
     /// # Example
     ///
@@ -1129,7 +1222,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("Describe this video")
-    ///     .with_file_uri(
+    ///     .add_file_uri(
     ///         "https://generativelanguage.googleapis.com/v1beta/files/abc123",
     ///         "video/mp4"
     ///     )
@@ -1139,7 +1232,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # }
     /// ```
     #[must_use]
-    pub fn with_file_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn add_file_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content =
             crate::interactions_api::content_from_uri_and_mime(uri.into(), mime_type.into());
         self.add_content_item(content);
@@ -1148,25 +1241,22 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
 
     /// Internal helper to add a content item, converting input type if needed.
     ///
-    /// - If input is `None`: creates a new `Content` variant with the item
-    /// - If input is `Text`: converts to `Content` with the text as first item, then adds the new item
-    /// - If input is `Content`: appends the item to the existing vec
+    /// - If `content_input` is `None` and no `current_message`: creates new `Content` vec
+    /// - If `content_input` is `None` but has `current_message`: converts text to content, combines
+    /// - If `content_input` is `Some`: appends the item to the existing vec
     fn add_content_item(&mut self, item: InteractionContent) {
-        match &mut self.input {
+        match &mut self.content_input {
             None => {
-                self.input = Some(InteractionInput::Content(vec![item]));
+                // Check if we have a current_message to convert
+                if let Some(text) = self.current_message.take() {
+                    let text_item = crate::interactions_api::text_content(text);
+                    self.content_input = Some(vec![text_item, item]);
+                } else {
+                    self.content_input = Some(vec![item]);
+                }
             }
-            Some(InteractionInput::Text(text)) => {
-                let text_item = crate::interactions_api::text_content(std::mem::take(text));
-                self.input = Some(InteractionInput::Content(vec![text_item, item]));
-            }
-            Some(InteractionInput::Content(contents)) => {
+            Some(contents) => {
                 contents.push(item);
-            }
-            // Required by #[non_exhaustive] but unreachable: InteractionInput uses
-            // #[serde(untagged)] so only Text/Content can exist at runtime.
-            Some(_) => {
-                unreachable!("InteractionInput is untagged; only Text/Content variants exist")
             }
         }
     }
@@ -1176,16 +1266,18 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         self.tools.get_or_insert_with(Vec::new).push(tool);
     }
 
-    /// Adds tools for function calling.
+    /// Sets the tools for function calling, replacing any existing tools.
+    ///
+    /// Use `add_function()` to accumulate functions instead of replacing.
     #[must_use]
-    pub fn with_tools(mut self, tools: Vec<InternalTool>) -> Self {
+    pub fn set_tools(mut self, tools: Vec<InternalTool>) -> Self {
         self.tools = Some(tools);
         self
     }
 
     /// Adds a single function declaration to the request.
     ///
-    /// This method can be called multiple times to add several functions.
+    /// This method can be called multiple times to accumulate functions.
     /// Each function is converted into a [`crate::Tool`] and added to the request.
     ///
     /// # Example
@@ -1206,17 +1298,17 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("What's the temperature in Paris?")
-    ///     .with_function(func);
+    ///     .add_function(func);
     /// ```
     #[must_use]
-    pub fn with_function(mut self, function: FunctionDeclaration) -> Self {
+    pub fn add_function(mut self, function: FunctionDeclaration) -> Self {
         self.add_tool(function.into_tool());
         self
     }
 
     /// Adds multiple function declarations to the request at once.
     ///
-    /// This is a convenience method equivalent to calling [`with_function`] multiple times.
+    /// This is a convenience method equivalent to calling [`add_function`] multiple times.
     ///
     /// # Example
     ///
@@ -1234,12 +1326,12 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("What's the weather and time?")
-    ///     .with_functions(functions);
+    ///     .add_functions(functions);
     /// ```
     ///
-    /// [`with_function`]: InteractionBuilder::with_function
+    /// [`add_function`]: InteractionBuilder::add_function
     #[must_use]
-    pub fn with_functions(mut self, functions: Vec<FunctionDeclaration>) -> Self {
+    pub fn add_functions(mut self, functions: Vec<FunctionDeclaration>) -> Self {
         for func in functions {
             self.add_tool(func.into_tool());
         }
@@ -1546,7 +1638,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("What files are in my project?")
-    ///     .with_mcp_server("filesystem", "https://mcp.example.com/fs")
+    ///     .add_mcp_server("filesystem", "https://mcp.example.com/fs")
     ///     .create()
     ///     .await?;
     /// # Ok(())
@@ -1566,15 +1658,15 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("Search the database and format the results")
-    ///     .with_mcp_server("database", "https://mcp.example.com/db")
-    ///     .with_mcp_server("formatter", "https://mcp.example.com/fmt")
+    ///     .add_mcp_server("database", "https://mcp.example.com/db")
+    ///     .add_mcp_server("formatter", "https://mcp.example.com/fmt")
     ///     .create()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
     #[must_use]
-    pub fn with_mcp_server(mut self, name: impl Into<String>, url: impl Into<String>) -> Self {
+    pub fn add_mcp_server(mut self, name: impl Into<String>, url: impl Into<String>) -> Self {
         self.add_tool(InternalTool::McpServer {
             name: name.into(),
             url: url.into(),
@@ -2425,14 +2517,60 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Errors
     ///
     /// Returns [`GenaiError::InvalidInput`] if:
-    /// - No input was provided (via `with_text()`, `with_input()`, etc.)
+    /// - No input was provided (via `with_text()`, `with_history()`, `set_content()`, etc.)
+    /// - `set_content()` was combined with `with_history()` (mutually exclusive)
     /// - Neither model nor agent was specified
     /// - Both model and agent were specified (mutually exclusive)
     pub fn build(self) -> Result<InteractionRequest, GenaiError> {
-        // Validate that we have input
-        let input = self.input.ok_or_else(|| {
-            GenaiError::InvalidInput("Input is required for interaction".to_string())
-        })?;
+        // Validate that content input is not combined with history
+        // Content input is fundamentally incompatible with multi-turn history
+        if self.content_input.is_some() && !self.history.is_empty() {
+            return Err(GenaiError::InvalidInput(
+                "Content input (set_content() or add_* methods) cannot be combined with \
+                 with_history(). For multimodal multi-turn conversations, build Turn objects \
+                 with content arrays instead."
+                    .to_string(),
+            ));
+        }
+
+        // Validate that agent_config is not set without agent
+        if self.agent_config.is_some() && self.agent.is_none() {
+            return Err(GenaiError::InvalidInput(
+                "with_agent_config() requires with_agent(). \
+                 Agent config is ignored when using with_model()."
+                    .to_string(),
+            ));
+        }
+
+        // Compose input from the separate fields
+        // Priority: content_input > history > current_message
+        // - content_input + current_message: merge (text prepended to content)
+        // - history + current_message: merge (text appended as user turn)
+        let input = if let Some(mut content) = self.content_input {
+            // Content input mode (single-turn multimodal)
+            // If there's also a current_message, prepend it as text content
+            if let Some(text) = self.current_message {
+                content.insert(0, crate::interactions_api::text_content(text));
+            }
+            InteractionInput::Content(content)
+        } else {
+            // Text/history mode
+            match (self.history.is_empty(), self.current_message) {
+                (true, None) => {
+                    return Err(GenaiError::InvalidInput(
+                        "Input is required for interaction".to_string(),
+                    ));
+                }
+                (true, Some(msg)) => InteractionInput::Text(msg),
+                (false, None) => InteractionInput::Turns(self.history),
+                (false, Some(msg)) => {
+                    // Compose: history + current message as final user turn
+                    let mut turns = self.history;
+                    turns.push(Turn::user(msg));
+                    InteractionInput::Turns(turns)
+                }
+            }
+        };
 
         // Validate that we have either model or agent (but not both)
         match (&self.model, &self.agent) {
@@ -2649,7 +2787,7 @@ impl<'a, State: Send + 'a> ConversationBuilder<'a, State> {
     #[must_use]
     pub fn done(self) -> InteractionBuilder<'a, State> {
         let mut parent = self.parent;
-        parent.input = Some(InteractionInput::Turns(self.turns));
+        parent.history = self.turns;
         parent
     }
 }

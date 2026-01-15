@@ -211,7 +211,7 @@ let result = client
 let result = client
     .interaction()
     .with_text("What's the weather?")
-    .with_function(GetWeatherCallable.declaration())  // Explicit
+    .add_function(GetWeatherCallable.declaration())  // Explicit
     .create_with_auto_functions()
     .await?;
 ```
@@ -229,7 +229,7 @@ use genai_rs::FunctionCallingMode;
 let result = client
     .interaction()
     .with_text("What's the weather?")
-    .with_function(decl)
+    .add_function(decl)
     .with_function_calling_mode(FunctionCallingMode::Any)  // MUST call
     .create()
     .await?;
@@ -293,7 +293,7 @@ let response = client
 let result = client
     .interaction()
     .with_text(prompt)
-    .with_function(func)
+    .add_function(func)
     .with_max_function_call_loops(3)  // Default is 10
     .create_with_auto_functions()
     .await?;

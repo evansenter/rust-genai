@@ -79,7 +79,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_content(contents)
+       .set_content(contents)
        .create()
        .await?;
 "#
@@ -209,7 +209,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_content(vec![
+       .set_content(vec![
            text_content("Transcribe this audio."),
            audio_content,
        ])

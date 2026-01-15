@@ -107,7 +107,7 @@ async fn test_streaming_multi_turn_function_calling() {
     let response1 = retry_request!([client, get_weather] => {
         stateful_builder(&client)
             .with_text("What's the weather in Paris?")
-            .with_function(get_weather)
+            .add_function(get_weather)
             .with_store_enabled()
             .create()
             .await
@@ -136,8 +136,8 @@ async fn test_streaming_multi_turn_function_calling() {
     let response2 = retry_request!([client, prev_id, function_result, get_weather] => {
         stateful_builder(&client)
             .with_previous_interaction(&prev_id)
-            .with_content(vec![function_result])
-            .with_function(get_weather)
+            .set_content(vec![function_result])
+            .add_function(get_weather)
             .with_store_enabled()
             .create()
             .await
@@ -153,7 +153,7 @@ async fn test_streaming_multi_turn_function_calling() {
     let stream = stateful_builder(&client)
         .with_previous_interaction(response2.id.as_ref().expect("id should exist"))
         .with_text("Should I bring an umbrella? Answer briefly.")
-        .with_function(get_weather)
+        .add_function(get_weather)
         .with_store_enabled()
         .create_stream();
 

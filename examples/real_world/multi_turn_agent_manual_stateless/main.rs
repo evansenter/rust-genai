@@ -289,7 +289,7 @@ impl StatelessSupportSession {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_input(InteractionInput::Content(self.conversation_history.clone()))
-            .with_functions(self.functions.clone())
+            .add_functions(self.functions.clone())
             .with_system_instruction(&self.system_instruction)
             .with_store_disabled() // <-- Key: no server-side state
             .create()
@@ -334,7 +334,7 @@ impl StatelessSupportSession {
                 .interaction()
                 .with_model("gemini-3-flash-preview")
                 .with_input(InteractionInput::Content(self.conversation_history.clone()))
-                .with_functions(self.functions.clone())
+                .add_functions(self.functions.clone())
                 .with_system_instruction(&self.system_instruction)
                 .with_store_disabled()
                 .create()
