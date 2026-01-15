@@ -162,6 +162,25 @@ See `InteractionContent` in `src/content.rs` for reference implementation.
 
 **Wire format field naming**: The Gemini Interactions API uses **snake_case** for field names. If the API appears to accept both camelCase and snake_case, always use snake_case in our serialization. Verify actual wire format with `LOUD_WIRE=1` before assuming documentation is correct.
 
+### Wire Format Gotchas
+
+Google's API docs are sometimes wrong. Always verify with `LOUD_WIRE=1` before trusting documentation.
+
+**Known doc/reality mismatches (PR #356):**
+
+| What Docs Said | What API Actually Returns |
+|----------------|---------------------------|
+| `CodeExecutionResult.outcome` enum | `is_error: bool` + `result: String` |
+| `Thought.text` field | `signature: String` (cryptographic) |
+| `UrlContextCall.url` (singular) | Nested `arguments.urls` array |
+| `CodeExecutionCall` flat fields | Nested `arguments` object |
+| ThinkingSummaries lowercase `"auto"` | SCREAMING_CASE `"THINKING_SUMMARIES_AUTO"` |
+
+**When changing wire format types:**
+1. Check `docs/ENUM_WIRE_FORMATS.md` for existing verification
+2. Run `LOUD_WIRE=1 cargo run --example <relevant>` against live API
+3. Update `docs/ENUM_WIRE_FORMATS.md` with verified format
+
 ## Test Organization
 
 - **Unit tests**: Inline in source files
