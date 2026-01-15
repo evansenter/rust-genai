@@ -250,16 +250,16 @@ impl SupportSession {
         // Build and execute the interaction
         //
         // Inheritance behavior with previousInteractionId:
-        // - systemInstruction: IS inherited (only need to send on first turn)
+        // - systemInstruction: NOT inherited (set explicitly on each turn if needed)
         // - tools: NOT inherited (must send on every turn that needs function calling)
         // - conversation history: IS inherited
         //
-        // The typestate pattern enforces these constraints at compile time:
-        // - with_system_instruction() is only available on FirstTurn
-        // - with_previous_interaction() transitions FirstTurn -> Chained
+        // Note: with_system_instruction() is available on all builder states.
+        // For create_with_auto_functions(), the SDK reuses the request internally,
+        // so system_instruction is automatically present on all internal iterations.
         let result = match &self.last_interaction_id {
             Some(prev_id) => {
-                // Subsequent turns: chain to previous, tools required, systemInstruction inherited
+                // Subsequent turns: chain to previous, include system instruction
                 self.client
                     .interaction()
                     .with_model("gemini-3-flash-preview")
@@ -267,11 +267,12 @@ impl SupportSession {
                     .with_functions(functions)
                     .with_store_enabled()
                     .with_previous_interaction(prev_id)
+                    .with_system_instruction(self.system_prompt())
                     .create_with_auto_functions()
                     .await?
             }
             None => {
-                // First turn: set up systemInstruction
+                // First turn: same setup, system instruction included
                 self.client
                     .interaction()
                     .with_model("gemini-3-flash-preview")

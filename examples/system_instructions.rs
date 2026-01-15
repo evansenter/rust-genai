@@ -199,10 +199,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("✅ System Instructions Demo Complete\n");
 
     println!("--- Key Takeaways ---");
-    println!("• with_system_instruction() sets persistent model behavior");
-    println!("• System instructions persist across multi-turn conversations");
-    println!("• Use for personas, output format control, and behavioral constraints");
-    println!("• Works with streaming and non-streaming requests\n");
+    println!("• with_system_instruction() sets model behavior for a turn");
+    println!("• Available on all builder states (FirstTurn, Chained, StoreDisabled)");
+    println!("• API does NOT inherit system_instruction via previousInteractionId");
+    println!("• Set explicitly on each turn if needed; auto_functions reuses request internally");
+    println!("• Use for personas, output format control, and behavioral constraints\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");
     println!("  [REQ#1] POST with systemInstruction + input text");
@@ -210,8 +211,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Multi-turn:");
     println!("  [REQ#2] POST with systemInstruction + input + store:true");
     println!("  [RES#2] completed: text response");
-    println!("  [REQ#3] POST with input + previousInteractionId (system instruction inherited)");
-    println!("  [RES#3] completed: response maintains persona/behavior\n");
+    println!("  [REQ#3] POST with systemInstruction + input + previousInteractionId");
+    println!("  [RES#3] completed: response follows system instruction\n");
 
     println!("--- Production Considerations ---");
     println!("• System instructions consume tokens - keep them concise");

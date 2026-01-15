@@ -2627,16 +2627,16 @@ mod multiturn {
 
     #[test]
     fn test_typestate_constraints_documented() {
-        // The following code would NOT compile:
+        // The typestate pattern enforces certain constraints at compile time:
         //
-        // ```
-        // // Error: with_system_instruction not available on Chained
-        // client.interaction()
-        //     .with_previous_interaction("id")
-        //     .with_system_instruction("..."); // Compile error!
-        // ```
+        // - with_store_disabled() transitions FirstTurn -> StoreDisabled
+        // - with_previous_interaction() transitions FirstTurn -> Chained
+        // - create_with_auto_functions() requires store=true (not available on StoreDisabled)
         //
-        // These are verified by compile-fail tests in tests/ui_tests.rs
+        // Note: with_system_instruction() is now available on ALL states since the API
+        // does not inherit system_instruction via previousInteractionId.
+        //
+        // Compile-fail tests are in tests/ui_tests.rs
         println!("Typestate constraints are enforced at compile time.");
     }
 
