@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: Renamed `with_turns()` to `with_history()`. The new name better reflects that this sets conversation history, and now composes correctly with `with_text()`: calling both produces `[...history, Turn::user(current_message)]` regardless of call order.
+- **BREAKING**: `with_text()` now sets `current_message` instead of replacing `input`. This fixes issue #359 where `with_turns().with_text()` silently overwrote the history.
 - **BREAKING**: `with_system_instruction()` is now available on ALL builder states (FirstTurn, Chained, StoreDisabled), not just FirstTurn. The API does NOT inherit system instructions via `previousInteractionId`, so users should set it explicitly on each turn if needed. For `create_with_auto_functions()`, the SDK automatically includes system_instruction on all internal turns.
 
 ### Fixed
@@ -34,6 +36,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING**: `thought_signature` field from `InteractionContent::FunctionCall` variant - API does not send this field on function calls (thought signatures appear only on `Thought` content blocks)
 
 ### Migration Guide
+
+**`with_turns()` renamed to `with_history()` and composes with `with_text()`:**
+```rust
+// Before (0.6.0)
+// with_turns().with_text() silently overwrote history - bug!
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_turns(history)
+    .create()
+    .await?;
+
+// After (0.7.0)
+// Renamed to with_history(), and now composes correctly with with_text()
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_history(history)
+    .with_text("Current message")  // Appended as final user turn
+    .create()
+    .await?;
+// Produces: [...history, Turn::user("Current message")]
+// Order doesn't matter - with_text().with_history() produces same result
+```
 
 **`CodeExecutionOutcome` removal:**
 ```rust

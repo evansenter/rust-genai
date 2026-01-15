@@ -63,10 +63,7 @@ fn test_interaction_builder_with_model() {
 
     assert_eq!(builder.model.as_deref(), Some("gemini-3-flash-preview"));
     assert!(builder.agent.is_none());
-    assert!(matches!(
-        builder.input,
-        Some(crate::InteractionInput::Text(_))
-    ));
+    assert_eq!(builder.current_message.as_deref(), Some("Hello"));
 }
 
 #[test]
@@ -504,7 +501,7 @@ async fn test_auto_functions_allows_store_default() {
 // --- Turn Array Input Tests ---
 
 #[test]
-fn test_interaction_builder_with_turns() {
+fn test_interaction_builder_with_history() {
     use crate::Turn;
 
     let client = create_test_client();
@@ -517,16 +514,13 @@ fn test_interaction_builder_with_turns() {
     let builder = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_turns(turns);
+        .with_history(turns);
 
-    assert!(matches!(
-        builder.input,
-        Some(crate::InteractionInput::Turns(_))
-    ));
+    assert_eq!(builder.history.len(), 3);
 }
 
 #[test]
-fn test_interaction_builder_build_with_turns() {
+fn test_interaction_builder_build_with_history() {
     use crate::Turn;
 
     let client = create_test_client();
@@ -539,7 +533,7 @@ fn test_interaction_builder_build_with_turns() {
     let builder = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_turns(turns);
+        .with_history(turns);
 
     let result = builder.build();
     assert!(result.is_ok());
@@ -559,10 +553,212 @@ fn test_interaction_builder_with_single_turn() {
     let builder = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_turns(turns);
+        .with_history(turns);
 
     let result = builder.build();
     assert!(result.is_ok());
+}
+
+// --- History + Current Message Composition Tests ---
+
+#[test]
+fn test_with_history_then_with_text_composes_correctly() {
+    use crate::{InteractionInput, Role, Turn};
+
+    let client = create_test_client();
+    let history = vec![Turn::user("Hello"), Turn::model("Hi there!")];
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_history(history)
+        .with_text("How are you?");
+
+    // Build should compose history + current_message
+    let request = builder.build().expect("Build should succeed");
+
+    // Verify the input is Turns with 3 items
+    match &request.input {
+        InteractionInput::Turns(turns) => {
+            assert_eq!(turns.len(), 3, "Should have 3 turns");
+            assert_eq!(*turns[0].role(), Role::User);
+            assert_eq!(*turns[1].role(), Role::Model);
+            assert_eq!(*turns[2].role(), Role::User);
+        }
+        _ => panic!("Expected Turns input"),
+    }
+}
+
+#[test]
+fn test_with_text_then_with_history_composes_correctly() {
+    use crate::{InteractionInput, Role, Turn};
+
+    let client = create_test_client();
+    let history = vec![Turn::user("Hello"), Turn::model("Hi there!")];
+
+    // Order reversed - should produce same result
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("How are you?")
+        .with_history(history);
+
+    let request = builder.build().expect("Build should succeed");
+
+    // Verify the input is Turns with 3 items (history + current)
+    match &request.input {
+        InteractionInput::Turns(turns) => {
+            assert_eq!(turns.len(), 3, "Should have 3 turns");
+            assert_eq!(*turns[0].role(), Role::User);
+            assert_eq!(*turns[1].role(), Role::Model);
+            assert_eq!(*turns[2].role(), Role::User); // Current message appended
+        }
+        _ => panic!("Expected Turns input"),
+    }
+}
+
+#[test]
+fn test_history_and_text_order_independent() {
+    use crate::Turn;
+
+    let client = create_test_client();
+    let history = vec![Turn::user("First"), Turn::model("Response")];
+
+    // Build in one order
+    let req1 = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_history(history.clone())
+        .with_text("Current")
+        .build()
+        .expect("Build should succeed");
+
+    // Build in reverse order
+    let req2 = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Current")
+        .with_history(history)
+        .build()
+        .expect("Build should succeed");
+
+    // Both should produce equivalent requests
+    let json1 = serde_json::to_string(&req1.input).unwrap();
+    let json2 = serde_json::to_string(&req2.input).unwrap();
+    assert_eq!(json1, json2, "Order should not affect result");
+}
+
+#[test]
+fn test_conversation_builder_then_with_text() {
+    use crate::{InteractionInput, Role};
+
+    let client = create_test_client();
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .conversation()
+        .user("What is 2+2?")
+        .model("4")
+        .done()
+        .with_text("And times 3?");
+
+    let request = builder.build().expect("Build should succeed");
+
+    // Should have 3 turns: original 2 + appended current message
+    match &request.input {
+        InteractionInput::Turns(turns) => {
+            assert_eq!(turns.len(), 3, "Should have 3 turns");
+            assert_eq!(*turns[0].role(), Role::User);
+            assert_eq!(*turns[1].role(), Role::Model);
+            assert_eq!(*turns[2].role(), Role::User);
+        }
+        _ => panic!("Expected Turns input"),
+    }
+}
+
+#[test]
+fn test_with_text_only_produces_text_input() {
+    use crate::InteractionInput;
+
+    let client = create_test_client();
+
+    let request = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Hello!")
+        .build()
+        .expect("Build should succeed");
+
+    // Should produce Text input when no history
+    assert!(
+        matches!(request.input, InteractionInput::Text(_)),
+        "Expected Text input, got {:?}",
+        request.input
+    );
+}
+
+#[test]
+fn test_with_history_only_produces_turns_input() {
+    use crate::{InteractionInput, Turn};
+
+    let client = create_test_client();
+    let history = vec![Turn::user("Hello"), Turn::model("Hi!")];
+
+    let request = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_history(history)
+        .build()
+        .expect("Build should succeed");
+
+    // Should produce Turns input
+    match &request.input {
+        InteractionInput::Turns(turns) => {
+            assert_eq!(turns.len(), 2);
+        }
+        _ => panic!("Expected Turns input"),
+    }
+}
+
+#[test]
+fn test_typestate_chained_preserves_history_and_current_message() {
+    use crate::Turn;
+
+    let client = create_test_client();
+    let history = vec![Turn::user("Hello"), Turn::model("Hi!")];
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_history(history)
+        .with_text("Current message")
+        .with_previous_interaction("prev-123");
+
+    // Fields should be preserved through the FirstTurn -> Chained transition
+    assert_eq!(builder.history.len(), 2);
+    assert_eq!(builder.current_message.as_deref(), Some("Current message"));
+    assert_eq!(builder.previous_interaction_id.as_deref(), Some("prev-123"));
+}
+
+#[test]
+fn test_typestate_store_disabled_preserves_history_and_current_message() {
+    use crate::Turn;
+
+    let client = create_test_client();
+    let history = vec![Turn::user("Hello"), Turn::model("Hi!")];
+
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_history(history)
+        .with_text("Current message")
+        .with_store_disabled();
+
+    // Fields should be preserved through the FirstTurn -> StoreDisabled transition
+    assert_eq!(builder.history.len(), 2);
+    assert_eq!(builder.current_message.as_deref(), Some("Current message"));
+    assert_eq!(builder.store, Some(false));
 }
 
 #[test]
@@ -579,17 +775,11 @@ fn test_conversation_builder_fluent_api() {
         .user("And what's that times 3?")
         .done();
 
-    assert!(matches!(
-        builder.input,
-        Some(crate::InteractionInput::Turns(ref turns)) if turns.len() == 3
-    ));
-
-    // Verify the turns have correct roles
-    if let Some(crate::InteractionInput::Turns(ref turns)) = builder.input {
-        assert_eq!(*turns[0].role(), Role::User);
-        assert_eq!(*turns[1].role(), Role::Model);
-        assert_eq!(*turns[2].role(), Role::User);
-    }
+    // Verify the history has correct length and roles
+    assert_eq!(builder.history.len(), 3);
+    assert_eq!(*builder.history[0].role(), Role::User);
+    assert_eq!(*builder.history[1].role(), Role::Model);
+    assert_eq!(*builder.history[2].role(), Role::User);
 }
 
 #[test]
@@ -609,15 +799,9 @@ fn test_conversation_builder_with_parts_content() {
         .user(TurnContent::Parts(parts))
         .done();
 
-    assert!(matches!(
-        builder.input,
-        Some(crate::InteractionInput::Turns(ref turns)) if turns.len() == 1
-    ));
-
-    // Verify the turn has parts content
-    if let Some(crate::InteractionInput::Turns(ref turns)) = builder.input {
-        assert!(turns[0].content().is_parts());
-    }
+    // Verify the history has 1 turn with parts content
+    assert_eq!(builder.history.len(), 1);
+    assert!(builder.history[0].content().is_parts());
 }
 
 #[test]
@@ -633,10 +817,7 @@ fn test_conversation_builder_with_turn_method() {
         .turn(Role::Model, "Hi!")
         .done();
 
-    assert!(matches!(
-        builder.input,
-        Some(crate::InteractionInput::Turns(ref turns)) if turns.len() == 2
-    ));
+    assert_eq!(builder.history.len(), 2);
 }
 
 #[test]
@@ -648,11 +829,8 @@ fn test_conversation_builder_empty() {
         .conversation()
         .done();
 
-    // Empty conversation results in empty turns array
-    assert!(matches!(
-        builder.input,
-        Some(crate::InteractionInput::Turns(ref turns)) if turns.is_empty()
-    ));
+    // Empty conversation results in empty history
+    assert!(builder.history.is_empty());
 }
 
 #[test]

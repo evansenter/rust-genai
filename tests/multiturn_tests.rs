@@ -490,7 +490,7 @@ async fn test_explicit_turns_basic() {
     ];
 
     let response = interaction_builder(&client)
-        .with_turns(turns)
+        .with_history(turns)
         .create()
         .await
         .expect("Request failed");
@@ -574,7 +574,7 @@ async fn test_explicit_turns_context_preservation() {
     ];
 
     let response = interaction_builder(&client)
-        .with_turns(turns)
+        .with_history(turns)
         .create()
         .await
         .expect("Request failed");
@@ -610,7 +610,7 @@ async fn test_explicit_turns_single_user_message() {
     )];
 
     let response = interaction_builder(&client)
-        .with_turns(turns)
+        .with_history(turns)
         .create()
         .await
         .expect("Request failed");
