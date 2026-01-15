@@ -113,9 +113,9 @@ See `examples/` for full list (multimodal, thinking, files API, image generation
 | Validated | Schema adherence for both calls and natural language |
 
 **Multi-Turn Inheritance Rules** (critical gotcha):
-| Field | Inherited? | Notes |
-|-------|------------|-------|
-| `systemInstruction` | ✅ Yes | Only send on first turn |
+| Field | Inherited by API? | SDK Behavior |
+|-------|-------------------|--------------|
+| `systemInstruction` | ❌ No | Available on all states; set explicitly per-turn if needed |
 | `tools` | ❌ No | Must resend on every new user message turn |
 | Conversation history | ✅ Yes | Automatically included |
 

@@ -240,8 +240,11 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
     ///
     /// This method transitions the builder from [`FirstTurn`] to [`Chained`] state.
     /// After calling this method:
-    /// - `with_system_instruction()` is no longer available (system instructions are inherited)
     /// - `with_store_disabled()` is no longer available (chained interactions require storage)
+    ///
+    /// Note: `with_system_instruction()` remains available on all states. The API does NOT
+    /// inherit system instructions via `previousInteractionId`, so you must set it on each
+    /// turn if needed.
     #[must_use]
     pub fn with_previous_interaction(
         self,
@@ -268,19 +271,6 @@ impl<'a> InteractionBuilder<'a, FirstTurn> {
             timeout: self.timeout,
             _state: PhantomData,
         }
-    }
-
-    /// Sets a system instruction for the model.
-    ///
-    /// # Availability
-    ///
-    /// This method is only available on [`FirstTurn`] builders. After calling
-    /// `with_previous_interaction()`, system instructions are inherited from the
-    /// previous interaction and cannot be changed.
-    #[must_use]
-    pub fn with_system_instruction(mut self, instruction: impl Into<String>) -> Self {
-        self.system_instruction = Some(InteractionInput::Text(instruction.into()));
-        self
     }
 
     /// Explicitly disables storage for this interaction.
@@ -493,6 +483,43 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     #[must_use]
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
         self.input = Some(InteractionInput::Text(text.into()));
+        self
+    }
+
+    /// Sets a system instruction for the model.
+    ///
+    /// System instructions provide context or guidelines for the model's behavior
+    /// throughout the interaction.
+    ///
+    /// # Note on Multi-Turn Conversations
+    ///
+    /// The Gemini API does NOT inherit system instructions via `previousInteractionId`.
+    /// You must explicitly set the system instruction on each turn where you want it
+    /// to apply.
+    ///
+    /// For `create_with_auto_functions()`, the system instruction is automatically
+    /// included on all turns within the auto-function loop (the request is reused).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use genai_rs::Client;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Client::new("api-key".to_string());
+    ///
+    /// let response = client.interaction()
+    ///     .with_model("gemini-3-flash-preview")
+    ///     .with_system_instruction("You are a helpful assistant specializing in Rust")
+    ///     .with_text("Hello!")
+    ///     .create()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn with_system_instruction(mut self, instruction: impl Into<String>) -> Self {
+        self.system_instruction = Some(InteractionInput::Text(instruction.into()));
         self
     }
 

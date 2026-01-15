@@ -33,31 +33,20 @@ This example demonstrates a production-style support agent that:
 
 ### Stateful Conversations
 
-Uses `with_previous_interaction()` to chain conversation turns. The typestate
-pattern enforces constraints at compile time (e.g., `with_system_instruction()`
-is only available on first turn):
+Uses `with_previous_interaction()` to chain conversation turns. The API does NOT
+inherit `system_instruction` via `previousInteractionId`, so set it on each turn
+if needed. For `create_with_auto_functions()`, the SDK reuses the request
+internally, so system_instruction is present on all internal iterations:
 
 ```rust
-let result = match &self.last_interaction_id {
-    Some(prev_id) => {
-        // Subsequent turns: chain to previous
-        client.interaction()
-            .with_model("gemini-3-flash-preview")
-            .with_text(message)
-            .with_previous_interaction(prev_id)
-            .create_with_auto_functions()
-            .await?
-    }
-    None => {
-        // First turn: set system instruction
-        client.interaction()
-            .with_model("gemini-3-flash-preview")
-            .with_text(message)
-            .with_system_instruction("You are a helpful assistant")
-            .create_with_auto_functions()
-            .await?
-    }
-};
+// System instruction set on each turn for clarity
+let result = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text(message)
+    .with_previous_interaction(&prev_id)  // Chain to previous turn
+    .with_system_instruction("You are a helpful assistant")
+    .create_with_auto_functions()
+    .await?;
 ```
 
 ### Integrated Tools
