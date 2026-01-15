@@ -789,6 +789,30 @@ fn test_with_content_cannot_combine_with_history() {
 }
 
 #[test]
+fn test_add_methods_cannot_combine_with_history() {
+    use crate::Turn;
+
+    let client = create_test_client();
+    let history = vec![Turn::user("Hello"), Turn::model("Hi!")];
+
+    // add_image_data() sets content_input, which is incompatible with history
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_history(history)
+        .add_image_data("dGVzdA==", "image/png")
+        .build();
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string().contains("add_*"),
+        "Error should mention add_* methods: {}",
+        err
+    );
+}
+
+#[test]
 fn test_with_content_and_text_merge() {
     use crate::{InteractionContent, InteractionInput};
 
