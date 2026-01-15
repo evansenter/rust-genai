@@ -2633,9 +2633,6 @@ mod multiturn {
         // - with_previous_interaction() transitions FirstTurn -> Chained
         // - create_with_auto_functions() requires store=true (not available on StoreDisabled)
         //
-        // Note: with_system_instruction() is now available on ALL states since the API
-        // does not inherit system_instruction via previousInteractionId.
-        //
         // Compile-fail tests are in tests/ui_tests.rs
         println!("Typestate constraints are enforced at compile time.");
     }
