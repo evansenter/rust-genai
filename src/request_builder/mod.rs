@@ -591,9 +591,11 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// This is useful for building multi-part inputs or for sending function results.
     ///
-    /// Note: This is mutually exclusive with `with_history()` and `with_text()`. If you
-    /// need to combine function results with conversation history, include them in the
-    /// history via [`Turn`] objects instead.
+    /// # Panics / Errors
+    ///
+    /// Calling `build()` will return an error if `with_content()` is combined with
+    /// `with_history()` or `with_text()`. If you need to combine function results with
+    /// conversation history, include them in the history via [`Turn`] objects instead.
     ///
     /// # Example
     /// ```no_run
@@ -2509,14 +2511,34 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// Returns [`GenaiError::InvalidInput`] if:
     /// - No input was provided (via `with_text()`, `with_history()`, `with_content()`, etc.)
+    /// - `with_content()` was combined with `with_history()` or `with_text()` (mutually exclusive)
     /// - Neither model nor agent was specified
     /// - Both model and agent were specified (mutually exclusive)
     pub fn build(self) -> Result<InteractionRequest, GenaiError> {
+        // Validate that content input is not combined with history
+        // Content input is fundamentally incompatible with multi-turn history
+        if self.content_input.is_some() && !self.history.is_empty() {
+            return Err(GenaiError::InvalidInput(
+                "Content input (with_content() or add_* methods) cannot be combined with \
+                 with_history(). For multimodal multi-turn conversations, build Turn objects \
+                 with content arrays instead."
+                    .to_string(),
+            ));
+        }
+
         // Compose input from the separate fields
-        // Priority: content_input > history/current_message
-        let input = if let Some(content) = self.content_input {
+        // Priority: content_input > history > current_message
+        // - content_input + current_message: merge (text prepended to content)
+        // - history + current_message: merge (text appended as user turn)
+        let input = if let Some(mut content) = self.content_input {
+            // Content input mode (single-turn multimodal)
+            // If there's also a current_message, prepend it as text content
+            if let Some(text) = self.current_message {
+                content.insert(0, crate::interactions_api::text_content(text));
+            }
             InteractionInput::Content(content)
         } else {
+            // Text/history mode
             match (self.history.is_empty(), self.current_message) {
                 (true, None) => {
                     return Err(GenaiError::InvalidInput(

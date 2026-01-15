@@ -762,6 +762,113 @@ fn test_typestate_store_disabled_preserves_history_and_current_message() {
 }
 
 #[test]
+fn test_with_content_cannot_combine_with_history() {
+    use crate::{InteractionContent, Turn};
+
+    let client = create_test_client();
+    let history = vec![Turn::user("Hello"), Turn::model("Hi!")];
+    let content = vec![InteractionContent::Text {
+        text: Some("test".to_string()),
+        annotations: None,
+    }];
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_history(history)
+        .with_content(content)
+        .build();
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string().contains("with_content()"),
+        "Error should mention with_content(): {}",
+        err
+    );
+}
+
+#[test]
+fn test_with_content_and_text_merge() {
+    use crate::{InteractionContent, InteractionInput};
+
+    let client = create_test_client();
+    let image_content = InteractionContent::Image {
+        data: Some("dGVzdA==".to_string()),
+        uri: None,
+        mime_type: Some("image/png".to_string()),
+        resolution: None,
+    };
+
+    // with_text() then with_content() - text should be prepended to content
+    let request = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Describe this image")
+        .with_content(vec![image_content.clone()])
+        .build()
+        .expect("Should succeed");
+
+    match &request.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 2, "Should have 2 items (text + image)");
+            // Text should be first (prepended)
+            assert!(
+                matches!(&items[0], InteractionContent::Text { text: Some(t), .. } if t == "Describe this image"),
+                "First item should be the text"
+            );
+            assert!(
+                matches!(&items[1], InteractionContent::Image { .. }),
+                "Second item should be the image"
+            );
+        }
+        _ => panic!("Expected Content input"),
+    }
+
+    // with_content() then with_text() - should also work (order-independent)
+    let request2 = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_content(vec![image_content])
+        .with_text("Describe this image")
+        .build()
+        .expect("Should succeed");
+
+    match &request2.input {
+        InteractionInput::Content(items) => {
+            assert_eq!(items.len(), 2, "Should have 2 items (text + image)");
+            // Text should still be first (prepended at build time)
+            assert!(
+                matches!(&items[0], InteractionContent::Text { text: Some(t), .. } if t == "Describe this image"),
+                "First item should be the text"
+            );
+        }
+        _ => panic!("Expected Content input"),
+    }
+}
+
+#[test]
+fn test_with_content_alone_works() {
+    use crate::{InteractionContent, InteractionInput};
+
+    let client = create_test_client();
+    let content = vec![InteractionContent::Text {
+        text: Some("test".to_string()),
+        annotations: None,
+    }];
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_content(content)
+        .build();
+
+    assert!(result.is_ok());
+    let request = result.unwrap();
+    assert!(matches!(request.input, InteractionInput::Content(_)));
+}
+
+#[test]
 fn test_conversation_builder_fluent_api() {
     use crate::Role;
 
