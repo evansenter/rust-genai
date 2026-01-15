@@ -2518,7 +2518,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// Returns [`GenaiError::InvalidInput`] if:
     /// - No input was provided (via `with_text()`, `with_history()`, `set_content()`, etc.)
-    /// - `set_content()` was combined with `with_history()` or `with_text()` (mutually exclusive)
+    /// - `set_content()` was combined with `with_history()` (mutually exclusive)
     /// - Neither model nor agent was specified
     /// - Both model and agent were specified (mutually exclusive)
     pub fn build(self) -> Result<InteractionRequest, GenaiError> {
