@@ -1638,7 +1638,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("What files are in my project?")
-    ///     .with_mcp_server("filesystem", "https://mcp.example.com/fs")
+    ///     .add_mcp_server("filesystem", "https://mcp.example.com/fs")
     ///     .create()
     ///     .await?;
     /// # Ok(())
@@ -1658,15 +1658,15 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("Search the database and format the results")
-    ///     .with_mcp_server("database", "https://mcp.example.com/db")
-    ///     .with_mcp_server("formatter", "https://mcp.example.com/fmt")
+    ///     .add_mcp_server("database", "https://mcp.example.com/db")
+    ///     .add_mcp_server("formatter", "https://mcp.example.com/fmt")
     ///     .create()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
     #[must_use]
-    pub fn with_mcp_server(mut self, name: impl Into<String>, url: impl Into<String>) -> Self {
+    pub fn add_mcp_server(mut self, name: impl Into<String>, url: impl Into<String>) -> Self {
         self.add_tool(InternalTool::McpServer {
             name: name.into(),
             url: url.into(),

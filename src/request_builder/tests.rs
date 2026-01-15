@@ -153,13 +153,13 @@ fn test_interaction_builder_with_function() {
 }
 
 #[test]
-fn test_interaction_builder_with_mcp_server() {
+fn test_interaction_builder_add_mcp_server() {
     let client = create_test_client();
     let builder = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Use MCP server")
-        .with_mcp_server("my-server", "https://mcp.example.com/api");
+        .add_mcp_server("my-server", "https://mcp.example.com/api");
 
     assert!(builder.tools.is_some());
     let tools = builder.tools.as_ref().unwrap();
@@ -181,8 +181,8 @@ fn test_interaction_builder_with_multiple_mcp_servers() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Use multiple MCP servers")
-        .with_mcp_server("server-1", "https://mcp1.example.com")
-        .with_mcp_server("server-2", "https://mcp2.example.com");
+        .add_mcp_server("server-1", "https://mcp1.example.com")
+        .add_mcp_server("server-2", "https://mcp2.example.com");
 
     assert!(builder.tools.is_some());
     let tools = builder.tools.as_ref().unwrap();
@@ -190,7 +190,7 @@ fn test_interaction_builder_with_multiple_mcp_servers() {
 }
 
 #[test]
-fn test_interaction_builder_with_mcp_server_and_other_tools() {
+fn test_interaction_builder_add_mcp_server_and_other_tools() {
     let client = create_test_client();
     let func = FunctionDeclaration::builder("test_func")
         .description("Test function")
@@ -200,7 +200,7 @@ fn test_interaction_builder_with_mcp_server_and_other_tools() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Use MCP and other tools")
-        .with_mcp_server("my-server", "https://mcp.example.com")
+        .add_mcp_server("my-server", "https://mcp.example.com")
         .with_google_search()
         .add_function(func);
 

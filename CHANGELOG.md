@@ -427,7 +427,7 @@ if let Some(audio) = response.first_audio() {
 - **Computer Use tool (#298)** - Browser automation via Gemini
   - New `with_computer_use()` method (requires allowlisted API key)
 - **MCP Server convenience (#295)** - Connect to Model Context Protocol servers
-  - New `with_mcp_server(uri)` method
+  - New `add_mcp_server(uri)` method
 
 #### Explicit Multi-Turn Conversations (#296)
 - **New `with_turns(Vec<Turn>)` method** - Provide full conversation history

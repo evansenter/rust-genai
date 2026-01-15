@@ -638,7 +638,7 @@ mod duration_millis {
 ///   to cap the maximum number of iterations (default: 5)
 /// - **Extract and drop**: Extract only the data you need, then drop the result
 /// - **Manual control**: For fine-grained memory management, implement function
-///   calling manually using [`crate::InteractionBuilder::with_functions()`] and
+///   calling manually using [`crate::InteractionBuilder::add_functions()`] and
 ///   [`crate::InteractionBuilder::create()`] instead of the auto-function helpers
 ///
 /// Each `FunctionExecutionResult` contains the function name, call ID, result

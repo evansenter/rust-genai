@@ -69,7 +69,7 @@ Methods follow a consistent naming pattern based on their behavior:
 | `with_code_execution()` | with | accumulates | Enables code execution |
 | `with_url_context()` | with | accumulates | Enables URL fetching |
 | `with_computer_use()` | with | accumulates | Enables computer use |
-| `with_mcp_server()` | with | accumulates | Adds MCP server |
+| `add_mcp_server()` | with | accumulates | Adds MCP server |
 | `with_file_search()` | with | accumulates | Enables file search |
 
 ## Input Methods
