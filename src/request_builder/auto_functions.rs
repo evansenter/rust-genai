@@ -117,7 +117,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     /// 4. Repeat until model returns text or max iterations reached
     ///
     /// Functions are auto-discovered from the global registry (via `#[tool]` macro)
-    /// or can be explicitly provided via `.with_function()` or `.with_tools()`.
+    /// or can be explicitly provided via `.add_function()` or `.set_tools()`.
     ///
     /// The loop automatically stops when:
     /// - Model returns text without function calls

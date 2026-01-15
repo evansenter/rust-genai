@@ -50,7 +50,7 @@
 //!        .interaction()
 //!        .with_model("gemini-3-flash-preview")
 //!        .with_text("Describe this video")
-//!        .with_file(&file)
+//!        .add_file(&file)
 //!        .create()
 //!        .await?;
 //!    # Ok(())
@@ -76,7 +76,7 @@
 //! let response = client
 //!     .interaction()
 //!     .with_model("gemini-3-flash-preview")
-//!     .with_content(contents)
+//!     .set_content(contents)
 //!     .create()
 //!     .await?;
 //! # Ok(())

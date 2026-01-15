@@ -88,7 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_content(vec![
+        .set_content(vec![
             text_content("Analyze this JSON data. How many users are there and what roles exist?"),
             // Note: Use text/plain for JSON - API doesn't support application/json as document type
             document_data_content(encode_text(SAMPLE_JSON), "text/plain"),
@@ -108,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_content(vec![
+        .set_content(vec![
             text_content("Parse this CSV and calculate the average age of all employees."),
             // Note: Use text/plain for CSV - API doesn't support text/csv as document type
             document_data_content(encode_text(SAMPLE_CSV), "text/plain"),
@@ -128,7 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_content(vec![
+        .set_content(vec![
             text_content("Summarize this markdown document in one sentence."),
             // text/markdown is supported for markdown content
             document_data_content(encode_text(SAMPLE_MARKDOWN), "text/markdown"),
@@ -151,7 +151,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_content(vec![
+        .set_content(vec![
             text_content("What is the main purpose of this project based on the README?"),
             readme_content,
         ])

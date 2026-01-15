@@ -93,7 +93,7 @@ let result = client
     .interaction()
     .with_model("gemini-3-flash-preview")
     .with_text("What's the weather in Tokyo?")
-    .with_function(GetWeatherCallable.declaration())  // Only weather
+    .add_function(GetWeatherCallable.declaration())  // Only weather
     .create_with_auto_functions()
     .await?;
 ```
@@ -243,7 +243,7 @@ let mut response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
     .with_text("What's the weather in Tokyo?")
-    .with_functions(vec![get_weather])
+    .add_functions(vec![get_weather])
     .create()  // NOT create_with_auto_functions
     .await?;
 
@@ -267,7 +267,7 @@ while response.has_function_calls() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_previous_interaction(response.id.as_ref().unwrap())
-        .with_content(results)
+        .set_content(results)
         .create()
         .await?;
 }
@@ -393,22 +393,22 @@ use genai_rs::FunctionCallingMode;
 
 // Auto (default): Model decides whether to call
 client.interaction()
-    .with_function(decl)
+    .add_function(decl)
     .with_function_calling_mode(FunctionCallingMode::Auto)
 
 // Any: Model MUST call a function
 client.interaction()
-    .with_function(decl)
+    .add_function(decl)
     .with_function_calling_mode(FunctionCallingMode::Any)
 
 // None: Disable function calling
 client.interaction()
-    .with_function(decl)
+    .add_function(decl)
     .with_function_calling_mode(FunctionCallingMode::None)
 
 // Validated: Schema adherence for both calls and text
 client.interaction()
-    .with_function(decl)
+    .add_function(decl)
     .with_function_calling_mode(FunctionCallingMode::Validated)
 ```
 
@@ -525,7 +525,7 @@ fn do_thing(x: String) -> String
 let result = client
     .interaction()
     .with_text("What's the weather?")
-    .with_function(weather_func)  // Only weather, not all 20 functions
+    .add_function(weather_func)  // Only weather, not all 20 functions
     .create_with_auto_functions()
     .await?;
 ```
@@ -537,7 +537,7 @@ let result = client
 let result = client
     .interaction()
     .with_text(prompt)
-    .with_function(func)
+    .add_function(func)
     .with_max_function_call_loops(5)  // Default is 10
     .create_with_auto_functions()
     .await?;

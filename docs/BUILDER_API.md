@@ -1,13 +1,14 @@
 # InteractionBuilder API Guide
 
-This guide covers the `InteractionBuilder` fluent API, including method interactions, sharp edges, and common patterns.
+This guide covers the `InteractionBuilder` fluent API, including method naming conventions, interactions, and common patterns.
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Method Naming Conventions](#method-naming-conventions)
 - [Input Methods](#input-methods)
 - [Method Interactions](#method-interactions)
-- [Sharp Edges](#sharp-edges)
+- [Validation Errors](#validation-errors)
 - [Typestate Pattern](#typestate-pattern)
 - [Best Practices](#best-practices)
 
@@ -25,35 +26,75 @@ let response = client
     .await?;
 ```
 
+## Method Naming Conventions
+
+Methods follow a consistent naming pattern based on their behavior:
+
+| Prefix | Behavior | Example |
+|--------|----------|---------|
+| `with_*` | **Configures** a setting (replaces if called twice) | `with_model()`, `with_text()`, `with_history()` |
+| `set_*` | **Replaces** a collection entirely | `set_content()`, `set_tools()` |
+| `add_*` | **Accumulates** items to a collection | `add_function()`, `add_image_file()`, `add_file()` |
+
+### Complete Method Reference
+
+| Method | Prefix | Behavior | Notes |
+|--------|--------|----------|-------|
+| **Configuration** |
+| `with_model()` | with | replaces | Mutually exclusive with `with_agent()` |
+| `with_agent()` | with | replaces | Mutually exclusive with `with_model()` |
+| `with_agent_config()` | with | replaces | Requires `with_agent()` |
+| `with_system_instruction()` | with | replaces | |
+| `with_timeout()` | with | replaces | |
+| **Input** |
+| `with_text()` | with | replaces | Composes with `with_history()` |
+| `with_history()` | with | replaces | Composes with `with_text()` |
+| `set_content()` | set | replaces | For function results; incompatible with history |
+| **Multimodal (accumulate)** |
+| `add_image_file()` | add | accumulates | |
+| `add_image_data()` | add | accumulates | |
+| `add_image_uri()` | add | accumulates | |
+| `add_audio_file()` | add | accumulates | |
+| `add_video_file()` | add | accumulates | |
+| `add_document_file()` | add | accumulates | |
+| `add_file()` | add | accumulates | Files API |
+| `add_file_uri()` | add | accumulates | Files API |
+| **Tools** |
+| `set_tools()` | set | replaces | Raw tool array |
+| `add_function()` | add | accumulates | Single function declaration |
+| `add_functions()` | add | accumulates | Multiple function declarations |
+| `with_tool_service()` | with | replaces | Dependency-injected tools |
+| **Server-Side Tools (enable capabilities)** |
+| `with_google_search()` | with | accumulates | Enables Google Search |
+| `with_code_execution()` | with | accumulates | Enables code execution |
+| `with_url_context()` | with | accumulates | Enables URL fetching |
+| `with_computer_use()` | with | accumulates | Enables computer use |
+| `with_mcp_server()` | with | accumulates | Adds MCP server |
+| `with_file_search()` | with | accumulates | Enables file search |
+
 ## Input Methods
 
 The builder has several ways to set the input content:
 
-| Method | Purpose | Sets Field |
-|--------|---------|------------|
-| `with_text(str)` | Simple text message | `current_message` |
-| `with_history(Vec<Turn>)` | Conversation history | `history` |
-| `with_content(Vec<InteractionContent>)` | Raw content (function results) | `content_input` |
-| `add_image_file()` / `add_image_data()` / etc. | Multimodal content | `content_input` |
-| `conversation()...done()` | Fluent conversation builder | `history` |
+| Method | Purpose | Composes With |
+|--------|---------|---------------|
+| `with_text(str)` | Simple text message | `with_history()`, `add_*()` |
+| `with_history(Vec<Turn>)` | Conversation history | `with_text()` |
+| `set_content(Vec<InteractionContent>)` | Raw content (function results) | `with_text()`, `add_*()` |
+| `add_*()` methods | Multimodal content | `with_text()`, `set_content()` |
+| `conversation()...done()` | Fluent conversation builder | — |
 
 ### How Inputs Compose at Build Time
 
-At `build()`, inputs are composed based on what's set:
-
-1. **`content_input` + `current_message`**: Merged (text prepended to content)
-2. **`history` + `current_message`**: Merged (text appended as user turn)
-3. **`content_input` + `history`**: **Error** - incompatible modes
-4. **Single input**: Used directly
-
 ```text
-Priority: content_input > history > current_message
-
 content_input set?
 ├── Yes
-│   └── current_message set?
-│       ├── Yes → Content([text, ...content_items])
-│       └── No  → Content([...content_items])
+│   └── history set?
+│       ├── Yes → ERROR (incompatible)
+│       └── No
+│           └── current_message set?
+│               ├── Yes → Content([text, ...content_items])
+│               └── No  → Content([...content_items])
 └── No
     └── history set?
         ├── Yes
@@ -63,7 +104,7 @@ content_input set?
         └── No
             └── current_message set?
                 ├── Yes → Text(message)
-                └── No  → Error: "Input is required"
+                └── No  → ERROR ("Input is required")
 ```
 
 ## Method Interactions
@@ -84,33 +125,32 @@ Most input methods are **order-independent** - calling them in different orders 
 
 ### Replacement vs Accumulation
 
-| Method | Behavior |
-|--------|----------|
-| `with_text()` | **Replaces** current message |
-| `with_history()` | **Replaces** history |
-| `with_content()` | **Replaces** content input |
-| `add_*()` methods | **Accumulates** content items |
-
 ```rust,ignore
 // Replacement: second call wins
 .with_text("first").with_text("second")  // → "second"
 
 // Accumulation: both are included
 .add_image_file("a.jpg").add_image_file("b.jpg")  // → [image_a, image_b]
+
+// set_* replaces, add_* accumulates on the same collection
+.set_tools(tools1).add_function(func)  // → tools1 + func
+.add_function(func1).set_tools(tools2)  // → tools2 only (set replaces!)
 ```
 
-## Sharp Edges
+## Validation Errors
 
-### 1. `content_input` Cannot Combine with `history`
+The builder validates configuration at `build()` time and returns clear errors:
 
-Content input (via `with_content()` or `add_*()` methods) is for single-turn multimodal messages. It cannot be combined with multi-turn history.
+### 1. Content Cannot Combine with History
+
+Content input (via `set_content()` or `add_*()` methods) is for single-turn multimodal messages. It cannot be combined with multi-turn history.
 
 ```rust,ignore
 // ERROR: Cannot combine content with history
 client.interaction()
     .with_model("gemini-3-flash-preview")
     .with_history(conversation_history)
-    .add_image_file("photo.jpg").await?  // Sets content_input
+    .add_image_file("photo.jpg").await?
     .build()  // Returns Err!
 ```
 
@@ -134,20 +174,7 @@ client.interaction()
     .await?;
 ```
 
-### 2. `with_content()` Replaces, `add_*()` Accumulates
-
-```rust,ignore
-// with_content replaces everything
-.with_content(items1).with_content(items2)  // → items2 only
-
-// add_* accumulates
-.add_image_data(d1, m1).add_image_data(d2, m2)  // → [image1, image2]
-
-// Mixing: with_content then add_* works (accumulates)
-.with_content(items).add_image_data(d, m)  // → items + image
-```
-
-### 3. Model vs Agent is Mutually Exclusive
+### 2. Model vs Agent is Mutually Exclusive
 
 You must specify exactly one of `with_model()` or `with_agent()`:
 
@@ -164,16 +191,17 @@ client.interaction()
     .build()  // Returns Err!
 ```
 
-### 4. `with_agent_config()` Without `with_agent()` is Silently Ignored
+### 3. Agent Config Requires Agent
+
+`with_agent_config()` is only valid when using `with_agent()`:
 
 ```rust,ignore
-// agent_config is ignored when using a model
+// ERROR: agent_config without agent
 client.interaction()
-    .with_model("gemini-3-flash-preview")  // Using model, not agent
-    .with_agent_config(DeepResearchConfig::new())  // Silently ignored!
+    .with_model("gemini-3-flash-preview")
+    .with_agent_config(DeepResearchConfig::new())
     .with_text("Research AI trends")
-    .create()
-    .await?;
+    .build()  // Returns Err!
 ```
 
 ## Typestate Pattern
@@ -206,16 +234,6 @@ client.interaction()
     .with_store_disabled()  // ERROR: method not available
 ```
 
-### Methods Available on All States
-
-These methods work regardless of state:
-- `with_model()` / `with_agent()`
-- `with_text()` / `with_history()` / `with_content()`
-- `with_system_instruction()`
-- `with_tools()` / `with_function()`
-- All `add_*()` multimodal methods
-- `create()` / `create_stream()` / `build()`
-
 ## Best Practices
 
 ### 1. Use Specific Input Methods
@@ -237,7 +255,6 @@ Prefer the specific method for your use case:
 Group related builder calls together:
 
 ```rust,ignore
-// Good: Grouped by concern
 client.interaction()
     // Target
     .with_model("gemini-3-flash-preview")
@@ -247,7 +264,7 @@ client.interaction()
     // Input
     .with_text("Current question")
     // Tools
-    .with_function(get_weather.declaration())
+    .add_function(get_weather.declaration())
     // Execute
     .create()
     .await?;
@@ -272,7 +289,6 @@ let response = client.execute(request).await?;
 For test fixtures or inline conversation construction:
 
 ```rust,ignore
-// Good: Readable inline conversation
 let response = client.interaction()
     .with_model("gemini-3-flash-preview")
     .conversation()
@@ -280,18 +296,6 @@ let response = client.interaction()
         .model("4")
         .user("Times 3?")
         .done()
-    .create()
-    .await?;
-
-// Alternative: Explicit history (better for dynamic conversations)
-let history = vec![
-    Turn::user("What is 2+2?"),
-    Turn::model("4"),
-    Turn::user("Times 3?"),
-];
-let response = client.interaction()
-    .with_model("gemini-3-flash-preview")
-    .with_history(history)
     .create()
     .await?;
 ```

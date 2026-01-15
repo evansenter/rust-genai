@@ -679,7 +679,7 @@ impl Client {
     /// // Use in interaction
     /// let response = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
-    ///     .with_file(&file)
+    ///     .add_file(&file)
     ///     .with_text("Describe this video")
     ///     .create()
     ///     .await?;
@@ -958,7 +958,7 @@ impl Client {
     /// // Use in interaction
     /// let response = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
-    ///     .with_file(&file)
+    ///     .add_file(&file)
     ///     .with_text("Describe this video")
     ///     .create()
     ///     .await?;

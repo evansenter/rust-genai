@@ -130,7 +130,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(limited_prompt)
-        .with_function(weather_func) // Only weather, not time
+        .add_function(weather_func) // Only weather, not time
         .create_with_auto_functions()
         .await?;
 
@@ -155,7 +155,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(stream_prompt)
-        .with_function(time_func) // Provide declaration but no auto-execution
+        .add_function(time_func) // Provide declaration but no auto-execution
         .create_stream(); // Note: create_stream, not create_stream_with_auto_functions
 
     while let Some(result) = stream.next().await {
@@ -208,7 +208,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(auto_prompt)
-        .with_function(GetWeatherCallable.declaration())
+        .add_function(GetWeatherCallable.declaration())
         .with_function_calling_mode(FunctionCallingMode::Auto) // Model decides
         .create()
         .await?;
@@ -233,7 +233,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(any_prompt)
-        .with_function(GetWeatherCallable.declaration())
+        .add_function(GetWeatherCallable.declaration())
         .with_function_calling_mode(FunctionCallingMode::Any) // MUST call a function
         .create()
         .await?;
@@ -255,7 +255,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(none_prompt)
-        .with_function(GetWeatherCallable.declaration())
+        .add_function(GetWeatherCallable.declaration())
         .with_function_calling_mode(FunctionCallingMode::None) // Disabled
         .create()
         .await?;
@@ -275,7 +275,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text(validated_prompt)
-        .with_function(GetWeatherCallable.declaration())
+        .add_function(GetWeatherCallable.declaration())
         .with_function_calling_mode(FunctionCallingMode::Validated) // Schema adherence
         .create()
         .await?;

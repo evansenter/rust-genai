@@ -174,7 +174,7 @@ async fn test_file_in_interaction() {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_file(&ready_file)
+        .add_file(&ready_file)
         .with_text("What city is mentioned in this document?")
         .create()
         .await
@@ -593,7 +593,7 @@ async fn test_chunked_upload_in_interaction() {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_file(&ready_file)
+        .add_file(&ready_file)
         .with_text("What does the file say about a fox?")
         .create()
         .await

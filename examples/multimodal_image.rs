@@ -79,7 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let comparison = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_content(comparison_contents)
+        .set_content(comparison_contents)
         .with_store_enabled()
         .create()
         .await?;
@@ -137,7 +137,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let helper_response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_content(vec![
+        .set_content(vec![
             text_content("Describe this image briefly."),
             content_with_res,
         ])

@@ -31,7 +31,7 @@ let mut response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
     .with_text(message)
-    .with_functions(declarations)
+    .add_functions(declarations)
     .with_store_enabled()
     .create()
     .await?;
@@ -61,7 +61,7 @@ for _ in 0..MAX_ITERATIONS {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_previous_interaction(response.id.as_ref().unwrap())
-        .with_content(results)
+        .set_content(results)
         .with_store_enabled()
         .create()
         .await?;

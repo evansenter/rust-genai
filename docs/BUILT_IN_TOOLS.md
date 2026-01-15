@@ -356,7 +356,7 @@ let response = client
     .with_model("gemini-3-flash-preview")
     .with_text("Personalize search results based on my preferences")
     .with_google_search()
-    .with_function(get_user_prefs.declaration())
+    .add_function(get_user_prefs.declaration())
     .create_with_auto_functions()
     .await?;
 ```

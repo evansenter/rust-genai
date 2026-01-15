@@ -302,7 +302,7 @@ use genai_rs::{Client, AutoFunctionStreamChunk};
 let mut stream = client.interaction()
     .with_model("gemini-3-flash-preview")
     .with_text("What's the weather in Tokyo?")
-    .with_functions(vec![weather_function])
+    .add_functions(vec![weather_function])
     .create_stream_with_auto_functions();
 
 while let Some(result) = stream.next().await {

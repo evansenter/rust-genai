@@ -252,7 +252,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_content(vec![
+       .set_content(vec![
            text_content("Describe what's happening in this video."),
            video_content,
        ])

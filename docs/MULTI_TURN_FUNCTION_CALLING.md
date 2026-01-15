@@ -198,7 +198,7 @@ let functions = vec![
 
 let response = client.interaction()
     .with_text("Look up customer CUST-001")
-    .with_functions(functions)
+    .add_functions(functions)
     .create()  // Manual handling required
     .await?;
 
@@ -251,7 +251,7 @@ println!("Final: {}", result.response.text().unwrap());
 ```rust,ignore
 let mut response = client.interaction()
     .with_text("What's the weather in Tokyo?")
-    .with_functions(functions)
+    .add_functions(functions)
     .create()
     .await?;
 
@@ -275,7 +275,7 @@ for _ in 0..MAX_ITERATIONS {
     response = client.interaction()
         .with_model("gemini-3-flash-preview")
         .with_previous_interaction(response.id.as_ref().unwrap())
-        .with_content(results)
+        .set_content(results)
         .create()
         .await?;
 }
@@ -317,7 +317,7 @@ let result_contents: Vec<_> = calls.iter().zip(results.iter())
 // Function result turn - no need to resend tools
 response = client.interaction()
     .with_previous_interaction(&response.id.unwrap())
-    .with_content(result_contents)
+    .set_content(result_contents)
     .create()
     .await?;
 ```
@@ -420,7 +420,7 @@ let system_prompt = "You are a helpful assistant";
 let response = client.interaction()
     .with_model("gemini-3-flash-preview")
     .with_text(message)
-    .with_functions(functions.clone())
+    .add_functions(functions.clone())
     .with_system_instruction(system_prompt)
     .with_previous_interaction(&last_id)  // if not first turn
     .create()
@@ -438,7 +438,7 @@ let results = execute_functions(&calls);
 // Function result turn - no tools needed
 response = client.interaction()
     .with_previous_interaction(&response.id.unwrap())
-    .with_content(results)  // Just the function results
+    .set_content(results)  // Just the function results
     .create()
     .await?;
 ```
@@ -537,7 +537,7 @@ impl Agent {
                 self.client.interaction()
                     .with_model("gemini-3-flash-preview")
                     .with_text(message)
-                    .with_functions(self.functions.clone())
+                    .add_functions(self.functions.clone())
                     .with_previous_interaction(prev_id)
                     .create()
                     .await?
@@ -546,7 +546,7 @@ impl Agent {
                 self.client.interaction()
                     .with_model("gemini-3-flash-preview")
                     .with_text(message)
-                    .with_functions(self.functions.clone())
+                    .add_functions(self.functions.clone())
                     .with_system_instruction("...")
                     .create()
                     .await?
@@ -585,7 +585,7 @@ impl StatelessSession {
         let mut response = self.client.interaction()
             .with_model("gemini-3-flash-preview")
             .with_input(InteractionInput::Content(self.history.clone()))
-            .with_functions(self.functions.clone())
+            .add_functions(self.functions.clone())
             .with_system_instruction(&self.system_instruction)
             .with_store_disabled()
             .create()

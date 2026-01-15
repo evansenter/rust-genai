@@ -2062,7 +2062,7 @@ impl InteractionContent {
     ///
     /// let response = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
-    ///     .with_content(vec![
+    ///     .set_content(vec![
     ///         InteractionContent::new_text("Describe this video"),
     ///         content,
     ///     ])

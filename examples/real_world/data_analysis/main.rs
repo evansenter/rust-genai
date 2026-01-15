@@ -387,7 +387,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                  When showing statistics, explain what the numbers mean.",
             )
             .with_text(question)
-            .with_functions(functions.clone())
+            .add_functions(functions.clone())
             .create_with_auto_functions()
             .await?;
 

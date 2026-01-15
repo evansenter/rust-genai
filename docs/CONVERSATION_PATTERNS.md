@@ -314,7 +314,7 @@ let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
     .with_history(history)
-    .with_function(get_weather.declaration())
+    .add_function(get_weather.declaration())
     .create_with_auto_functions()
     .await?;
 ```

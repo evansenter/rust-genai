@@ -506,7 +506,7 @@ pub fn document_uri_content(
 ///
 /// let response = client.interaction()
 ///     .with_model("gemini-3-flash-preview")
-///     .with_content(vec![
+///     .set_content(vec![
 ///         genai_rs::text_content("Describe this video"),
 ///         content,
 ///     ])

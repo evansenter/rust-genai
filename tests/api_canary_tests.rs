@@ -136,7 +136,7 @@ async fn canary_function_calling_interaction() {
         .interaction()
         .with_model(CANARY_MODEL)
         .with_text("What time is it?")
-        .with_functions(vec![get_time])
+        .add_functions(vec![get_time])
         .create()
         .await
         .expect("API call should succeed");
@@ -191,7 +191,7 @@ async fn canary_code_execution_interaction() {
             .interaction()
             .with_model(CANARY_MODEL)
             .with_text("Use code execution to calculate 2 + 2")
-            .with_tools(vec![Tool::CodeExecution])
+            .set_tools(vec![Tool::CodeExecution])
             .create(),
     )
     .await;

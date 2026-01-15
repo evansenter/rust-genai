@@ -92,7 +92,7 @@ Stateful customer support bot with automatic function execution:
 // Auto handles function calling loop
 let result = client.interaction()
     .with_previous_interaction(&last_id)
-    .with_functions(tools)
+    .add_functions(tools)
     .create_with_auto_functions().await?;
 ```
 
@@ -104,7 +104,7 @@ Same bot with manual control over function execution:
 // Manual function calling loop
 let response = client.interaction()
     .with_previous_interaction(&last_id)
-    .with_content(function_results)
+    .set_content(function_results)
     .create().await?;
 ```
 
@@ -142,7 +142,7 @@ Natural language data queries:
 // NL question -> function calls -> answer
 let result = client.interaction()
     .with_text("What are total sales by region?")
-    .with_functions(data_tools)
+    .add_functions(data_tools)
     .create_with_auto_functions().await?;
 ```
 
@@ -209,7 +209,7 @@ fn get_stats(column: String) -> String {
 
 // Use in interaction
 client.interaction()
-    .with_functions(vec![GetStatsCallable.declaration()])
+    .add_functions(vec![GetStatsCallable.declaration()])
 ```
 
 ### Structured Output

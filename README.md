@@ -59,11 +59,11 @@ async fn main() -> Result<(), genai_rs::GenaiError> {
 
 ```toml
 [dependencies]
-genai-rs = "0.6"
+genai-rs = "0.7"
 tokio = { version = "1.0", features = ["full"] }
 
 # Optional
-genai-rs-macros = "0.6"  # For #[tool] macro
+genai-rs-macros = "0.7"  # For #[tool] macro
 futures-util = "0.3"     # For streaming
 ```
 
@@ -126,7 +126,7 @@ fn get_weather(location: String) -> String {
 
 let result = client.interaction()
     .with_text("What's the weather in Tokyo?")
-    .with_function(GetWeatherCallable.declaration())
+    .add_function(GetWeatherCallable.declaration())
     .create_with_auto_functions()
     .await?;
 ```

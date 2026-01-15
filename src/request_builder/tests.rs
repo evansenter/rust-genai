@@ -146,7 +146,7 @@ fn test_interaction_builder_with_function() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Call a function")
-        .with_function(func);
+        .add_function(func);
 
     assert!(builder.tools.is_some());
     assert_eq!(builder.tools.as_ref().unwrap().len(), 1);
@@ -202,7 +202,7 @@ fn test_interaction_builder_with_mcp_server_and_other_tools() {
         .with_text("Use MCP and other tools")
         .with_mcp_server("my-server", "https://mcp.example.com")
         .with_google_search()
-        .with_function(func);
+        .add_function(func);
 
     assert!(builder.tools.is_some());
     let tools = builder.tools.as_ref().unwrap();
@@ -455,7 +455,7 @@ async fn test_auto_functions_allows_store_true() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Test")
-        .with_function(func)
+        .add_function(func)
         .with_store_enabled() // Explicitly true
         .create_with_auto_functions()
         .await;
@@ -483,7 +483,7 @@ async fn test_auto_functions_allows_store_default() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Test")
-        .with_function(func)
+        .add_function(func)
         // No .with_store() call - uses default (None, which means true on server)
         .create_with_auto_functions()
         .await;
@@ -776,14 +776,14 @@ fn test_with_content_cannot_combine_with_history() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_history(history)
-        .with_content(content)
+        .set_content(content)
         .build();
 
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(
-        err.to_string().contains("with_content()"),
-        "Error should mention with_content(): {}",
+        err.to_string().contains("set_content()"),
+        "Error should mention set_content(): {}",
         err
     );
 }
@@ -805,7 +805,7 @@ fn test_with_content_and_text_merge() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Describe this image")
-        .with_content(vec![image_content.clone()])
+        .set_content(vec![image_content.clone()])
         .build()
         .expect("Should succeed");
 
@@ -829,7 +829,7 @@ fn test_with_content_and_text_merge() {
     let request2 = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_content(vec![image_content])
+        .set_content(vec![image_content])
         .with_text("Describe this image")
         .build()
         .expect("Should succeed");
@@ -860,7 +860,7 @@ fn test_with_content_alone_works() {
     let result = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_content(content)
+        .set_content(content)
         .build();
 
     assert!(result.is_ok());
@@ -1045,7 +1045,7 @@ fn test_interaction_builder_with_file_search_and_other_tools() {
         .with_text("Search and process")
         .with_file_search(vec!["stores/docs".to_string()])
         .with_google_search()
-        .with_function(func);
+        .add_function(func);
 
     assert!(builder.tools.is_some());
     let tools = builder.tools.as_ref().unwrap();

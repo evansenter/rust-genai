@@ -161,7 +161,7 @@ pub struct InteractionBuilder<'a, State = FirstTurn> {
     history: Vec<Turn>,
     /// Current user message (set by `with_text()`)
     current_message: Option<String>,
-    /// Content input for function results (set by `with_content()`)
+    /// Content input for function results (set by `set_content()`)
     content_input: Option<Vec<InteractionContent>>,
     previous_interaction_id: Option<String>,
     tools: Option<Vec<InternalTool>>,
@@ -485,10 +485,10 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// This is a convenience method that dispatches to the appropriate setter:
     /// - `InteractionInput::Text(text)` → `with_text(text)`
-    /// - `InteractionInput::Content(content)` → `with_content(content)`
+    /// - `InteractionInput::Content(content)` → `set_content(content)`
     /// - `InteractionInput::Turns(turns)` → `with_history(turns)`
     ///
-    /// For direct usage, prefer the specific methods (`with_text()`, `with_content()`,
+    /// For direct usage, prefer the specific methods (`with_text()`, `set_content()`,
     /// `with_history()`) for clarity.
     #[must_use]
     pub fn with_input(mut self, input: InteractionInput) -> Self {
@@ -587,15 +587,16 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         self
     }
 
-    /// Sets the input from a vector of content objects.
+    /// Sets the input from a vector of content objects, replacing any existing content.
     ///
     /// This is useful for building multi-part inputs or for sending function results.
+    /// Use `add_*` methods (like `add_image_file()`) to accumulate content instead.
     ///
     /// # Panics / Errors
     ///
-    /// Calling `build()` will return an error if `with_content()` is combined with
-    /// `with_history()` or `with_text()`. If you need to combine function results with
-    /// conversation history, include them in the history via [`Turn`] objects instead.
+    /// Calling `build()` will return an error if `set_content()` is combined with
+    /// `with_history()`. If you need to combine function results with conversation
+    /// history, include them in the history via [`Turn`] objects instead.
     ///
     /// # Example
     /// ```no_run
@@ -609,14 +610,14 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// let response = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
-    ///     .with_content(vec![result])
+    ///     .set_content(vec![result])
     ///     .create()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
     #[must_use]
-    pub fn with_content(mut self, content: Vec<InteractionContent>) -> Self {
+    pub fn set_content(mut self, content: Vec<InteractionContent>) -> Self {
         self.content_input = Some(content);
         self
     }
@@ -1169,6 +1170,8 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// is referenced by its URI, which is more efficient than sending the file
     /// data inline for large files or files used across multiple interactions.
     ///
+    /// This method accumulates content - it can be called multiple times.
+    ///
     /// # Example
     ///
     /// ```no_run
@@ -1186,14 +1189,14 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("Describe this video")
-    ///     .with_file(&file)
+    ///     .add_file(&file)
     ///     .create()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
     #[must_use]
-    pub fn with_file(mut self, file: &crate::FileMetadata) -> Self {
+    pub fn add_file(mut self, file: &crate::FileMetadata) -> Self {
         let content = crate::interactions_api::file_uri_content(file);
         self.add_content_item(content);
         self
@@ -1203,6 +1206,8 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// Use this when you have the file URI and MIME type but not the full
     /// `FileMetadata` struct. The content type is inferred from the MIME type.
+    ///
+    /// This method accumulates content - it can be called multiple times.
     ///
     /// # Example
     ///
@@ -1217,7 +1222,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("Describe this video")
-    ///     .with_file_uri(
+    ///     .add_file_uri(
     ///         "https://generativelanguage.googleapis.com/v1beta/files/abc123",
     ///         "video/mp4"
     ///     )
@@ -1227,7 +1232,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # }
     /// ```
     #[must_use]
-    pub fn with_file_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn add_file_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
         let content =
             crate::interactions_api::content_from_uri_and_mime(uri.into(), mime_type.into());
         self.add_content_item(content);
@@ -1261,16 +1266,18 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         self.tools.get_or_insert_with(Vec::new).push(tool);
     }
 
-    /// Adds tools for function calling.
+    /// Sets the tools for function calling, replacing any existing tools.
+    ///
+    /// Use `add_function()` to accumulate functions instead of replacing.
     #[must_use]
-    pub fn with_tools(mut self, tools: Vec<InternalTool>) -> Self {
+    pub fn set_tools(mut self, tools: Vec<InternalTool>) -> Self {
         self.tools = Some(tools);
         self
     }
 
     /// Adds a single function declaration to the request.
     ///
-    /// This method can be called multiple times to add several functions.
+    /// This method can be called multiple times to accumulate functions.
     /// Each function is converted into a [`crate::Tool`] and added to the request.
     ///
     /// # Example
@@ -1291,17 +1298,17 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("What's the temperature in Paris?")
-    ///     .with_function(func);
+    ///     .add_function(func);
     /// ```
     #[must_use]
-    pub fn with_function(mut self, function: FunctionDeclaration) -> Self {
+    pub fn add_function(mut self, function: FunctionDeclaration) -> Self {
         self.add_tool(function.into_tool());
         self
     }
 
     /// Adds multiple function declarations to the request at once.
     ///
-    /// This is a convenience method equivalent to calling [`with_function`] multiple times.
+    /// This is a convenience method equivalent to calling [`add_function`] multiple times.
     ///
     /// # Example
     ///
@@ -1319,12 +1326,12 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .interaction()
     ///     .with_model("gemini-3-flash-preview")
     ///     .with_text("What's the weather and time?")
-    ///     .with_functions(functions);
+    ///     .add_functions(functions);
     /// ```
     ///
-    /// [`with_function`]: InteractionBuilder::with_function
+    /// [`add_function`]: InteractionBuilder::add_function
     #[must_use]
-    pub fn with_functions(mut self, functions: Vec<FunctionDeclaration>) -> Self {
+    pub fn add_functions(mut self, functions: Vec<FunctionDeclaration>) -> Self {
         for func in functions {
             self.add_tool(func.into_tool());
         }
@@ -2510,8 +2517,8 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Errors
     ///
     /// Returns [`GenaiError::InvalidInput`] if:
-    /// - No input was provided (via `with_text()`, `with_history()`, `with_content()`, etc.)
-    /// - `with_content()` was combined with `with_history()` or `with_text()` (mutually exclusive)
+    /// - No input was provided (via `with_text()`, `with_history()`, `set_content()`, etc.)
+    /// - `set_content()` was combined with `with_history()` or `with_text()` (mutually exclusive)
     /// - Neither model nor agent was specified
     /// - Both model and agent were specified (mutually exclusive)
     pub fn build(self) -> Result<InteractionRequest, GenaiError> {
@@ -2519,9 +2526,18 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         // Content input is fundamentally incompatible with multi-turn history
         if self.content_input.is_some() && !self.history.is_empty() {
             return Err(GenaiError::InvalidInput(
-                "Content input (with_content() or add_* methods) cannot be combined with \
+                "Content input (set_content() or add_* methods) cannot be combined with \
                  with_history(). For multimodal multi-turn conversations, build Turn objects \
                  with content arrays instead."
+                    .to_string(),
+            ));
+        }
+
+        // Validate that agent_config is not set without agent
+        if self.agent_config.is_some() && self.agent.is_none() {
+            return Err(GenaiError::InvalidInput(
+                "with_agent_config() requires with_agent(). \
+                 Agent config is ignored when using with_model()."
                     .to_string(),
             ));
         }
