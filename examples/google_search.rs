@@ -150,7 +150,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         match result {
             Ok(event) => match event.chunk {
                 StreamChunk::Delta(content) => {
-                    if let Some(text) = content.text() {
+                    if let Some(text) = content.as_text() {
                         print!("{}", text);
                         stdout().flush()?;
                     }

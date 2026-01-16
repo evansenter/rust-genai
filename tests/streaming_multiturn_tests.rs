@@ -136,7 +136,7 @@ async fn test_streaming_multi_turn_function_calling() {
     let response2 = retry_request!([client, prev_id, function_result, get_weather] => {
         stateful_builder(&client)
             .with_previous_interaction(&prev_id)
-            .set_content(vec![function_result])
+            .with_content(vec![function_result])
             .add_function(get_weather)
             .with_store_enabled()
             .create()

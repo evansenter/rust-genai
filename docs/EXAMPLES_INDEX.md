@@ -201,7 +201,7 @@ Send images for analysis with resolution control.
 ```bash
 cargo run --example multimodal_image
 ```
-**Learn**: `add_image_file()`, `Resolution`, image comparison.
+**Learn**: `with_content()`, `Content::image_data()`, `Resolution`, image comparison.
 
 #### files_api
 Upload files once, reference many times.

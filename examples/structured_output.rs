@@ -289,7 +289,7 @@ async fn streaming_structured_output(client: &Client) -> Result<(), Box<dyn Erro
         match result {
             Ok(event) => match event.chunk {
                 StreamChunk::Delta(content) => {
-                    if let Some(text) = content.text() {
+                    if let Some(text) = content.as_text() {
                         print!("{}", text);
                         stdout().flush()?;
                     }

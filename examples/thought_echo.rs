@@ -22,7 +22,7 @@
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
 use genai_rs::interactions_api::text_content;
-use genai_rs::{Client, InteractionContent, InteractionInput, ThinkingLevel};
+use genai_rs::{Client, Content, InteractionInput, ThinkingLevel};
 use std::env;
 
 #[tokio::main]
@@ -120,7 +120,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Model's answer: {}\n", answer);
 
     // Build manual history - TEXT ONLY (no thoughts!)
-    let history: Vec<InteractionContent> = vec![
+    let history: Vec<Content> = vec![
         text_content(prompt),
         text_content(answer),
         text_content("Now divide that by 13."),

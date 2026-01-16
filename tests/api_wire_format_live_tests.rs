@@ -72,7 +72,7 @@ async fn canary_basic_interaction_no_unknown_content() {
         assert!(
             !content.is_unknown(),
             "Unknown content type detected at output index {}: {:?}. \
-             This indicates API drift - update InteractionContent enum. \
+             This indicates API drift - update Content enum. \
              Unknown type: {:?}",
             i,
             content.unknown_content_type(),

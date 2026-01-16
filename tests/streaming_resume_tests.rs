@@ -160,7 +160,7 @@ async fn test_get_interaction_stream() {
                 match event.chunk {
                     StreamChunk::Delta(delta) => {
                         delta_count += 1;
-                        if let Some(text) = delta.text() {
+                        if let Some(text) = delta.as_text() {
                             collected_text.push_str(text);
                             print!("{}", text);
                         }
@@ -305,7 +305,7 @@ async fn test_stream_resume_with_last_event_id() {
                 all_event_ids.push(eid.clone());
             }
             if let StreamChunk::Delta(delta) = event.chunk
-                && let Some(text) = delta.text()
+                && let Some(text) = delta.as_text()
             {
                 full_text.push_str(text);
             }
@@ -345,7 +345,7 @@ async fn test_stream_resume_with_last_event_id() {
                 resumed_event_ids.push(eid.clone());
             }
             if let StreamChunk::Delta(delta) = event.chunk
-                && let Some(text) = delta.text()
+                && let Some(text) = delta.as_text()
             {
                 resumed_text.push_str(text);
             }

@@ -7,7 +7,7 @@
 //!
 //! Run with: cargo run --example video_input
 
-use genai_rs::{Client, GenaiError};
+use genai_rs::{Client, Content, GenaiError};
 use std::env;
 use std::error::Error;
 
@@ -28,16 +28,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("=== Example 1: Video Analysis ===\n");
 
     // Note: This uses a minimal MP4 header for demonstration.
-    // In real usage, you would use add_video_file() for automatic file loading:
-    //   .add_video_file("video.mp4").await?
+    // In real usage, you would use video_from_file() for automatic file loading.
     let response = client
         .interaction()
         .with_model(model_name)
-        .with_text(
-            "This is a demo video file. In real usage, describe what you see. \
-             If the video is empty or corrupted, just say 'No video content detected.'",
-        )
-        .add_video_data(DEMO_MP4_BASE64, "video/mp4")
+        .with_content(vec![
+            Content::text(
+                "This is a demo video file. In real usage, describe what you see. \
+                 If the video is empty or corrupted, just say 'No video content detected.'",
+            ),
+            Content::video_data(DEMO_MP4_BASE64, "video/mp4"),
+        ])
         .create()
         .await;
 
@@ -59,24 +60,30 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Here are common patterns for working with video:\n");
 
-    println!("1. SCENE DESCRIPTION (Fluent Pattern):");
+    println!("1. SCENE DESCRIPTION:");
     println!(
         r#"
-   // Most ergonomic: fluent builder pattern
+   // Using with_content() for multimodal input
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_text("Describe the key scenes in this video. What's happening?")
-       .add_video_data(&base64_video, "video/mp4")
+       .with_content(vec![
+           Content::text("Describe the key scenes in this video. What's happening?"),
+           Content::video_data(&base64_video, "video/mp4"),
+       ])
        .create()
        .await?;
 
-   // Or load from file with automatic MIME detection:
+   // Or load from file with automatic encoding:
+   use genai_rs::video_from_file;
+   let video = video_from_file("video.mp4").await?;
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_text("Describe the key scenes in this video.")
-       .add_video_file("video.mp4").await?
+       .with_content(vec![
+           Content::text("Describe the key scenes in this video."),
+           video,
+       ])
        .create()
        .await?;
 "#
@@ -88,9 +95,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_text("List all the objects and people visible in this video.
-           For each, note when they first appear (approximate timestamp).")
-       .add_video_data(&base64_video, "video/mp4")
+       .with_content(vec![
+           Content::text("List all the objects and people visible in this video.
+               For each, note when they first appear (approximate timestamp)."),
+           Content::video_data(&base64_video, "video/mp4"),
+       ])
        .create()
        .await?;
 "#
@@ -102,9 +111,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_text("What actions or activities are being performed in this video?
-           Describe the sequence of events.")
-       .add_video_data(&base64_video, "video/mp4")
+       .with_content(vec![
+           Content::text("What actions or activities are being performed in this video?
+               Describe the sequence of events."),
+           Content::video_data(&base64_video, "video/mp4"),
+       ])
        .create()
        .await?;
 "#
@@ -116,8 +127,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_text("How many people are in this video? What are they wearing?")
-       .add_video_data(&base64_video, "video/mp4")
+       .with_content(vec![
+           Content::text("How many people are in this video? What are they wearing?"),
+           Content::video_data(&base64_video, "video/mp4"),
+       ])
        .create()
        .await?;
 "#
@@ -135,8 +148,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
    let first = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_text("Describe what's happening in this video.")
-       .add_video_data(&base64_video, "video/mp4")
+       .with_content(vec![
+           Content::text("Describe what's happening in this video."),
+           Content::video_data(&base64_video, "video/mp4"),
+       ])
        .with_store_enabled()  // Enable conversation storage
        .create()
        .await?;
@@ -172,11 +187,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_text("Analyze this video:
-           1. What is shown visually?
-           2. What sounds or speech can you hear?
-           3. How do the visuals and audio relate?")
-       .add_video_data(&base64_video, "video/mp4")
+       .with_content(vec![
+           Content::text("Analyze this video:
+               1. What is shown visually?
+               2. What sounds or speech can you hear?
+               3. How do the visuals and audio relate?"),
+           Content::video_data(&base64_video, "video/mp4"),
+       ])
        .create()
        .await?;
 "#
@@ -193,8 +210,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     match client
         .interaction()
         .with_model(model_name)
-        .with_text("Describe this video.")
-        .add_video_data(invalid_base64, "video/mp4")
+        .with_content(vec![
+            Content::text("Describe this video."),
+            Content::video_data(invalid_base64, "video/mp4"),
+        ])
         .create()
         .await
     {
@@ -252,19 +271,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .set_content(vec![
-           text_content("Describe what's happening in this video."),
+       .with_content(vec![
+           Content::text("Describe what's happening in this video."),
            video_content,
        ])
-       .create()
-       .await?;
-
-   // Or use the async builder method directly
-   let response = client
-       .interaction()
-       .with_model("gemini-3-flash-preview")
-       .with_text("Describe what's happening in this video.")
-       .add_video_file("path/to/video.mp4").await?
        .create()
        .await?;
 "#
@@ -280,12 +290,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
    let video_bytes = fs::read("path/to/video.mp4")?;
    let base64_video = base64::engine::general_purpose::STANDARD.encode(&video_bytes);
 
-   // Send with fluent builder
+   // Send with with_content
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_text("Describe what's happening in this video.")
-       .add_video_data(&base64_video, "video/mp4")
+       .with_content(vec![
+           Content::text("Describe what's happening in this video."),
+           Content::video_data(&base64_video, "video/mp4"),
+       ])
        .create()
        .await?;
 "#
@@ -301,9 +313,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("✅ Video Input Demo Complete\n");
 
     println!("--- Key Takeaways ---");
-    println!("• add_video_data(base64, mime_type) for inline video content");
-    println!("• add_video_file(path) loads and encodes video automatically");
-    println!("• video_from_file() helper for programmatic content building");
+    println!("• Content::video_data(base64, mime_type) for inline video content");
+    println!("• video_from_file() helper loads and encodes files automatically");
+    println!("• with_content() accepts mixed Content::text() + Content::video_data()");
     println!("• Model analyzes both visual content and audio track\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");

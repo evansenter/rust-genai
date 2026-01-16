@@ -11,7 +11,7 @@
 //! When adding new enums or updating wire formats, add corresponding tests here.
 
 use genai_rs::{
-    FunctionCallingMode, InteractionContent, InteractionStatus, Resolution, Role, ThinkingLevel,
+    Content, FunctionCallingMode, InteractionStatus, Resolution, Role, ThinkingLevel,
     ThinkingSummaries,
 };
 use serde_json::json;
@@ -370,7 +370,7 @@ mod role {
 }
 
 // =============================================================================
-// InteractionContent Wire Format Tests
+// Content Wire Format Tests
 // Per docs: snake_case type field - "text", "function_call", etc.
 // =============================================================================
 
@@ -379,7 +379,7 @@ mod interaction_content {
 
     #[test]
     fn text_uses_snake_case_type() {
-        let content = InteractionContent::Text {
+        let content = Content::Text {
             text: Some("hello".to_string()),
             annotations: None,
         };
@@ -389,7 +389,7 @@ mod interaction_content {
 
     #[test]
     fn function_call_uses_snake_case_type() {
-        let content = InteractionContent::FunctionCall {
+        let content = Content::FunctionCall {
             id: Some("call_123".to_string()),
             name: "test".to_string(),
             args: json!({}),
@@ -400,7 +400,7 @@ mod interaction_content {
 
     #[test]
     fn function_result_uses_snake_case_type() {
-        let content = InteractionContent::FunctionResult {
+        let content = Content::FunctionResult {
             call_id: "call_123".to_string(),
             name: Some("test".to_string()),
             result: json!({"output": "result"}),
@@ -412,7 +412,7 @@ mod interaction_content {
 
     #[test]
     fn thought_uses_snake_case_type() {
-        let content = InteractionContent::Thought {
+        let content = Content::Thought {
             signature: Some("Eq0JCqoJ...signature".to_string()),
         };
         let json = serde_json::to_value(&content).unwrap();
@@ -422,7 +422,7 @@ mod interaction_content {
 
     #[test]
     fn code_execution_call_uses_snake_case_type() {
-        let content = InteractionContent::CodeExecutionCall {
+        let content = Content::CodeExecutionCall {
             id: Some("exec_123".to_string()),
             language: genai_rs::CodeExecutionLanguage::Python,
             code: "print('hello')".to_string(),
@@ -433,7 +433,7 @@ mod interaction_content {
 
     #[test]
     fn code_execution_result_uses_snake_case_type() {
-        let content = InteractionContent::CodeExecutionResult {
+        let content = Content::CodeExecutionResult {
             call_id: Some("exec_123".to_string()),
             is_error: false,
             result: "hello".to_string(),
@@ -444,7 +444,7 @@ mod interaction_content {
 
     #[test]
     fn image_uses_snake_case_type() {
-        let content = InteractionContent::Image {
+        let content = Content::Image {
             data: None,
             uri: Some("gs://bucket/image.png".to_string()),
             mime_type: Some("image/png".to_string()),
@@ -456,7 +456,7 @@ mod interaction_content {
 
     #[test]
     fn audio_uses_snake_case_type() {
-        let content = InteractionContent::Audio {
+        let content = Content::Audio {
             data: None,
             uri: Some("gs://bucket/audio.mp3".to_string()),
             mime_type: Some("audio/mpeg".to_string()),
@@ -467,7 +467,7 @@ mod interaction_content {
 
     #[test]
     fn video_uses_snake_case_type() {
-        let content = InteractionContent::Video {
+        let content = Content::Video {
             data: None,
             uri: Some("gs://bucket/video.mp4".to_string()),
             mime_type: Some("video/mp4".to_string()),
@@ -479,7 +479,7 @@ mod interaction_content {
 
     #[test]
     fn document_uses_snake_case_type() {
-        let content = InteractionContent::Document {
+        let content = Content::Document {
             data: None,
             uri: Some("gs://bucket/doc.pdf".to_string()),
             mime_type: Some("application/pdf".to_string()),

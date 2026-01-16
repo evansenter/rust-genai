@@ -21,17 +21,19 @@
 //! For files larger than 20MB, consider these alternatives:
 //!
 //! 1. **URI-based methods**: Upload files to Google Cloud Storage and use
-//!    the `add_*_uri()` builder methods instead:
+//!    `Content::from_uri_and_mime()` with `with_content()`:
 //!
 //!    ```no_run
-//!    # use genai_rs::Client;
+//!    # use genai_rs::{Client, Content};
 //!    # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //!    # let client = Client::new("key".to_string());
 //!    let response = client
 //!        .interaction()
 //!        .with_model("gemini-3-flash-preview")
-//!        .with_text("Describe this video")
-//!        .add_video_uri("gs://bucket/large-video.mp4", "video/mp4")
+//!        .with_content(vec![
+//!            Content::text("Describe this video"),
+//!            Content::from_uri_and_mime("gs://bucket/large-video.mp4", "video/mp4"),
+//!        ])
 //!        .create()
 //!        .await?;
 //!    # Ok(())
@@ -42,15 +44,17 @@
 //!    interactions, the Files API allows uploading once and referencing by URI:
 //!
 //!    ```no_run
-//!    # use genai_rs::Client;
+//!    # use genai_rs::{Client, Content};
 //!    # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //!    # let client = Client::new("key".to_string());
 //!    let file = client.upload_file("large-video.mp4").await?;
 //!    let response = client
 //!        .interaction()
 //!        .with_model("gemini-3-flash-preview")
-//!        .with_text("Describe this video")
-//!        .add_file(&file)
+//!        .with_content(vec![
+//!            Content::text("Describe this video"),
+//!            Content::from_file(&file),
+//!        ])
 //!        .create()
 //!        .await?;
 //!    # Ok(())
@@ -60,7 +64,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use genai_rs::{Client, image_from_file, text_content};
+//! use genai_rs::{Client, Content, image_from_file};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let client = Client::new("api-key".to_string());
@@ -68,22 +72,20 @@
 //! // Load image from file with automatic MIME detection
 //! let image = image_from_file("photo.jpg").await?;
 //!
-//! let contents = vec![
-//!     text_content("What's in this image?"),
-//!     image,
-//! ];
-//!
 //! let response = client
 //!     .interaction()
 //!     .with_model("gemini-3-flash-preview")
-//!     .set_content(contents)
+//!     .with_content(vec![
+//!         Content::text("What's in this image?"),
+//!         image,
+//!     ])
 //!     .create()
 //!     .await?;
 //! # Ok(())
 //! # }
 //! ```
 
-use crate::InteractionContent;
+use crate::Content;
 use crate::errors::GenaiError;
 use crate::interactions_api::{
     audio_data_content, document_data_content, image_data_content, video_data_content,
@@ -304,7 +306,7 @@ fn validate_mime_category(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn image_from_file(path: impl AsRef<Path>) -> Result<InteractionContent, GenaiError> {
+pub async fn image_from_file(path: impl AsRef<Path>) -> Result<Content, GenaiError> {
     let path = path.as_ref();
 
     // Get extension with specific error handling
@@ -344,7 +346,7 @@ pub async fn image_from_file(path: impl AsRef<Path>) -> Result<InteractionConten
 pub async fn image_from_file_with_mime(
     path: impl AsRef<Path>,
     mime_type: impl Into<String>,
-) -> Result<InteractionContent, GenaiError> {
+) -> Result<Content, GenaiError> {
     let data = load_and_encode_file(&path).await?;
     Ok(image_data_content(data, mime_type))
 }
@@ -386,7 +388,7 @@ pub async fn image_from_file_with_mime(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn audio_from_file(path: impl AsRef<Path>) -> Result<InteractionContent, GenaiError> {
+pub async fn audio_from_file(path: impl AsRef<Path>) -> Result<Content, GenaiError> {
     let path = path.as_ref();
 
     // Get extension with specific error handling
@@ -428,7 +430,7 @@ pub async fn audio_from_file(path: impl AsRef<Path>) -> Result<InteractionConten
 pub async fn audio_from_file_with_mime(
     path: impl AsRef<Path>,
     mime_type: impl Into<String>,
-) -> Result<InteractionContent, GenaiError> {
+) -> Result<Content, GenaiError> {
     let data = load_and_encode_file(&path).await?;
     Ok(audio_data_content(data, mime_type))
 }
@@ -469,7 +471,7 @@ pub async fn audio_from_file_with_mime(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn video_from_file(path: impl AsRef<Path>) -> Result<InteractionContent, GenaiError> {
+pub async fn video_from_file(path: impl AsRef<Path>) -> Result<Content, GenaiError> {
     let path = path.as_ref();
 
     // Get extension with specific error handling
@@ -511,7 +513,7 @@ pub async fn video_from_file(path: impl AsRef<Path>) -> Result<InteractionConten
 pub async fn video_from_file_with_mime(
     path: impl AsRef<Path>,
     mime_type: impl Into<String>,
-) -> Result<InteractionContent, GenaiError> {
+) -> Result<Content, GenaiError> {
     let data = load_and_encode_file(&path).await?;
     Ok(video_data_content(data, mime_type))
 }
@@ -551,7 +553,7 @@ pub async fn video_from_file_with_mime(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn document_from_file(path: impl AsRef<Path>) -> Result<InteractionContent, GenaiError> {
+pub async fn document_from_file(path: impl AsRef<Path>) -> Result<Content, GenaiError> {
     let path = path.as_ref();
 
     // Get extension with specific error handling
@@ -610,7 +612,7 @@ pub async fn document_from_file(path: impl AsRef<Path>) -> Result<InteractionCon
 pub async fn document_from_file_with_mime(
     path: impl AsRef<Path>,
     mime_type: impl Into<String>,
-) -> Result<InteractionContent, GenaiError> {
+) -> Result<Content, GenaiError> {
     let data = load_and_encode_file(&path).await?;
     Ok(document_data_content(data, mime_type))
 }

@@ -212,7 +212,7 @@ mod basic {
 
             let response2 = stateful_builder(&client)
                 .with_previous_interaction(response.id.as_ref().expect("id should exist"))
-                .set_content(vec![result])
+                .with_content(vec![result])
                 .add_function(status_func)
                 .create()
                 .await
@@ -309,7 +309,7 @@ mod basic {
 
         let response2 = stateful_builder(&client)
             .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-            .set_content(vec![error_result])
+            .with_content(vec![error_result])
             .add_function(failing_func)
             .create()
             .await
@@ -527,7 +527,7 @@ mod parallel {
 
             let response2 = stateful_builder(&client)
                 .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-                .set_content(results)
+                .with_content(results)
                 .create()
                 .await
                 .expect("Parallel results turn failed - tools should not be required");
@@ -600,7 +600,7 @@ mod parallel {
                     .interaction()
                     .with_model("gemini-3-flash-preview")
                     .with_previous_interaction(response1.id.as_ref().expect("id required"))
-                    .set_content(results)
+                    .with_content(results)
                     .create()
                     .await
                     .expect("Function result turn failed - order might matter?");
@@ -680,7 +680,7 @@ mod parallel {
                     .interaction()
                     .with_model("gemini-3-flash-preview")
                     .with_previous_interaction(response1.id.as_ref().expect("id required"))
-                    .set_content(results)
+                    .with_content(results)
                     .create()
                     .await
                     .expect("Function result turn failed");
@@ -764,7 +764,7 @@ mod sequential {
 
             let response2 = stateful_builder(&client)
                 .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-                .set_content(vec![result1])
+                .with_content(vec![result1])
                 .add_functions(vec![get_weather.clone(), convert_temp.clone()])
                 .create()
                 .await
@@ -788,7 +788,7 @@ mod sequential {
 
                 let response3 = stateful_builder(&client)
                     .with_previous_interaction(response2.id.as_ref().expect("id should exist"))
-                    .set_content(vec![result2])
+                    .with_content(vec![result2])
                     .add_functions(vec![get_weather, convert_temp])
                     .create()
                     .await
@@ -843,7 +843,7 @@ mod sequential {
             // Step 2: Provide function result WITHOUT resending tools
             let response2 = stateful_builder(&client)
                 .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-                .set_content(vec![result])
+                .with_content(vec![result])
                 .create()
                 .await
                 .expect("Function result turn failed - tools should not be required");
@@ -919,7 +919,7 @@ mod sequential {
 
                 let next_response = stateful_builder(&client)
                     .with_previous_interaction(current_response.id.as_ref().expect("id should exist"))
-                    .set_content(results)
+                    .with_content(results)
                     .create()
                     .await
                     .expect("Compositional chain step failed");
@@ -1361,7 +1361,7 @@ mod stateless {
                     .build(),
             ];
 
-            let mut history: Vec<genai_rs::InteractionContent> =
+            let mut history: Vec<genai_rs::Content> =
                 vec![text_content("What's the weather in Tokyo?")];
 
             let response1 = client
@@ -1429,8 +1429,7 @@ mod stateless {
             .required(vec!["city".to_string()])
             .build();
 
-        let history: Vec<genai_rs::InteractionContent> =
-            vec![text_content("What's the weather in Paris?")];
+        let history: Vec<genai_rs::Content> = vec![text_content("What's the weather in Paris?")];
 
         // Stateless with thinking enabled, force function calling
         let response = client
@@ -1520,7 +1519,7 @@ mod thinking {
         let response2 = retry_request!([client, prev_id, get_weather, function_result] => {
             stateful_builder(&client)
                 .with_previous_interaction(&prev_id)
-                .set_content(vec![function_result])
+                .with_content(vec![function_result])
                 .add_function(get_weather)
                 .with_thinking_level(ThinkingLevel::Medium)
                 .with_store_enabled()
@@ -1619,7 +1618,7 @@ mod thinking {
         let response2 = retry_request!([client, prev_id, get_weather, get_time, results] => {
             stateful_builder(&client)
                 .with_previous_interaction(&prev_id)
-                .set_content(results)
+                .with_content(results)
                 .add_functions(vec![get_weather, get_time])
                 .with_thinking_level(ThinkingLevel::Medium)
                 .with_store_enabled()
@@ -1695,7 +1694,7 @@ mod thinking {
                 retry_request!([client, prev_id, get_weather_fn, fn_result, level_clone] => {
                     stateful_builder(&client)
                         .with_previous_interaction(&prev_id)
-                        .set_content(vec![fn_result])
+                        .with_content(vec![fn_result])
                         .add_function(get_weather_fn)
                         .with_thinking_level(level_clone)
                         .create()
@@ -1769,7 +1768,7 @@ mod thinking {
         let response2 = retry_request!([client, prev_id, get_weather_fn, fn_result] => {
             stateful_builder(&client)
                 .with_previous_interaction(&prev_id)
-                .set_content(vec![fn_result])
+                .with_content(vec![fn_result])
                 .add_function(get_weather_fn)
                 .create()
                 .await
@@ -1840,7 +1839,7 @@ mod thinking {
 
         let stream2 = stateful_builder(&client)
             .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-            .set_content(vec![function_result])
+            .with_content(vec![function_result])
             .add_function(get_weather)
             .with_thinking_level(ThinkingLevel::Medium)
             .with_store_enabled()
@@ -1972,7 +1971,7 @@ mod thinking {
             // Step 2
             let response2 = stateful_builder(&client)
                 .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-                .set_content(vec![result1])
+                .with_content(vec![result1])
                 .with_text("Now what about Paris?")
                 .add_function(get_weather.clone())
                 .with_thinking_level(ThinkingLevel::Low)
@@ -2131,7 +2130,7 @@ mod thinking {
         let response2 = retry_request!([client, prev_id, functions, results] => {
             stateful_builder(&client)
                 .with_previous_interaction(&prev_id)
-                .set_content(results)
+                .with_content(results)
                 .add_functions(functions)
                 .with_thinking_level(ThinkingLevel::Medium)
                 .with_store_enabled()
@@ -2198,7 +2197,7 @@ mod thinking {
             let response3 = retry_request!([client, prev_id, functions, results] => {
                 stateful_builder(&client)
                     .with_previous_interaction(&prev_id)
-                    .set_content(results)
+                    .with_content(results)
                     .add_functions(functions)
                     .with_thinking_level(ThinkingLevel::Medium)
                     .with_store_enabled()
@@ -2453,7 +2452,7 @@ mod multiturn {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_previous_interaction(response1.id.as_ref().expect("Should have ID"))
-            .set_content(results)
+            .with_content(results)
             .add_functions(functions.clone())
             .with_store_enabled()
             .create()
@@ -2689,7 +2688,7 @@ mod multiturn {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_previous_interaction(response1.id.as_ref().expect("Should have ID"))
-            .set_content(vec![error_result])
+            .with_content(vec![error_result])
             .add_function(secret_function)
             .with_store_enabled()
             .create()

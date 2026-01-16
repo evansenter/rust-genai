@@ -214,7 +214,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             in_thought = true;
                         }
                         stdout().flush()?;
-                    } else if let Some(t) = content.text() {
+                    } else if let Some(t) = content.as_text() {
                         if in_thought {
                             println!("\n[END THINKING]\n");
                             in_thought = false;

@@ -5,7 +5,7 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
-use crate::content::InteractionContent;
+use crate::content::Content;
 use crate::tools::{FunctionCallingMode, Tool};
 
 /// Role in a conversation turn.
@@ -131,7 +131,7 @@ impl<'de> Deserialize<'de> for Role {
 /// // From string reference
 /// let content: TurnContent = "Hello!".into();
 /// ```
-// Note: Unlike tagged enums (e.g., InteractionContent), this untagged enum cannot
+// Note: Unlike tagged enums (e.g., Content), this untagged enum cannot
 // have an Unknown variant. Untagged enums have no type discriminator field, so Serde
 // tries variants in order - there's no way to detect "unknown" content. The
 // #[non_exhaustive] attribute provides forward compatibility at the Rust level by
@@ -143,7 +143,7 @@ pub enum TurnContent {
     /// Simple text content
     Text(String),
     /// Array of content parts (for multimodal content)
-    Parts(Vec<InteractionContent>),
+    Parts(Vec<Content>),
 }
 
 impl From<String> for TurnContent {
@@ -158,8 +158,8 @@ impl From<&str> for TurnContent {
     }
 }
 
-impl From<Vec<InteractionContent>> for TurnContent {
-    fn from(parts: Vec<InteractionContent>) -> Self {
+impl From<Vec<Content>> for TurnContent {
+    fn from(parts: Vec<Content>) -> Self {
         Self::Parts(parts)
     }
 }
@@ -176,7 +176,7 @@ impl TurnContent {
 
     /// Returns the content parts if this is a `Parts` variant.
     #[must_use]
-    pub fn parts(&self) -> Option<&[InteractionContent]> {
+    pub fn parts(&self) -> Option<&[Content]> {
         match self {
             Self::Parts(p) => Some(p),
             Self::Text(_) => None,
@@ -325,7 +325,7 @@ pub enum InteractionInput {
     /// Simple text input
     Text(String),
     /// Array of content objects
-    Content(Vec<InteractionContent>),
+    Content(Vec<Content>),
     /// Array of turns for multi-turn conversations
     Turns(Vec<Turn>),
 }

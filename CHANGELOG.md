@@ -11,21 +11,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - New `docs/BUILDER_API.md` documenting the InteractionBuilder API, method naming conventions, and validation errors
 - `build()` now validates that `with_agent_config()` requires `with_agent()` - returns error instead of silently ignoring
+- **New Content API**: Static constructors on `Content` for all content types:
+  - `Content::text()`, `Content::image_data()`, `Content::image_uri()`, `Content::audio_data()`, `Content::audio_uri()`, `Content::video_data()`, `Content::video_uri()`, `Content::document_data()`, `Content::document_uri()`
+  - `Content::from_file(&FileMetadata)` - create content from Files API upload
+  - `Content::from_uri_and_mime(uri, mime)` - generic URI content
+  - Resolution variants: `Content::image_data_with_resolution()`, etc.
+- **Content builder methods**:
+  - `Content::with_resolution(Resolution)` - chain resolution setting
+  - `Content::with_result(value)` - convert `FunctionCall` to `FunctionResult`
+  - `Content::with_result_error(value)` - convert `FunctionCall` to error `FunctionResult`
 
 ### Changed
 
-- **BREAKING**: Method naming consistency overhaul for clearer semantics:
-  - `with_content()` → `set_content()` (replaces content)
-  - `with_tools()` → `set_tools()` (replaces tools)
-  - `with_function()` → `add_function()` (accumulates)
-  - `with_functions()` → `add_functions()` (accumulates)
-  - `with_file()` → `add_file()` (accumulates)
-  - `with_file_uri()` → `add_file_uri()` (accumulates)
+- **BREAKING**: Renamed `InteractionContent` → `Content` for ergonomics. Update imports: `use genai_rs::Content;`
+- **BREAKING**: Renamed `Content::text()` getter → `Content::as_text()` to follow Rust getter conventions
+- **BREAKING**: Renamed `InteractionResponse::text()` getter → `InteractionResponse::as_text()` for consistency
 - **BREAKING**: Renamed `with_turns()` to `with_history()`. The new name better reflects that this sets conversation history, and now composes correctly with `with_text()`: calling both produces `[...history, Turn::user(current_message)]` regardless of call order.
 - **BREAKING**: `with_text()` now sets `current_message` instead of replacing `input`. This fixes issue #359 where `with_turns().with_text()` silently overwrote the history.
 - **BREAKING**: `with_system_instruction()` is now available on ALL builder states (FirstTurn, Chained, StoreDisabled), not just FirstTurn. The API does NOT inherit system instructions via `previousInteractionId`, so users should set it explicitly on each turn if needed. For `create_with_auto_functions()`, the SDK automatically includes system_instruction on all internal turns.
-- `set_content()` and `add_*()` methods now compose with `with_text()` in any order - text is prepended to content at build time
+- Method naming consistency overhaul:
+  - `with_function()` → `add_function()` (accumulates)
+  - `with_functions()` → `add_functions()` (accumulates)
 - `build()` now returns an error if content input is combined with history (incompatible modes), with a helpful error message explaining the workaround
+
+### Removed
+
+- **BREAKING**: Removed all `add_*` multimodal methods from `InteractionBuilder`:
+  - `add_image_data()`, `add_image_uri()`, `add_image_file()`, `add_image_bytes()`
+  - `add_audio_data()`, `add_audio_uri()`, `add_audio_file()`, `add_audio_bytes()`
+  - `add_video_data()`, `add_video_uri()`, `add_video_file()`, `add_video_bytes()`
+  - `add_document_data()`, `add_document_uri()`, `add_document_file()`, `add_document_bytes()`
+  - `add_file()`, `add_file_uri()` (Files API methods)
+  - All `*_with_resolution()` variants
+
+  **Migration**: Use `with_content(vec![Content::*(...)])` instead. See migration guide below.
 
 ### Fixed
 
@@ -51,23 +70,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Migration Guide
 
-**Method renames for naming consistency:**
+**Type rename - `InteractionContent` → `Content`:**
 ```rust
 // Before (0.6.0)
-.with_content(items)
-.with_tools(tools)
-.with_function(func)
-.with_functions(funcs)
-.with_file(&file)
-.with_file_uri(uri, mime)
+use genai_rs::InteractionContent;
+let content = InteractionContent::new_text("Hello");
 
 // After (0.7.0)
-.set_content(items)    // set_* = replaces
-.set_tools(tools)      // set_* = replaces
-.add_function(func)    // add_* = accumulates
-.add_functions(funcs)  // add_* = accumulates
-.add_file(&file)       // add_* = accumulates
-.add_file_uri(uri, mime) // add_* = accumulates
+use genai_rs::Content;
+let content = Content::text("Hello");  // Static constructor
+```
+
+**Multimodal content - `add_*()` methods removed:**
+```rust
+// Before (0.6.0)
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text("Describe this image")
+    .add_image_file("photo.jpg").await?
+    .create()
+    .await?;
+
+// After (0.7.0) - Option A: Content constructors
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_content(vec![
+        Content::text("Describe this image"),
+        Content::image_data(base64_data, "image/png"),
+    ])
+    .create()
+    .await?;
+
+// After (0.7.0) - Option B: File helpers
+use genai_rs::image_from_file;
+let image = image_from_file("photo.jpg").await?;
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_content(vec![
+        Content::text("Describe this image"),
+        image,
+    ])
+    .create()
+    .await?;
+```
+
+**Files API - `add_file()` removed:**
+```rust
+// Before (0.6.0)
+let file = client.upload_file("video.mp4").await?;
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .add_file(&file)
+    .with_text("Describe this video")
+    .create()
+    .await?;
+
+// After (0.7.0)
+let file = client.upload_file("video.mp4").await?;
+let response = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_content(vec![
+        Content::text("Describe this video"),
+        Content::from_file(&file),
+    ])
+    .create()
+    .await?;
+```
+
+**Resolution control:**
+```rust
+// Before (0.6.0)
+.add_image_data_with_resolution(base64, "image/png", Resolution::High)
+
+// After (0.7.0) - Constructor
+Content::image_data_with_resolution(base64, "image/png", Resolution::High)
+
+// After (0.7.0) - Builder chain
+Content::image_data(base64, "image/png").with_resolution(Resolution::High)
 ```
 
 **`with_turns()` renamed to `with_history()` and composes with `with_text()`:**

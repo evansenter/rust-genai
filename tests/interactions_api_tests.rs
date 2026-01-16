@@ -316,7 +316,7 @@ mod streaming {
                     Ok(event) => match event.chunk {
                         StreamChunk::Delta(delta) => {
                             delta_count += 1;
-                            if let Some(text) = delta.text() {
+                            if let Some(text) = delta.as_text() {
                                 println!("Delta #{}: {:?} (len={})", delta_count, text, text.len());
                                 delta_texts.push(text.to_string());
                             }
@@ -563,7 +563,7 @@ mod function_calling {
 
                 let second_response = interaction_builder(&client)
                     .with_previous_interaction(response.id.as_ref().expect("id should exist"))
-                    .set_content(vec![function_result])
+                    .with_content(vec![function_result])
                     .add_function(get_weather)
                     .create()
                     .await
@@ -635,7 +635,7 @@ mod function_calling {
 
                     let response2 = interaction_builder(&client)
                         .with_previous_interaction(response.id.as_ref().expect("id should exist"))
-                        .set_content(vec![function_result])
+                        .with_content(vec![function_result])
                         .add_function(get_time)
                         .create()
                         .await
@@ -794,7 +794,7 @@ mod function_calling {
 
                 let response2 = interaction_builder(&client)
                     .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-                    .set_content(vec![function_result])
+                    .with_content(vec![function_result])
                     .add_function(get_weather)
                     .create()
                     .await
@@ -915,7 +915,7 @@ mod function_calling {
             let response2 = retry_request!([client, prev_id, call_id, get_info] => {
                 interaction_builder(&client)
                     .with_previous_interaction(&prev_id)
-                    .set_content(vec![function_result_content(
+                    .with_content(vec![function_result_content(
                         "get_info",
                         call_id,
                         json!({"info": "The weather is sunny and warm, about 25°C with clear skies."}),
@@ -991,7 +991,7 @@ mod function_calling {
                 let result = retry_request!([client, prev_id, call_id, get_weather] => {
                     interaction_builder(&client)
                         .with_previous_interaction(&prev_id)
-                        .set_content(vec![function_result_content(
+                        .with_content(vec![function_result_content(
                             "get_weather",
                             call_id,
                             json!({"temperature": "22°C", "conditions": "sunny"}),
@@ -1601,7 +1601,7 @@ mod multimodal {
     #[tokio::test]
     #[ignore = "Requires API key"]
     async fn test_image_generation() {
-        use genai_rs::InteractionContent;
+        use genai_rs::Content;
         use std::time::Duration;
 
         let Some(client) = get_client() else {
@@ -1634,7 +1634,7 @@ mod multimodal {
                 }
 
                 for output in &response.outputs {
-                    if let InteractionContent::Image {
+                    if let Content::Image {
                         data: Some(base64_data),
                         mime_type,
                         ..

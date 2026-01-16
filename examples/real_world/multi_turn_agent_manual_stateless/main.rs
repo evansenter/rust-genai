@@ -33,7 +33,7 @@
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
 use genai_rs::interactions_api::{function_call_content, function_result_content, text_content};
-use genai_rs::{Client, FunctionDeclaration, InteractionContent, InteractionInput};
+use genai_rs::{Client, Content, FunctionDeclaration, InteractionInput};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -259,7 +259,7 @@ fn get_function_declarations() -> Vec<FunctionDeclaration> {
 struct StatelessSupportSession {
     client: Client,
     /// Full conversation history maintained locally
-    conversation_history: Vec<InteractionContent>,
+    conversation_history: Vec<Content>,
     functions: Vec<FunctionDeclaration>,
     system_instruction: String,
 }

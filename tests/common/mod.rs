@@ -141,7 +141,7 @@ where
 ///         .await?;
 ///
 ///     // Check if we got an image (not text)
-///     if resp.outputs.iter().any(|o| matches!(o, InteractionContent::Image { .. })) {
+///     if resp.outputs.iter().any(|o| matches!(o, Content::Image { .. })) {
 ///         Ok(resp)
 ///     } else {
 ///         Err(anyhow::anyhow!("No image in response"))
@@ -540,7 +540,7 @@ pub async fn consume_stream(
                 match event.chunk {
                     StreamChunk::Delta(delta) => {
                         result.delta_count += 1;
-                        if let Some(text) = delta.text() {
+                        if let Some(text) = delta.as_text() {
                             result.collected_text.push_str(text);
                             print!("{}", text);
                         }
@@ -650,7 +650,7 @@ pub async fn consume_auto_function_stream(
                 match event.chunk {
                     AutoFunctionStreamChunk::Delta(delta) => {
                         result.delta_count += 1;
-                        if let Some(text) = delta.text() {
+                        if let Some(text) = delta.as_text() {
                             result.collected_text.push_str(text);
                             print!("{}", text);
                         }

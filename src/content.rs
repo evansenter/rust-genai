@@ -1,6 +1,6 @@
 //! Core content types for the Interactions API.
 //!
-//! This module contains `InteractionContent`, the primary enum representing all content
+//! This module contains `Content`, the primary enum representing all content
 //! types that can appear in API requests and responses, along with its custom serialization
 //! and deserialization implementations.
 
@@ -163,9 +163,9 @@ impl Annotation {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_rs::{InteractionContent, GoogleSearchResultItem};
-/// # let content: InteractionContent = todo!();
-/// if let InteractionContent::GoogleSearchResult { result, .. } = content {
+/// # use genai_rs::{Content, GoogleSearchResultItem};
+/// # let content: Content = todo!();
+/// if let Content::GoogleSearchResult { result, .. } = content {
 ///     for item in result {
 ///         println!("Source: {} - {}", item.title, item.url);
 ///     }
@@ -212,9 +212,9 @@ impl GoogleSearchResultItem {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_rs::{InteractionContent, UrlContextResultItem};
-/// # let content: InteractionContent = todo!();
-/// if let InteractionContent::UrlContextResult { result, .. } = content {
+/// # use genai_rs::{Content, UrlContextResultItem};
+/// # let content: Content = todo!();
+/// if let Content::UrlContextResult { result, .. } = content {
 ///     for item in result {
 ///         println!("URL: {} - Status: {}", item.url, item.status);
 ///     }
@@ -270,9 +270,9 @@ impl UrlContextResultItem {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_rs::{InteractionContent, FileSearchResultItem};
-/// # let content: InteractionContent = todo!();
-/// if let InteractionContent::FileSearchResult { result, .. } = content {
+/// # use genai_rs::{Content, FileSearchResultItem};
+/// # let content: Content = todo!();
+/// if let Content::FileSearchResult { result, .. } = content {
 ///     for item in result {
 ///         println!("Match from '{}': {}", item.store, item.text);
 ///     }
@@ -332,9 +332,9 @@ impl FileSearchResultItem {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_rs::{InteractionContent, CodeExecutionLanguage};
-/// # let content: InteractionContent = todo!();
-/// if let InteractionContent::CodeExecutionCall { language, code, .. } = content {
+/// # use genai_rs::{Content, CodeExecutionLanguage};
+/// # let content: Content = todo!();
+/// if let Content::CodeExecutionCall { language, code, .. } = content {
 ///     match language {
 ///         CodeExecutionLanguage::Python => println!("Python code: {}", code),
 ///         CodeExecutionLanguage::Unknown { language_type, .. } => {
@@ -638,7 +638,7 @@ impl fmt::Display for Resolution {
 /// - New variants may be added in minor version updates without breaking your code
 ///
 /// When the API returns a content type that this library doesn't recognize, it will be
-/// captured as `InteractionContent::Unknown` rather than causing a deserialization error.
+/// captured as `Content::Unknown` rather than causing a deserialization error.
 /// This allows your code to continue working even when Google adds new content types.
 ///
 /// Use [`super::InteractionResponse::has_unknown`] and [`super::InteractionResponse::unknown_content`]
@@ -647,18 +647,18 @@ impl fmt::Display for Resolution {
 /// # Example
 ///
 /// ```no_run
-/// # use genai_rs::{InteractionContent, InteractionResponse};
+/// # use genai_rs::{Content, InteractionResponse};
 /// # let response: InteractionResponse = todo!();
 /// for content in &response.outputs {
 ///     match content {
-///         InteractionContent::Text { text, annotations } => {
+///         Content::Text { text, annotations } => {
 ///             println!("Text: {:?}", text);
 ///             if let Some(annots) = annotations {
 ///                 println!("  {} annotations", annots.len());
 ///             }
 ///         }
-///         InteractionContent::FunctionCall { name, .. } => println!("Function: {}", name),
-///         InteractionContent::Unknown { content_type, .. } => {
+///         Content::FunctionCall { name, .. } => println!("Function: {}", name),
+///         Content::Unknown { content_type, .. } => {
 ///             println!("Unknown content type: {}", content_type);
 ///         }
 ///         // Required due to #[non_exhaustive] - handles future variants
@@ -668,7 +668,7 @@ impl fmt::Display for Resolution {
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
-pub enum InteractionContent {
+pub enum Content {
     /// Text content with optional source annotations.
     ///
     /// Annotations are present when grounding tools like `GoogleSearch` or `UrlContext`
@@ -757,9 +757,9 @@ pub enum InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_rs::{InteractionContent, CodeExecutionLanguage};
-    /// # let content: InteractionContent = todo!();
-    /// if let InteractionContent::CodeExecutionCall { id, language, code } = content {
+    /// # use genai_rs::{Content, CodeExecutionLanguage};
+    /// # let content: Content = todo!();
+    /// if let Content::CodeExecutionCall { id, language, code } = content {
     ///     println!("Executing {:?} code (id: {:?}): {}", language, id, code);
     /// }
     /// ```
@@ -784,9 +784,9 @@ pub enum InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_rs::InteractionContent;
-    /// # let content: InteractionContent = todo!();
-    /// if let InteractionContent::CodeExecutionResult { is_error, result, .. } = content {
+    /// # use genai_rs::Content;
+    /// # let content: Content = todo!();
+    /// if let Content::CodeExecutionResult { is_error, result, .. } = content {
     ///     if is_error {
     ///         eprintln!("Error: {}", result);
     ///     } else {
@@ -848,9 +848,9 @@ pub enum InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_rs::{InteractionContent, FileSearchResultItem};
-    /// # let content: InteractionContent = todo!();
-    /// if let InteractionContent::FileSearchResult { call_id, result } = content {
+    /// # use genai_rs::{Content, FileSearchResultItem};
+    /// # let content: Content = todo!();
+    /// if let Content::FileSearchResult { call_id, result } = content {
     ///     println!("Results for call {}: {} matches", call_id, result.len());
     ///     for item in result {
     ///         println!("  {}: {}", item.title, item.text);
@@ -878,9 +878,9 @@ pub enum InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_rs::InteractionContent;
-    /// # let content: InteractionContent = todo!();
-    /// if let InteractionContent::ComputerUseCall { id, action, parameters } = content {
+    /// # use genai_rs::Content;
+    /// # let content: Content = todo!();
+    /// if let Content::ComputerUseCall { id, action, parameters } = content {
     ///     println!("Browser action '{}' requested (id: {})", action, id);
     ///     println!("Parameters: {:?}", parameters);
     /// }
@@ -909,9 +909,9 @@ pub enum InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_rs::InteractionContent;
-    /// # let content: InteractionContent = todo!();
-    /// if let InteractionContent::ComputerUseResult { success, output, error, .. } = content {
+    /// # use genai_rs::Content;
+    /// # let content: Content = todo!();
+    /// if let Content::ComputerUseResult { success, output, error, .. } = content {
     ///     if success {
     ///         println!("Action succeeded: {:?}", output);
     ///     } else {
@@ -949,9 +949,9 @@ pub enum InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_rs::InteractionContent;
-    /// # let content: InteractionContent = todo!();
-    /// if let InteractionContent::Unknown { content_type, data } = content {
+    /// # use genai_rs::Content;
+    /// # let content: Content = todo!();
+    /// if let Content::Unknown { content_type, data } = content {
     ///     eprintln!("Encountered unknown type '{}': {:?}", content_type, data);
     /// }
     /// ```
@@ -971,9 +971,9 @@ pub enum InteractionContent {
     /// ## Example: Object Data (Common Case)
     ///
     /// ```
-    /// # use genai_rs::InteractionContent;
+    /// # use genai_rs::Content;
     /// # use serde_json::json;
-    /// let content = InteractionContent::Unknown {
+    /// let content = Content::Unknown {
     ///     content_type: "new_feature".to_string(),
     ///     data: json!({"field1": "value1", "field2": 42}),
     /// };
@@ -986,9 +986,9 @@ pub enum InteractionContent {
     /// (the `content_type` takes precedence):
     ///
     /// ```
-    /// # use genai_rs::InteractionContent;
+    /// # use genai_rs::Content;
     /// # use serde_json::json;
-    /// let content = InteractionContent::Unknown {
+    /// let content = Content::Unknown {
     ///     content_type: "my_type".to_string(),
     ///     data: json!({"type": "ignored", "value": 123}),
     /// };
@@ -999,9 +999,9 @@ pub enum InteractionContent {
     /// ## Example: Non-Object Data
     ///
     /// ```
-    /// # use genai_rs::InteractionContent;
+    /// # use genai_rs::Content;
     /// # use serde_json::json;
-    /// let content = InteractionContent::Unknown {
+    /// let content = Content::Unknown {
     ///     content_type: "array_type".to_string(),
     ///     data: json!([1, 2, 3]),
     /// };
@@ -1040,9 +1040,9 @@ pub enum InteractionContent {
     },
 }
 
-// Custom Serialize implementation for InteractionContent.
+// Custom Serialize implementation for Content.
 // This handles the Unknown variant specially by merging content_type into the data.
-impl Serialize for InteractionContent {
+impl Serialize for Content {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -1312,13 +1312,13 @@ impl Serialize for InteractionContent {
     }
 }
 
-impl InteractionContent {
+impl Content {
     /// Extract the text content, if this is a Text variant with non-empty text.
     ///
     /// Returns `Some` only for `Text` variants with non-empty text.
     /// Returns `None` for all other variants including `Thought`.
     #[must_use]
-    pub fn text(&self) -> Option<&str> {
+    pub fn as_text(&self) -> Option<&str> {
         match self {
             Self::Text { text: Some(t), .. } if !t.is_empty() => Some(t),
             _ => None,
@@ -1336,8 +1336,8 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_rs::{InteractionContent, Annotation};
-    /// # let content: InteractionContent = todo!();
+    /// # use genai_rs::{Content, Annotation};
+    /// # let content: Content = todo!();
     /// if let Some(annotations) = content.annotations() {
     ///     for annotation in annotations {
     ///         println!("Source: {:?} for bytes {}..{}",
@@ -1400,7 +1400,7 @@ impl InteractionContent {
     /// Returns `true` if this is an unknown content type.
     ///
     /// Use this to check for content types that the library doesn't recognize.
-    /// See [`InteractionContent::Unknown`] for more details.
+    /// See [`Content::Unknown`] for more details.
     #[must_use]
     pub const fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown { .. })
@@ -1486,7 +1486,7 @@ impl InteractionContent {
     // Content Constructors
     // =========================================================================
     //
-    // These associated functions create InteractionContent variants for sending
+    // These associated functions create Content variants for sending
     // to the API. They replace the standalone functions in interactions_api.rs.
 
     /// Creates text content.
@@ -1494,13 +1494,13 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     ///
-    /// let content = InteractionContent::new_text("Hello, world!");
+    /// let content = Content::text("Hello, world!");
     /// assert!(content.is_text());
     /// ```
     #[must_use]
-    pub fn new_text(text: impl Into<String>) -> Self {
+    pub fn text(text: impl Into<String>) -> Self {
         Self::Text {
             text: Some(text.into()),
             annotations: None,
@@ -1516,13 +1516,13 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     ///
-    /// let thought = InteractionContent::new_thought("signature_value_here");
+    /// let thought = Content::thought("signature_value_here");
     /// assert!(thought.is_thought());
     /// ```
     #[must_use]
-    pub fn new_thought(signature: impl Into<String>) -> Self {
+    pub fn thought(signature: impl Into<String>) -> Self {
         Self::Thought {
             signature: Some(signature.into()),
         }
@@ -1536,10 +1536,10 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     /// use serde_json::json;
     ///
-    /// let call = InteractionContent::new_function_call_with_id(
+    /// let call = Content::function_call_with_id(
     ///     Some("call_123"),
     ///     "get_weather",
     ///     json!({"location": "San Francisco"})
@@ -1547,7 +1547,7 @@ impl InteractionContent {
     /// assert!(call.is_function_call());
     /// ```
     #[must_use]
-    pub fn new_function_call_with_id(
+    pub fn function_call_with_id(
         id: Option<impl Into<String>>,
         name: impl Into<String>,
         args: serde_json::Value,
@@ -1564,18 +1564,18 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     /// use serde_json::json;
     ///
-    /// let call = InteractionContent::new_function_call(
+    /// let call = Content::function_call(
     ///     "get_weather",
     ///     json!({"location": "San Francisco"})
     /// );
     /// assert!(call.is_function_call());
     /// ```
     #[must_use]
-    pub fn new_function_call(name: impl Into<String>, args: serde_json::Value) -> Self {
-        Self::new_function_call_with_id(None::<String>, name, args)
+    pub fn function_call(name: impl Into<String>, args: serde_json::Value) -> Self {
+        Self::function_call_with_id(None::<String>, name, args)
     }
 
     /// Creates a function result content.
@@ -1591,17 +1591,17 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     /// use serde_json::json;
     ///
-    /// let result = InteractionContent::new_function_result(
+    /// let result = Content::function_result(
     ///     "get_weather",
     ///     "call_abc123",
     ///     json!({"temperature": "72F", "conditions": "sunny"})
     /// );
     /// ```
     #[must_use]
-    pub fn new_function_result(
+    pub fn function_result(
         name: impl Into<String>,
         call_id: impl Into<String>,
         result: serde_json::Value,
@@ -1634,17 +1634,17 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     /// use serde_json::json;
     ///
-    /// let error_result = InteractionContent::new_function_result_error(
+    /// let error_result = Content::function_result_error(
     ///     "get_weather",
     ///     "call_abc123",
     ///     json!({"error": "API rate limit exceeded"})
     /// );
     /// ```
     #[must_use]
-    pub fn new_function_result_error(
+    pub fn function_result_error(
         name: impl Into<String>,
         call_id: impl Into<String>,
         result: serde_json::Value,
@@ -1665,15 +1665,15 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     ///
-    /// let image = InteractionContent::new_image_data(
+    /// let image = Content::image_data(
     ///     "base64encodeddata...",
     ///     "image/png"
     /// );
     /// ```
     #[must_use]
-    pub fn new_image_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn image_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self::Image {
             data: Some(data.into()),
             uri: None,
@@ -1696,16 +1696,16 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::{InteractionContent, Resolution};
+    /// use genai_rs::{Content, Resolution};
     ///
-    /// let image = InteractionContent::new_image_data_with_resolution(
+    /// let image = Content::image_data_with_resolution(
     ///     "base64encodeddata...",
     ///     "image/png",
     ///     Resolution::High
     /// );
     /// ```
     #[must_use]
-    pub fn new_image_data_with_resolution(
+    pub fn image_data_with_resolution(
         data: impl Into<String>,
         mime_type: impl Into<String>,
         resolution: Resolution,
@@ -1728,15 +1728,15 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     ///
-    /// let image = InteractionContent::new_image_uri(
+    /// let image = Content::image_uri(
     ///     "https://example.com/image.png",
     ///     "image/png"
     /// );
     /// ```
     #[must_use]
-    pub fn new_image_uri(uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn image_uri(uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self::Image {
             data: None,
             uri: Some(uri.into()),
@@ -1750,16 +1750,16 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::{InteractionContent, Resolution};
+    /// use genai_rs::{Content, Resolution};
     ///
-    /// let image = InteractionContent::new_image_uri_with_resolution(
+    /// let image = Content::image_uri_with_resolution(
     ///     "https://example.com/image.png",
     ///     "image/png",
     ///     Resolution::Low  // Use low resolution to reduce token cost
     /// );
     /// ```
     #[must_use]
-    pub fn new_image_uri_with_resolution(
+    pub fn image_uri_with_resolution(
         uri: impl Into<String>,
         mime_type: impl Into<String>,
         resolution: Resolution,
@@ -1777,15 +1777,15 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     ///
-    /// let audio = InteractionContent::new_audio_data(
+    /// let audio = Content::audio_data(
     ///     "base64encodeddata...",
     ///     "audio/mp3"
     /// );
     /// ```
     #[must_use]
-    pub fn new_audio_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn audio_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self::Audio {
             data: Some(data.into()),
             uri: None,
@@ -1803,15 +1803,15 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     ///
-    /// let audio = InteractionContent::new_audio_uri(
+    /// let audio = Content::audio_uri(
     ///     "https://example.com/audio.mp3",
     ///     "audio/mp3"
     /// );
     /// ```
     #[must_use]
-    pub fn new_audio_uri(uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn audio_uri(uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self::Audio {
             data: None,
             uri: Some(uri.into()),
@@ -1824,15 +1824,15 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     ///
-    /// let video = InteractionContent::new_video_data(
+    /// let video = Content::video_data(
     ///     "base64encodeddata...",
     ///     "video/mp4"
     /// );
     /// ```
     #[must_use]
-    pub fn new_video_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn video_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self::Video {
             data: Some(data.into()),
             uri: None,
@@ -1846,16 +1846,16 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::{InteractionContent, Resolution};
+    /// use genai_rs::{Content, Resolution};
     ///
-    /// let video = InteractionContent::new_video_data_with_resolution(
+    /// let video = Content::video_data_with_resolution(
     ///     "base64encodeddata...",
     ///     "video/mp4",
     ///     Resolution::Low  // Use low resolution to reduce token cost for long videos
     /// );
     /// ```
     #[must_use]
-    pub fn new_video_data_with_resolution(
+    pub fn video_data_with_resolution(
         data: impl Into<String>,
         mime_type: impl Into<String>,
         resolution: Resolution,
@@ -1878,15 +1878,15 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     ///
-    /// let video = InteractionContent::new_video_uri(
+    /// let video = Content::video_uri(
     ///     "https://example.com/video.mp4",
     ///     "video/mp4"
     /// );
     /// ```
     #[must_use]
-    pub fn new_video_uri(uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn video_uri(uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self::Video {
             data: None,
             uri: Some(uri.into()),
@@ -1900,16 +1900,16 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::{InteractionContent, Resolution};
+    /// use genai_rs::{Content, Resolution};
     ///
-    /// let video = InteractionContent::new_video_uri_with_resolution(
+    /// let video = Content::video_uri_with_resolution(
     ///     "https://example.com/video.mp4",
     ///     "video/mp4",
     ///     Resolution::Medium
     /// );
     /// ```
     #[must_use]
-    pub fn new_video_uri_with_resolution(
+    pub fn video_uri_with_resolution(
         uri: impl Into<String>,
         mime_type: impl Into<String>,
         resolution: Resolution,
@@ -1929,15 +1929,15 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     ///
-    /// let document = InteractionContent::new_document_data(
+    /// let document = Content::document_data(
     ///     "base64encodeddata...",
     ///     "application/pdf"
     /// );
     /// ```
     #[must_use]
-    pub fn new_document_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn document_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self::Document {
             data: Some(data.into()),
             uri: None,
@@ -1957,15 +1957,15 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     ///
-    /// let document = InteractionContent::new_document_uri(
+    /// let document = Content::document_uri(
     ///     "https://example.com/document.pdf",
     ///     "application/pdf"
     /// );
     /// ```
     #[must_use]
-    pub fn new_document_uri(uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn document_uri(uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self::Document {
             data: None,
             uri: Some(uri.into()),
@@ -1977,10 +1977,10 @@ impl InteractionContent {
     ///
     /// The content type is inferred from the MIME type:
     ///
-    /// - `image/*` → [`InteractionContent::Image`]
-    /// - `audio/*` → [`InteractionContent::Audio`]
-    /// - `video/*` → [`InteractionContent::Video`]
-    /// - Other MIME types (including `application/*`, `text/*`) → [`InteractionContent::Document`]
+    /// - `image/*` → [`Content::Image`]
+    /// - `audio/*` → [`Content::Audio`]
+    /// - `video/*` → [`Content::Video`]
+    /// - Other MIME types (including `application/*`, `text/*`) → [`Content::Document`]
     ///
     /// # Arguments
     ///
@@ -1990,16 +1990,16 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```
-    /// use genai_rs::InteractionContent;
+    /// use genai_rs::Content;
     ///
     /// // Creates Image variant for image MIME types
-    /// let image = InteractionContent::from_uri_and_mime(
+    /// let image = Content::from_uri_and_mime(
     ///     "files/abc123",
     ///     "image/png"
     /// );
     ///
     /// // Creates Document variant for PDF
-    /// let doc = InteractionContent::from_uri_and_mime(
+    /// let doc = Content::from_uri_and_mime(
     ///     "files/def456",
     ///     "application/pdf"
     /// );
@@ -2052,18 +2052,18 @@ impl InteractionContent {
     /// # Example
     ///
     /// ```no_run
-    /// use genai_rs::{Client, InteractionContent};
+    /// use genai_rs::{Client, Content};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
     ///
     /// let file = client.upload_file("video.mp4").await?;
-    /// let content = InteractionContent::from_file(&file);
+    /// let content = Content::from_file(&file);
     ///
     /// let response = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
-    ///     .set_content(vec![
-    ///         InteractionContent::new_text("Describe this video"),
+    ///     .with_content(vec![
+    ///         Content::text("Describe this video"),
     ///         content,
     ///     ])
     ///     .create()
@@ -2075,6 +2075,158 @@ impl InteractionContent {
     pub fn from_file(file: &crate::http::files::FileMetadata) -> Self {
         Self::from_uri_and_mime(file.uri.clone(), file.mime_type.clone())
     }
+
+    // =========================================================================
+    // Builder Methods
+    // =========================================================================
+
+    /// Sets the resolution on image or video content.
+    ///
+    /// This builder method enables fluent chaining for setting resolution:
+    ///
+    /// ```
+    /// use genai_rs::{Content, Resolution};
+    ///
+    /// let image = Content::image_uri("files/abc123", "image/png")
+    ///     .with_resolution(Resolution::High);
+    ///
+    /// let video = Content::video_uri("files/def456", "video/mp4")
+    ///     .with_resolution(Resolution::Low);
+    /// ```
+    ///
+    /// # Resolution Trade-offs
+    ///
+    /// | Level | Token Cost | Detail Level |
+    /// |-------|------------|--------------|
+    /// | Low | Lowest | Basic shapes and colors |
+    /// | Medium | Moderate | Standard detail (default) |
+    /// | High | Higher | Fine details visible |
+    /// | UltraHigh | Highest | Maximum fidelity |
+    ///
+    /// # Behavior on Non-Media Content
+    ///
+    /// For content types that don't support resolution (Text, Audio, Document,
+    /// FunctionCall, etc.), this method logs a warning and returns the content
+    /// unchanged.
+    #[must_use]
+    pub fn with_resolution(self, resolution: Resolution) -> Self {
+        match self {
+            Self::Image {
+                data,
+                uri,
+                mime_type,
+                ..
+            } => Self::Image {
+                data,
+                uri,
+                mime_type,
+                resolution: Some(resolution),
+            },
+            Self::Video {
+                data,
+                uri,
+                mime_type,
+                ..
+            } => Self::Video {
+                data,
+                uri,
+                mime_type,
+                resolution: Some(resolution),
+            },
+            other => {
+                tracing::warn!(
+                    "with_resolution() called on content type that doesn't support resolution. \
+                     Resolution is only applicable to Image and Video content."
+                );
+                other
+            }
+        }
+    }
+
+    /// Creates a function result from this function call.
+    ///
+    /// This builder method enables fluent patterns for handling function calls:
+    ///
+    /// ```
+    /// use genai_rs::Content;
+    /// use serde_json::json;
+    ///
+    /// // Given a function call content
+    /// let call = Content::function_call_with_id(
+    ///     Some("call_123"),
+    ///     "get_weather",
+    ///     json!({"location": "San Francisco"})
+    /// );
+    ///
+    /// // Execute the function and create the result
+    /// let result = call.with_result(json!({"temperature": "72F", "conditions": "sunny"}));
+    /// assert!(matches!(result, Content::FunctionResult { .. }));
+    /// ```
+    ///
+    /// # Behavior on Non-FunctionCall Content
+    ///
+    /// For content types other than `FunctionCall`, this method logs a warning
+    /// and returns the original content unchanged.
+    ///
+    /// # Error Results
+    ///
+    /// To indicate a function execution error, use [`with_result_error`](Self::with_result_error)
+    /// instead.
+    #[must_use]
+    pub fn with_result(self, result: serde_json::Value) -> Self {
+        match &self {
+            Self::FunctionCall { id, name, .. } => Self::FunctionResult {
+                name: Some(name.clone()),
+                call_id: id.clone().unwrap_or_default(),
+                result,
+                is_error: None,
+            },
+            _ => {
+                tracing::warn!(
+                    "with_result() called on non-FunctionCall content type. \
+                     This method is only valid for FunctionCall content."
+                );
+                self
+            }
+        }
+    }
+
+    /// Creates a function error result from this function call.
+    ///
+    /// Use this when function execution fails and you need to report the error
+    /// back to the model.
+    ///
+    /// ```
+    /// use genai_rs::Content;
+    /// use serde_json::json;
+    ///
+    /// let call = Content::function_call_with_id(
+    ///     Some("call_123"),
+    ///     "get_weather",
+    ///     json!({"location": "San Francisco"})
+    /// );
+    ///
+    /// // Report execution error
+    /// let error = call.with_result_error(json!({"error": "API rate limit exceeded"}));
+    /// ```
+    #[must_use]
+    pub fn with_result_error(self, result: serde_json::Value) -> Self {
+        match &self {
+            Self::FunctionCall { id, name, .. } => Self::FunctionResult {
+                name: Some(name.clone()),
+                call_id: id.clone().unwrap_or_default(),
+                result,
+                is_error: Some(true),
+            },
+            _ => {
+                tracing::warn!(
+                    "with_result_error() called on non-FunctionCall content type. \
+                     This method is only valid for FunctionCall content."
+                );
+                self
+            }
+        }
+    }
 }
 
 // Custom Deserialize implementation to handle unknown content types gracefully.
@@ -2082,7 +2234,7 @@ impl InteractionContent {
 // This tries to deserialize known types first, and falls back to Unknown for
 // unrecognized types. This provides forward compatibility when Google adds
 // new content types to the API.
-impl<'de> Deserialize<'de> for InteractionContent {
+impl<'de> Deserialize<'de> for Content {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -2209,19 +2361,17 @@ impl<'de> Deserialize<'de> for InteractionContent {
         // Try to deserialize as a known type
         match serde_json::from_value::<KnownContent>(value.clone()) {
             Ok(known) => Ok(match known {
-                KnownContent::Text { text, annotations } => {
-                    InteractionContent::Text { text, annotations }
-                }
-                KnownContent::Thought { signature } => InteractionContent::Thought { signature },
+                KnownContent::Text { text, annotations } => Content::Text { text, annotations },
+                KnownContent::Thought { signature } => Content::Thought { signature },
                 KnownContent::ThoughtSignature { signature } => {
-                    InteractionContent::ThoughtSignature { signature }
+                    Content::ThoughtSignature { signature }
                 }
                 KnownContent::Image {
                     data,
                     uri,
                     mime_type,
                     resolution,
-                } => InteractionContent::Image {
+                } => Content::Image {
                     data,
                     uri,
                     mime_type,
@@ -2231,7 +2381,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     data,
                     uri,
                     mime_type,
-                } => InteractionContent::Audio {
+                } => Content::Audio {
                     data,
                     uri,
                     mime_type,
@@ -2241,7 +2391,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     uri,
                     mime_type,
                     resolution,
-                } => InteractionContent::Video {
+                } => Content::Video {
                     data,
                     uri,
                     mime_type,
@@ -2251,20 +2401,20 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     data,
                     uri,
                     mime_type,
-                } => InteractionContent::Document {
+                } => Content::Document {
                     data,
                     uri,
                     mime_type,
                 },
                 KnownContent::FunctionCall { id, name, args } => {
-                    InteractionContent::FunctionCall { id, name, args }
+                    Content::FunctionCall { id, name, args }
                 }
                 KnownContent::FunctionResult {
                     name,
                     call_id,
                     result,
                     is_error,
-                } => InteractionContent::FunctionResult {
+                } => Content::FunctionResult {
                     name,
                     call_id,
                     result,
@@ -2278,7 +2428,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 } => {
                     // Prefer direct fields, fall back to parsing arguments
                     if let (Some(lang), Some(source)) = (language, code) {
-                        InteractionContent::CodeExecutionCall {
+                        Content::CodeExecutionCall {
                             id,
                             language: lang,
                             code: source,
@@ -2294,7 +2444,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                                      Treating as Unknown variant to preserve data for debugging.",
                                     id
                                 );
-                                return Ok(InteractionContent::Unknown {
+                                return Ok(Content::Unknown {
                                     content_type: "code_execution_call".to_string(),
                                     data: value.clone(),
                                 });
@@ -2322,7 +2472,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                             None => CodeExecutionLanguage::Python,
                         };
 
-                        InteractionContent::CodeExecutionCall {
+                        Content::CodeExecutionCall {
                             id,
                             language: lang,
                             code: source,
@@ -2336,7 +2486,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                              Treating as Unknown variant to preserve data for debugging.",
                             id
                         );
-                        InteractionContent::Unknown {
+                        Content::Unknown {
                             content_type: "code_execution_call".to_string(),
                             data: value.clone(),
                         }
@@ -2346,7 +2496,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     call_id,
                     is_error,
                     result,
-                } => InteractionContent::CodeExecutionResult {
+                } => Content::CodeExecutionResult {
                     call_id,
                     // Default to false (success) when is_error is not provided
                     is_error: is_error.unwrap_or(false),
@@ -2365,10 +2515,10 @@ impl<'de> Deserialize<'de> for InteractionContent {
                         })
                         .unwrap_or_default();
 
-                    InteractionContent::GoogleSearchCall { id, queries }
+                    Content::GoogleSearchCall { id, queries }
                 }
                 KnownContent::GoogleSearchResult { call_id, result } => {
-                    InteractionContent::GoogleSearchResult { call_id, result }
+                    Content::GoogleSearchResult { call_id, result }
                 }
                 KnownContent::UrlContextCall { id, arguments } => {
                     // Extract urls from arguments.urls
@@ -2383,19 +2533,19 @@ impl<'de> Deserialize<'de> for InteractionContent {
                         })
                         .unwrap_or_default();
 
-                    InteractionContent::UrlContextCall { id, urls }
+                    Content::UrlContextCall { id, urls }
                 }
                 KnownContent::UrlContextResult { call_id, result } => {
-                    InteractionContent::UrlContextResult { call_id, result }
+                    Content::UrlContextResult { call_id, result }
                 }
                 KnownContent::FileSearchResult { call_id, result } => {
-                    InteractionContent::FileSearchResult { call_id, result }
+                    Content::FileSearchResult { call_id, result }
                 }
                 KnownContent::ComputerUseCall {
                     id,
                     action,
                     parameters,
-                } => InteractionContent::ComputerUseCall {
+                } => Content::ComputerUseCall {
                     id,
                     action,
                     parameters: parameters.unwrap_or(serde_json::Value::Null),
@@ -2406,7 +2556,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                     output,
                     error,
                     screenshot,
-                } => InteractionContent::ComputerUseResult {
+                } => Content::ComputerUseResult {
                     call_id,
                     success,
                     output,
@@ -2425,7 +2575,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 // Log the actual parse error for debugging - this helps distinguish
                 // between truly unknown types and malformed known types
                 tracing::warn!(
-                    "Encountered unknown InteractionContent type '{}'. \
+                    "Encountered unknown Content type '{}'. \
                      Parse error: {}. \
                      This may indicate a new API feature or a malformed response. \
                      The content will be preserved in the Unknown variant.",
@@ -2436,7 +2586,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
                 #[cfg(feature = "strict-unknown")]
                 {
                     Err(D::Error::custom(format!(
-                        "Unknown InteractionContent type '{}'. \
+                        "Unknown Content type '{}'. \
                          Strict mode is enabled via the 'strict-unknown' feature flag. \
                          Either update the library or disable strict mode.",
                         content_type
@@ -2445,7 +2595,7 @@ impl<'de> Deserialize<'de> for InteractionContent {
 
                 #[cfg(not(feature = "strict-unknown"))]
                 {
-                    Ok(InteractionContent::Unknown {
+                    Ok(Content::Unknown {
                         content_type,
                         data: value,
                     })

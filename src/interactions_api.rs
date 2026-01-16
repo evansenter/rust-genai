@@ -1,6 +1,6 @@
 /// Helper functions for building Interactions API content
 ///
-/// This module provides ergonomic builders for InteractionContent and InteractionInput.
+/// This module provides ergonomic builders for Content and InteractionInput.
 ///
 /// # Module Organization
 ///
@@ -29,8 +29,7 @@
 /// When using `previous_interaction_id` with the Interactions API, thought signatures are
 /// managed automatically by the server. You don't need to manually extract and echo them.
 use crate::{
-    CodeExecutionLanguage, FileSearchResultItem, GoogleSearchResultItem, InteractionContent,
-    Resolution,
+    CodeExecutionLanguage, Content, FileSearchResultItem, GoogleSearchResultItem, Resolution,
 };
 use serde_json::Value;
 
@@ -47,7 +46,7 @@ use serde_json::Value;
 
 /// Creates text content.
 ///
-/// **Prefer:** [`InteractionContent::new_text()`] for new code.
+/// **Prefer:** [`Content::text()`] for new code.
 ///
 /// # Example
 /// ```
@@ -55,8 +54,8 @@ use serde_json::Value;
 ///
 /// let content = text_content("This is a response");
 /// ```
-pub fn text_content(text: impl Into<String>) -> InteractionContent {
-    InteractionContent::new_text(text)
+pub fn text_content(text: impl Into<String>) -> Content {
+    Content::text(text)
 }
 
 /// Creates thought content (for testing and roundtrip verification only).
@@ -85,8 +84,8 @@ pub fn text_content(text: impl Into<String>) -> InteractionContent {
 /// let thought = thought_content("EosFCogFAXLI2...");
 /// assert!(thought.is_thought());
 /// ```
-pub fn thought_content(signature: impl Into<String>) -> InteractionContent {
-    InteractionContent::new_thought(signature)
+pub fn thought_content(signature: impl Into<String>) -> Content {
+    Content::thought(signature)
 }
 
 // ----------------------------------------------------------------------------
@@ -95,7 +94,7 @@ pub fn thought_content(signature: impl Into<String>) -> InteractionContent {
 
 /// Creates a function call content with optional call ID.
 ///
-/// **Prefer:** [`InteractionContent::new_function_call_with_id()`] for new code.
+/// **Prefer:** [`Content::function_call_with_id()`] for new code.
 ///
 /// Use this when you need to specify a call ID, typically when echoing function calls back
 /// in manual conversation construction.
@@ -117,13 +116,13 @@ pub fn function_call_content_with_id(
     id: Option<impl Into<String>>,
     name: impl Into<String>,
     args: Value,
-) -> InteractionContent {
-    InteractionContent::new_function_call_with_id(id, name, args)
+) -> Content {
+    Content::function_call_with_id(id, name, args)
 }
 
 /// Creates a function call content (without call ID).
 ///
-/// **Prefer:** [`InteractionContent::new_function_call()`] for new code.
+/// **Prefer:** [`Content::function_call()`] for new code.
 ///
 /// Use `function_call_content_with_id` when you need to specify a call ID.
 ///
@@ -137,13 +136,13 @@ pub fn function_call_content_with_id(
 ///     json!({"location": "San Francisco"})
 /// );
 /// ```
-pub fn function_call_content(name: impl Into<String>, args: Value) -> InteractionContent {
-    InteractionContent::new_function_call(name, args)
+pub fn function_call_content(name: impl Into<String>, args: Value) -> Content {
+    Content::function_call(name, args)
 }
 
 /// Creates a function result content.
 ///
-/// **Prefer:** [`InteractionContent::new_function_result()`] for new code.
+/// **Prefer:** [`Content::function_result()`] for new code.
 ///
 /// This is the correct way to send function execution results back to the Interactions API.
 /// The call_id must match the id from the FunctionCall you're responding to.
@@ -168,8 +167,8 @@ pub fn function_result_content(
     name: impl Into<String>,
     call_id: impl Into<String>,
     result: Value,
-) -> InteractionContent {
-    InteractionContent::new_function_result(name, call_id, result)
+) -> Content {
+    Content::function_result(name, call_id, result)
 }
 
 // ----------------------------------------------------------------------------
@@ -178,7 +177,7 @@ pub fn function_result_content(
 
 /// Creates image content from base64-encoded data.
 ///
-/// **Prefer:** [`InteractionContent::new_image_data()`] for new code.
+/// **Prefer:** [`Content::image_data()`] for new code.
 ///
 /// # Example
 /// ```
@@ -189,16 +188,13 @@ pub fn function_result_content(
 ///     "image/png"
 /// );
 /// ```
-pub fn image_data_content(
-    data: impl Into<String>,
-    mime_type: impl Into<String>,
-) -> InteractionContent {
-    InteractionContent::new_image_data(data, mime_type)
+pub fn image_data_content(data: impl Into<String>, mime_type: impl Into<String>) -> Content {
+    Content::image_data(data, mime_type)
 }
 
 /// Creates image content from base64-encoded data with specified resolution.
 ///
-/// **Prefer:** [`InteractionContent::new_image_data_with_resolution()`] for new code.
+/// **Prefer:** [`Content::image_data_with_resolution()`] for new code.
 ///
 /// # Resolution Trade-offs
 ///
@@ -224,13 +220,13 @@ pub fn image_data_content_with_resolution(
     data: impl Into<String>,
     mime_type: impl Into<String>,
     resolution: Resolution,
-) -> InteractionContent {
-    InteractionContent::new_image_data_with_resolution(data, mime_type, resolution)
+) -> Content {
+    Content::image_data_with_resolution(data, mime_type, resolution)
 }
 
 /// Creates image content from a URI.
 ///
-/// **Prefer:** [`InteractionContent::new_image_uri()`] for new code.
+/// **Prefer:** [`Content::image_uri()`] for new code.
 ///
 /// # Arguments
 ///
@@ -246,16 +242,13 @@ pub fn image_data_content_with_resolution(
 ///     "image/png"
 /// );
 /// ```
-pub fn image_uri_content(
-    uri: impl Into<String>,
-    mime_type: impl Into<String>,
-) -> InteractionContent {
-    InteractionContent::new_image_uri(uri, mime_type)
+pub fn image_uri_content(uri: impl Into<String>, mime_type: impl Into<String>) -> Content {
+    Content::image_uri(uri, mime_type)
 }
 
 /// Creates image content from a URI with specified resolution.
 ///
-/// **Prefer:** [`InteractionContent::new_image_uri_with_resolution()`] for new code.
+/// **Prefer:** [`Content::image_uri_with_resolution()`] for new code.
 ///
 /// # Arguments
 ///
@@ -278,13 +271,13 @@ pub fn image_uri_content_with_resolution(
     uri: impl Into<String>,
     mime_type: impl Into<String>,
     resolution: Resolution,
-) -> InteractionContent {
-    InteractionContent::new_image_uri_with_resolution(uri, mime_type, resolution)
+) -> Content {
+    Content::image_uri_with_resolution(uri, mime_type, resolution)
 }
 
 /// Creates audio content from base64-encoded data.
 ///
-/// **Prefer:** [`InteractionContent::new_audio_data()`] for new code.
+/// **Prefer:** [`Content::audio_data()`] for new code.
 ///
 /// # Example
 /// ```
@@ -295,16 +288,13 @@ pub fn image_uri_content_with_resolution(
 ///     "audio/mp3"
 /// );
 /// ```
-pub fn audio_data_content(
-    data: impl Into<String>,
-    mime_type: impl Into<String>,
-) -> InteractionContent {
-    InteractionContent::new_audio_data(data, mime_type)
+pub fn audio_data_content(data: impl Into<String>, mime_type: impl Into<String>) -> Content {
+    Content::audio_data(data, mime_type)
 }
 
 /// Creates audio content from a URI.
 ///
-/// **Prefer:** [`InteractionContent::new_audio_uri()`] for new code.
+/// **Prefer:** [`Content::audio_uri()`] for new code.
 ///
 /// # Arguments
 ///
@@ -320,16 +310,13 @@ pub fn audio_data_content(
 ///     "audio/mp3"
 /// );
 /// ```
-pub fn audio_uri_content(
-    uri: impl Into<String>,
-    mime_type: impl Into<String>,
-) -> InteractionContent {
-    InteractionContent::new_audio_uri(uri, mime_type)
+pub fn audio_uri_content(uri: impl Into<String>, mime_type: impl Into<String>) -> Content {
+    Content::audio_uri(uri, mime_type)
 }
 
 /// Creates video content from base64-encoded data.
 ///
-/// **Prefer:** [`InteractionContent::new_video_data()`] for new code.
+/// **Prefer:** [`Content::video_data()`] for new code.
 ///
 /// # Example
 /// ```
@@ -340,16 +327,13 @@ pub fn audio_uri_content(
 ///     "video/mp4"
 /// );
 /// ```
-pub fn video_data_content(
-    data: impl Into<String>,
-    mime_type: impl Into<String>,
-) -> InteractionContent {
-    InteractionContent::new_video_data(data, mime_type)
+pub fn video_data_content(data: impl Into<String>, mime_type: impl Into<String>) -> Content {
+    Content::video_data(data, mime_type)
 }
 
 /// Creates video content from base64-encoded data with specified resolution.
 ///
-/// **Prefer:** [`InteractionContent::new_video_data_with_resolution()`] for new code.
+/// **Prefer:** [`Content::video_data_with_resolution()`] for new code.
 ///
 /// # Resolution Trade-offs
 ///
@@ -375,13 +359,13 @@ pub fn video_data_content_with_resolution(
     data: impl Into<String>,
     mime_type: impl Into<String>,
     resolution: Resolution,
-) -> InteractionContent {
-    InteractionContent::new_video_data_with_resolution(data, mime_type, resolution)
+) -> Content {
+    Content::video_data_with_resolution(data, mime_type, resolution)
 }
 
 /// Creates video content from a URI.
 ///
-/// **Prefer:** [`InteractionContent::new_video_uri()`] for new code.
+/// **Prefer:** [`Content::video_uri()`] for new code.
 ///
 /// # Arguments
 ///
@@ -397,16 +381,13 @@ pub fn video_data_content_with_resolution(
 ///     "video/mp4"
 /// );
 /// ```
-pub fn video_uri_content(
-    uri: impl Into<String>,
-    mime_type: impl Into<String>,
-) -> InteractionContent {
-    InteractionContent::new_video_uri(uri, mime_type)
+pub fn video_uri_content(uri: impl Into<String>, mime_type: impl Into<String>) -> Content {
+    Content::video_uri(uri, mime_type)
 }
 
 /// Creates video content from a URI with specified resolution.
 ///
-/// **Prefer:** [`InteractionContent::new_video_uri_with_resolution()`] for new code.
+/// **Prefer:** [`Content::video_uri_with_resolution()`] for new code.
 ///
 /// # Arguments
 ///
@@ -429,13 +410,13 @@ pub fn video_uri_content_with_resolution(
     uri: impl Into<String>,
     mime_type: impl Into<String>,
     resolution: Resolution,
-) -> InteractionContent {
-    InteractionContent::new_video_uri_with_resolution(uri, mime_type, resolution)
+) -> Content {
+    Content::video_uri_with_resolution(uri, mime_type, resolution)
 }
 
 /// Creates document content from base64-encoded data.
 ///
-/// **Prefer:** [`InteractionContent::new_document_data()`] for new code.
+/// **Prefer:** [`Content::document_data()`] for new code.
 ///
 /// Use this for PDF files and other document formats.
 ///
@@ -448,16 +429,13 @@ pub fn video_uri_content_with_resolution(
 ///     "application/pdf"
 /// );
 /// ```
-pub fn document_data_content(
-    data: impl Into<String>,
-    mime_type: impl Into<String>,
-) -> InteractionContent {
-    InteractionContent::new_document_data(data, mime_type)
+pub fn document_data_content(data: impl Into<String>, mime_type: impl Into<String>) -> Content {
+    Content::document_data(data, mime_type)
 }
 
 /// Creates document content from a URI.
 ///
-/// **Prefer:** [`InteractionContent::new_document_uri()`] for new code.
+/// **Prefer:** [`Content::document_uri()`] for new code.
 ///
 /// Use this for PDF files and other document formats accessible via URI.
 ///
@@ -475,16 +453,13 @@ pub fn document_data_content(
 ///     "application/pdf"
 /// );
 /// ```
-pub fn document_uri_content(
-    uri: impl Into<String>,
-    mime_type: impl Into<String>,
-) -> InteractionContent {
-    InteractionContent::new_document_uri(uri, mime_type)
+pub fn document_uri_content(uri: impl Into<String>, mime_type: impl Into<String>) -> Content {
+    Content::document_uri(uri, mime_type)
 }
 
 /// Creates file content from a Files API URI.
 ///
-/// **Prefer:** [`InteractionContent::from_file()`] for new code.
+/// **Prefer:** [`Content::from_file()`] for new code.
 ///
 /// Use this to reference files uploaded via the Files API. The content type
 /// is inferred from the file's MIME type (image, audio, video, or document).
@@ -506,7 +481,7 @@ pub fn document_uri_content(
 ///
 /// let response = client.interaction()
 ///     .with_model("gemini-3-flash-preview")
-///     .set_content(vec![
+///     .with_content(vec![
 ///         genai_rs::text_content("Describe this video"),
 ///         content,
 ///     ])
@@ -515,29 +490,29 @@ pub fn document_uri_content(
 /// # Ok(())
 /// # }
 /// ```
-pub fn file_uri_content(file: &crate::FileMetadata) -> InteractionContent {
-    InteractionContent::from_file(file)
+pub fn file_uri_content(file: &crate::FileMetadata) -> Content {
+    Content::from_file(file)
 }
 
 /// Creates content from a URI and MIME type.
 ///
-/// **Prefer:** [`InteractionContent::from_uri_and_mime()`] for new code.
+/// **Prefer:** [`Content::from_uri_and_mime()`] for new code.
 ///
 /// This is the shared implementation used by [`file_uri_content`] and
 /// [`crate::InteractionBuilder::add_file_uri`]. The content type is inferred
 /// from the MIME type:
 ///
-/// - `image/*` → [`InteractionContent::Image`]
-/// - `audio/*` → [`InteractionContent::Audio`]
-/// - `video/*` → [`InteractionContent::Video`]
-/// - Other MIME types (including `application/*`, `text/*`) → [`InteractionContent::Document`]
+/// - `image/*` → [`Content::Image`]
+/// - `audio/*` → [`Content::Audio`]
+/// - `video/*` → [`Content::Video`]
+/// - Other MIME types (including `application/*`, `text/*`) → [`Content::Document`]
 ///
 /// # Arguments
 ///
 /// * `uri` - The file URI (typically from the Files API)
 /// * `mime_type` - The MIME type of the file
-pub fn content_from_uri_and_mime(uri: String, mime_type: String) -> InteractionContent {
-    InteractionContent::from_uri_and_mime(uri, mime_type)
+pub fn content_from_uri_and_mime(uri: String, mime_type: String) -> Content {
+    Content::from_uri_and_mime(uri, mime_type)
 }
 
 // ============================================================================
@@ -570,8 +545,8 @@ pub fn code_execution_call_content(
     id: impl Into<String>,
     language: CodeExecutionLanguage,
     code: impl Into<String>,
-) -> InteractionContent {
-    InteractionContent::CodeExecutionCall {
+) -> Content {
+    Content::CodeExecutionCall {
         id: Some(id.into()),
         language,
         code: code.into(),
@@ -592,8 +567,8 @@ pub fn code_execution_result_content(
     call_id: impl Into<String>,
     is_error: bool,
     result: impl Into<String>,
-) -> InteractionContent {
-    InteractionContent::CodeExecutionResult {
+) -> Content {
+    Content::CodeExecutionResult {
         call_id: Some(call_id.into()),
         is_error,
         result: result.into(),
@@ -610,10 +585,7 @@ pub fn code_execution_result_content(
 ///
 /// let result = code_execution_success("call_123", "42\n");
 /// ```
-pub fn code_execution_success(
-    call_id: impl Into<String>,
-    result: impl Into<String>,
-) -> InteractionContent {
+pub fn code_execution_success(call_id: impl Into<String>, result: impl Into<String>) -> Content {
     code_execution_result_content(call_id, false, result)
 }
 
@@ -630,7 +602,7 @@ pub fn code_execution_success(
 pub fn code_execution_error(
     call_id: impl Into<String>,
     error_result: impl Into<String>,
-) -> InteractionContent {
+) -> Content {
     code_execution_result_content(call_id, true, error_result)
 }
 
@@ -651,8 +623,8 @@ pub fn code_execution_error(
 pub fn google_search_call_content(
     id: impl Into<String>,
     queries: Vec<impl Into<String>>,
-) -> InteractionContent {
-    InteractionContent::GoogleSearchCall {
+) -> Content {
+    Content::GoogleSearchCall {
         id: id.into(),
         queries: queries.into_iter().map(|q| q.into()).collect(),
     }
@@ -674,8 +646,8 @@ pub fn google_search_call_content(
 pub fn google_search_result_content(
     call_id: impl Into<String>,
     result: Vec<GoogleSearchResultItem>,
-) -> InteractionContent {
-    InteractionContent::GoogleSearchResult {
+) -> Content {
+    Content::GoogleSearchResult {
         call_id: call_id.into(),
         result,
     }
@@ -705,8 +677,8 @@ pub fn google_search_result_content(
 pub fn file_search_result_content(
     call_id: impl Into<String>,
     result: Vec<FileSearchResultItem>,
-) -> InteractionContent {
-    InteractionContent::FileSearchResult {
+) -> Content {
+    Content::FileSearchResult {
         call_id: call_id.into(),
         result,
     }
@@ -729,8 +701,8 @@ pub fn file_search_result_content(
 pub fn url_context_call_content(
     id: impl Into<String>,
     urls: impl IntoIterator<Item = impl Into<String>>,
-) -> InteractionContent {
-    InteractionContent::UrlContextCall {
+) -> Content {
+    Content::UrlContextCall {
         id: id.into(),
         urls: urls.into_iter().map(Into::into).collect(),
     }
@@ -753,8 +725,8 @@ pub fn url_context_call_content(
 pub fn url_context_result_content(
     call_id: impl Into<String>,
     result: Vec<crate::UrlContextResultItem>,
-) -> InteractionContent {
-    InteractionContent::UrlContextResult {
+) -> Content {
+    Content::UrlContextResult {
         call_id: call_id.into(),
         result,
     }
@@ -770,10 +742,7 @@ pub fn url_context_result_content(
 ///
 /// let result = url_context_success("ctx_123", "https://example.com");
 /// ```
-pub fn url_context_success(
-    call_id: impl Into<String>,
-    url: impl Into<String>,
-) -> InteractionContent {
+pub fn url_context_success(call_id: impl Into<String>, url: impl Into<String>) -> Content {
     url_context_result_content(
         call_id,
         vec![crate::UrlContextResultItem::new(url, "success")],
@@ -791,10 +760,7 @@ pub fn url_context_success(
 ///
 /// let result = url_context_failure("ctx_123", "https://example.com/blocked");
 /// ```
-pub fn url_context_failure(
-    call_id: impl Into<String>,
-    url: impl Into<String>,
-) -> InteractionContent {
+pub fn url_context_failure(call_id: impl Into<String>, url: impl Into<String>) -> Content {
     url_context_result_content(
         call_id,
         vec![crate::UrlContextResultItem::new(url, "error")],
@@ -814,7 +780,7 @@ mod tests {
     fn test_text_content() {
         let content = text_content("Hello");
         match content {
-            InteractionContent::Text { text, .. } => assert_eq!(text, Some("Hello".to_string())),
+            Content::Text { text, .. } => assert_eq!(text, Some("Hello".to_string())),
             _ => panic!("Expected Text variant"),
         }
     }
@@ -824,7 +790,7 @@ mod tests {
         // Thought content now contains a signature, not text
         let content = thought_content("EosFCogFAXLI2...");
         match content {
-            InteractionContent::Thought { signature } => {
+            Content::Thought { signature } => {
                 assert_eq!(signature, Some("EosFCogFAXLI2...".to_string()))
             }
             _ => panic!("Expected Thought variant"),
@@ -835,7 +801,7 @@ mod tests {
     fn test_function_call_content() {
         let content = function_call_content("test", json!({"key": "value"}));
         match content {
-            InteractionContent::FunctionCall { name, args, .. } => {
+            Content::FunctionCall { name, args, .. } => {
                 assert_eq!(name, "test");
                 assert_eq!(args, json!({"key": "value"}));
             }
@@ -847,7 +813,7 @@ mod tests {
     fn test_function_result_content() {
         let content = function_result_content("test", "call_123", json!({"result": "ok"}));
         match content {
-            InteractionContent::FunctionResult {
+            Content::FunctionResult {
                 name,
                 call_id,
                 result,
@@ -866,7 +832,7 @@ mod tests {
     fn test_image_data_content() {
         let content = image_data_content("data123", "image/png");
         match content {
-            InteractionContent::Image {
+            Content::Image {
                 data,
                 uri,
                 mime_type,
@@ -885,7 +851,7 @@ mod tests {
     fn test_image_data_content_with_resolution() {
         let content = image_data_content_with_resolution("data123", "image/png", Resolution::High);
         match content {
-            InteractionContent::Image {
+            Content::Image {
                 data,
                 uri,
                 mime_type,
@@ -904,7 +870,7 @@ mod tests {
     fn test_image_uri_content() {
         let content = image_uri_content("http://example.com/img.png", "image/png");
         match content {
-            InteractionContent::Image {
+            Content::Image {
                 data,
                 uri,
                 mime_type,
@@ -927,7 +893,7 @@ mod tests {
             Resolution::Low,
         );
         match content {
-            InteractionContent::Image {
+            Content::Image {
                 data,
                 uri,
                 mime_type,
@@ -950,7 +916,7 @@ mod tests {
             json!({"city": "Tokyo"}),
         );
         match content {
-            InteractionContent::FunctionCall { id, name, args } => {
+            Content::FunctionCall { id, name, args } => {
                 assert_eq!(id, Some("call_abc".to_string()));
                 assert_eq!(name, "get_weather");
                 assert_eq!(args, json!({"city": "Tokyo"}));
@@ -963,7 +929,7 @@ mod tests {
     fn test_function_call_content_without_id() {
         let content = function_call_content_with_id(None::<String>, "test_fn", json!({}));
         match content {
-            InteractionContent::FunctionCall { id, .. } => {
+            Content::FunctionCall { id, .. } => {
                 assert_eq!(id, None);
             }
             _ => panic!("Expected FunctionCall variant"),
@@ -974,7 +940,7 @@ mod tests {
     fn test_audio_data_content() {
         let content = audio_data_content("audio_base64_data", "audio/mp3");
         match content {
-            InteractionContent::Audio {
+            Content::Audio {
                 data,
                 uri,
                 mime_type,
@@ -991,7 +957,7 @@ mod tests {
     fn test_audio_uri_content() {
         let content = audio_uri_content("https://example.com/audio.mp3", "audio/mp3");
         match content {
-            InteractionContent::Audio {
+            Content::Audio {
                 data,
                 uri,
                 mime_type,
@@ -1008,7 +974,7 @@ mod tests {
     fn test_video_data_content() {
         let content = video_data_content("video_base64_data", "video/mp4");
         match content {
-            InteractionContent::Video {
+            Content::Video {
                 data,
                 uri,
                 mime_type,
@@ -1028,7 +994,7 @@ mod tests {
         let content =
             video_data_content_with_resolution("video_base64_data", "video/mp4", Resolution::Low);
         match content {
-            InteractionContent::Video {
+            Content::Video {
                 data,
                 uri,
                 mime_type,
@@ -1047,7 +1013,7 @@ mod tests {
     fn test_video_uri_content() {
         let content = video_uri_content("https://example.com/video.mp4", "video/mp4");
         match content {
-            InteractionContent::Video {
+            Content::Video {
                 data,
                 uri,
                 mime_type,
@@ -1070,7 +1036,7 @@ mod tests {
             Resolution::UltraHigh,
         );
         match content {
-            InteractionContent::Video {
+            Content::Video {
                 data,
                 uri,
                 mime_type,
@@ -1089,7 +1055,7 @@ mod tests {
     fn test_document_data_content() {
         let content = document_data_content("pdf_base64_data", "application/pdf");
         match content {
-            InteractionContent::Document {
+            Content::Document {
                 data,
                 uri,
                 mime_type,
@@ -1106,7 +1072,7 @@ mod tests {
     fn test_document_uri_content() {
         let content = document_uri_content("https://example.com/doc.pdf", "application/pdf");
         match content {
-            InteractionContent::Document {
+            Content::Document {
                 data,
                 uri,
                 mime_type,
@@ -1124,7 +1090,7 @@ mod tests {
         let content =
             code_execution_call_content("call_123", CodeExecutionLanguage::Python, "print(42)");
         match content {
-            InteractionContent::CodeExecutionCall { id, language, code } => {
+            Content::CodeExecutionCall { id, language, code } => {
                 assert_eq!(id, Some("call_123".to_string()));
                 assert_eq!(language, CodeExecutionLanguage::Python);
                 assert_eq!(code, "print(42)");
@@ -1137,7 +1103,7 @@ mod tests {
     fn test_code_execution_result_content() {
         let content = code_execution_result_content("call_123", false, "42\n");
         match content {
-            InteractionContent::CodeExecutionResult {
+            Content::CodeExecutionResult {
                 call_id,
                 is_error,
                 result,
@@ -1154,7 +1120,7 @@ mod tests {
     fn test_code_execution_success() {
         let content = code_execution_success("call_456", "Hello World");
         match content {
-            InteractionContent::CodeExecutionResult {
+            Content::CodeExecutionResult {
                 is_error, result, ..
             } => {
                 assert!(!is_error);
@@ -1168,7 +1134,7 @@ mod tests {
     fn test_code_execution_error() {
         let content = code_execution_error("call_789", "NameError: x not defined");
         match content {
-            InteractionContent::CodeExecutionResult {
+            Content::CodeExecutionResult {
                 is_error, result, ..
             } => {
                 assert!(is_error);
@@ -1183,7 +1149,7 @@ mod tests {
         let content =
             google_search_call_content("call123", vec!["Rust programming", "latest version"]);
         match content {
-            InteractionContent::GoogleSearchCall { id, queries } => {
+            Content::GoogleSearchCall { id, queries } => {
                 assert_eq!(id, "call123");
                 assert_eq!(queries, vec!["Rust programming", "latest version"]);
             }
@@ -1197,7 +1163,7 @@ mod tests {
         let result = vec![GoogleSearchResultItem::new("Rust", "https://rust-lang.org")];
         let content = google_search_result_content("call123", result.clone());
         match content {
-            InteractionContent::GoogleSearchResult { call_id, result: r } => {
+            Content::GoogleSearchResult { call_id, result: r } => {
                 assert_eq!(call_id, "call123");
                 assert_eq!(r.len(), 1);
                 assert_eq!(r[0].title, "Rust");
@@ -1212,7 +1178,7 @@ mod tests {
         let content =
             url_context_call_content("ctx_123", vec!["https://docs.rs", "https://crates.io"]);
         match content {
-            InteractionContent::UrlContextCall { id, urls } => {
+            Content::UrlContextCall { id, urls } => {
                 assert_eq!(id, "ctx_123");
                 assert_eq!(urls.len(), 2);
                 assert_eq!(urls[0], "https://docs.rs");
@@ -1232,7 +1198,7 @@ mod tests {
             )],
         );
         match content {
-            InteractionContent::UrlContextResult { call_id, result } => {
+            Content::UrlContextResult { call_id, result } => {
                 assert_eq!(call_id, "ctx_123");
                 assert_eq!(result.len(), 1);
                 assert_eq!(result[0].url, "https://example.com");
@@ -1246,7 +1212,7 @@ mod tests {
     fn test_url_context_success() {
         let content = url_context_success("ctx_123", "https://example.com");
         match content {
-            InteractionContent::UrlContextResult { call_id, result } => {
+            Content::UrlContextResult { call_id, result } => {
                 assert_eq!(call_id, "ctx_123");
                 assert_eq!(result.len(), 1);
                 assert_eq!(result[0].url, "https://example.com");
@@ -1260,7 +1226,7 @@ mod tests {
     fn test_url_context_failure() {
         let content = url_context_failure("ctx_123", "https://blocked.com");
         match content {
-            InteractionContent::UrlContextResult { call_id, result } => {
+            Content::UrlContextResult { call_id, result } => {
                 assert_eq!(call_id, "ctx_123");
                 assert_eq!(result.len(), 1);
                 assert_eq!(result[0].url, "https://blocked.com");
@@ -1275,7 +1241,7 @@ mod tests {
         let content =
             content_from_uri_and_mime("files/abc123".to_string(), "image/png".to_string());
         match content {
-            InteractionContent::Image { uri, mime_type, .. } => {
+            Content::Image { uri, mime_type, .. } => {
                 assert_eq!(uri, Some("files/abc123".to_string()));
                 assert_eq!(mime_type, Some("image/png".to_string()));
             }
@@ -1288,7 +1254,7 @@ mod tests {
         let content =
             content_from_uri_and_mime("files/audio456".to_string(), "audio/mp3".to_string());
         match content {
-            InteractionContent::Audio { uri, mime_type, .. } => {
+            Content::Audio { uri, mime_type, .. } => {
                 assert_eq!(uri, Some("files/audio456".to_string()));
                 assert_eq!(mime_type, Some("audio/mp3".to_string()));
             }
@@ -1301,7 +1267,7 @@ mod tests {
         let content =
             content_from_uri_and_mime("files/video789".to_string(), "video/mp4".to_string());
         match content {
-            InteractionContent::Video { uri, mime_type, .. } => {
+            Content::Video { uri, mime_type, .. } => {
                 assert_eq!(uri, Some("files/video789".to_string()));
                 assert_eq!(mime_type, Some("video/mp4".to_string()));
             }
@@ -1314,7 +1280,7 @@ mod tests {
         let content =
             content_from_uri_and_mime("files/doc123".to_string(), "application/pdf".to_string());
         match content {
-            InteractionContent::Document { uri, mime_type, .. } => {
+            Content::Document { uri, mime_type, .. } => {
                 assert_eq!(uri, Some("files/doc123".to_string()));
                 assert_eq!(mime_type, Some("application/pdf".to_string()));
             }
@@ -1328,7 +1294,7 @@ mod tests {
         let content =
             content_from_uri_and_mime("files/text123".to_string(), "text/plain".to_string());
         match content {
-            InteractionContent::Document { uri, mime_type, .. } => {
+            Content::Document { uri, mime_type, .. } => {
                 assert_eq!(uri, Some("files/text123".to_string()));
                 assert_eq!(mime_type, Some("text/plain".to_string()));
             }
@@ -1339,7 +1305,7 @@ mod tests {
         let content =
             content_from_uri_and_mime("files/md456".to_string(), "text/markdown".to_string());
         match content {
-            InteractionContent::Document { uri, mime_type, .. } => {
+            Content::Document { uri, mime_type, .. } => {
                 assert_eq!(uri, Some("files/md456".to_string()));
                 assert_eq!(mime_type, Some("text/markdown".to_string()));
             }

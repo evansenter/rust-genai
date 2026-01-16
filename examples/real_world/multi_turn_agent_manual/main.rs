@@ -388,7 +388,7 @@ impl SupportSession {
                 .interaction()
                 .with_model("gemini-3-flash-preview")
                 .with_previous_interaction(response.id.as_ref().ok_or("Missing interaction ID")?)
-                .set_content(results)
+                .with_content(results)
                 .with_store_enabled()
                 .create()
                 .await?;

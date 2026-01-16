@@ -15,8 +15,8 @@
 #![cfg(not(feature = "strict-unknown"))]
 
 use genai_rs::{
-    FunctionCallingMode, InteractionContent, InteractionStatus, Resolution, Role, StreamChunk,
-    ThinkingLevel, ThinkingSummaries,
+    Content, FunctionCallingMode, InteractionStatus, Resolution, Role, StreamChunk, ThinkingLevel,
+    ThinkingSummaries,
 };
 use serde_json::json;
 
@@ -45,7 +45,7 @@ mod resolution {
 }
 
 // =============================================================================
-// InteractionContent Unknown Variant Tests
+// Content Unknown Variant Tests
 // =============================================================================
 
 mod interaction_content {
@@ -58,7 +58,7 @@ mod interaction_content {
             "some_field": "value",
             "nested": {"a": 1}
         });
-        let content: InteractionContent = serde_json::from_value(json).unwrap();
+        let content: Content = serde_json::from_value(json).unwrap();
         assert!(content.is_unknown());
         assert_eq!(content.unknown_content_type(), Some("future_content_type"));
     }
@@ -71,7 +71,7 @@ mod interaction_content {
             "field2": 42,
             "nested": {"key": "value"}
         });
-        let content: InteractionContent = serde_json::from_value(json).unwrap();
+        let content: Content = serde_json::from_value(json).unwrap();
 
         let data = content.unknown_data().unwrap();
         assert_eq!(data["field1"], "value1");
@@ -85,7 +85,7 @@ mod interaction_content {
             "type": "experimental_type",
             "payload": {"data": "test"}
         });
-        let content: InteractionContent = serde_json::from_value(json.clone()).unwrap();
+        let content: Content = serde_json::from_value(json.clone()).unwrap();
         let back = serde_json::to_value(&content).unwrap();
 
         assert_eq!(back["type"], "experimental_type");
@@ -95,7 +95,7 @@ mod interaction_content {
     #[test]
     fn missing_type_field_becomes_unknown() {
         let json = json!({"foo": "bar", "baz": 42});
-        let content: InteractionContent = serde_json::from_value(json).unwrap();
+        let content: Content = serde_json::from_value(json).unwrap();
         assert!(content.is_unknown());
     }
 }
@@ -267,9 +267,8 @@ mod helper_methods {
         let resolution: Resolution = serde_json::from_value(json!("future")).unwrap();
         assert!(resolution.is_unknown());
 
-        // InteractionContent
-        let content: InteractionContent =
-            serde_json::from_value(json!({"type": "future"})).unwrap();
+        // Content
+        let content: Content = serde_json::from_value(json!({"type": "future"})).unwrap();
         assert!(content.is_unknown());
 
         // Role
@@ -303,9 +302,8 @@ mod helper_methods {
         let resolution: Resolution = serde_json::from_value(json!("test_res")).unwrap();
         assert_eq!(resolution.unknown_resolution_type(), Some("test_res"));
 
-        // InteractionContent
-        let content: InteractionContent =
-            serde_json::from_value(json!({"type": "test_content"})).unwrap();
+        // Content
+        let content: Content = serde_json::from_value(json!({"type": "test_content"})).unwrap();
         assert_eq!(content.unknown_content_type(), Some("test_content"));
 
         // Role
@@ -340,8 +338,8 @@ mod helper_methods {
         let resolution: Resolution = serde_json::from_value(json!("test")).unwrap();
         assert!(resolution.unknown_data().is_some());
 
-        // InteractionContent
-        let content: InteractionContent =
+        // Content
+        let content: Content =
             serde_json::from_value(json!({"type": "test", "extra": 42})).unwrap();
         let data = content.unknown_data().unwrap();
         assert_eq!(data["extra"], 42);

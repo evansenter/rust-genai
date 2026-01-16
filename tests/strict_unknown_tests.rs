@@ -4,7 +4,7 @@
 //! deserialization behavior for unknown content types.
 //!
 //! When `strict-unknown` is DISABLED (default):
-//! - Unknown content types are captured in `InteractionContent::Unknown` variants
+//! - Unknown content types are captured in `Content::Unknown` variants
 //! - Deserialization succeeds even for unrecognized types
 //! - Unknown variants can be serialized back (round-trip support)
 //!
@@ -31,7 +31,7 @@
 //! cargo test --test strict_unknown_tests --features strict-unknown
 //! ```
 
-use genai_rs::InteractionContent;
+use genai_rs::Content;
 use serde_json::json;
 
 // =============================================================================
@@ -45,7 +45,7 @@ mod graceful_handling {
     #[test]
     fn unknown_type_deserializes_successfully() {
         let json = r#"{"type": "future_feature", "data": "test", "extra_field": 42}"#;
-        let result: Result<InteractionContent, _> = serde_json::from_str(json);
+        let result: Result<Content, _> = serde_json::from_str(json);
 
         assert!(
             result.is_ok(),
@@ -54,7 +54,7 @@ mod graceful_handling {
 
         let content = result.unwrap();
         assert!(
-            matches!(&content, InteractionContent::Unknown { content_type, .. } if content_type == "future_feature"),
+            matches!(&content, Content::Unknown { content_type, .. } if content_type == "future_feature"),
             "Should be Unknown variant with correct content_type"
         );
     }
@@ -68,9 +68,9 @@ mod graceful_handling {
             "nested": {"a": 1, "b": 2}
         });
 
-        let content: InteractionContent = serde_json::from_value(json.clone()).unwrap();
+        let content: Content = serde_json::from_value(json.clone()).unwrap();
 
-        if let InteractionContent::Unknown { content_type, data } = content {
+        if let Content::Unknown { content_type, data } = content {
             assert_eq!(content_type, "new_api_feature");
             assert_eq!(data["field1"], "value1");
             assert_eq!(data["field2"], 42);
@@ -89,7 +89,7 @@ mod graceful_handling {
         });
 
         // Deserialize
-        let content: InteractionContent = serde_json::from_value(original_json.clone()).unwrap();
+        let content: Content = serde_json::from_value(original_json.clone()).unwrap();
 
         // Serialize back
         let serialized = serde_json::to_value(&content).unwrap();
@@ -102,7 +102,7 @@ mod graceful_handling {
 
     #[test]
     fn multiple_unknown_types_all_captured() {
-        let items: Vec<InteractionContent> = serde_json::from_value(json!([
+        let items: Vec<Content> = serde_json::from_value(json!([
             {"type": "unknown_type_a", "data": "a"},
             {"type": "text", "text": "Hello"},
             {"type": "unknown_type_b", "data": "b"}
@@ -114,25 +114,25 @@ mod graceful_handling {
         // First is unknown
         assert!(matches!(
             &items[0],
-            InteractionContent::Unknown { content_type, .. } if content_type == "unknown_type_a"
+            Content::Unknown { content_type, .. } if content_type == "unknown_type_a"
         ));
 
         // Second is known (Text)
-        assert!(matches!(&items[1], InteractionContent::Text { .. }));
+        assert!(matches!(&items[1], Content::Text { .. }));
 
         // Third is unknown
         assert!(matches!(
             &items[2],
-            InteractionContent::Unknown { content_type, .. } if content_type == "unknown_type_b"
+            Content::Unknown { content_type, .. } if content_type == "unknown_type_b"
         ));
     }
 
     #[test]
     fn is_unknown_method_works() {
-        let unknown: InteractionContent =
+        let unknown: Content =
             serde_json::from_value(json!({"type": "new_type", "data": 1})).unwrap();
 
-        let known: InteractionContent =
+        let known: Content =
             serde_json::from_value(json!({"type": "text", "text": "hello"})).unwrap();
 
         assert!(unknown.is_unknown());
@@ -141,27 +141,25 @@ mod graceful_handling {
 
     #[test]
     fn unknown_type_accessor_returns_content_type() {
-        let content: InteractionContent =
+        let content: Content =
             serde_json::from_value(json!({"type": "brand_new_type", "x": 1})).unwrap();
 
         assert_eq!(content.unknown_content_type(), Some("brand_new_type"));
 
-        let text: InteractionContent =
-            serde_json::from_value(json!({"type": "text", "text": "hi"})).unwrap();
+        let text: Content = serde_json::from_value(json!({"type": "text", "text": "hi"})).unwrap();
 
         assert_eq!(text.unknown_content_type(), None);
     }
 
     #[test]
     fn unknown_data_accessor_returns_raw_json() {
-        let content: InteractionContent =
+        let content: Content =
             serde_json::from_value(json!({"type": "custom_type", "value": 42})).unwrap();
 
         let data = content.unknown_data().expect("Should have data");
         assert_eq!(data["value"], 42);
 
-        let text: InteractionContent =
-            serde_json::from_value(json!({"type": "text", "text": "hi"})).unwrap();
+        let text: Content = serde_json::from_value(json!({"type": "text", "text": "hi"})).unwrap();
 
         assert!(text.unknown_data().is_none());
     }
@@ -169,11 +167,11 @@ mod graceful_handling {
     #[test]
     fn missing_type_field_handled_gracefully() {
         let json = json!({"no_type_field": "value"});
-        let result: Result<InteractionContent, _> = serde_json::from_value(json);
+        let result: Result<Content, _> = serde_json::from_value(json);
 
         // Should succeed but result in Unknown with "<missing type>" marker
         assert!(result.is_ok());
-        if let InteractionContent::Unknown { content_type, .. } = result.unwrap() {
+        if let Content::Unknown { content_type, .. } = result.unwrap() {
             assert_eq!(content_type, "<missing type>");
         } else {
             panic!("Expected Unknown variant for missing type");
@@ -192,7 +190,7 @@ mod strict_mode {
     #[test]
     fn unknown_type_causes_deserialization_error() {
         let json = r#"{"type": "future_feature", "data": "test"}"#;
-        let result: Result<InteractionContent, _> = serde_json::from_str(json);
+        let result: Result<Content, _> = serde_json::from_str(json);
 
         assert!(
             result.is_err(),
@@ -203,7 +201,7 @@ mod strict_mode {
     #[test]
     fn error_message_contains_unknown_content_type() {
         let json = r#"{"type": "experimental_api_type", "data": "test"}"#;
-        let result: Result<InteractionContent, _> = serde_json::from_str(json);
+        let result: Result<Content, _> = serde_json::from_str(json);
 
         let err = result.expect_err("Should fail in strict mode");
         let err_msg = err.to_string();
@@ -219,7 +217,7 @@ mod strict_mode {
     #[test]
     fn error_message_mentions_strict_mode() {
         let json = r#"{"type": "new_type", "data": "test"}"#;
-        let result: Result<InteractionContent, _> = serde_json::from_str(json);
+        let result: Result<Content, _> = serde_json::from_str(json);
 
         let err = result.expect_err("Should fail in strict mode");
         let err_msg = err.to_string();
@@ -235,7 +233,7 @@ mod strict_mode {
     #[test]
     fn error_message_format_is_actionable() {
         let json = r#"{"type": "unknown_content_type", "data": "test"}"#;
-        let result: Result<InteractionContent, _> = serde_json::from_str(json);
+        let result: Result<Content, _> = serde_json::from_str(json);
 
         let err = result.expect_err("Should fail in strict mode");
         let err_msg = err.to_string();
@@ -259,40 +257,39 @@ mod strict_mode {
     #[test]
     fn known_types_still_deserialize_correctly() {
         // Text
-        let text: InteractionContent =
-            serde_json::from_value(json!({"type": "text", "text": "hello"}))
-                .expect("Text should deserialize in strict mode");
-        assert!(matches!(text, InteractionContent::Text { .. }));
+        let text: Content = serde_json::from_value(json!({"type": "text", "text": "hello"}))
+            .expect("Text should deserialize in strict mode");
+        assert!(matches!(text, Content::Text { .. }));
 
         // Thought
-        let thought: InteractionContent =
+        let thought: Content =
             serde_json::from_value(json!({"type": "thought", "text": "thinking..."}))
                 .expect("Thought should deserialize in strict mode");
-        assert!(matches!(thought, InteractionContent::Thought { .. }));
+        assert!(matches!(thought, Content::Thought { .. }));
 
         // Image
-        let image: InteractionContent = serde_json::from_value(json!({
+        let image: Content = serde_json::from_value(json!({
             "type": "image",
             "data": "base64data",
             "mime_type": "image/png"
         }))
         .expect("Image should deserialize in strict mode");
-        assert!(matches!(image, InteractionContent::Image { .. }));
+        assert!(matches!(image, Content::Image { .. }));
 
         // FunctionCall
-        let func_call: InteractionContent = serde_json::from_value(json!({
+        let func_call: Content = serde_json::from_value(json!({
             "type": "function_call",
             "name": "test_func",
             "arguments": {}
         }))
         .expect("FunctionCall should deserialize in strict mode");
-        assert!(matches!(func_call, InteractionContent::FunctionCall { .. }));
+        assert!(matches!(func_call, Content::FunctionCall { .. }));
     }
 
     #[test]
     fn fails_on_any_unknown_type_in_array() {
         // Array with unknown type in the middle
-        let result: Result<Vec<InteractionContent>, _> = serde_json::from_value(json!([
+        let result: Result<Vec<Content>, _> = serde_json::from_value(json!([
             {"type": "text", "text": "Hello"},
             {"type": "unknown_middle", "data": "x"},
             {"type": "text", "text": "World"}
@@ -315,58 +312,57 @@ mod common {
     #[test]
     fn all_known_content_types_deserialize() {
         // Text
-        let _: InteractionContent =
-            serde_json::from_value(json!({"type": "text", "text": "hello"})).unwrap();
+        let _: Content = serde_json::from_value(json!({"type": "text", "text": "hello"})).unwrap();
 
         // Thought (contains signature, not text - per wire format)
-        let _: InteractionContent =
+        let _: Content =
             serde_json::from_value(json!({"type": "thought", "signature": "Eq0JCqoJ..."})).unwrap();
 
         // ThoughtSignature
-        let _: InteractionContent =
+        let _: Content =
             serde_json::from_value(json!({"type": "thought_signature", "signature": "sig123"}))
                 .unwrap();
 
         // Image
-        let _: InteractionContent =
+        let _: Content =
             serde_json::from_value(json!({"type": "image", "data": "x", "mime_type": "image/png"}))
                 .unwrap();
 
         // Audio
-        let _: InteractionContent =
+        let _: Content =
             serde_json::from_value(json!({"type": "audio", "data": "x", "mime_type": "audio/mp3"}))
                 .unwrap();
 
         // Video
-        let _: InteractionContent =
+        let _: Content =
             serde_json::from_value(json!({"type": "video", "data": "x", "mime_type": "video/mp4"}))
                 .unwrap();
 
         // Document
-        let _: InteractionContent = serde_json::from_value(
+        let _: Content = serde_json::from_value(
             json!({"type": "document", "data": "x", "mime_type": "application/pdf"}),
         )
         .unwrap();
 
         // FunctionCall
-        let _: InteractionContent =
+        let _: Content =
             serde_json::from_value(json!({"type": "function_call", "name": "fn", "arguments": {}}))
                 .unwrap();
 
         // FunctionResult
-        let _: InteractionContent = serde_json::from_value(
+        let _: Content = serde_json::from_value(
             json!({"type": "function_result", "name": "fn", "call_id": "1", "result": {}}),
         )
         .unwrap();
 
         // CodeExecutionCall
-        let _: InteractionContent = serde_json::from_value(
+        let _: Content = serde_json::from_value(
             json!({"type": "code_execution_call", "id": "1", "language": "PYTHON", "code": "print(1)"}),
         )
         .unwrap();
 
         // CodeExecutionResult
-        let _: InteractionContent = serde_json::from_value(json!({
+        let _: Content = serde_json::from_value(json!({
             "type": "code_execution_result",
             "call_id": "1",
             "outcome": "OUTCOME_OK",
@@ -375,7 +371,7 @@ mod common {
         .unwrap();
 
         // GoogleSearchCall
-        let _: InteractionContent = serde_json::from_value(json!({
+        let _: Content = serde_json::from_value(json!({
             "type": "google_search_call",
             "id": "test-id",
             "arguments": {"queries": ["test query"]}
@@ -383,7 +379,7 @@ mod common {
         .unwrap();
 
         // GoogleSearchResult
-        let _: InteractionContent = serde_json::from_value(json!({
+        let _: Content = serde_json::from_value(json!({
             "type": "google_search_result",
             "call_id": "test-id",
             "result": [{"title": "Test", "url": "https://example.com"}]
@@ -391,7 +387,7 @@ mod common {
         .unwrap();
 
         // UrlContextCall (wire format has id + arguments.urls)
-        let _: InteractionContent = serde_json::from_value(json!({
+        let _: Content = serde_json::from_value(json!({
             "type": "url_context_call",
             "id": "ctx_123",
             "arguments": {"urls": ["https://example.com"]}
@@ -399,7 +395,7 @@ mod common {
         .unwrap();
 
         // UrlContextResult (wire format has call_id + result array)
-        let _: InteractionContent = serde_json::from_value(json!({
+        let _: Content = serde_json::from_value(json!({
             "type": "url_context_result",
             "call_id": "ctx_123",
             "result": [{"url": "https://example.com", "status": "success"}]
@@ -409,7 +405,7 @@ mod common {
 
     #[test]
     fn known_types_roundtrip_correctly() {
-        let text = InteractionContent::Text {
+        let text = Content::Text {
             text: Some("hello".to_string()),
             annotations: None,
         };
@@ -417,14 +413,14 @@ mod common {
         assert_eq!(json["type"], "text");
         assert_eq!(json["text"], "hello");
 
-        let thought = InteractionContent::Thought {
+        let thought = Content::Thought {
             signature: Some("Eq0JCqoJ...signature".to_string()),
         };
         let json = serde_json::to_value(&thought).unwrap();
         assert_eq!(json["type"], "thought");
         assert_eq!(json["signature"], "Eq0JCqoJ...signature");
 
-        let image = InteractionContent::Image {
+        let image = Content::Image {
             data: Some("b64".to_string()),
             uri: None,
             mime_type: Some("image/png".to_string()),

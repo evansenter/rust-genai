@@ -107,7 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     StreamChunk::Delta(delta) => {
                         delta_count += 1;
                         // Print text deltas as they arrive
-                        if let Some(text) = delta.text() {
+                        if let Some(text) = delta.as_text() {
                             print!("{}", text);
                             io::stdout().flush()?; // Flush to show immediately
                             total_chars += text.len();

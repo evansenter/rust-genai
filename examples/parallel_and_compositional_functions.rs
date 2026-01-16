@@ -247,7 +247,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_previous_interaction(response.id.as_ref().unwrap())
-            .set_content(result_contents) // Just the results, no tools needed
+            .with_content(result_contents) // Just the results, no tools needed
             .create()
             .await?;
     }
@@ -319,7 +319,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_previous_interaction(response.id.as_ref().unwrap())
-            .set_content(result_contents)
+            .with_content(result_contents)
             .create()
             .await?;
     }

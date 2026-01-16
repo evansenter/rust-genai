@@ -236,7 +236,7 @@ async fn test_conversation_function_then_text() {
 
     let response2 = stateful_builder(&client)
         .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-        .set_content(vec![result])
+        .with_content(vec![result])
         .add_function(get_weather.clone())
         .create()
         .await

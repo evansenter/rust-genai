@@ -788,10 +788,9 @@ mod streaming {
 mod file_loading {
     use crate::common::{
         TINY_BLUE_PNG_BASE64, TINY_RED_PNG_BASE64, assert_response_semantic, get_client,
-        interaction_builder,
     };
     use base64::Engine;
-    use genai_rs::InteractionStatus;
+    use genai_rs::{Content, InteractionStatus, image_from_file};
 
     /// Tests the add_image_file() builder method.
     ///
@@ -817,12 +816,17 @@ mod file_loading {
             .expect("Failed to decode base64");
         std::fs::write(&image_path, &image_bytes).expect("Failed to write image");
 
-        // Use the fluent builder pattern with add_image_file()
-        let response = interaction_builder(&client)
-            .with_text("What color is this image? Answer with just the color name.")
-            .add_image_file(&image_path)
+        // Use image_from_file() helper to load and encode, then with_content()
+        let image_content = image_from_file(&image_path)
             .await
-            .expect("Failed to add image file")
+            .expect("Failed to load image file");
+        let response = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_content(vec![
+                Content::text("What color is this image? Answer with just the color name."),
+                image_content,
+            ])
             .create()
             .await
             .expect("Image interaction failed");
@@ -873,15 +877,23 @@ mod file_loading {
             .expect("Failed to decode blue PNG");
         std::fs::write(&blue_path, &blue_bytes).expect("Failed to write blue image");
 
-        // Chain multiple add_image_file() calls
-        let response = interaction_builder(&client)
-            .with_text("I'm showing you two small colored images. What colors are they? List both.")
-            .add_image_file(&red_path)
+        // Load multiple images with image_from_file() and combine with with_content()
+        let red_content = image_from_file(&red_path)
             .await
-            .expect("Failed to add red image")
-            .add_image_file(&blue_path)
+            .expect("Failed to load red image");
+        let blue_content = image_from_file(&blue_path)
             .await
-            .expect("Failed to add blue image")
+            .expect("Failed to load blue image");
+        let response = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_content(vec![
+                Content::text(
+                    "I'm showing you two small colored images. What colors are they? List both.",
+                ),
+                red_content,
+                blue_content,
+            ])
             .create()
             .await
             .expect("Multiple images interaction failed");
@@ -902,20 +914,11 @@ mod file_loading {
         .await;
     }
 
-    /// Tests add_image_file() error handling for missing file.
+    /// Tests image_from_file() error handling for missing file.
     #[tokio::test]
-    async fn test_add_image_file_not_found() {
+    async fn test_image_from_file_not_found() {
         // This test doesn't require an API key - just tests local file loading error
-        let client = genai_rs::Client::builder("fake-key-for-testing".to_string())
-            .build()
-            .unwrap();
-
-        let result = client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
-            .with_text("Describe this image")
-            .add_image_file("/nonexistent/path/image.png")
-            .await;
+        let result = image_from_file("/nonexistent/path/image.png").await;
 
         assert!(result.is_err(), "Should return error for missing file");
         let err = result.unwrap_err().to_string();
@@ -930,15 +933,13 @@ mod file_loading {
 mod bytes_loading {
     use crate::common::{
         TINY_MP4_BASE64, TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64,
-        assert_response_semantic, get_client, interaction_builder, validate_response_semantically,
+        assert_response_semantic, get_client, validate_response_semantically,
     };
-    use base64::Engine;
-    use genai_rs::InteractionStatus;
+    use genai_rs::{Content, InteractionStatus};
 
-    /// Tests the add_image_bytes() builder method.
+    /// Tests image input with base64-encoded data using Content::image_data().
     ///
-    /// This validates that raw bytes (not base64-encoded) can be passed directly
-    /// to the builder, which will handle the base64 encoding internally.
+    /// This validates that base64-encoded image data works correctly.
     /// Uses semantic validation to verify the model correctly interprets the image.
     ///
     /// Note: This test uses `.expect()` (strict assertion) because the PNG fixture
@@ -947,25 +948,24 @@ mod bytes_loading {
     /// minimal fixtures may be rejected by the API.
     #[tokio::test]
     #[ignore = "Requires API key"]
-    async fn test_add_image_bytes_roundtrip() {
+    async fn test_image_data_roundtrip() {
         let Some(client) = get_client() else {
             println!("Skipping: GEMINI_API_KEY not set");
             return;
         };
 
-        // Decode the base64 constant to get raw bytes
-        let image_bytes = base64::engine::general_purpose::STANDARD
-            .decode(TINY_RED_PNG_BASE64)
-            .expect("Failed to decode base64");
-
-        // Use add_image_bytes() with raw bytes
+        // Use Content::image_data() with base64-encoded data
         // The tiny PNG is well-formed and should always be processable
-        let response = interaction_builder(&client)
-            .with_text("What color is this image? Answer with just the color name.")
-            .add_image_bytes(&image_bytes, "image/png")
+        let response = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_content(vec![
+                Content::text("What color is this image? Answer with just the color name."),
+                Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+            ])
             .create()
             .await
-            .expect("Image bytes interaction failed");
+            .expect("Image data interaction failed");
 
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
@@ -983,28 +983,27 @@ mod bytes_loading {
         .await;
     }
 
-    /// Tests the add_audio_bytes() builder method.
+    /// Tests audio input with base64-encoded data using Content::audio_data().
     ///
-    /// This validates that raw audio bytes can be passed directly to the builder.
+    /// This validates that base64-encoded audio data works correctly.
     /// Note: The minimal WAV test file may not contain actual audio, so the model
     /// may report it's empty/silent.
     #[tokio::test]
     #[ignore = "Requires API key"]
-    async fn test_add_audio_bytes_roundtrip() {
+    async fn test_audio_data_roundtrip() {
         let Some(client) = get_client() else {
             println!("Skipping: GEMINI_API_KEY not set");
             return;
         };
 
-        // Decode the base64 constant to get raw bytes
-        let audio_bytes = base64::engine::general_purpose::STANDARD
-            .decode(TINY_WAV_BASE64)
-            .expect("Failed to decode base64");
-
-        // Use add_audio_bytes() with raw bytes
-        let result = interaction_builder(&client)
-            .with_text("Describe what you hear in this audio file.")
-            .add_audio_bytes(&audio_bytes, "audio/wav")
+        // Use Content::audio_data() with base64-encoded data
+        let result = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_content(vec![
+                Content::text("Describe what you hear in this audio file."),
+                Content::audio_data(TINY_WAV_BASE64, "audio/wav"),
+            ])
             .create()
             .await;
 
@@ -1028,28 +1027,27 @@ mod bytes_loading {
         }
     }
 
-    /// Tests the add_video_bytes() builder method.
+    /// Tests video input with base64-encoded data using Content::video_data().
     ///
-    /// This validates that raw video bytes can be passed directly to the builder.
+    /// This validates that base64-encoded video data works correctly.
     /// Note: The minimal MP4 test file is just a container header with no frames,
     /// so the model may report it's empty/corrupt.
     #[tokio::test]
     #[ignore = "Requires API key"]
-    async fn test_add_video_bytes_roundtrip() {
+    async fn test_video_data_roundtrip() {
         let Some(client) = get_client() else {
             println!("Skipping: GEMINI_API_KEY not set");
             return;
         };
 
-        // Decode the base64 constant to get raw bytes
-        let video_bytes = base64::engine::general_purpose::STANDARD
-            .decode(TINY_MP4_BASE64)
-            .expect("Failed to decode base64");
-
-        // Use add_video_bytes() with raw bytes
-        let result = interaction_builder(&client)
-            .with_text("Describe what you see in this video file.")
-            .add_video_bytes(&video_bytes, "video/mp4")
+        // Use Content::video_data() with base64-encoded data
+        let result = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_content(vec![
+                Content::text("Describe what you see in this video file."),
+                Content::video_data(TINY_MP4_BASE64, "video/mp4"),
+            ])
             .create()
             .await;
 
@@ -1073,33 +1071,32 @@ mod bytes_loading {
         }
     }
 
-    /// Tests the add_document_bytes() builder method.
+    /// Tests document input with base64-encoded data using Content::document_data().
     ///
-    /// This validates that raw document bytes (PDF) can be passed directly to
-    /// the builder. The test PDF contains "Hello World" text.
+    /// This validates that base64-encoded document data (PDF) works correctly.
+    /// The test PDF contains "Hello World" text.
     /// Uses semantic validation to verify the model correctly interprets the document.
     ///
     /// Note: Like audio/video tests, this uses lenient error handling because the
     /// minimal PDF fixture or the semantic validation call might fail.
     #[tokio::test]
     #[ignore = "Requires API key"]
-    async fn test_add_document_bytes_roundtrip() {
+    async fn test_document_data_roundtrip() {
         let Some(client) = get_client() else {
             println!("Skipping: GEMINI_API_KEY not set");
             return;
         };
 
-        // Decode the base64 constant to get raw bytes
-        let pdf_bytes = base64::engine::general_purpose::STANDARD
-            .decode(TINY_PDF_BASE64)
-            .expect("Failed to decode base64");
-
-        // Use add_document_bytes() with raw bytes
-        let result = interaction_builder(&client)
-            .with_text(
-                "What text does this PDF document contain? Answer with just the text you find.",
-            )
-            .add_document_bytes(&pdf_bytes, "application/pdf")
+        // Use Content::document_data() with base64-encoded data
+        let result = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_content(vec![
+                Content::text(
+                    "What text does this PDF document contain? Answer with just the text you find.",
+                ),
+                Content::document_data(TINY_PDF_BASE64, "application/pdf"),
+            ])
             .create()
             .await;
 

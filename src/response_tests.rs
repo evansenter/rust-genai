@@ -92,11 +92,11 @@ fn test_interaction_response_text() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Hello".to_string()),
                 annotations: None,
             },
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("World".to_string()),
                 annotations: None,
             },
@@ -125,18 +125,18 @@ fn test_interaction_response_thoughts() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Thought {
+            Content::Thought {
                 signature: Some("sig_1".to_string()),
             },
-            InteractionContent::Thought {
+            Content::Thought {
                 signature: Some("sig_2".to_string()),
             },
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("The answer is 42.".to_string()),
                 annotations: None,
             },
             // Thought with None signature should be filtered out
-            InteractionContent::Thought { signature: None },
+            Content::Thought { signature: None },
         ],
         status: InteractionStatus::Completed,
         usage: None,
@@ -166,7 +166,7 @@ fn test_interaction_response_no_thoughts() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("Just text, no thoughts.".to_string()),
             annotations: None,
         }],
@@ -193,12 +193,12 @@ fn test_interaction_response_function_calls() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::FunctionCall {
+            Content::FunctionCall {
                 id: Some("call_001".to_string()),
                 name: "get_weather".to_string(),
                 args: serde_json::json!({"location": "Paris"}),
             },
-            InteractionContent::FunctionCall {
+            Content::FunctionCall {
                 id: Some("call_002".to_string()),
                 name: "get_time".to_string(),
                 args: serde_json::json!({"timezone": "UTC"}),
@@ -236,7 +236,7 @@ fn test_function_call_missing_id() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::FunctionCall {
+        outputs: vec![Content::FunctionCall {
             id: None, // Missing call_id - should be captured correctly
             name: "get_weather".to_string(),
             args: serde_json::json!({"location": "Tokyo"}),
@@ -271,16 +271,16 @@ fn test_interaction_response_mixed_content() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Let me check".to_string()),
                 annotations: None,
             },
-            InteractionContent::FunctionCall {
+            Content::FunctionCall {
                 id: Some("call_mixed".to_string()),
                 name: "check_status".to_string(),
                 args: serde_json::json!({}),
             },
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Done!".to_string()),
                 annotations: None,
             },
@@ -337,11 +337,11 @@ fn test_interaction_response_has_unknown() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Here's the result:".to_string()),
                 annotations: None,
             },
-            InteractionContent::Unknown {
+            Content::Unknown {
                 content_type: "code_execution_result".to_string(),
                 data: serde_json::json!({
                     "type": "code_execution_result",
@@ -376,7 +376,7 @@ fn test_interaction_response_no_unknown() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("Normal response".to_string()),
             annotations: None,
         }],
@@ -404,31 +404,31 @@ fn test_content_summary() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Text 1".to_string()),
                 annotations: None,
             },
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Text 2".to_string()),
                 annotations: None,
             },
-            InteractionContent::Thought {
+            Content::Thought {
                 signature: Some("sig_thinking".to_string()),
             },
-            InteractionContent::FunctionCall {
+            Content::FunctionCall {
                 id: Some("call_1".to_string()),
                 name: "test_fn".to_string(),
                 args: serde_json::json!({}),
             },
-            InteractionContent::Unknown {
+            Content::Unknown {
                 content_type: "type_a".to_string(),
                 data: serde_json::json!({"type": "type_a"}),
             },
-            InteractionContent::Unknown {
+            Content::Unknown {
                 content_type: "type_b".to_string(),
                 data: serde_json::json!({"type": "type_b"}),
             },
-            InteractionContent::Unknown {
+            Content::Unknown {
                 content_type: "type_a".to_string(), // Duplicate type
                 data: serde_json::json!({"type": "type_a", "extra": true}),
             },
@@ -526,34 +526,34 @@ fn test_content_summary_with_built_in_tools() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::CodeExecutionCall {
+            Content::CodeExecutionCall {
                 id: Some("call_1".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print(1)".to_string(),
             },
-            InteractionContent::CodeExecutionCall {
+            Content::CodeExecutionCall {
                 id: Some("call_2".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print(2)".to_string(),
             },
-            InteractionContent::CodeExecutionResult {
+            Content::CodeExecutionResult {
                 call_id: Some("call_1".to_string()),
                 is_error: false,
                 result: "1\n2\n".to_string(),
             },
-            InteractionContent::GoogleSearchCall {
+            Content::GoogleSearchCall {
                 id: "search1".to_string(),
                 queries: vec!["test".to_string()],
             },
-            InteractionContent::GoogleSearchResult {
+            Content::GoogleSearchResult {
                 call_id: "search1".to_string(),
                 result: vec![],
             },
-            InteractionContent::UrlContextCall {
+            Content::UrlContextCall {
                 id: "ctx_123".to_string(),
                 urls: vec!["https://example.com".to_string()],
             },
-            InteractionContent::UrlContextResult {
+            Content::UrlContextResult {
                 call_id: "ctx_123".to_string(),
                 result: vec![],
             },
@@ -589,16 +589,16 @@ fn test_interaction_response_code_execution_helpers() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Here's the code:".to_string()),
                 annotations: None,
             },
-            InteractionContent::CodeExecutionCall {
+            Content::CodeExecutionCall {
                 id: Some("call_123".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print(42)".to_string(),
             },
-            InteractionContent::CodeExecutionResult {
+            Content::CodeExecutionResult {
                 call_id: Some("call_123".to_string()),
                 is_error: false,
                 result: "42\n".to_string(),
@@ -646,11 +646,11 @@ fn test_interaction_response_google_search_helpers() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::GoogleSearchResult {
+            Content::GoogleSearchResult {
                 call_id: "call123".to_string(),
                 result: vec![GoogleSearchResultItem::new("Test", "https://example.com")],
             },
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Based on search results...".to_string()),
                 annotations: None,
             },
@@ -680,7 +680,7 @@ fn test_interaction_response_url_context_helpers() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::UrlContextResult {
+        outputs: vec![Content::UrlContextResult {
             call_id: "ctx_123".to_string(),
             result: vec![UrlContextResultItem::new("https://example.com", "success")],
         }],
@@ -872,19 +872,19 @@ fn test_interaction_response_function_results() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::FunctionResult {
+            Content::FunctionResult {
                 name: Some("get_weather".to_string()),
                 call_id: "call_001".to_string(),
                 result: serde_json::json!({"temp": 72, "unit": "F"}),
                 is_error: None,
             },
-            InteractionContent::FunctionResult {
+            Content::FunctionResult {
                 name: Some("get_time".to_string()),
                 call_id: "call_002".to_string(),
                 result: serde_json::json!({"time": "14:30", "zone": "UTC"}),
                 is_error: None,
             },
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Here are the results".to_string()),
                 annotations: None,
             },
@@ -918,7 +918,7 @@ fn test_interaction_response_no_function_results() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("Just text".to_string()),
             annotations: None,
         }],
@@ -946,15 +946,15 @@ fn test_interaction_response_google_search_call_helpers() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::GoogleSearchCall {
+            Content::GoogleSearchCall {
                 id: "search1".to_string(),
                 queries: vec!["Rust programming language".to_string()],
             },
-            InteractionContent::GoogleSearchCall {
+            Content::GoogleSearchCall {
                 id: "search2".to_string(),
                 queries: vec!["async await Rust".to_string()],
             },
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Search results...".to_string()),
                 annotations: None,
             },
@@ -991,7 +991,7 @@ fn test_interaction_response_no_google_search_calls() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("No search".to_string()),
             annotations: None,
         }],
@@ -1020,11 +1020,11 @@ fn test_interaction_response_url_context_call_helpers() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::UrlContextCall {
+            Content::UrlContextCall {
                 id: "ctx_1".to_string(),
                 urls: vec!["https://docs.rs".to_string()],
             },
-            InteractionContent::UrlContextCall {
+            Content::UrlContextCall {
                 id: "ctx_2".to_string(),
                 urls: vec![
                     "https://rust-lang.org".to_string(),
@@ -1088,12 +1088,12 @@ fn test_interaction_response_code_execution_call_singular() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::CodeExecutionCall {
+            Content::CodeExecutionCall {
                 id: Some("call_first".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print('first')".to_string(),
             },
-            InteractionContent::CodeExecutionCall {
+            Content::CodeExecutionCall {
                 id: Some("call_second".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print('second')".to_string(),
@@ -1125,7 +1125,7 @@ fn test_interaction_response_no_code_execution_call() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("No code".to_string()),
             annotations: None,
         }],
@@ -1153,7 +1153,7 @@ fn test_interaction_response_google_search_metadata_helpers() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("Response grounded with search".to_string()),
             annotations: None,
         }],
@@ -1269,17 +1269,17 @@ fn test_interaction_response_code_execution_calls_plural() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::CodeExecutionCall {
+            Content::CodeExecutionCall {
                 id: Some("call_1".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print('first')".to_string(),
             },
-            InteractionContent::CodeExecutionCall {
+            Content::CodeExecutionCall {
                 id: Some("call_2".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print('second')".to_string(),
             },
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Results".to_string()),
                 annotations: None,
             },
@@ -1314,12 +1314,12 @@ fn test_interaction_response_code_execution_results() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::CodeExecutionResult {
+            Content::CodeExecutionResult {
                 call_id: Some("call_1".to_string()),
                 is_error: false,
                 result: "first output".to_string(),
             },
-            InteractionContent::CodeExecutionResult {
+            Content::CodeExecutionResult {
                 call_id: Some("call_2".to_string()),
                 is_error: true,
                 result: "error message".to_string(),
@@ -1358,7 +1358,7 @@ fn test_interaction_response_no_code_execution_results() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("No code".to_string()),
             annotations: None,
         }],
@@ -1385,7 +1385,7 @@ fn test_interaction_response_google_search_results() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::GoogleSearchResult {
+            Content::GoogleSearchResult {
                 call_id: "search1".to_string(),
                 result: vec![GoogleSearchResultItem {
                     title: "Rust Lang".to_string(),
@@ -1393,7 +1393,7 @@ fn test_interaction_response_google_search_results() {
                     rendered_content: None,
                 }],
             },
-            InteractionContent::GoogleSearchResult {
+            Content::GoogleSearchResult {
                 call_id: "search2".to_string(),
                 result: vec![GoogleSearchResultItem {
                     title: "Cargo".to_string(),
@@ -1450,14 +1450,14 @@ fn test_interaction_response_url_context_results() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::UrlContextResult {
+            Content::UrlContextResult {
                 call_id: "ctx_1".to_string(),
                 result: vec![
                     UrlContextResultItem::new("https://docs.rs", "success"),
                     UrlContextResultItem::new("https://crates.io", "success"),
                 ],
             },
-            InteractionContent::UrlContextResult {
+            Content::UrlContextResult {
                 call_id: "ctx_2".to_string(),
                 result: vec![UrlContextResultItem::new("https://blocked.com", "error")],
             },
@@ -1520,11 +1520,11 @@ fn test_interaction_response_complex_roundtrip() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Analyze this and call the weather function".to_string()),
                 annotations: None,
             },
-            InteractionContent::Image {
+            Content::Image {
                 mime_type: Some("image/png".to_string()),
                 data: Some("base64encodeddata".to_string()),
                 uri: None,
@@ -1533,42 +1533,42 @@ fn test_interaction_response_complex_roundtrip() {
         ],
         outputs: vec![
             // Thought with signature (thinking models)
-            InteractionContent::Thought {
+            Content::Thought {
                 signature: Some("sig_thinking".to_string()),
             },
-            InteractionContent::ThoughtSignature {
+            Content::ThoughtSignature {
                 signature: "thought-sig-abc123".to_string(),
             },
             // Function call
-            InteractionContent::FunctionCall {
+            Content::FunctionCall {
                 id: Some("call-func-001".to_string()),
                 name: "get_weather".to_string(),
                 args: serde_json::json!({"city": "Tokyo", "units": "celsius"}),
             },
             // Function result
-            InteractionContent::FunctionResult {
+            Content::FunctionResult {
                 call_id: "call-func-001".to_string(),
                 name: Some("get_weather".to_string()),
                 result: serde_json::json!({"temp": 22, "conditions": "sunny"}),
                 is_error: None,
             },
             // Code execution
-            InteractionContent::CodeExecutionCall {
+            Content::CodeExecutionCall {
                 id: Some("code-exec-001".to_string()),
                 language: CodeExecutionLanguage::Python,
                 code: "print(2 + 2)".to_string(),
             },
-            InteractionContent::CodeExecutionResult {
+            Content::CodeExecutionResult {
                 call_id: Some("code-exec-001".to_string()),
                 is_error: false,
                 result: "4".to_string(),
             },
             // Google search
-            InteractionContent::GoogleSearchCall {
+            Content::GoogleSearchCall {
                 id: "gsearch-001".to_string(),
                 queries: vec!["weather in Tokyo".to_string()],
             },
-            InteractionContent::GoogleSearchResult {
+            Content::GoogleSearchResult {
                 call_id: "gsearch-001".to_string(),
                 result: vec![GoogleSearchResultItem {
                     title: "Tokyo Weather".to_string(),
@@ -1577,16 +1577,16 @@ fn test_interaction_response_complex_roundtrip() {
                 }],
             },
             // URL context
-            InteractionContent::UrlContextCall {
+            Content::UrlContextCall {
                 id: "ctx_123".to_string(),
                 urls: vec!["https://example.com".to_string()],
             },
-            InteractionContent::UrlContextResult {
+            Content::UrlContextResult {
                 call_id: "ctx_123".to_string(),
                 result: vec![UrlContextResultItem::new("https://example.com", "success")],
             },
             // Final text response
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("The weather in Tokyo is 22°C and sunny.".to_string()),
                 annotations: None,
             },
@@ -1875,7 +1875,7 @@ fn test_interaction_response_serialize_without_id() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("Hello".to_string()),
             annotations: None,
         }],
@@ -1906,7 +1906,7 @@ fn test_interaction_response_roundtrip_without_id() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("Test response".to_string()),
             annotations: None,
         }],
@@ -1938,7 +1938,7 @@ fn test_function_call_info_to_owned() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::FunctionCall {
+        outputs: vec![Content::FunctionCall {
             id: Some("call_123".to_string()),
             name: "get_weather".to_string(),
             args: serde_json::json!({"city": "Tokyo", "units": "celsius"}),
@@ -1973,7 +1973,7 @@ fn test_function_call_info_to_owned_none_fields() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::FunctionCall {
+        outputs: vec![Content::FunctionCall {
             id: None,
             name: "simple_function".to_string(),
             args: serde_json::json!({}),
@@ -2006,12 +2006,12 @@ fn test_owned_function_call_info_outlives_response() {
             agent: None,
             input: vec![],
             outputs: vec![
-                InteractionContent::FunctionCall {
+                Content::FunctionCall {
                     id: Some("call_1".to_string()),
                     name: "func_a".to_string(),
                     args: serde_json::json!({"x": 1}),
                 },
-                InteractionContent::FunctionCall {
+                Content::FunctionCall {
                     id: Some("call_2".to_string()),
                     name: "func_b".to_string(),
                     args: serde_json::json!({"y": 2}),
@@ -2116,7 +2116,7 @@ fn test_interaction_response_has_annotations() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("According to the source, climate change is accelerating.".to_string()),
             annotations: Some(vec![Annotation {
                 start_index: 19,
@@ -2145,7 +2145,7 @@ fn test_interaction_response_no_annotations() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("Plain text without citations.".to_string()),
             annotations: None,
         }],
@@ -2170,7 +2170,7 @@ fn test_interaction_response_empty_annotations_not_counted() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("Text with empty annotations.".to_string()),
             annotations: Some(vec![]), // Empty array
         }],
@@ -2196,7 +2196,7 @@ fn test_interaction_response_all_annotations() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("First claim from source A.".to_string()),
                 annotations: Some(vec![Annotation {
                     start_index: 0,
@@ -2204,10 +2204,10 @@ fn test_interaction_response_all_annotations() {
                     source: Some("https://source-a.com".to_string()),
                 }]),
             },
-            InteractionContent::Thought {
+            Content::Thought {
                 signature: Some("sig_thinking".to_string()),
             },
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Second and third claims.".to_string()),
                 annotations: Some(vec![
                     Annotation {
@@ -2222,7 +2222,7 @@ fn test_interaction_response_all_annotations() {
                     },
                 ]),
             },
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Text without annotations.".to_string()),
                 annotations: None,
             },
@@ -2264,11 +2264,11 @@ fn test_interaction_response_all_annotations_empty() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("No annotations here.".to_string()),
                 annotations: None,
             },
-            InteractionContent::FunctionCall {
+            Content::FunctionCall {
                 id: Some("call_1".to_string()),
                 name: "test".to_string(),
                 args: serde_json::json!({}),
@@ -2297,18 +2297,18 @@ fn test_interaction_response_all_annotations_skips_non_text() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Image {
+            Content::Image {
                 data: Some("base64".to_string()),
                 uri: None,
                 mime_type: Some("image/png".to_string()),
                 resolution: None,
             },
-            InteractionContent::CodeExecutionResult {
+            Content::CodeExecutionResult {
                 call_id: Some("call_1".to_string()),
                 is_error: false,
                 result: "result".to_string(),
             },
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Only text has annotations.".to_string()),
                 annotations: Some(vec![Annotation {
                     start_index: 0,
@@ -2348,7 +2348,7 @@ fn test_interaction_response_has_file_search_results() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::FileSearchResult {
+        outputs: vec![Content::FileSearchResult {
             call_id: "call_123".to_string(),
             result: vec![FileSearchResultItem {
                 title: "Technical Doc".to_string(),
@@ -2376,7 +2376,7 @@ fn test_interaction_response_no_file_search_results() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("No file search here".to_string()),
             annotations: None,
         }],
@@ -2401,7 +2401,7 @@ fn test_interaction_response_file_search_results_extraction() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::FileSearchResult {
+            Content::FileSearchResult {
                 call_id: "call_1".to_string(),
                 result: vec![
                     FileSearchResultItem {
@@ -2416,11 +2416,11 @@ fn test_interaction_response_file_search_results_extraction() {
                     },
                 ],
             },
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Summary of search results".to_string()),
                 annotations: None,
             },
-            InteractionContent::FileSearchResult {
+            Content::FileSearchResult {
                 call_id: "call_2".to_string(),
                 result: vec![FileSearchResultItem {
                     title: "Doc 3".to_string(),
@@ -2458,7 +2458,7 @@ fn test_interaction_response_file_search_results_empty_results() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::FileSearchResult {
+        outputs: vec![Content::FileSearchResult {
             call_id: "call_empty".to_string(),
             result: vec![], // Empty results array
         }],
@@ -2496,7 +2496,7 @@ fn test_image_info_bytes_decodes_valid_base64() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Image {
+        outputs: vec![Content::Image {
             data: Some(base64_data),
             uri: None,
             mime_type: Some("image/png".to_string()),
@@ -2526,7 +2526,7 @@ fn test_image_info_bytes_invalid_base64() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Image {
+        outputs: vec![Content::Image {
             data: Some("not valid base64!!!".to_string()),
             uri: None,
             mime_type: Some("image/png".to_string()),
@@ -2557,13 +2557,13 @@ fn test_image_info_mime_type() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Image {
+            Content::Image {
                 data: Some("YWJj".to_string()), // "abc" in base64
                 uri: None,
                 mime_type: Some("image/jpeg".to_string()),
                 resolution: None,
             },
-            InteractionContent::Image {
+            Content::Image {
                 data: Some("ZGVm".to_string()), // "def" in base64
                 uri: None,
                 mime_type: None,
@@ -2594,7 +2594,7 @@ fn test_image_info_extension_jpeg() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Image {
+        outputs: vec![Content::Image {
             data: Some("YWJj".to_string()),
             uri: None,
             mime_type: Some("image/jpeg".to_string()),
@@ -2621,7 +2621,7 @@ fn test_image_info_extension_jpg_alternate() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Image {
+        outputs: vec![Content::Image {
             data: Some("YWJj".to_string()),
             uri: None,
             mime_type: Some("image/jpg".to_string()),
@@ -2648,7 +2648,7 @@ fn test_image_info_extension_png() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Image {
+        outputs: vec![Content::Image {
             data: Some("YWJj".to_string()),
             uri: None,
             mime_type: Some("image/png".to_string()),
@@ -2675,7 +2675,7 @@ fn test_image_info_extension_webp() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Image {
+        outputs: vec![Content::Image {
             data: Some("YWJj".to_string()),
             uri: None,
             mime_type: Some("image/webp".to_string()),
@@ -2702,7 +2702,7 @@ fn test_image_info_extension_gif() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Image {
+        outputs: vec![Content::Image {
             data: Some("YWJj".to_string()),
             uri: None,
             mime_type: Some("image/gif".to_string()),
@@ -2729,7 +2729,7 @@ fn test_image_info_extension_unknown_defaults_to_png() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Image {
+        outputs: vec![Content::Image {
             data: Some("YWJj".to_string()),
             uri: None,
             mime_type: Some("image/tiff".to_string()), // Unknown type
@@ -2756,7 +2756,7 @@ fn test_image_info_extension_none_mime_type_defaults_to_png() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Image {
+        outputs: vec![Content::Image {
             data: Some("YWJj".to_string()),
             uri: None,
             mime_type: None,
@@ -2784,29 +2784,29 @@ fn test_images_iterator_returns_only_images_with_data() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Text content".to_string()),
                 annotations: None,
             },
-            InteractionContent::Image {
+            Content::Image {
                 data: Some("YWJj".to_string()), // Has data - should be included
                 uri: None,
                 mime_type: Some("image/png".to_string()),
                 resolution: None,
             },
-            InteractionContent::Image {
+            Content::Image {
                 data: None, // No data - URI-based image, should be excluded
                 uri: Some("https://example.com/image.png".to_string()),
                 mime_type: Some("image/png".to_string()),
                 resolution: None,
             },
-            InteractionContent::Image {
+            Content::Image {
                 data: Some("ZGVm".to_string()), // Has data - should be included
                 uri: None,
                 mime_type: Some("image/jpeg".to_string()),
                 resolution: None,
             },
-            InteractionContent::FunctionCall {
+            Content::FunctionCall {
                 id: None,
                 name: "test".to_string(),
                 args: serde_json::json!({}),
@@ -2837,11 +2837,11 @@ fn test_images_iterator_empty_when_no_images() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Just text".to_string()),
                 annotations: None,
             },
-            InteractionContent::Thought {
+            Content::Thought {
                 signature: Some("sig_thought".to_string()),
             },
         ],
@@ -2893,26 +2893,26 @@ fn test_audios_iterator_returns_only_audios_with_data() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Text content".to_string()),
                 annotations: None,
             },
-            InteractionContent::Audio {
+            Content::Audio {
                 data: Some("YWJj".to_string()), // Has data - should be included
                 uri: None,
                 mime_type: Some("audio/L16;codec=pcm;rate=24000".to_string()),
             },
-            InteractionContent::Audio {
+            Content::Audio {
                 data: None, // No data - URI-based audio, should be excluded
                 uri: Some("https://example.com/audio.mp3".to_string()),
                 mime_type: Some("audio/mp3".to_string()),
             },
-            InteractionContent::Audio {
+            Content::Audio {
                 data: Some("ZGVm".to_string()), // Has data - should be included
                 uri: None,
                 mime_type: Some("audio/wav".to_string()),
             },
-            InteractionContent::FunctionCall {
+            Content::FunctionCall {
                 id: None,
                 name: "test".to_string(),
                 args: serde_json::json!({}),
@@ -2946,11 +2946,11 @@ fn test_audios_iterator_empty_when_no_audios() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Just text".to_string()),
                 annotations: None,
             },
-            InteractionContent::Thought {
+            Content::Thought {
                 signature: Some("sig_thought".to_string()),
             },
         ],
@@ -2998,16 +2998,16 @@ fn test_first_audio() {
         agent: None,
         input: vec![],
         outputs: vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Hello".to_string()),
                 annotations: None,
             },
-            InteractionContent::Audio {
+            Content::Audio {
                 data: Some("Zmlyc3Q=".to_string()),
                 uri: None,
                 mime_type: Some("audio/L16;codec=pcm;rate=24000".to_string()),
             },
-            InteractionContent::Audio {
+            Content::Audio {
                 data: Some("c2Vjb25k".to_string()),
                 uri: None,
                 mime_type: Some("audio/wav".to_string()),
@@ -3037,7 +3037,7 @@ fn test_first_audio_none_when_empty() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("No audio here".to_string()),
             annotations: None,
         }],
@@ -3061,7 +3061,7 @@ fn test_has_audio_true() {
         model: Some("gemini-2.5-pro-preview-tts".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Audio {
+        outputs: vec![Content::Audio {
             data: Some("YXVkaW8=".to_string()),
             uri: None,
             mime_type: Some("audio/L16;codec=pcm;rate=24000".to_string()),
@@ -3086,7 +3086,7 @@ fn test_has_audio_false_when_no_audio() {
         model: Some("gemini-3-flash-preview".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Text {
+        outputs: vec![Content::Text {
             text: Some("Text only".to_string()),
             annotations: None,
         }],
@@ -3112,7 +3112,7 @@ fn test_has_audio_false_when_uri_only() {
         model: Some("gemini-2.5-pro-preview-tts".to_string()),
         agent: None,
         input: vec![],
-        outputs: vec![InteractionContent::Audio {
+        outputs: vec![Content::Audio {
             data: None,
             uri: Some("https://example.com/audio.mp3".to_string()),
             mime_type: Some("audio/mp3".to_string()),
@@ -3128,4 +3128,70 @@ fn test_has_audio_false_when_uri_only() {
     };
 
     assert!(!response.has_audio());
+}
+
+// =============================================================================
+// as_model_turn() Tests
+// =============================================================================
+
+#[test]
+fn test_as_model_turn_creates_model_turn() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![Content::Text {
+            text: Some("Response text".to_string()),
+            annotations: None,
+        }],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let turn = response.as_model_turn();
+    assert!(turn.is_model());
+    assert!(!turn.is_user());
+}
+
+#[test]
+fn test_as_model_turn_includes_all_outputs() {
+    let response = InteractionResponse {
+        id: Some("test_id".to_string()),
+        model: Some("gemini-3-flash-preview".to_string()),
+        agent: None,
+        input: vec![],
+        outputs: vec![
+            Content::Text {
+                text: Some("First part".to_string()),
+                annotations: None,
+            },
+            Content::Text {
+                text: Some("Second part".to_string()),
+                annotations: None,
+            },
+        ],
+        status: InteractionStatus::Completed,
+        usage: None,
+        tools: None,
+        previous_interaction_id: None,
+        grounding_metadata: None,
+        url_context_metadata: None,
+        created: None,
+        updated: None,
+    };
+
+    let turn = response.as_model_turn();
+    // The turn should contain all outputs
+    if let Some(parts) = turn.content().parts() {
+        assert_eq!(parts.len(), 2);
+    } else {
+        panic!("Expected Parts variant");
+    }
 }

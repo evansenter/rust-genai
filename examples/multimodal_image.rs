@@ -15,9 +15,7 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use genai_rs::{
-    Client, Resolution, image_data_content, image_data_content_with_resolution, text_content,
-};
+use genai_rs::{Client, Content, Resolution};
 use std::env;
 
 // A tiny red PNG image (1x1 pixel) encoded as base64
@@ -42,8 +40,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("What color is this image? Describe it.")
-        .add_image_data(TINY_RED_PNG_BASE64, "image/png")
+        .with_content(vec![
+            Content::text("What color is this image? Describe it."),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+        ])
         .with_store_enabled()
         .create()
         .await?;
@@ -71,15 +71,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n=== IMAGE COMPARISON ===\n");
 
     let comparison_contents = vec![
-        text_content("Compare these two colored images. What are their colors?"),
-        image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-        image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
+        Content::text("Compare these two colored images. What are their colors?"),
+        Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+        Content::image_data(TINY_BLUE_PNG_BASE64, "image/png"),
     ];
 
     let comparison = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .set_content(comparison_contents)
+        .with_content(comparison_contents)
         .with_store_enabled()
         .create()
         .await?;
@@ -97,8 +97,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let low_res_response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("What color is this image?")
-        .add_image_data_with_resolution(TINY_RED_PNG_BASE64, "image/png", Resolution::Low)
+        .with_content(vec![
+            Content::text("What color is this image?"),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png").with_resolution(Resolution::Low),
+        ])
         .create()
         .await?;
 
@@ -114,8 +116,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let high_res_response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("What color is this image?")
-        .add_image_data_with_resolution(TINY_RED_PNG_BASE64, "image/png", Resolution::High)
+        .with_content(vec![
+            Content::text("What color is this image?"),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png").with_resolution(Resolution::High),
+        ])
         .create()
         .await?;
 
@@ -127,19 +131,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  Tokens used: {:?}", usage.total_tokens);
     }
 
-    // Using the helper function with resolution
-    println!("\nUsing image_data_content_with_resolution() helper:");
-    let content_with_res = image_data_content_with_resolution(
-        TINY_BLUE_PNG_BASE64,
-        "image/png",
-        Resolution::Medium, // Default balance of cost and quality
-    );
+    // Using chained builder with resolution
+    println!("\nUsing Content::image_data().with_resolution() builder:");
     let helper_response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .set_content(vec![
-            text_content("Describe this image briefly."),
-            content_with_res,
+        .with_content(vec![
+            Content::text("Describe this image briefly."),
+            Content::image_data(TINY_BLUE_PNG_BASE64, "image/png")
+                .with_resolution(Resolution::Medium), // Default balance of cost and quality
         ])
         .create()
         .await?;
@@ -177,11 +177,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ Multimodal Image Input Demo Complete\n");
 
     println!("--- Key Takeaways ---");
-    println!("• add_image_data(base64, mime_type) for inline image content");
-    println!("• add_image_data_with_resolution() to control quality vs. cost");
+    println!("• Content::image_data(base64, mime_type) for inline image content");
+    println!("• .with_resolution(Resolution::*) for quality vs. cost control");
     println!("• Resolution levels: Low, Medium (default), High, UltraHigh");
-    println!("• with_content() accepts mixed text + image vectors");
-    println!("• image_data_content_with_resolution() helper with resolution support");
+    println!("• with_content() accepts mixed Content::text() + Content::image_data() vectors");
     println!("• Follow-up questions work with with_previous_interaction()\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");

@@ -4,8 +4,8 @@ use super::loud_wire;
 use super::sse_parser::parse_sse_stream;
 use crate::errors::GenaiError;
 use crate::{
-    InteractionContent, InteractionRequest, InteractionResponse, InteractionStreamEvent,
-    StreamChunk, StreamEvent,
+    Content, InteractionRequest, InteractionResponse, InteractionStreamEvent, StreamChunk,
+    StreamEvent,
 };
 use async_stream::try_stream;
 use futures_util::{Stream, StreamExt};
@@ -92,7 +92,7 @@ pub async fn create_interaction(
 ///             println!("Started: {:?}", interaction.id);
 ///         }
 ///         StreamChunk::Delta(delta) => {
-///             if let Some(text) = delta.text() {
+///             if let Some(text) = delta.as_text() {
 ///                 print!("{}", text);
 ///             }
 ///         }
@@ -196,17 +196,17 @@ pub fn create_interaction_stream<'a>(
                         let content_type = event.content.as_ref().and_then(|c| {
                             // Get the content type name from the variant
                             match c {
-                                InteractionContent::Text { .. } => Some("text".to_string()),
-                                InteractionContent::Thought { .. } => Some("thought".to_string()),
-                                InteractionContent::FunctionCall { .. } => Some("function_call".to_string()),
-                                InteractionContent::FunctionResult { .. } => Some("function_result".to_string()),
-                                InteractionContent::CodeExecutionCall { .. } => Some("code_execution_call".to_string()),
-                                InteractionContent::CodeExecutionResult { .. } => Some("code_execution_result".to_string()),
-                                InteractionContent::GoogleSearchCall { .. } => Some("google_search_call".to_string()),
-                                InteractionContent::GoogleSearchResult { .. } => Some("google_search_result".to_string()),
-                                InteractionContent::UrlContextCall { .. } => Some("url_context_call".to_string()),
-                                InteractionContent::UrlContextResult { .. } => Some("url_context_result".to_string()),
-                                InteractionContent::Unknown { content_type, .. } => Some(content_type.clone()),
+                                Content::Text { .. } => Some("text".to_string()),
+                                Content::Thought { .. } => Some("thought".to_string()),
+                                Content::FunctionCall { .. } => Some("function_call".to_string()),
+                                Content::FunctionResult { .. } => Some("function_result".to_string()),
+                                Content::CodeExecutionCall { .. } => Some("code_execution_call".to_string()),
+                                Content::CodeExecutionResult { .. } => Some("code_execution_result".to_string()),
+                                Content::GoogleSearchCall { .. } => Some("google_search_call".to_string()),
+                                Content::GoogleSearchResult { .. } => Some("google_search_result".to_string()),
+                                Content::UrlContextCall { .. } => Some("url_context_call".to_string()),
+                                Content::UrlContextResult { .. } => Some("url_context_result".to_string()),
+                                Content::Unknown { content_type, .. } => Some(content_type.clone()),
                                 _ => None,
                             }
                         });
@@ -521,7 +521,7 @@ pub async fn cancel_interaction(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{InteractionContent, InteractionInput, InteractionStatus};
+    use crate::{Content, InteractionInput, InteractionStatus};
 
     #[test]
     fn test_endpoint_url_construction() {
@@ -597,7 +597,7 @@ mod tests {
 
         // Verify we can access the text content
         match &response.outputs[0] {
-            InteractionContent::Text { text, .. } => {
+            Content::Text { text, .. } => {
                 assert_eq!(text.as_ref().unwrap(), "Hi there!")
             }
             _ => panic!("Expected Text content"),

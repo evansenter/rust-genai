@@ -432,7 +432,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     /// # Example
     ///
     /// ```no_run
-    /// # use genai_rs::{Client, AutoFunctionStreamChunk, InteractionContent};
+    /// # use genai_rs::{Client, AutoFunctionStreamChunk, Content};
     /// # use futures_util::StreamExt;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -448,7 +448,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     ///     // event.event_id can be saved for stream resume support
     ///     match event.chunk {
     ///         AutoFunctionStreamChunk::Delta(content) => {
-    ///             if let InteractionContent::Text { text: Some(t), .. } = content {
+    ///             if let Content::Text { text: Some(t), .. } = content {
     ///                 print!("{}", t);
     ///             }
     ///         }
@@ -626,7 +626,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                     match event.chunk {
                         StreamChunk::Delta(delta) => {
                             // Check for function calls in delta
-                            if let crate::InteractionContent::FunctionCall { id, name, args, .. } = &delta {
+                            if let crate::Content::FunctionCall { id, name, args, .. } = &delta {
                                 accumulated_calls.push((id.clone(), name.clone(), args.clone()));
                             }
                             yield AutoFunctionStreamEvent::new(

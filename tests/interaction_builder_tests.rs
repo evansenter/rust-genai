@@ -15,8 +15,7 @@ mod common;
 mod basic {
     use crate::common::DEFAULT_MODEL;
     use genai_rs::{
-        Client, FunctionDeclaration, GenerationConfig, InteractionContent, InteractionInput,
-        ThinkingLevel,
+        Client, Content, FunctionDeclaration, GenerationConfig, InteractionInput, ThinkingLevel,
     };
     use serde_json::json;
 
@@ -26,15 +25,15 @@ mod basic {
         let client = Client::new("test-api-key".to_string());
 
         let complex_input = InteractionInput::Content(vec![
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("First message".to_string()),
                 annotations: None,
             },
-            InteractionContent::Text {
+            Content::Text {
                 text: Some("Second message".to_string()),
                 annotations: None,
             },
-            InteractionContent::Thought {
+            Content::Thought {
                 signature: Some("Eq0JCq...signature".to_string()),
             },
         ]);
@@ -692,7 +691,7 @@ mod edge_cases {
 mod multimodal {
     use crate::common::DEFAULT_MODEL;
     use genai_rs::{
-        Client, FunctionDeclaration, GenerationConfig, InteractionContent, InteractionInput, Tool,
+        Client, Content, FunctionDeclaration, GenerationConfig, InteractionInput, Tool,
         detect_mime_type,
     };
     use std::path::Path;
@@ -712,14 +711,14 @@ mod multimodal {
     }
 
     #[test]
-    fn test_add_image_data_creates_content_from_empty() {
-        // When input is None, add_image_data should create Content variant
+    fn test_with_content_image_data() {
+        // with_content() with image data should create Content variant
         let client = Client::new("test-api-key".to_string());
 
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .add_image_data("base64data", "image/jpeg");
+            .with_content(vec![Content::image_data("base64data", "image/jpeg")]);
 
         let result = builder.build();
         assert!(result.is_ok());
@@ -731,7 +730,7 @@ mod multimodal {
                 // Verify it's an Image with data
                 assert!(matches!(
                     &items[0],
-                    InteractionContent::Image { mime_type, data, .. }
+                    Content::Image { mime_type, data, .. }
                     if mime_type.as_deref() == Some("image/jpeg") && data.is_some()
                 ));
             }
@@ -740,15 +739,17 @@ mod multimodal {
     }
 
     #[test]
-    fn test_add_image_data_converts_text_to_content() {
-        // When input is Text, add_image_data should convert to Content with both
+    fn test_with_content_text_and_image() {
+        // with_content() with text and image should contain both
         let client = Client::new("test-api-key".to_string());
 
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .with_text("Analyze this image")
-            .add_image_data("base64data", "image/png");
+            .with_content(vec![
+                Content::text("Analyze this image"),
+                Content::image_data("base64data", "image/png"),
+            ]);
 
         let result = builder.build();
         assert!(result.is_ok());
@@ -760,13 +761,13 @@ mod multimodal {
                 // First should be text
                 assert!(matches!(
                     &items[0],
-                    InteractionContent::Text { text, .. }
+                    Content::Text { text, .. }
                     if text.as_deref() == Some("Analyze this image")
                 ));
                 // Second should be image with data
                 assert!(matches!(
                     &items[1],
-                    InteractionContent::Image { mime_type, data, .. }
+                    Content::Image { mime_type, data, .. }
                     if mime_type.as_deref() == Some("image/png") && data.is_some()
                 ));
             }
@@ -775,16 +776,18 @@ mod multimodal {
     }
 
     #[test]
-    fn test_multiple_add_calls_accumulate() {
-        // Multiple add_* calls should accumulate content
+    fn test_with_content_multiple_items() {
+        // with_content() should accumulate multiple content items
         let client = Client::new("test-api-key".to_string());
 
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .add_image_data("img1", "image/jpeg")
-            .add_image_data("img2", "image/png")
-            .add_audio_data("audio1", "audio/mp3");
+            .with_content(vec![
+                Content::image_data("img1", "image/jpeg"),
+                Content::image_data("img2", "image/png"),
+                Content::audio_data("audio1", "audio/mp3"),
+            ]);
 
         let result = builder.build();
         assert!(result.is_ok());
@@ -799,42 +802,16 @@ mod multimodal {
     }
 
     #[test]
-    fn test_add_methods_after_with_content() {
-        // add_* methods should accumulate with existing Content
-        let client = Client::new("test-api-key".to_string());
-
-        let initial_content = vec![InteractionContent::Text {
-            text: Some("Initial text".to_string()),
-            annotations: None,
-        }];
-
-        let builder = client
-            .interaction()
-            .with_model(DEFAULT_MODEL)
-            .set_content(initial_content)
-            .add_image_data("imagedata", "image/gif");
-
-        let result = builder.build();
-        assert!(result.is_ok());
-
-        let request = result.unwrap();
-        match &request.input {
-            InteractionInput::Content(items) => {
-                assert_eq!(items.len(), 2, "Should have 2 content items");
-            }
-            _ => panic!("Expected InteractionInput::Content variant"),
-        }
-    }
-
-    #[test]
-    fn test_add_image_uri_works() {
+    fn test_with_content_image_uri() {
         let client = Client::new("test-api-key".to_string());
 
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .with_text("Describe this image")
-            .add_image_uri("gs://bucket/image.jpg", "image/jpeg");
+            .with_content(vec![
+                Content::text("Describe this image"),
+                Content::from_uri_and_mime("gs://bucket/image.jpg", "image/jpeg"),
+            ]);
 
         let result = builder.build();
         assert!(result.is_ok());
@@ -846,7 +823,7 @@ mod multimodal {
                 // Second should be an Image with URI
                 assert!(matches!(
                     &items[1],
-                    InteractionContent::Image { uri, mime_type, .. }
+                    Content::Image { uri, mime_type, .. }
                     if uri.is_some() && mime_type.as_deref() == Some("image/jpeg")
                 ));
             }
@@ -855,13 +832,13 @@ mod multimodal {
     }
 
     #[test]
-    fn test_add_audio_data_works() {
+    fn test_with_content_audio_data() {
         let client = Client::new("test-api-key".to_string());
 
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .add_audio_data("audiodata", "audio/wav");
+            .with_content(vec![Content::audio_data("audiodata", "audio/wav")]);
 
         let result = builder.build();
         assert!(result.is_ok());
@@ -872,7 +849,7 @@ mod multimodal {
                 assert_eq!(items.len(), 1);
                 assert!(matches!(
                     &items[0],
-                    InteractionContent::Audio { mime_type, data, .. }
+                    Content::Audio { mime_type, data, .. }
                     if mime_type.as_deref() == Some("audio/wav") && data.is_some()
                 ));
             }
@@ -881,13 +858,13 @@ mod multimodal {
     }
 
     #[test]
-    fn test_add_video_data_works() {
+    fn test_with_content_video_data() {
         let client = Client::new("test-api-key".to_string());
 
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .add_video_data("videodata", "video/mp4");
+            .with_content(vec![Content::video_data("videodata", "video/mp4")]);
 
         let result = builder.build();
         assert!(result.is_ok());
@@ -898,7 +875,7 @@ mod multimodal {
                 assert_eq!(items.len(), 1);
                 assert!(matches!(
                     &items[0],
-                    InteractionContent::Video { mime_type, data, .. }
+                    Content::Video { mime_type, data, .. }
                     if mime_type.as_deref() == Some("video/mp4") && data.is_some()
                 ));
             }
@@ -907,13 +884,13 @@ mod multimodal {
     }
 
     #[test]
-    fn test_add_document_data_works() {
+    fn test_with_content_document_data() {
         let client = Client::new("test-api-key".to_string());
 
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .add_document_data("pdfdata", "application/pdf");
+            .with_content(vec![Content::document_data("pdfdata", "application/pdf")]);
 
         let result = builder.build();
         assert!(result.is_ok());
@@ -924,7 +901,7 @@ mod multimodal {
                 assert_eq!(items.len(), 1);
                 assert!(matches!(
                     &items[0],
-                    InteractionContent::Document { mime_type, data, .. }
+                    Content::Document { mime_type, data, .. }
                     if mime_type.as_deref() == Some("application/pdf") && data.is_some()
                 ));
             }
@@ -933,14 +910,16 @@ mod multimodal {
     }
 
     #[test]
-    fn test_add_document_uri_works() {
+    fn test_with_content_document_uri() {
         let client = Client::new("test-api-key".to_string());
 
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .with_text("Summarize this document")
-            .add_document_uri("gs://bucket/report.pdf", "application/pdf");
+            .with_content(vec![
+                Content::text("Summarize this document"),
+                Content::from_uri_and_mime("gs://bucket/report.pdf", "application/pdf"),
+            ]);
 
         let result = builder.build();
         assert!(result.is_ok());
@@ -951,7 +930,7 @@ mod multimodal {
                 assert_eq!(items.len(), 2);
                 assert!(matches!(
                     &items[1],
-                    InteractionContent::Document { uri, mime_type, .. }
+                    Content::Document { uri, mime_type, .. }
                     if uri.is_some() && mime_type.as_deref() == Some("application/pdf")
                 ));
             }
@@ -960,14 +939,16 @@ mod multimodal {
     }
 
     #[test]
-    fn test_add_audio_uri_works() {
+    fn test_with_content_audio_uri() {
         let client = Client::new("test-api-key".to_string());
 
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .with_text("Describe this audio")
-            .add_audio_uri("gs://bucket/audio.mp3", "audio/mp3");
+            .with_content(vec![
+                Content::text("Describe this audio"),
+                Content::from_uri_and_mime("gs://bucket/audio.mp3", "audio/mp3"),
+            ]);
 
         let result = builder.build();
         assert!(result.is_ok());
@@ -979,7 +960,7 @@ mod multimodal {
                 // Second should be an Audio with URI
                 assert!(matches!(
                     &items[1],
-                    InteractionContent::Audio { uri, mime_type, .. }
+                    Content::Audio { uri, mime_type, .. }
                     if uri.is_some() && mime_type.as_deref() == Some("audio/mp3")
                 ));
             }
@@ -988,14 +969,16 @@ mod multimodal {
     }
 
     #[test]
-    fn test_add_video_uri_works() {
+    fn test_with_content_video_uri() {
         let client = Client::new("test-api-key".to_string());
 
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .with_text("Describe this video")
-            .add_video_uri("gs://bucket/video.mp4", "video/mp4");
+            .with_content(vec![
+                Content::text("Describe this video"),
+                Content::from_uri_and_mime("gs://bucket/video.mp4", "video/mp4"),
+            ]);
 
         let result = builder.build();
         assert!(result.is_ok());
@@ -1007,7 +990,7 @@ mod multimodal {
                 // Second should be a Video with URI
                 assert!(matches!(
                     &items[1],
-                    InteractionContent::Video { uri, mime_type, .. }
+                    Content::Video { uri, mime_type, .. }
                     if uri.is_some() && mime_type.as_deref() == Some("video/mp4")
                 ));
             }
@@ -1036,8 +1019,10 @@ mod multimodal {
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .with_text("Analyze this image and describe it")
-            .add_image_data("imagedata", "image/jpeg")
+            .with_content(vec![
+                Content::text("Analyze this image and describe it"),
+                Content::image_data("imagedata", "image/jpeg"),
+            ])
             .with_system_instruction("Be descriptive")
             .add_function(func)
             .with_generation_config(config)
@@ -1071,17 +1056,19 @@ mod multimodal {
     }
 
     #[test]
-    fn test_add_methods_order_preserves_sequence() {
+    fn test_with_content_preserves_order() {
         // Content should appear in the order it was added
         let client = Client::new("test-api-key".to_string());
 
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .with_text("First")
-            .add_image_data("second", "image/jpeg")
-            .add_audio_data("third", "audio/mp3")
-            .add_video_data("fourth", "video/mp4");
+            .with_content(vec![
+                Content::text("First"),
+                Content::image_data("second", "image/jpeg"),
+                Content::audio_data("third", "audio/mp3"),
+                Content::video_data("fourth", "video/mp4"),
+            ]);
 
         let result = builder.build();
         assert!(result.is_ok());
@@ -1092,26 +1079,26 @@ mod multimodal {
                 assert_eq!(items.len(), 4);
 
                 // First: text
-                assert!(matches!(&items[0], InteractionContent::Text { .. }));
+                assert!(matches!(&items[0], Content::Text { .. }));
 
                 // Second: image
                 assert!(matches!(
                     &items[1],
-                    InteractionContent::Image { mime_type, .. }
+                    Content::Image { mime_type, .. }
                     if mime_type.as_deref() == Some("image/jpeg")
                 ));
 
                 // Third: audio
                 assert!(matches!(
                     &items[2],
-                    InteractionContent::Audio { mime_type, .. }
+                    Content::Audio { mime_type, .. }
                     if mime_type.as_deref() == Some("audio/mp3")
                 ));
 
                 // Fourth: video
                 assert!(matches!(
                     &items[3],
-                    InteractionContent::Video { mime_type, .. }
+                    Content::Video { mime_type, .. }
                     if mime_type.as_deref() == Some("video/mp4")
                 ));
             }
@@ -1119,16 +1106,19 @@ mod multimodal {
         }
     }
 
-    /// Test with_file_uri creates correct content variants based on MIME type.
+    /// Test Content::from_uri_and_mime creates correct content variants based on MIME type.
     #[test]
-    fn test_with_file_uri_creates_correct_content_type() {
+    fn test_from_uri_and_mime_creates_correct_content_type() {
         let client = Client::new("test-api-key".to_string());
 
         // Test image MIME type
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .add_file_uri("https://example.com/image.png", "image/png");
+            .with_content(vec![Content::from_uri_and_mime(
+                "https://example.com/image.png",
+                "image/png",
+            )]);
 
         let request = builder.build().expect("Should build valid request");
 
@@ -1137,7 +1127,7 @@ mod multimodal {
                 assert_eq!(items.len(), 1);
                 assert!(matches!(
                     &items[0],
-                    InteractionContent::Image { uri, mime_type, .. }
+                    Content::Image { uri, mime_type, .. }
                     if uri.as_deref() == Some("https://example.com/image.png")
                         && mime_type.as_deref() == Some("image/png")
                 ));
@@ -1149,14 +1139,17 @@ mod multimodal {
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .add_file_uri("https://example.com/video.mp4", "video/mp4");
+            .with_content(vec![Content::from_uri_and_mime(
+                "https://example.com/video.mp4",
+                "video/mp4",
+            )]);
 
         let request = builder.build().unwrap();
         match &request.input {
             InteractionInput::Content(items) => {
                 assert!(matches!(
                     &items[0],
-                    InteractionContent::Video { uri, mime_type, .. }
+                    Content::Video { uri, mime_type, .. }
                     if uri.as_deref() == Some("https://example.com/video.mp4")
                         && mime_type.as_deref() == Some("video/mp4")
                 ));
@@ -1168,14 +1161,17 @@ mod multimodal {
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .add_file_uri("https://example.com/doc.pdf", "application/pdf");
+            .with_content(vec![Content::from_uri_and_mime(
+                "https://example.com/doc.pdf",
+                "application/pdf",
+            )]);
 
         let request = builder.build().unwrap();
         match &request.input {
             InteractionInput::Content(items) => {
                 assert!(matches!(
                     &items[0],
-                    InteractionContent::Document { uri, mime_type, .. }
+                    Content::Document { uri, mime_type, .. }
                     if uri.as_deref() == Some("https://example.com/doc.pdf")
                         && mime_type.as_deref() == Some("application/pdf")
                 ));
@@ -1187,14 +1183,17 @@ mod multimodal {
         let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
-            .add_file_uri("https://example.com/file.txt", "text/plain");
+            .with_content(vec![Content::from_uri_and_mime(
+                "https://example.com/file.txt",
+                "text/plain",
+            )]);
 
         let request = builder.build().unwrap();
         match &request.input {
             InteractionInput::Content(items) => {
                 assert!(matches!(
                     &items[0],
-                    InteractionContent::Document { uri, mime_type, .. }
+                    Content::Document { uri, mime_type, .. }
                     if uri.as_deref() == Some("https://example.com/file.txt")
                         && mime_type.as_deref() == Some("text/plain")
                 ));

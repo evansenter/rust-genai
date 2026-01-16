@@ -763,11 +763,11 @@ fn test_typestate_store_disabled_preserves_history_and_current_message() {
 
 #[test]
 fn test_with_content_cannot_combine_with_history() {
-    use crate::{InteractionContent, Turn};
+    use crate::{Content, Turn};
 
     let client = create_test_client();
     let history = vec![Turn::user("Hello"), Turn::model("Hi!")];
-    let content = vec![InteractionContent::Text {
+    let content = vec![Content::Text {
         text: Some("test".to_string()),
         annotations: None,
     }];
@@ -776,48 +776,24 @@ fn test_with_content_cannot_combine_with_history() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_history(history)
-        .set_content(content)
+        .with_content(content)
         .build();
 
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(
-        err.to_string().contains("set_content()"),
-        "Error should mention set_content(): {}",
-        err
-    );
-}
-
-#[test]
-fn test_add_methods_cannot_combine_with_history() {
-    use crate::Turn;
-
-    let client = create_test_client();
-    let history = vec![Turn::user("Hello"), Turn::model("Hi!")];
-
-    // add_image_data() sets content_input, which is incompatible with history
-    let result = client
-        .interaction()
-        .with_model("gemini-3-flash-preview")
-        .with_history(history)
-        .add_image_data("dGVzdA==", "image/png")
-        .build();
-
-    assert!(result.is_err());
-    let err = result.unwrap_err();
-    assert!(
-        err.to_string().contains("add_*"),
-        "Error should mention add_* methods: {}",
+        err.to_string().contains("with_content()"),
+        "Error should mention with_content(): {}",
         err
     );
 }
 
 #[test]
 fn test_with_content_and_text_merge() {
-    use crate::{InteractionContent, InteractionInput};
+    use crate::{Content, InteractionInput};
 
     let client = create_test_client();
-    let image_content = InteractionContent::Image {
+    let image_content = Content::Image {
         data: Some("dGVzdA==".to_string()),
         uri: None,
         mime_type: Some("image/png".to_string()),
@@ -829,7 +805,7 @@ fn test_with_content_and_text_merge() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Describe this image")
-        .set_content(vec![image_content.clone()])
+        .with_content(vec![image_content.clone()])
         .build()
         .expect("Should succeed");
 
@@ -838,11 +814,11 @@ fn test_with_content_and_text_merge() {
             assert_eq!(items.len(), 2, "Should have 2 items (text + image)");
             // Text should be first (prepended)
             assert!(
-                matches!(&items[0], InteractionContent::Text { text: Some(t), .. } if t == "Describe this image"),
+                matches!(&items[0], Content::Text { text: Some(t), .. } if t == "Describe this image"),
                 "First item should be the text"
             );
             assert!(
-                matches!(&items[1], InteractionContent::Image { .. }),
+                matches!(&items[1], Content::Image { .. }),
                 "Second item should be the image"
             );
         }
@@ -853,7 +829,7 @@ fn test_with_content_and_text_merge() {
     let request2 = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .set_content(vec![image_content])
+        .with_content(vec![image_content])
         .with_text("Describe this image")
         .build()
         .expect("Should succeed");
@@ -863,7 +839,7 @@ fn test_with_content_and_text_merge() {
             assert_eq!(items.len(), 2, "Should have 2 items (text + image)");
             // Text should still be first (prepended at build time)
             assert!(
-                matches!(&items[0], InteractionContent::Text { text: Some(t), .. } if t == "Describe this image"),
+                matches!(&items[0], Content::Text { text: Some(t), .. } if t == "Describe this image"),
                 "First item should be the text"
             );
         }
@@ -873,10 +849,10 @@ fn test_with_content_and_text_merge() {
 
 #[test]
 fn test_with_content_alone_works() {
-    use crate::{InteractionContent, InteractionInput};
+    use crate::{Content, InteractionInput};
 
     let client = create_test_client();
-    let content = vec![InteractionContent::Text {
+    let content = vec![Content::Text {
         text: Some("test".to_string()),
         annotations: None,
     }];
@@ -884,7 +860,7 @@ fn test_with_content_alone_works() {
     let result = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .set_content(content)
+        .with_content(content)
         .build();
 
     assert!(result.is_ok());
@@ -915,10 +891,10 @@ fn test_conversation_builder_fluent_api() {
 
 #[test]
 fn test_conversation_builder_with_parts_content() {
-    use crate::{InteractionContent, TurnContent};
+    use crate::{Content, TurnContent};
 
     let client = create_test_client();
-    let parts = vec![InteractionContent::Text {
+    let parts = vec![Content::Text {
         text: Some("What is in this image?".to_string()),
         annotations: None,
     }];

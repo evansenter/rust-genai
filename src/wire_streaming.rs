@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::content::InteractionContent;
+use crate::content::Content;
 use crate::response::{InteractionResponse, InteractionStatus};
 
 /// A chunk from the streaming API
@@ -61,7 +61,7 @@ pub enum StreamChunk {
     },
 
     /// Incremental content update
-    Delta(InteractionContent),
+    Delta(Content),
 
     /// Content generation stopped for an output.
     ///
@@ -409,7 +409,7 @@ impl<'de> Deserialize<'de> for StreamChunk {
                         serde_json::Value::Null
                     }
                 };
-                let content: InteractionContent = serde_json::from_value(data).map_err(|e| {
+                let content: Content = serde_json::from_value(data).map_err(|e| {
                     serde::de::Error::custom(format!(
                         "Failed to deserialize StreamChunk::Delta data: {}",
                         e
@@ -712,7 +712,7 @@ pub struct InteractionStreamEvent {
 
     /// Incremental content delta (present in "content.delta" events)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub delta: Option<InteractionContent>,
+    pub delta: Option<Content>,
 
     /// Interaction ID (present in various events like "interaction.status_update")
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -728,7 +728,7 @@ pub struct InteractionStreamEvent {
 
     /// Content object being started (present in "content.start" events)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<InteractionContent>,
+    pub content: Option<Content>,
 
     /// Error details (present in "error" events)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -763,7 +763,7 @@ mod tests {
 
     #[test]
     fn test_stream_chunk_delta_roundtrip() {
-        let chunk = StreamChunk::Delta(InteractionContent::Text {
+        let chunk = StreamChunk::Delta(Content::Text {
             text: Some("Hello, world!".to_string()),
             annotations: None,
         });
@@ -778,7 +778,7 @@ mod tests {
 
         match deserialized {
             StreamChunk::Delta(content) => {
-                assert_eq!(content.text(), Some("Hello, world!"));
+                assert_eq!(content.as_text(), Some("Hello, world!"));
             }
             _ => panic!("Expected Delta variant"),
         }
@@ -790,11 +790,11 @@ mod tests {
             id: Some("test-interaction-123".to_string()),
             model: Some("gemini-3-flash-preview".to_string()),
             agent: None,
-            input: vec![InteractionContent::Text {
+            input: vec![Content::Text {
                 text: Some("What is 2+2?".to_string()),
                 annotations: None,
             }],
-            outputs: vec![InteractionContent::Text {
+            outputs: vec![Content::Text {
                 text: Some("The answer is 4.".to_string()),
                 annotations: None,
             }],
@@ -877,7 +877,7 @@ mod tests {
             id: Some("test-interaction-456".to_string()),
             model: Some("gemini-3-flash-preview".to_string()),
             agent: None,
-            input: vec![InteractionContent::Text {
+            input: vec![Content::Text {
                 text: Some("Hello".to_string()),
                 annotations: None,
             }],
@@ -1076,7 +1076,7 @@ mod tests {
         };
         assert_eq!(status_chunk.interaction_id(), Some("status-id"));
 
-        let delta_chunk = StreamChunk::Delta(InteractionContent::Text {
+        let delta_chunk = StreamChunk::Delta(Content::Text {
             text: Some("test".to_string()),
             annotations: None,
         });
@@ -1118,7 +1118,7 @@ mod tests {
     #[test]
     fn test_stream_event_with_event_id_roundtrip() {
         let event = StreamEvent::new(
-            StreamChunk::Delta(InteractionContent::Text {
+            StreamChunk::Delta(Content::Text {
                 text: Some("Hello".to_string()),
                 annotations: None,
             }),
@@ -1148,7 +1148,7 @@ mod tests {
                 model: Some("gemini-3-flash-preview".to_string()),
                 agent: None,
                 input: vec![],
-                outputs: vec![InteractionContent::Text {
+                outputs: vec![Content::Text {
                     text: Some("Response".to_string()),
                     annotations: None,
                 }],

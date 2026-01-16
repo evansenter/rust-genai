@@ -254,7 +254,7 @@ mod google_search {
 mod code_execution {
     use super::*;
     use futures_util::StreamExt;
-    use genai_rs::InteractionContent;
+    use genai_rs::Content;
     use genai_rs::StreamChunk;
 
     #[tokio::test]
@@ -421,10 +421,10 @@ mod code_execution {
                             // Google Search, URL context) arrives via delta chunks, not in the
                             // Complete response. The Complete event is a lifecycle signal that
                             // may arrive before all content is streamed.
-                            if matches!(content, InteractionContent::CodeExecutionCall { .. }) {
+                            if matches!(content, Content::CodeExecutionCall { .. }) {
                                 has_code_execution_call = true;
                             }
-                            if matches!(content, InteractionContent::CodeExecutionResult { .. }) {
+                            if matches!(content, Content::CodeExecutionResult { .. }) {
                                 has_code_execution_result = true;
                             }
                         }
@@ -978,7 +978,7 @@ mod structured_output {
                     chunk_count += 1;
                     match event.chunk {
                         StreamChunk::Delta(content) => {
-                            if let Some(text) = content.text() {
+                            if let Some(text) = content.as_text() {
                                 collected_text.push_str(text);
                             }
                             println!("Delta chunk {}: {:?}", chunk_count, content);
@@ -1195,7 +1195,7 @@ mod image_generation {
                 let has_image = response
                     .outputs
                     .iter()
-                    .any(|o| matches!(o, genai_rs::InteractionContent::Image { .. }));
+                    .any(|o| matches!(o, genai_rs::Content::Image { .. }));
 
                 if has_image {
                     println!("Has image output: true");

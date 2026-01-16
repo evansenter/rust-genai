@@ -2,7 +2,7 @@
 //!
 //! These tests verify file upload, listing, deletion, and integration with interactions.
 
-use genai_rs::Client;
+use genai_rs::{Client, Content};
 use std::time::Duration;
 
 fn get_client() -> Client {
@@ -174,8 +174,10 @@ async fn test_file_in_interaction() {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .add_file(&ready_file)
-        .with_text("What city is mentioned in this document?")
+        .with_content(vec![
+            Content::from_file(&ready_file),
+            Content::text("What city is mentioned in this document?"),
+        ])
         .create()
         .await
         .expect("Interaction should succeed");
@@ -195,7 +197,7 @@ async fn test_file_in_interaction() {
 #[tokio::test]
 #[ignore] // Requires API key
 async fn test_file_uri_content_type_inference() {
-    use genai_rs::{InteractionContent, file_uri_content};
+    use genai_rs::{Content, file_uri_content};
 
     let client = get_client();
 
@@ -227,25 +229,25 @@ async fn test_file_uri_content_type_inference() {
     // Verify content type inference
     let video_content = file_uri_content(&video_file);
     assert!(
-        matches!(video_content, InteractionContent::Video { .. }),
+        matches!(video_content, Content::Video { .. }),
         "video/mp4 should create Video content"
     );
 
     let image_content = file_uri_content(&image_file);
     assert!(
-        matches!(image_content, InteractionContent::Image { .. }),
+        matches!(image_content, Content::Image { .. }),
         "image/png should create Image content"
     );
 
     let audio_content = file_uri_content(&audio_file);
     assert!(
-        matches!(audio_content, InteractionContent::Audio { .. }),
+        matches!(audio_content, Content::Audio { .. }),
         "audio/mp3 should create Audio content"
     );
 
     let doc_content = file_uri_content(&doc_file);
     assert!(
-        matches!(doc_content, InteractionContent::Document { .. }),
+        matches!(doc_content, Content::Document { .. }),
         "application/pdf should create Document content"
     );
 
@@ -593,8 +595,10 @@ async fn test_chunked_upload_in_interaction() {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .add_file(&ready_file)
-        .with_text("What does the file say about a fox?")
+        .with_content(vec![
+            Content::from_file(&ready_file),
+            Content::text("What does the file say about a fox?"),
+        ])
         .create()
         .await
         .expect("Interaction should succeed");

@@ -90,7 +90,7 @@ async fn canary_streaming_interaction() {
         let event = result.expect("Stream event should be valid");
         match event.chunk {
             genai_rs::StreamChunk::Delta(content) => {
-                if let genai_rs::InteractionContent::Unknown { content_type, .. } = &content
+                if let genai_rs::Content::Unknown { content_type, .. } = &content
                     && !unknown_types_found.contains(content_type)
                 {
                     unknown_types_found.push(content_type.clone());

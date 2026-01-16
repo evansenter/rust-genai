@@ -296,7 +296,7 @@ impl Client {
     ///     last_event_id = event.event_id.clone();  // Track for resume
     ///     match event.chunk {
     ///         StreamChunk::Delta(delta) => {
-    ///             if let Some(text) = delta.text() {
+    ///             if let Some(text) = delta.as_text() {
     ///                 print!("{}", text);
     ///             }
     ///         }
@@ -387,7 +387,7 @@ impl Client {
     ///     let event = result?;
     ///     match event.chunk {
     ///         StreamChunk::Delta(delta) => {
-    ///             if let Some(text) = delta.text() {
+    ///             if let Some(text) = delta.as_text() {
     ///                 print!("{}", text);
     ///             }
     ///         }
@@ -499,7 +499,7 @@ impl Client {
     ///     println!("Event ID: {:?}", event.event_id);
     ///     match event.chunk {
     ///         StreamChunk::Delta(delta) => {
-    ///             if let Some(text) = delta.text() {
+    ///             if let Some(text) = delta.as_text() {
     ///                 print!("{}", text);
     ///             }
     ///         }
@@ -667,7 +667,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use genai_rs::Client;
+    /// use genai_rs::{Client, Content};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
@@ -679,8 +679,10 @@ impl Client {
     /// // Use in interaction
     /// let response = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
-    ///     .add_file(&file)
-    ///     .with_text("Describe this video")
+    ///     .with_content(vec![
+    ///         Content::text("Describe this video"),
+    ///         Content::from_file(&file),
+    ///     ])
     ///     .create()
     ///     .await?;
     /// # Ok(())
@@ -946,7 +948,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use genai_rs::Client;
+    /// use genai_rs::{Client, Content};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("api-key".to_string());
@@ -958,8 +960,10 @@ impl Client {
     /// // Use in interaction
     /// let response = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
-    ///     .add_file(&file)
-    ///     .with_text("Describe this video")
+    ///     .with_content(vec![
+    ///         Content::text("Describe this video"),
+    ///         Content::from_file(&file),
+    ///     ])
     ///     .create()
     ///     .await?;
     /// # Ok(())

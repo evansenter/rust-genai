@@ -65,11 +65,11 @@ pub(crate) mod http;
 pub mod errors;
 pub use errors::GenaiError;
 
-// Content types (InteractionContent and related)
+// Content types (Content and related)
 pub mod content;
 pub use content::{
-    Annotation, CodeExecutionLanguage, FileSearchResultItem, GoogleSearchResultItem,
-    InteractionContent, Resolution, UrlContextResultItem,
+    Annotation, CodeExecutionLanguage, Content, FileSearchResultItem, GoogleSearchResultItem,
+    Resolution, UrlContextResultItem,
 };
 
 // Request types (includes agent configuration)

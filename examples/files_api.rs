@@ -9,7 +9,7 @@
 //!
 //! Run with: `cargo run --example files_api`
 
-use genai_rs::Client;
+use genai_rs::{Client, Content};
 use std::time::Duration;
 
 #[tokio::main]
@@ -66,8 +66,10 @@ to analyze multiple times without resending the data.
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .add_file(&ready_file)
-        .with_text("What are the main points about the Files API in this document?")
+        .with_content(vec![
+            Content::from_file(&ready_file),
+            Content::text("What are the main points about the Files API in this document?"),
+        ])
         .create()
         .await?;
 
@@ -84,8 +86,10 @@ to analyze multiple times without resending the data.
     let response2 = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .add_file(&ready_file)
-        .with_text("What file types are supported according to this document?")
+        .with_content(vec![
+            Content::from_file(&ready_file),
+            Content::text("What file types are supported according to this document?"),
+        ])
         .create()
         .await?;
 
@@ -148,7 +152,7 @@ to analyze multiple times without resending the data.
 
     println!("--- Key Takeaways ---");
     println!("• upload_file() uploads files up to 2GB to server storage");
-    println!("• with_file() references uploaded files in interactions");
+    println!("• Content::from_file() references uploaded files in interactions");
     println!("• Files can be reused across multiple interactions (efficient)");
     println!("• Files auto-expire after 48 hours; use delete_file() to clean up\n");
 

@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             if !response.outputs.is_empty() {
                 println!("\nModel Output:");
                 for output in &response.outputs {
-                    if let Some(t) = output.text() {
+                    if let Some(t) = output.as_text() {
                         println!("{t}");
                     } else if output.thought_signature().is_some() {
                         println!("[Thought] (signature present)");
