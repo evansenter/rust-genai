@@ -163,7 +163,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // ==========================================================================
-    // Example 5: Builder Pattern with add_document_file()
+    // Example 5: Builder Pattern with document_from_file()
     // ==========================================================================
     println!("--- Example 5: Builder Pattern ---\n");
 
@@ -190,10 +190,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  1. Use document_from_file() for automatic file loading:");
     println!("     let doc = document_from_file(\"data.json\").await?;");
     println!();
-    println!("  2. Use add_document_file() with the builder pattern:");
+    println!("  2. Combine with with_content():");
     println!("     client.interaction()");
-    println!("         .add_document_file(\"README.md\").await?");
-    println!("         .with_text(\"Summarize this\")");
+    println!("         .with_content(vec![");
+    println!("             Content::text(\"Summarize this\"),");
+    println!("             doc,");
+    println!("         ])");
     println!("         .create().await?;");
     println!();
     println!("  3. For inline data, use Content::document_data() with base64:");
@@ -212,7 +214,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- Key Takeaways ---");
     println!("• Content::document_data(base64, mime_type) for inline documents");
     println!("• document_from_file() auto-loads and encodes files");
-    println!("• add_document_file(path) for fluent builder pattern");
+    println!("• with_content(vec![...]) for combining text and documents");
     println!("• Native types: text/plain, text/markdown, application/pdf\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");

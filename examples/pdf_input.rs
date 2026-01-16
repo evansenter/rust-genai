@@ -47,9 +47,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ==========================================================================
     println!("--- Example 1: Basic PDF Analysis ---\n");
 
-    // Using the fluent builder pattern with add_document_data()
-    // In a real application, use add_document_file() for automatic file loading:
-    //   .add_document_file("document.pdf").await?
+    // Using with_content() with Content::document_data()
+    // In a real application, use document_from_file() for automatic file loading:
+    //   let doc = document_from_file("document.pdf").await?;
     //
     println!("Sending PDF to Gemini for analysis...\n");
 

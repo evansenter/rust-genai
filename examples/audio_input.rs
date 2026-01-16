@@ -102,8 +102,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_text("In this podcast, what are the main topics discussed?")
-       .add_audio_data(&podcast_audio, "audio/mp3")
+       .with_content(vec![
+           Content::text("In this podcast, what are the main topics discussed?"),
+           Content::audio_data(&podcast_audio, "audio/mp3"),
+       ])
        .create()
        .await?;
 "#
@@ -121,8 +123,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
    let first = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_text("Summarize this audio recording.")
-       .add_audio_data(&base64_audio, "audio/mp3")
+       .with_content(vec![
+           Content::text("Summarize this audio recording."),
+           Content::audio_data(&base64_audio, "audio/mp3"),
+       ])
        .with_store_enabled()  // Enable conversation storage
        .create()
        .await?;
@@ -197,7 +201,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Option 1: Use the built-in file loading helper (recommended):\n");
     println!(
         r#"
-   use genai_rs::audio_from_file;
+   use genai_rs::{{audio_from_file, Content}};
 
    // Load audio file with automatic MIME detection and base64 encoding
    let audio_content = audio_from_file("path/to/audio.mp3").await?;
@@ -207,18 +211,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
        .interaction()
        .with_model("gemini-3-flash-preview")
        .with_content(vec![
-           text_content("Transcribe this audio."),
+           Content::text("Transcribe this audio."),
            audio_content,
        ])
-       .create()
-       .await?;
-
-   // Or use the async builder method
-   let response = client
-       .interaction()
-       .with_model("gemini-3-flash-preview")
-       .with_text("Transcribe this audio.")
-       .add_audio_file("path/to/audio.mp3").await?
        .create()
        .await?;
 "#
@@ -229,17 +224,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
         r#"
    use std::fs;
    use base64::Engine;
+   use genai_rs::Content;
 
    // Read and encode
    let audio_bytes = fs::read("path/to/audio.mp3")?;
    let base64_audio = base64::engine::general_purpose::STANDARD.encode(&audio_bytes);
 
-   // Send with fluent builder
+   // Send with with_content
    let response = client
        .interaction()
        .with_model("gemini-3-flash-preview")
-       .with_text("Transcribe this audio.")
-       .add_audio_data(&base64_audio, "audio/mp3")
+       .with_content(vec![
+           Content::text("Transcribe this audio."),
+           Content::audio_data(&base64_audio, "audio/mp3"),
+       ])
        .create()
        .await?;
 "#
@@ -252,9 +250,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("✅ Audio Input Demo Complete\n");
 
     println!("--- Key Takeaways ---");
-    println!("• add_audio_data(base64, mime_type) for inline audio content");
-    println!("• add_audio_file(path) loads and encodes audio automatically");
-    println!("• audio_from_file() helper for programmatic content building");
+    println!("• Content::audio_data(base64, mime_type) for inline audio content");
+    println!("• audio_from_file(path) helper loads and encodes files automatically");
+    println!("• Use with_content(vec![...]) to combine text and audio");
     println!("• Multi-turn conversations remember audio context\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");
