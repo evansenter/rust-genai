@@ -203,6 +203,23 @@ GitHub Actions runs: check, test, test-strict-unknown, test-integration (5 matri
 
 ### Naming Conventions
 
+**Builder method prefixes** (see `docs/BUILDER_API.md` for complete reference):
+
+| Prefix | Behavior | Example |
+|--------|----------|---------|
+| `with_*` | **Configures** a setting (replaces if called twice) | `with_model()`, `with_text()` |
+| `add_*` | **Accumulates** items to a collection | `add_function()`, `add_mcp_server()` |
+
+**Getter patterns**:
+
+| Pattern | Purpose | Example |
+|---------|---------|---------|
+| `as_*()` | Extract enum variant as borrowed reference | `as_text()`, `as_parts()` |
+| `into_*()` | Extract enum variant, consuming self | `into_text()` |
+| `is_*()` | Check if value matches a variant/condition | `is_unknown()`, `is_empty()` |
+
+**Method suffixes**:
+
 | Suffix | Meaning | Example |
 |--------|---------|---------|
 | `*_stream()` | Returns `Stream<Item>` for async iteration | `create_stream()` |
