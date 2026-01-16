@@ -361,8 +361,8 @@ loop {
 1. **Check MIME type:**
 ```rust,ignore
 // Correct MIME types
-.add_image_data(base64, "image/png")   // Not "png"
-.add_image_data(base64, "image/jpeg")  // Not "jpg"
+Content::image_data(base64, "image/png")   // Not "png"
+Content::image_data(base64, "image/jpeg")  // Not "jpg"
 ```
 
 2. **Verify base64 encoding:**
@@ -412,7 +412,7 @@ match client
 ```rust,ignore
 if response.has_images() {
     // Success
-} else if let Some(text) = response.text() {
+} else if let Some(text) = response.as_text() {
     println!("Got text instead: {}", text);
 }
 ```
@@ -507,7 +507,7 @@ if let Some(usage) = &response.usage {
 
 3. **Use lower resolution for images:**
 ```rust,ignore
-.add_image_data_with_resolution(data, "image/png", Resolution::Low)
+Content::image_data(data, "image/png").with_resolution(Resolution::Low)
 ```
 
 ## FAQ

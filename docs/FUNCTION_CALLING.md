@@ -267,7 +267,7 @@ while response.has_function_calls() {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_previous_interaction(response.id.as_ref().unwrap())
-        .set_content(results)
+        .with_content(results)
         .create()
         .await?;
 }

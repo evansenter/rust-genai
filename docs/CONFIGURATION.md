@@ -324,7 +324,7 @@ let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
     .with_text("What's the weather?")
-    .with_function::<get_weather>()
+    .add_function(GetWeatherCallable.declaration())
     .with_function_calling_mode(FunctionCallingMode::Any)
     .create()
     .await?;
@@ -342,7 +342,7 @@ let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
     .with_text("Get current time")
-    .with_function::<get_time>()
+    .add_function(GetTimeCallable.declaration())
     .with_generation_config(config)
     .create()
     .await?;
