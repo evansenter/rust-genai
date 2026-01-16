@@ -68,7 +68,7 @@ mod google_search {
             Ok(response) => {
                 println!("Status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Response with Google Search: {}", text);
                     // Should provide current/recent information - use semantic validation
                     let is_valid = validate_response_semantically(
@@ -190,7 +190,7 @@ mod google_search {
             Ok(response) => {
                 println!("Status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Response text: {}", text);
 
                     // Check for annotations
@@ -254,7 +254,7 @@ mod google_search {
 mod code_execution {
     use super::*;
     use futures_util::StreamExt;
-    use genai_rs::InteractionContent;
+    use genai_rs::Content;
     use genai_rs::StreamChunk;
 
     #[tokio::test]
@@ -276,7 +276,7 @@ mod code_execution {
             Ok(response) => {
                 println!("Status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Response with Code Execution: {}", text);
                     // factorial(10) = 3628800
                     assert!(
@@ -372,7 +372,7 @@ mod code_execution {
             Ok(response) => {
                 println!("Status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Prime sum response: {}", text);
                     // Sum of first 100 primes is 24133
                     // Model might express this with or without comma formatting
@@ -421,10 +421,10 @@ mod code_execution {
                             // Google Search, URL context) arrives via delta chunks, not in the
                             // Complete response. The Complete event is a lifecycle signal that
                             // may arrive before all content is streamed.
-                            if matches!(content, InteractionContent::CodeExecutionCall { .. }) {
+                            if matches!(content, Content::CodeExecutionCall { .. }) {
                                 has_code_execution_call = true;
                             }
-                            if matches!(content, InteractionContent::CodeExecutionResult { .. }) {
+                            if matches!(content, Content::CodeExecutionResult { .. }) {
                                 has_code_execution_result = true;
                             }
                         }
@@ -535,7 +535,7 @@ mod url_context {
                 }
 
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("URL Context response: {}", text);
                     // example.com has standard placeholder content - use semantic validation
                     let is_valid = validate_response_semantically(
@@ -670,7 +670,7 @@ mod structured_output {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Structured output: {}", text);
 
         // Parse as JSON - should be valid JSON matching our schema
@@ -722,7 +722,7 @@ mod structured_output {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Sentiment analysis: {}", text);
 
         // Parse as JSON
@@ -784,7 +784,7 @@ mod structured_output {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Google Search structured output: {}", text);
 
         // Parse as JSON
@@ -838,7 +838,7 @@ mod structured_output {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("URL context structured output: {}", text);
 
         // Parse as JSON
@@ -910,7 +910,7 @@ mod structured_output {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Nested structured output: {}", text);
 
         // Parse as JSON
@@ -978,7 +978,7 @@ mod structured_output {
                     chunk_count += 1;
                     match event.chunk {
                         StreamChunk::Delta(content) => {
-                            if let Some(text) = content.text() {
+                            if let Some(text) = content.as_text() {
                                 collected_text.push_str(text);
                             }
                             println!("Delta chunk {}: {:?}", chunk_count, content);
@@ -1001,7 +1001,7 @@ mod structured_output {
         assert!(final_response.is_some(), "Should receive complete response");
 
         // Verify the final response is valid JSON matching our schema
-        if let Some(text) = final_response.as_ref().and_then(|r| r.text()) {
+        if let Some(text) = final_response.as_ref().and_then(|r| r.as_text()) {
             // Verify streamed text matches final response
             assert_eq!(
                 collected_text, text,
@@ -1062,7 +1062,7 @@ mod structured_output {
             "Turn 1 should complete successfully"
         );
 
-        let text1 = response1.text().expect("Should have text response");
+        let text1 = response1.as_text().expect("Should have text response");
         println!("Turn 1 JSON: {}", text1);
 
         // Parse and validate Turn 1 JSON
@@ -1101,7 +1101,7 @@ mod structured_output {
             "Turn 2 should complete successfully"
         );
 
-        let text2 = response2.text().expect("Should have text response");
+        let text2 = response2.as_text().expect("Should have text response");
         println!("Turn 2 JSON: {}", text2);
 
         // Parse and validate Turn 2 JSON
@@ -1195,7 +1195,7 @@ mod image_generation {
                 let has_image = response
                     .outputs
                     .iter()
-                    .any(|o| matches!(o, genai_rs::InteractionContent::Image { .. }));
+                    .any(|o| matches!(o, genai_rs::Content::Image { .. }));
 
                 if has_image {
                     println!("Has image output: true");
@@ -1250,7 +1250,7 @@ mod thinking {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Minimal thinking response: {}", text);
 
         // Deterministic math - use .contains() per CLAUDE.md guidance
@@ -1286,7 +1286,7 @@ mod thinking {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("High thinking response: {}", text);
 
         // Should provide a detailed explanation
@@ -1324,7 +1324,7 @@ mod thinking {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Thinking with summaries response: {}", text);
 
         // Verify we got a reasonable response
@@ -1366,7 +1366,7 @@ mod sampling {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Top-p response: {}", text);
 
         let is_valid = validate_response_semantically(
@@ -1409,7 +1409,7 @@ mod sampling {
                 assert_eq!(response.status, InteractionStatus::Completed);
                 assert!(response.has_text(), "Should have text response");
 
-                let text = response.text().unwrap();
+                let text = response.as_text().unwrap();
                 println!("Top-k response: {}", text);
 
                 // Deterministic math - use .contains() per CLAUDE.md guidance
@@ -1464,7 +1464,7 @@ mod sampling {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Combined config response: {}", text);
 
         // Haiku should be short and have line breaks or short lines
@@ -1505,7 +1505,7 @@ mod config_fields {
             .expect("First seed request should succeed");
 
         assert_eq!(response1.status, InteractionStatus::Completed);
-        let text1 = response1.text().expect("Should have text response");
+        let text1 = response1.as_text().expect("Should have text response");
         println!("Seed {} response 1: {}", seed, text1);
 
         // Second request with same seed - should produce same output
@@ -1517,7 +1517,7 @@ mod config_fields {
             .expect("Second seed request should succeed");
 
         assert_eq!(response2.status, InteractionStatus::Completed);
-        let text2 = response2.text().expect("Should have text response");
+        let text2 = response2.as_text().expect("Should have text response");
         println!("Seed {} response 2: {}", seed, text2);
 
         // With the same seed and input, outputs should be identical
@@ -1552,7 +1552,7 @@ mod config_fields {
             .expect("Stop sequences request should succeed");
 
         assert_eq!(response.status, InteractionStatus::Completed);
-        let text = response.text().expect("Should have text response");
+        let text = response.as_text().expect("Should have text response");
         println!("Stop sequence response: {}", text);
 
         // The response should NOT contain numbers after 5 since we stopped there
@@ -1603,7 +1603,7 @@ mod config_fields {
             .expect("Response mime type request should succeed");
 
         assert_eq!(response.status, InteractionStatus::Completed);
-        let text = response.text().expect("Should have text response");
+        let text = response.as_text().expect("Should have text response");
         println!("Response with MIME type: {}", text);
 
         // Should be valid JSON
@@ -1652,7 +1652,7 @@ mod config_fields {
             .expect("Combined new fields request should succeed");
 
         assert_eq!(response.status, InteractionStatus::Completed);
-        let text = response.text().expect("Should have text response");
+        let text = response.as_text().expect("Should have text response");
         println!("Combined new fields response: {}", text);
 
         // Should be valid JSON with items array
@@ -1863,7 +1863,7 @@ mod function_calling_modes {
         } else if response.has_text() {
             // Model may respond with text if function calling fails
             println!("Note: Model responded with text instead of function call");
-            println!("Text: {}", response.text().unwrap());
+            println!("Text: {}", response.as_text().unwrap());
         }
     }
 }

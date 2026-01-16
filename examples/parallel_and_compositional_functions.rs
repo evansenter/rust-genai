@@ -25,7 +25,7 @@
 //! ```
 
 use futures_util::future::join_all;
-use genai_rs::{Client, FunctionDeclaration, function_result_content};
+use genai_rs::{Client, Content, FunctionDeclaration};
 use serde_json::{Value, json};
 use std::env;
 use std::error::Error;
@@ -234,7 +234,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .iter()
             .zip(results.iter())
             .map(|(call, result)| {
-                function_result_content(
+                Content::function_result(
                     call.name,
                     call.id.expect("Function call should have an ID"),
                     result.clone(),
@@ -247,13 +247,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_previous_interaction(response.id.as_ref().unwrap())
-            .set_content(result_contents) // Just the results, no tools needed
+            .with_content(result_contents) // Just the results, no tools needed
             .create()
             .await?;
     }
 
     println!("\nFinal Response:");
-    println!("{}\n", response.text().unwrap_or("(no text)"));
+    println!("{}\n", response.as_text().unwrap_or("(no text)"));
 
     // -------------------------------------------------------------------------
     // Demo 2: Compositional (Sequential) Function Calls
@@ -305,7 +305,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .iter()
             .zip(results.iter())
             .map(|(call, result)| {
-                function_result_content(
+                Content::function_result(
                     call.name,
                     call.id.expect("Function call should have an ID"),
                     result.clone(),
@@ -319,13 +319,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .interaction()
             .with_model("gemini-3-flash-preview")
             .with_previous_interaction(response.id.as_ref().unwrap())
-            .set_content(result_contents)
+            .with_content(result_contents)
             .create()
             .await?;
     }
 
     println!("\nFinal Response (after {} step chain):", step);
-    println!("{}\n", response.text().unwrap_or("(no text)"));
+    println!("{}\n", response.as_text().unwrap_or("(no text)"));
 
     // =========================================================================
     // Summary

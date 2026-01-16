@@ -255,7 +255,7 @@ For behavioral tests where exact output varies:
 let is_valid = validate_response_semantically(
     &client,
     "User asked about weather in Tokyo",
-    response.text().unwrap(),
+    response.as_text().unwrap(),
     "Does the response mention Tokyo's weather?"
 ).await?;
 assert!(is_valid);
@@ -321,7 +321,7 @@ async fn test_feature_name() {
             .expect("Request should succeed");
 
         // Structural assertions (preferred)
-        assert!(response.text().is_some());
+        assert!(response.as_text().is_some());
         assert_eq!(response.status, InteractionStatus::Completed);
     }).await;
 }
@@ -363,7 +363,7 @@ Check API mechanics without depending on LLM output:
 
 ```rust,ignore
 // Good - structural
-assert!(response.text().is_some());
+assert!(response.as_text().is_some());
 assert_eq!(response.status, InteractionStatus::Completed);
 assert!(response.function_calls().len() > 0);
 ```
@@ -376,7 +376,7 @@ For behavioral tests where the LLM's response content matters:
 let is_valid = validate_response_semantically(
     &client,
     "Context: user asked X, function returned Y",
-    response.text().unwrap(),
+    response.as_text().unwrap(),
     "Does the response incorporate Y?"
 ).await?;
 assert!(is_valid, "Response should use function result");

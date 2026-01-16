@@ -156,7 +156,7 @@ Unknown {
 
 Helper methods: `is_unknown()`, `unknown_<context>_type()`, `unknown_data()`
 
-See `InteractionContent` in `src/content.rs` for reference implementation.
+See `Content` in `src/content.rs` for reference implementation.
 
 **When adding/updating enums**: Always update `docs/ENUM_WIRE_FORMATS.md` with verified wire format and Unknown variant info. Test with `LOUD_WIRE=1` to confirm actual API format.
 
@@ -202,6 +202,23 @@ GitHub Actions runs: check, test, test-strict-unknown, test-integration (5 matri
 - **Model name**: Always use `gemini-3-flash-preview` (exceptions: `gemini-3-pro-image-preview` for image generation, `gemini-2.5-pro-preview-tts` for text-to-speech)
 
 ### Naming Conventions
+
+**Builder method prefixes** (see `docs/BUILDER_API.md` for complete reference):
+
+| Prefix | Behavior | Example |
+|--------|----------|---------|
+| `with_*` | **Configures** a setting (replaces if called twice) | `with_model()`, `with_text()` |
+| `add_*` | **Accumulates** items to a collection | `add_function()`, `add_mcp_server()` |
+
+**Getter patterns**:
+
+| Pattern | Purpose | Example |
+|---------|---------|---------|
+| `as_*()` | Extract enum variant as borrowed reference | `as_text()`, `as_parts()` |
+| `into_*()` | Extract enum variant, consuming self | `into_text()` |
+| `is_*()` | Check if value matches a variant/condition | `is_unknown()`, `is_empty()` |
+
+**Method suffixes**:
 
 | Suffix | Meaning | Example |
 |--------|---------|---------|

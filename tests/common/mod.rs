@@ -141,7 +141,7 @@ where
 ///         .await?;
 ///
 ///     // Check if we got an image (not text)
-///     if resp.outputs.iter().any(|o| matches!(o, InteractionContent::Image { .. })) {
+///     if resp.outputs.iter().any(|o| matches!(o, Content::Image { .. })) {
 ///         Ok(resp)
 ///     } else {
 ///         Err(anyhow::anyhow!("No image in response"))
@@ -540,7 +540,7 @@ pub async fn consume_stream(
                 match event.chunk {
                     StreamChunk::Delta(delta) => {
                         result.delta_count += 1;
-                        if let Some(text) = delta.text() {
+                        if let Some(text) = delta.as_text() {
                             result.collected_text.push_str(text);
                             print!("{}", text);
                         }
@@ -650,7 +650,7 @@ pub async fn consume_auto_function_stream(
                 match event.chunk {
                     AutoFunctionStreamChunk::Delta(delta) => {
                         result.delta_count += 1;
-                        if let Some(text) = delta.text() {
+                        if let Some(text) = delta.as_text() {
                             result.collected_text.push_str(text);
                             print!("{}", text);
                         }
@@ -842,7 +842,7 @@ pub fn stateful_builder(client: &Client) -> genai_rs::InteractionBuilder<'_> {
 /// let is_valid = validate_response_semantically(
 ///     &client,
 ///     "User said 'My favorite color is blue' in Turn 1, now asking 'What is my favorite color?' in Turn 2",
-///     response2.text().unwrap(),
+///     response2.as_text().unwrap(),
 ///     "Does this response indicate the user's favorite color is blue?"
 /// ).await?;
 ///
@@ -889,7 +889,7 @@ pub async fn validate_response_semantically(
         .await?;
 
     // Parse structured output
-    if let Some(text) = validation.text()
+    if let Some(text) = validation.as_text()
         && let Ok(json) = serde_json::from_str::<serde_json::Value>(text)
     {
         let is_valid = json
@@ -923,7 +923,7 @@ pub async fn validate_response_semantically(
     // validation, not a critical assertion. If Gemini's structured output format changes,
     // we don't want to break all tests; we want to degrade gracefully and log warnings.
     let response_preview = validation
-        .text()
+        .as_text()
         .map(|t| {
             if t.len() > 100 {
                 format!("{}...", &t[..100])

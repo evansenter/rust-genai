@@ -4,13 +4,12 @@ use super::*;
 
 #[test]
 fn test_deserialize_streaming_text_content() {
-    // Streaming deltas now use InteractionContent directly
+    // Streaming deltas now use Content directly
     let delta_json = r#"{"type": "text", "text": "Hello world"}"#;
-    let delta: InteractionContent =
-        serde_json::from_str(delta_json).expect("Deserialization failed");
+    let delta: Content = serde_json::from_str(delta_json).expect("Deserialization failed");
 
     match &delta {
-        InteractionContent::Text { text, .. } => {
+        Content::Text { text, .. } => {
             assert_eq!(text.as_deref(), Some("Hello world"));
         }
         _ => panic!("Expected Text content"),
@@ -18,18 +17,17 @@ fn test_deserialize_streaming_text_content() {
 
     assert!(delta.is_text());
     assert!(!delta.is_thought());
-    assert_eq!(delta.text(), Some("Hello world"));
+    assert_eq!(delta.as_text(), Some("Hello world"));
 }
 
 #[test]
 fn test_deserialize_streaming_thought_content() {
     // Thought content contains a signature, not text (per actual wire format)
     let delta_json = r#"{"type": "thought", "signature": "EosFCogFAXLI2..."}"#;
-    let delta: InteractionContent =
-        serde_json::from_str(delta_json).expect("Deserialization failed");
+    let delta: Content = serde_json::from_str(delta_json).expect("Deserialization failed");
 
     match &delta {
-        InteractionContent::Thought { signature } => {
+        Content::Thought { signature } => {
             assert_eq!(signature.as_deref(), Some("EosFCogFAXLI2..."));
         }
         _ => panic!("Expected Thought content"),
@@ -38,7 +36,7 @@ fn test_deserialize_streaming_thought_content() {
     assert!(!delta.is_text());
     assert!(delta.is_thought());
     // text() returns None for thoughts (only returns text for Text variant)
-    assert_eq!(delta.text(), None);
+    assert_eq!(delta.as_text(), None);
     // thought_signature() returns the signature
     assert_eq!(delta.thought_signature(), Some("EosFCogFAXLI2..."));
 }
@@ -48,11 +46,10 @@ fn test_deserialize_streaming_function_call() {
     // Function calls can now be streamed - this was issue #27
     let delta_json =
         r#"{"type": "function_call", "name": "get_weather", "arguments": {"city": "Paris"}}"#;
-    let delta: InteractionContent =
-        serde_json::from_str(delta_json).expect("Deserialization failed");
+    let delta: Content = serde_json::from_str(delta_json).expect("Deserialization failed");
 
     match &delta {
-        InteractionContent::FunctionCall { name, args, .. } => {
+        Content::FunctionCall { name, args, .. } => {
             assert_eq!(name, "get_weather");
             assert_eq!(args["city"], "Paris");
         }
@@ -66,11 +63,10 @@ fn test_deserialize_streaming_function_call() {
 #[test]
 fn test_deserialize_streaming_thought_signature() {
     let delta_json = r#"{"type": "thought_signature", "signature": "abc123"}"#;
-    let delta: InteractionContent =
-        serde_json::from_str(delta_json).expect("Deserialization failed");
+    let delta: Content = serde_json::from_str(delta_json).expect("Deserialization failed");
 
     match &delta {
-        InteractionContent::ThoughtSignature { signature } => {
+        Content::ThoughtSignature { signature } => {
             assert_eq!(signature, "abc123");
         }
         _ => panic!("Expected ThoughtSignature content"),
@@ -97,7 +93,7 @@ fn test_deserialize_content_delta_event() {
 
     let delta = event.delta.unwrap();
     assert!(delta.is_text());
-    assert_eq!(delta.text(), Some("Hello"));
+    assert_eq!(delta.as_text(), Some("Hello"));
 }
 
 #[test]
@@ -122,5 +118,5 @@ fn test_deserialize_interaction_complete_event() {
 
     let interaction = event.interaction.unwrap();
     assert_eq!(interaction.id.as_deref(), Some("interaction_456"));
-    assert_eq!(interaction.text(), Some("1, 2, 3"));
+    assert_eq!(interaction.as_text(), Some("1, 2, 3"));
 }

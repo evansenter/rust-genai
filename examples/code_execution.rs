@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             println!("Status: {:?}\n", response.status);
 
             // 4. Display the model's text response
-            if let Some(text) = response.text() {
+            if let Some(text) = response.as_text() {
                 println!("Model Explanation:\n{text}\n");
             }
 
@@ -143,7 +143,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         match result {
             Ok(event) => match event.chunk {
                 StreamChunk::Delta(content) => {
-                    if let Some(text) = content.text() {
+                    if let Some(text) = content.as_text() {
                         print!("{}", text);
                         stdout().flush()?;
                     }

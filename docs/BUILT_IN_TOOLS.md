@@ -40,7 +40,7 @@ let response = client
     .await?;
 
 // Access the response text
-println!("{}", response.text().unwrap());
+println!("{}", response.as_text().unwrap());
 
 // Check if grounded with search
 if response.has_google_search_metadata() {
@@ -83,7 +83,7 @@ let mut stream = client
 
 while let Some(Ok(event)) = stream.next().await {
     if let StreamChunk::Delta(delta) = event.chunk {
-        if let Some(text) = delta.text() {
+        if let Some(text) = delta.as_text() {
             print!("{}", text);
         }
     }

@@ -21,17 +21,19 @@
 //! For files larger than 20MB, consider these alternatives:
 //!
 //! 1. **URI-based methods**: Upload files to Google Cloud Storage and use
-//!    the `add_*_uri()` builder methods instead:
+//!    `Content::from_uri_and_mime()` with `with_content()`:
 //!
 //!    ```no_run
-//!    # use genai_rs::Client;
+//!    # use genai_rs::{Client, Content};
 //!    # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //!    # let client = Client::new("key".to_string());
 //!    let response = client
 //!        .interaction()
 //!        .with_model("gemini-3-flash-preview")
-//!        .with_text("Describe this video")
-//!        .add_video_uri("gs://bucket/large-video.mp4", "video/mp4")
+//!        .with_content(vec![
+//!            Content::text("Describe this video"),
+//!            Content::from_uri_and_mime("gs://bucket/large-video.mp4", "video/mp4"),
+//!        ])
 //!        .create()
 //!        .await?;
 //!    # Ok(())
@@ -42,15 +44,17 @@
 //!    interactions, the Files API allows uploading once and referencing by URI:
 //!
 //!    ```no_run
-//!    # use genai_rs::Client;
+//!    # use genai_rs::{Client, Content};
 //!    # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //!    # let client = Client::new("key".to_string());
 //!    let file = client.upload_file("large-video.mp4").await?;
 //!    let response = client
 //!        .interaction()
 //!        .with_model("gemini-3-flash-preview")
-//!        .with_text("Describe this video")
-//!        .add_file(&file)
+//!        .with_content(vec![
+//!            Content::text("Describe this video"),
+//!            Content::from_file(&file),
+//!        ])
 //!        .create()
 //!        .await?;
 //!    # Ok(())
@@ -60,7 +64,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use genai_rs::{Client, image_from_file, text_content};
+//! use genai_rs::{Client, Content, image_from_file};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let client = Client::new("api-key".to_string());
@@ -68,26 +72,21 @@
 //! // Load image from file with automatic MIME detection
 //! let image = image_from_file("photo.jpg").await?;
 //!
-//! let contents = vec![
-//!     text_content("What's in this image?"),
-//!     image,
-//! ];
-//!
 //! let response = client
 //!     .interaction()
 //!     .with_model("gemini-3-flash-preview")
-//!     .set_content(contents)
+//!     .with_content(vec![
+//!         Content::text("What's in this image?"),
+//!         image,
+//!     ])
 //!     .create()
 //!     .await?;
 //! # Ok(())
 //! # }
 //! ```
 
-use crate::InteractionContent;
+use crate::Content;
 use crate::errors::GenaiError;
-use crate::interactions_api::{
-    audio_data_content, document_data_content, image_data_content, video_data_content,
-};
 use base64::Engine;
 use std::path::Path;
 
@@ -304,7 +303,7 @@ fn validate_mime_category(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn image_from_file(path: impl AsRef<Path>) -> Result<InteractionContent, GenaiError> {
+pub async fn image_from_file(path: impl AsRef<Path>) -> Result<Content, GenaiError> {
     let path = path.as_ref();
 
     // Get extension with specific error handling
@@ -344,9 +343,9 @@ pub async fn image_from_file(path: impl AsRef<Path>) -> Result<InteractionConten
 pub async fn image_from_file_with_mime(
     path: impl AsRef<Path>,
     mime_type: impl Into<String>,
-) -> Result<InteractionContent, GenaiError> {
+) -> Result<Content, GenaiError> {
     let data = load_and_encode_file(&path).await?;
-    Ok(image_data_content(data, mime_type))
+    Ok(Content::image_data(data, mime_type))
 }
 
 /// Loads an audio file with automatic MIME type detection.
@@ -386,7 +385,7 @@ pub async fn image_from_file_with_mime(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn audio_from_file(path: impl AsRef<Path>) -> Result<InteractionContent, GenaiError> {
+pub async fn audio_from_file(path: impl AsRef<Path>) -> Result<Content, GenaiError> {
     let path = path.as_ref();
 
     // Get extension with specific error handling
@@ -428,9 +427,9 @@ pub async fn audio_from_file(path: impl AsRef<Path>) -> Result<InteractionConten
 pub async fn audio_from_file_with_mime(
     path: impl AsRef<Path>,
     mime_type: impl Into<String>,
-) -> Result<InteractionContent, GenaiError> {
+) -> Result<Content, GenaiError> {
     let data = load_and_encode_file(&path).await?;
-    Ok(audio_data_content(data, mime_type))
+    Ok(Content::audio_data(data, mime_type))
 }
 
 /// Loads a video file with automatic MIME type detection.
@@ -469,7 +468,7 @@ pub async fn audio_from_file_with_mime(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn video_from_file(path: impl AsRef<Path>) -> Result<InteractionContent, GenaiError> {
+pub async fn video_from_file(path: impl AsRef<Path>) -> Result<Content, GenaiError> {
     let path = path.as_ref();
 
     // Get extension with specific error handling
@@ -511,35 +510,34 @@ pub async fn video_from_file(path: impl AsRef<Path>) -> Result<InteractionConten
 pub async fn video_from_file_with_mime(
     path: impl AsRef<Path>,
     mime_type: impl Into<String>,
-) -> Result<InteractionContent, GenaiError> {
+) -> Result<Content, GenaiError> {
     let data = load_and_encode_file(&path).await?;
-    Ok(video_data_content(data, mime_type))
+    Ok(Content::video_data(data, mime_type))
 }
 
 /// Loads a document file with automatic MIME type detection.
 ///
-/// Reads the file, encodes it as base64, and detects the MIME type from
-/// the file extension.
+/// Reads the file, encodes it as base64, and validates the MIME type.
 ///
 /// # Supported Formats
+///
+/// The Gemini Interactions API only supports PDF for document content:
 ///
 /// | Extension | MIME Type |
 /// |-----------|-----------|
 /// | `.pdf` | `application/pdf` |
-/// | `.txt` | `text/plain` |
-/// | `.md` | `text/markdown` |
-/// | `.json` | `application/json` |
-/// | `.csv` | `text/csv` |
-/// | `.html` | `text/html` |
-/// | `.xml` | `application/xml` |
+///
+/// For text-based files (TXT, CSV, JSON, etc.), read the file content and send
+/// it as [`Content::text()`] instead. Document content type is specifically for
+/// PDF files that need visual processing (understanding charts, tables, images
+/// within the PDF).
 ///
 /// # Errors
 ///
 /// Returns [`GenaiError::InvalidInput`] if:
 /// - The file cannot be read (with a suggestion based on the error type)
 /// - The file has no extension
-/// - The extension is not recognized as a document type
-/// - The extension maps to a non-document MIME type (e.g., `.jpg`)
+/// - The file is not a PDF
 ///
 /// # Example
 ///
@@ -551,7 +549,7 @@ pub async fn video_from_file_with_mime(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn document_from_file(path: impl AsRef<Path>) -> Result<InteractionContent, GenaiError> {
+pub async fn document_from_file(path: impl AsRef<Path>) -> Result<Content, GenaiError> {
     let path = path.as_ref();
 
     // Get extension with specific error handling
@@ -561,27 +559,32 @@ pub async fn document_from_file(path: impl AsRef<Path>) -> Result<InteractionCon
     let mime_type = detect_mime_type(path).ok_or_else(|| {
         GenaiError::InvalidInput(format!(
             "Unsupported document extension '.{}' for file '{}'. \
-             Supported extensions: pdf, txt, md, json, csv, html, xml. \
              Use document_from_file_with_mime() to override.",
             ext,
             path.display()
         ))
     })?;
 
-    // Validate this is actually a document MIME type (application/* or text/*)
-    if !mime_type.starts_with("application/") && !mime_type.starts_with("text/") {
+    // The Gemini Interactions API only supports PDF for document content type.
+    // Other text-based formats should be sent as Content::text() instead.
+    if mime_type != "application/pdf" {
         let suggestion = if mime_type.starts_with("image/") {
             "image_from_file()"
         } else if mime_type.starts_with("audio/") {
             "audio_from_file()"
         } else if mime_type.starts_with("video/") {
             "video_from_file()"
+        } else if mime_type.starts_with("text/") || mime_type == "application/json" {
+            // Suggest reading as text for text-based formats
+            "Content::text() with the file contents read via std::fs::read_to_string()"
         } else {
             "the appropriate *_from_file() function"
         };
 
         return Err(GenaiError::InvalidInput(format!(
-            "File '{}' has MIME type '{}' which is not a document type. Did you mean to use {}?",
+            "File '{}' has MIME type '{}' which is not supported for document content. \
+             The Gemini API only supports 'application/pdf' for documents. \
+             For text-based files, use {}.",
             path.display(),
             mime_type,
             suggestion
@@ -610,9 +613,9 @@ pub async fn document_from_file(path: impl AsRef<Path>) -> Result<InteractionCon
 pub async fn document_from_file_with_mime(
     path: impl AsRef<Path>,
     mime_type: impl Into<String>,
-) -> Result<InteractionContent, GenaiError> {
+) -> Result<Content, GenaiError> {
     let data = load_and_encode_file(&path).await?;
-    Ok(document_data_content(data, mime_type))
+    Ok(Content::document_data(data, mime_type))
 }
 
 #[cfg(test)]

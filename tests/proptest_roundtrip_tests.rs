@@ -12,14 +12,14 @@
 //! because the `strict-unknown` feature causes deserialization errors instead of creating
 //! Unknown variants. The Unknown variant tests cover all 11 types with Unknown support:
 //!
-//! 1. Resolution, InteractionContent, StreamChunk, AutoFunctionStreamChunk
+//! 1. Resolution, Content, StreamChunk, AutoFunctionStreamChunk
 //! 2. Tool, FunctionCallingMode, FileState
 //! 3. Role, ThinkingLevel, ThinkingSummaries, InteractionStatus
 
 use chrono::{DateTime, TimeZone, Utc};
 use genai_rs::{
-    Annotation, AutoFunctionResult, AutoFunctionStreamChunk, FunctionExecutionResult,
-    InteractionContent, InteractionResponse, InteractionStatus, ModalityTokens, UsageMetadata,
+    Annotation, AutoFunctionResult, AutoFunctionStreamChunk, Content, FunctionExecutionResult,
+    InteractionResponse, InteractionStatus, ModalityTokens, UsageMetadata,
 };
 use proptest::prelude::*;
 
@@ -189,27 +189,26 @@ fn arb_annotation() -> impl Strategy<Value = Annotation> {
 }
 
 // =============================================================================
-// InteractionContent Strategy (subset for streaming tests)
+// Content Strategy (subset for streaming tests)
 // =============================================================================
 
-fn arb_interaction_content() -> impl Strategy<Value = InteractionContent> {
+fn arb_interaction_content() -> impl Strategy<Value = Content> {
     prop_oneof![
         // Text content with optional annotations
         (
             proptest::option::of(arb_text()),
             proptest::option::of(proptest::collection::vec(arb_annotation(), 0..3))
         )
-            .prop_map(|(text, annotations)| InteractionContent::Text { text, annotations }),
+            .prop_map(|(text, annotations)| Content::Text { text, annotations }),
         // Thought content (signature is a cryptographic value, not readable text)
-        proptest::option::of(arb_text())
-            .prop_map(|signature| InteractionContent::Thought { signature }),
+        proptest::option::of(arb_text()).prop_map(|signature| Content::Thought { signature }),
         // FunctionCall content
         (
             proptest::option::of(arb_identifier()),
             arb_identifier(),
             arb_json_value(),
         )
-            .prop_map(|(id, name, args)| { InteractionContent::FunctionCall { id, name, args } }),
+            .prop_map(|(id, name, args)| { Content::FunctionCall { id, name, args } }),
     ]
 }
 
@@ -632,15 +631,15 @@ fn arb_file_state_with_unknown() -> impl Strategy<Value = FileState> {
     ]
 }
 
-/// Strategy for generating InteractionContent Unknown variant.
+/// Strategy for generating Content Unknown variant.
 #[cfg(not(feature = "strict-unknown"))]
-fn arb_interaction_content_unknown() -> impl Strategy<Value = InteractionContent> {
+fn arb_interaction_content_unknown() -> impl Strategy<Value = Content> {
     (arb_unknown_type_string(), arb_json_value()).prop_map(|(type_str, extra_data)| {
         let json = serde_json::json!({
             "type": type_str,
             "extra_field": extra_data,
         });
-        serde_json::from_value::<InteractionContent>(json)
+        serde_json::from_value::<Content>(json)
             .expect("Unknown interaction content should deserialize")
     })
 }
@@ -791,11 +790,11 @@ proptest! {
         prop_assert_eq!(json, restored_json);
     }
 
-    /// Test InteractionContent Unknown variant roundtrip.
+    /// Test Content Unknown variant roundtrip.
     #[test]
     fn interaction_content_unknown_roundtrip(content in arb_interaction_content_unknown()) {
         let json = serde_json::to_value(&content).expect("Serialization should succeed");
-        let restored: InteractionContent = serde_json::from_value(json.clone()).expect("Deserialization should succeed");
+        let restored: Content = serde_json::from_value(json.clone()).expect("Deserialization should succeed");
 
         prop_assert!(content.is_unknown(), "Generated content should be Unknown");
         prop_assert!(restored.is_unknown(), "Restored content should be Unknown");

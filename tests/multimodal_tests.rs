@@ -36,9 +36,7 @@ mod image {
         SAMPLE_IMAGE_URL, TINY_BLUE_PNG_BASE64, TINY_RED_PNG_BASE64, assert_response_semantic,
         get_client, stateful_builder, test_timeout, with_timeout,
     };
-    use genai_rs::{
-        InteractionInput, InteractionStatus, image_data_content, image_uri_content, text_content,
-    };
+    use genai_rs::{Content, InteractionInput, InteractionStatus};
 
     /// Tests image input via GCS URI (gs://) which may not be supported by the Interactions API.
     /// This test documents the expected "Unsupported file uri" error behavior when the API rejects
@@ -53,8 +51,8 @@ mod image {
         };
 
         let contents = vec![
-            text_content("What is in this image? Describe it briefly in 1-2 sentences."),
-            image_uri_content(SAMPLE_IMAGE_URL, "image/jpeg"),
+            Content::text("What is in this image? Describe it briefly in 1-2 sentences."),
+            Content::image_uri(SAMPLE_IMAGE_URL, "image/jpeg"),
         ];
 
         let result = stateful_builder(&client)
@@ -69,7 +67,7 @@ mod image {
                     response.has_text(),
                     "Should have text response describing image"
                 );
-                let text = response.text().unwrap().to_lowercase();
+                let text = response.as_text().unwrap().to_lowercase();
                 println!("Image description: {}", text);
             }
             Err(e) => {
@@ -97,8 +95,8 @@ mod image {
 
         // Use tiny red PNG for testing base64 input
         let contents = vec![
-            text_content("What color is this image? Answer with just the color name."),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+            Content::text("What color is this image? Answer with just the color name."),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
         ];
 
         let response = stateful_builder(&client)
@@ -110,7 +108,7 @@ mod image {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Color response: {}", text);
 
         // The tiny PNG is red
@@ -134,11 +132,11 @@ mod image {
 
         // Send two images in a single request (both base64)
         let contents = vec![
-            text_content(
+            Content::text(
                 "I'm showing you two small colored images. What colors are they? List both.",
             ),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+            Content::image_data(TINY_BLUE_PNG_BASE64, "image/png"),
         ];
 
         let response = stateful_builder(&client)
@@ -150,7 +148,7 @@ mod image {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Multiple images response: {}", text);
 
         // Should mention the colors from both images
@@ -174,8 +172,8 @@ mod image {
         with_timeout(test_timeout(), async {
             // First turn: describe the base64 image
             let contents = vec![
-                text_content("What color is this image?"),
-                image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+                Content::text("What color is this image?"),
+                Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
             ];
 
             let response1 = stateful_builder(&client)
@@ -185,7 +183,7 @@ mod image {
                 .expect("First interaction failed");
 
             assert_eq!(response1.status, InteractionStatus::Completed);
-            println!("First response: {:?}", response1.text());
+            println!("First response: {:?}", response1.as_text());
 
             // Second turn: ask follow-up about the same image
             let response2 = stateful_builder(&client)
@@ -198,7 +196,7 @@ mod image {
             assert_eq!(response2.status, InteractionStatus::Completed);
             assert!(response2.has_text(), "Should have follow-up response");
 
-            let text = response2.text().unwrap();
+            let text = response2.as_text().unwrap();
             println!("Follow-up response: {}", text);
 
             // Red is a warm color - use semantic validation
@@ -216,7 +214,7 @@ mod image {
 
 mod audio {
     use crate::common::{SAMPLE_AUDIO_URL, TINY_WAV_BASE64, get_client, stateful_builder};
-    use genai_rs::{InteractionInput, audio_uri_content, text_content};
+    use genai_rs::{Content, InteractionInput};
 
     /// Tests audio input from URI.
     /// Note: GCS URIs are not supported by the Interactions API.
@@ -229,8 +227,8 @@ mod audio {
         };
 
         let contents = vec![
-            text_content("What is this audio about? Summarize briefly."),
-            audio_uri_content(SAMPLE_AUDIO_URL, "audio/mpeg"),
+            Content::text("What is this audio about? Summarize briefly."),
+            Content::audio_uri(SAMPLE_AUDIO_URL, "audio/mpeg"),
         ];
 
         let result = stateful_builder(&client)
@@ -242,7 +240,7 @@ mod audio {
             Ok(response) => {
                 println!("Audio response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Audio transcription/summary: {}", text);
                 }
             }
@@ -270,8 +268,8 @@ mod audio {
         // Use tiny WAV for testing base64 audio input
         // Note: This is a minimal header with no actual audio, so the model may report it's empty/silent
         let contents = vec![
-            text_content("Describe what you hear in this audio file."),
-            genai_rs::audio_data_content(TINY_WAV_BASE64, "audio/wav"),
+            Content::text("Describe what you hear in this audio file."),
+            genai_rs::Content::audio_data(TINY_WAV_BASE64, "audio/wav"),
         ];
 
         let result = stateful_builder(&client)
@@ -283,7 +281,7 @@ mod audio {
             Ok(response) => {
                 println!("Base64 audio response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Audio response: {}", text);
                     // Just verify we got some response - the content can vary
                     assert!(!text.is_empty(), "Should get some response about the audio");
@@ -301,7 +299,7 @@ mod audio {
 
 mod video {
     use crate::common::{SAMPLE_VIDEO_URL, TINY_MP4_BASE64, get_client, stateful_builder};
-    use genai_rs::{InteractionInput, text_content, video_data_content, video_uri_content};
+    use genai_rs::{Content, InteractionInput};
 
     /// Tests video input from URI.
     /// Note: GCS URIs are not supported by the Interactions API.
@@ -314,8 +312,8 @@ mod video {
         };
 
         let contents = vec![
-            text_content("What animals appear in this video? List them."),
-            video_uri_content(SAMPLE_VIDEO_URL, "video/mp4"),
+            Content::text("What animals appear in this video? List them."),
+            Content::video_uri(SAMPLE_VIDEO_URL, "video/mp4"),
         ];
 
         let result = stateful_builder(&client)
@@ -327,7 +325,7 @@ mod video {
             Ok(response) => {
                 println!("Video response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Video description: {}", text);
                 }
             }
@@ -357,8 +355,8 @@ mod video {
         // Use minimal MP4 for testing base64 video input
         // Note: This is a minimal header with no actual video frames, so the model may report it's empty
         let contents = vec![
-            text_content("Describe what you see in this video file."),
-            video_data_content(TINY_MP4_BASE64, "video/mp4"),
+            Content::text("Describe what you see in this video file."),
+            Content::video_data(TINY_MP4_BASE64, "video/mp4"),
         ];
 
         let result = stateful_builder(&client)
@@ -370,7 +368,7 @@ mod video {
             Ok(response) => {
                 println!("Base64 video response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Video response: {}", text);
                     // Just verify we got some response - the content can vary
                     assert!(!text.is_empty(), "Should get some response about the video");
@@ -392,7 +390,7 @@ mod mixed_content {
         TINY_BLUE_PNG_BASE64, TINY_RED_PNG_BASE64, assert_response_semantic, get_client,
         stateful_builder,
     };
-    use genai_rs::{InteractionInput, InteractionStatus, image_data_content, text_content};
+    use genai_rs::{Content, InteractionInput, InteractionStatus};
 
     #[tokio::test]
     #[ignore = "Requires API key"]
@@ -404,9 +402,9 @@ mod mixed_content {
 
         // Interleave text and base64 image content
         let contents = vec![
-            text_content("I'm going to show you an image."),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            text_content("Based on the color above, what emotion might it represent?"),
+            Content::text("I'm going to show you an image."),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+            Content::text("Based on the color above, what emotion might it represent?"),
         ];
 
         let response = stateful_builder(&client)
@@ -418,7 +416,7 @@ mod mixed_content {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Interleaved content response: {}", text);
 
         // Red is associated with passion, anger, love, energy - use semantic validation
@@ -441,11 +439,11 @@ mod mixed_content {
 
         // Ask model to compare two base64 images
         let contents = vec![
-            text_content(
+            Content::text(
                 "Compare these two colored squares. What are their colors and how do they differ?",
             ),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+            Content::image_data(TINY_BLUE_PNG_BASE64, "image/png"),
         ];
 
         let response = stateful_builder(&client)
@@ -457,7 +455,7 @@ mod mixed_content {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Comparison response: {}", text);
 
         // Should mention differences or colors - use semantic validation
@@ -476,10 +474,7 @@ mod mixed_media {
         TINY_MP4_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, assert_response_semantic,
         get_client, stateful_builder,
     };
-    use genai_rs::{
-        InteractionInput, InteractionStatus, audio_data_content, image_data_content, text_content,
-        video_data_content,
-    };
+    use genai_rs::{Content, InteractionInput, InteractionStatus};
 
     /// Tests combining multiple media types (image + audio) in a single interaction.
     ///
@@ -498,14 +493,14 @@ mod mixed_media {
 
         // Combine image and audio with a question about both
         let contents = vec![
-            text_content(
+            Content::text(
                 "I'm sending you an image and an audio file. \
                  For the image, tell me what color it is. \
                  For the audio, describe what kind of audio file it appears to be. \
                  Keep your response brief.",
             ),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            audio_data_content(TINY_WAV_BASE64, "audio/wav"),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+            Content::audio_data(TINY_WAV_BASE64, "audio/wav"),
         ];
 
         let result = stateful_builder(&client)
@@ -522,7 +517,7 @@ mod mixed_media {
                 );
                 assert!(response.has_text(), "Should have text response");
 
-                let text = response.text().unwrap();
+                let text = response.as_text().unwrap();
                 println!("Mixed media response: {}", text);
 
                 // Verify the model acknowledged at least one input using semantic validation
@@ -572,13 +567,13 @@ mod mixed_media {
 
         // Combine all three media types
         let contents = vec![
-            text_content(
+            Content::text(
                 "I'm sending you an image, an audio file, and a video file. \
                  Please briefly acknowledge each one.",
             ),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            audio_data_content(TINY_WAV_BASE64, "audio/wav"),
-            video_data_content(TINY_MP4_BASE64, "video/mp4"),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+            Content::audio_data(TINY_WAV_BASE64, "audio/wav"),
+            Content::video_data(TINY_MP4_BASE64, "video/mp4"),
         ];
 
         let result = stateful_builder(&client)
@@ -590,7 +585,7 @@ mod mixed_media {
             Ok(response) => {
                 println!("All media types response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("All media types response: {}", text);
                 }
                 // If we get here, the API accepted all three types
@@ -612,7 +607,7 @@ mod mixed_media {
 
 mod document {
     use crate::common::{TINY_PDF_BASE64, assert_response_semantic, get_client, stateful_builder};
-    use genai_rs::{InteractionInput, InteractionStatus, document_data_content, text_content};
+    use genai_rs::{Content, InteractionInput, InteractionStatus};
 
     /// Tests PDF document input from base64.
     /// This tests the ability to send PDF documents to the model for analysis.
@@ -626,10 +621,10 @@ mod document {
 
         // Use minimal PDF containing "Hello World" text
         let contents = vec![
-            text_content(
+            Content::text(
                 "What text does this PDF document contain? Answer with just the text you find.",
             ),
-            document_data_content(TINY_PDF_BASE64, "application/pdf"),
+            Content::document_data(TINY_PDF_BASE64, "application/pdf"),
         ];
 
         let result = stateful_builder(&client)
@@ -642,7 +637,7 @@ mod document {
                 println!("PDF document response status: {:?}", response.status);
                 assert_eq!(response.status, InteractionStatus::Completed);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("PDF response: {}", text);
                     // The minimal PDF contains "Hello World" - use semantic validation
                     assert_response_semantic(
@@ -674,9 +669,9 @@ mod document {
         };
 
         let contents = vec![
-            text_content("I'm sending you a PDF document."),
-            document_data_content(TINY_PDF_BASE64, "application/pdf"),
-            text_content("Is this a valid PDF? What can you tell me about its structure?"),
+            Content::text("I'm sending you a PDF document."),
+            Content::document_data(TINY_PDF_BASE64, "application/pdf"),
+            Content::text("Is this a valid PDF? What can you tell me about its structure?"),
         ];
 
         let result = stateful_builder(&client)
@@ -688,7 +683,7 @@ mod document {
             Ok(response) => {
                 assert_eq!(response.status, InteractionStatus::Completed);
                 assert!(response.has_text(), "Should have text response");
-                let text = response.text().unwrap();
+                let text = response.as_text().unwrap();
                 println!("PDF question response: {}", text);
                 // Should mention something about the PDF - use semantic validation
                 assert_response_semantic(
@@ -711,7 +706,7 @@ mod streaming {
         TINY_RED_PNG_BASE64, assert_response_semantic, consume_stream, get_client,
         interaction_builder, test_timeout, with_timeout,
     };
-    use genai_rs::{InteractionInput, InteractionStatus, image_data_content, text_content};
+    use genai_rs::{Content, InteractionInput, InteractionStatus};
 
     /// Test streaming with multimodal (image) input.
     ///
@@ -732,8 +727,8 @@ mod streaming {
 
             // Create content with text and image
             let contents = vec![
-                text_content("What color is this image? Answer in one word."),
-                image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+                Content::text("What color is this image? Answer in one word."),
+                Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
             ];
 
             // Stream the response using with_input for multimodal content
@@ -756,7 +751,7 @@ mod streaming {
             let text_to_check = if !result.collected_text.is_empty() {
                 result.collected_text.clone()
             } else if let Some(ref response) = result.final_response {
-                response.text().unwrap_or_default().to_string()
+                response.as_text().unwrap_or_default().to_string()
             } else {
                 String::new()
             };
@@ -788,14 +783,13 @@ mod streaming {
 mod file_loading {
     use crate::common::{
         TINY_BLUE_PNG_BASE64, TINY_RED_PNG_BASE64, assert_response_semantic, get_client,
-        interaction_builder,
     };
     use base64::Engine;
-    use genai_rs::InteractionStatus;
+    use genai_rs::{Content, InteractionStatus, image_from_file};
 
-    /// Tests the add_image_file() builder method.
+    /// Tests loading images from files with image_from_file() helper.
     ///
-    /// This validates the fluent builder pattern for loading images directly from files,
+    /// This validates loading images from files using the image_from_file() helper,
     /// which auto-detects MIME type from the file extension and base64 encodes the content.
     #[tokio::test]
     #[ignore = "Requires API key"]
@@ -817,12 +811,17 @@ mod file_loading {
             .expect("Failed to decode base64");
         std::fs::write(&image_path, &image_bytes).expect("Failed to write image");
 
-        // Use the fluent builder pattern with add_image_file()
-        let response = interaction_builder(&client)
-            .with_text("What color is this image? Answer with just the color name.")
-            .add_image_file(&image_path)
+        // Use image_from_file() helper to load and encode, then with_content()
+        let image_content = image_from_file(&image_path)
             .await
-            .expect("Failed to add image file")
+            .expect("Failed to load image file");
+        let response = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_content(vec![
+                Content::text("What color is this image? Answer with just the color name."),
+                image_content,
+            ])
             .create()
             .await
             .expect("Image interaction failed");
@@ -830,7 +829,7 @@ mod file_loading {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Color response: {}", text);
 
         // The tiny PNG is red - use semantic validation
@@ -843,10 +842,10 @@ mod file_loading {
         .await;
     }
 
-    /// Tests chaining multiple add_image_file() calls.
+    /// Tests loading multiple images from files.
     ///
-    /// Validates that the builder correctly accumulates multiple images when
-    /// chaining add_image_file() calls.
+    /// Validates that with_content() correctly handles multiple images loaded
+    /// using image_from_file() helpers.
     #[tokio::test]
     #[ignore = "Requires API key"]
     async fn test_add_multiple_image_files_builder() {
@@ -873,15 +872,23 @@ mod file_loading {
             .expect("Failed to decode blue PNG");
         std::fs::write(&blue_path, &blue_bytes).expect("Failed to write blue image");
 
-        // Chain multiple add_image_file() calls
-        let response = interaction_builder(&client)
-            .with_text("I'm showing you two small colored images. What colors are they? List both.")
-            .add_image_file(&red_path)
+        // Load multiple images with image_from_file() and combine with with_content()
+        let red_content = image_from_file(&red_path)
             .await
-            .expect("Failed to add red image")
-            .add_image_file(&blue_path)
+            .expect("Failed to load red image");
+        let blue_content = image_from_file(&blue_path)
             .await
-            .expect("Failed to add blue image")
+            .expect("Failed to load blue image");
+        let response = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_content(vec![
+                Content::text(
+                    "I'm showing you two small colored images. What colors are they? List both.",
+                ),
+                red_content,
+                blue_content,
+            ])
             .create()
             .await
             .expect("Multiple images interaction failed");
@@ -889,7 +896,7 @@ mod file_loading {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Multiple images response: {}", text);
 
         // Should mention at least one color - use semantic validation
@@ -902,20 +909,11 @@ mod file_loading {
         .await;
     }
 
-    /// Tests add_image_file() error handling for missing file.
+    /// Tests image_from_file() error handling for missing file.
     #[tokio::test]
-    async fn test_add_image_file_not_found() {
+    async fn test_image_from_file_not_found() {
         // This test doesn't require an API key - just tests local file loading error
-        let client = genai_rs::Client::builder("fake-key-for-testing".to_string())
-            .build()
-            .unwrap();
-
-        let result = client
-            .interaction()
-            .with_model("gemini-3-flash-preview")
-            .with_text("Describe this image")
-            .add_image_file("/nonexistent/path/image.png")
-            .await;
+        let result = image_from_file("/nonexistent/path/image.png").await;
 
         assert!(result.is_err(), "Should return error for missing file");
         let err = result.unwrap_err().to_string();
@@ -930,15 +928,13 @@ mod file_loading {
 mod bytes_loading {
     use crate::common::{
         TINY_MP4_BASE64, TINY_PDF_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64,
-        assert_response_semantic, get_client, interaction_builder, validate_response_semantically,
+        assert_response_semantic, get_client, validate_response_semantically,
     };
-    use base64::Engine;
-    use genai_rs::InteractionStatus;
+    use genai_rs::{Content, InteractionStatus};
 
-    /// Tests the add_image_bytes() builder method.
+    /// Tests image input with base64-encoded data using Content::image_data().
     ///
-    /// This validates that raw bytes (not base64-encoded) can be passed directly
-    /// to the builder, which will handle the base64 encoding internally.
+    /// This validates that base64-encoded image data works correctly.
     /// Uses semantic validation to verify the model correctly interprets the image.
     ///
     /// Note: This test uses `.expect()` (strict assertion) because the PNG fixture
@@ -947,30 +943,29 @@ mod bytes_loading {
     /// minimal fixtures may be rejected by the API.
     #[tokio::test]
     #[ignore = "Requires API key"]
-    async fn test_add_image_bytes_roundtrip() {
+    async fn test_image_data_roundtrip() {
         let Some(client) = get_client() else {
             println!("Skipping: GEMINI_API_KEY not set");
             return;
         };
 
-        // Decode the base64 constant to get raw bytes
-        let image_bytes = base64::engine::general_purpose::STANDARD
-            .decode(TINY_RED_PNG_BASE64)
-            .expect("Failed to decode base64");
-
-        // Use add_image_bytes() with raw bytes
+        // Use Content::image_data() with base64-encoded data
         // The tiny PNG is well-formed and should always be processable
-        let response = interaction_builder(&client)
-            .with_text("What color is this image? Answer with just the color name.")
-            .add_image_bytes(&image_bytes, "image/png")
+        let response = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_content(vec![
+                Content::text("What color is this image? Answer with just the color name."),
+                Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+            ])
             .create()
             .await
-            .expect("Image bytes interaction failed");
+            .expect("Image data interaction failed");
 
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Color response: {}", text);
 
         // Use semantic validation instead of brittle content checks
@@ -983,28 +978,27 @@ mod bytes_loading {
         .await;
     }
 
-    /// Tests the add_audio_bytes() builder method.
+    /// Tests audio input with base64-encoded data using Content::audio_data().
     ///
-    /// This validates that raw audio bytes can be passed directly to the builder.
+    /// This validates that base64-encoded audio data works correctly.
     /// Note: The minimal WAV test file may not contain actual audio, so the model
     /// may report it's empty/silent.
     #[tokio::test]
     #[ignore = "Requires API key"]
-    async fn test_add_audio_bytes_roundtrip() {
+    async fn test_audio_data_roundtrip() {
         let Some(client) = get_client() else {
             println!("Skipping: GEMINI_API_KEY not set");
             return;
         };
 
-        // Decode the base64 constant to get raw bytes
-        let audio_bytes = base64::engine::general_purpose::STANDARD
-            .decode(TINY_WAV_BASE64)
-            .expect("Failed to decode base64");
-
-        // Use add_audio_bytes() with raw bytes
-        let result = interaction_builder(&client)
-            .with_text("Describe what you hear in this audio file.")
-            .add_audio_bytes(&audio_bytes, "audio/wav")
+        // Use Content::audio_data() with base64-encoded data
+        let result = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_content(vec![
+                Content::text("Describe what you hear in this audio file."),
+                Content::audio_data(TINY_WAV_BASE64, "audio/wav"),
+            ])
             .create()
             .await;
 
@@ -1012,7 +1006,7 @@ mod bytes_loading {
             Ok(response) => {
                 println!("Audio bytes response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Audio response: {}", text);
                     // Just verify we got some response - the content can vary
                     assert!(!text.is_empty(), "Should get some response about the audio");
@@ -1028,28 +1022,27 @@ mod bytes_loading {
         }
     }
 
-    /// Tests the add_video_bytes() builder method.
+    /// Tests video input with base64-encoded data using Content::video_data().
     ///
-    /// This validates that raw video bytes can be passed directly to the builder.
+    /// This validates that base64-encoded video data works correctly.
     /// Note: The minimal MP4 test file is just a container header with no frames,
     /// so the model may report it's empty/corrupt.
     #[tokio::test]
     #[ignore = "Requires API key"]
-    async fn test_add_video_bytes_roundtrip() {
+    async fn test_video_data_roundtrip() {
         let Some(client) = get_client() else {
             println!("Skipping: GEMINI_API_KEY not set");
             return;
         };
 
-        // Decode the base64 constant to get raw bytes
-        let video_bytes = base64::engine::general_purpose::STANDARD
-            .decode(TINY_MP4_BASE64)
-            .expect("Failed to decode base64");
-
-        // Use add_video_bytes() with raw bytes
-        let result = interaction_builder(&client)
-            .with_text("Describe what you see in this video file.")
-            .add_video_bytes(&video_bytes, "video/mp4")
+        // Use Content::video_data() with base64-encoded data
+        let result = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_content(vec![
+                Content::text("Describe what you see in this video file."),
+                Content::video_data(TINY_MP4_BASE64, "video/mp4"),
+            ])
             .create()
             .await;
 
@@ -1057,7 +1050,7 @@ mod bytes_loading {
             Ok(response) => {
                 println!("Video bytes response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Video response: {}", text);
                     // Just verify we got some response - the content can vary
                     assert!(!text.is_empty(), "Should get some response about the video");
@@ -1073,33 +1066,32 @@ mod bytes_loading {
         }
     }
 
-    /// Tests the add_document_bytes() builder method.
+    /// Tests document input with base64-encoded data using Content::document_data().
     ///
-    /// This validates that raw document bytes (PDF) can be passed directly to
-    /// the builder. The test PDF contains "Hello World" text.
+    /// This validates that base64-encoded document data (PDF) works correctly.
+    /// The test PDF contains "Hello World" text.
     /// Uses semantic validation to verify the model correctly interprets the document.
     ///
     /// Note: Like audio/video tests, this uses lenient error handling because the
     /// minimal PDF fixture or the semantic validation call might fail.
     #[tokio::test]
     #[ignore = "Requires API key"]
-    async fn test_add_document_bytes_roundtrip() {
+    async fn test_document_data_roundtrip() {
         let Some(client) = get_client() else {
             println!("Skipping: GEMINI_API_KEY not set");
             return;
         };
 
-        // Decode the base64 constant to get raw bytes
-        let pdf_bytes = base64::engine::general_purpose::STANDARD
-            .decode(TINY_PDF_BASE64)
-            .expect("Failed to decode base64");
-
-        // Use add_document_bytes() with raw bytes
-        let result = interaction_builder(&client)
-            .with_text(
-                "What text does this PDF document contain? Answer with just the text you find.",
-            )
-            .add_document_bytes(&pdf_bytes, "application/pdf")
+        // Use Content::document_data() with base64-encoded data
+        let result = client
+            .interaction()
+            .with_model("gemini-3-flash-preview")
+            .with_content(vec![
+                Content::text(
+                    "What text does this PDF document contain? Answer with just the text you find.",
+                ),
+                Content::document_data(TINY_PDF_BASE64, "application/pdf"),
+            ])
             .create()
             .await;
 
@@ -1109,7 +1101,7 @@ mod bytes_loading {
                 assert_eq!(response.status, InteractionStatus::Completed);
                 assert!(response.has_text(), "Should have text response");
 
-                let text = response.text().unwrap();
+                let text = response.as_text().unwrap();
                 println!("PDF response: {}", text);
 
                 // Use semantic validation instead of brittle content checks

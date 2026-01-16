@@ -32,9 +32,8 @@ Methods follow a consistent naming pattern based on their behavior:
 
 | Prefix | Behavior | Example |
 |--------|----------|---------|
-| `with_*` | **Configures** a setting (replaces if called twice) | `with_model()`, `with_text()`, `with_history()` |
-| `set_*` | **Replaces** a collection entirely | `set_content()`, `set_tools()` |
-| `add_*` | **Accumulates** items to a collection | `add_function()`, `add_image_file()`, `add_file()` |
+| `with_*` | **Configures** a setting (replaces if called twice) | `with_model()`, `with_text()`, `with_content()` |
+| `add_*` | **Accumulates** items to a collection | `add_function()`, `add_mcp_server()` |
 
 ### Complete Method Reference
 
@@ -49,18 +48,8 @@ Methods follow a consistent naming pattern based on their behavior:
 | **Input** |
 | `with_text()` | with | replaces | Composes with `with_history()` |
 | `with_history()` | with | replaces | Composes with `with_text()` |
-| `set_content()` | set | replaces | For function results; incompatible with history |
-| **Multimodal (accumulate)** |
-| `add_image_file()` | add | accumulates | |
-| `add_image_data()` | add | accumulates | |
-| `add_image_uri()` | add | accumulates | |
-| `add_audio_file()` | add | accumulates | |
-| `add_video_file()` | add | accumulates | |
-| `add_document_file()` | add | accumulates | |
-| `add_file()` | add | accumulates | Files API |
-| `add_file_uri()` | add | accumulates | Files API |
+| `with_content()` | with | replaces | For multimodal; incompatible with history |
 | **Tools** |
-| `set_tools()` | set | replaces | Raw tool array |
 | `add_function()` | add | accumulates | Single function declaration |
 | `add_functions()` | add | accumulates | Multiple function declarations |
 | `with_tool_service()` | with | replaces | Dependency-injected tools |
@@ -69,19 +58,18 @@ Methods follow a consistent naming pattern based on their behavior:
 | `with_code_execution()` | with | accumulates | Enables code execution |
 | `with_url_context()` | with | accumulates | Enables URL fetching |
 | `with_computer_use()` | with | accumulates | Enables computer use |
-| `add_mcp_server()` | with | accumulates | Adds MCP server |
+| `add_mcp_server()` | add | accumulates | Adds MCP server |
 | `with_file_search()` | with | accumulates | Enables file search |
 
 ## Input Methods
 
-The builder has several ways to set the input content:
+The builder has three ways to set the input content:
 
 | Method | Purpose | Composes With |
 |--------|---------|---------------|
-| `with_text(str)` | Simple text message | `with_history()`, `add_*()` |
+| `with_text(str)` | Simple text message | `with_history()` |
 | `with_history(Vec<Turn>)` | Conversation history | `with_text()` |
-| `set_content(Vec<InteractionContent>)` | Raw content (function results) | `with_text()`, `add_*()` |
-| `add_*()` methods | Multimodal content | `with_text()`, `set_content()` |
+| `with_content(Vec<Content>)` | Multimodal content | — |
 | `conversation()...done()` | Fluent conversation builder | — |
 
 ### How Inputs Compose at Build Time
@@ -91,10 +79,7 @@ content_input set?
 ├── Yes
 │   └── history set?
 │       ├── Yes → ERROR (incompatible)
-│       └── No
-│           └── current_message set?
-│               ├── Yes → Content([text, ...content_items])
-│               └── No  → Content([...content_items])
+│       └── No  → Content([...content_items])
 └── No
     └── history set?
         ├── Yes
@@ -107,6 +92,41 @@ content_input set?
                 └── No  → ERROR ("Input is required")
 ```
 
+### Multimodal Input with Content
+
+For multimodal requests, use `with_content()` with `Content` constructors:
+
+```rust,ignore
+use genai_rs::{Client, Content};
+
+let response = client
+    .interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_content(vec![
+        Content::text("Describe this image"),
+        Content::image_data(base64_data, "image/png"),
+    ])
+    .create()
+    .await?;
+```
+
+For file-based content, use helper functions:
+
+```rust,ignore
+use genai_rs::{Client, Content, image_from_file};
+
+let image_content = image_from_file("photo.jpg").await?;
+let response = client
+    .interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_content(vec![
+        Content::text("What's in this image?"),
+        image_content,
+    ])
+    .create()
+    .await?;
+```
+
 ## Method Interactions
 
 ### Order Independence
@@ -117,10 +137,6 @@ Most input methods are **order-independent** - calling them in different orders 
 // These are equivalent:
 .with_history(h).with_text("question")
 .with_text("question").with_history(h)
-
-// These are also equivalent:
-.with_text("Describe this").add_image_file("photo.jpg")
-.add_image_file("photo.jpg").with_text("Describe this")
 ```
 
 ### Replacement vs Accumulation
@@ -129,12 +145,8 @@ Most input methods are **order-independent** - calling them in different orders 
 // Replacement: second call wins
 .with_text("first").with_text("second")  // → "second"
 
-// Accumulation: both are included
-.add_image_file("a.jpg").add_image_file("b.jpg")  // → [image_a, image_b]
-
-// set_* replaces, add_* accumulates on the same collection
-.set_tools(tools1).add_function(func)  // → tools1 + func
-.add_function(func1).set_tools(tools2)  // → tools2 only (set replaces!)
+// Accumulation for tools
+.add_function(func1).add_function(func2)  // → [func1, func2]
 ```
 
 ## Validation Errors
@@ -143,27 +155,27 @@ The builder validates configuration at `build()` time and returns clear errors:
 
 ### 1. Content Cannot Combine with History
 
-Content input (via `set_content()` or `add_*()` methods) is for single-turn multimodal messages. It cannot be combined with multi-turn history.
+Content input (via `with_content()`) is for single-turn multimodal messages. It cannot be combined with multi-turn history.
 
 ```rust,ignore
 // ERROR: Cannot combine content with history
 client.interaction()
     .with_model("gemini-3-flash-preview")
     .with_history(conversation_history)
-    .add_image_file("photo.jpg").await?
+    .with_content(vec![Content::image_data(base64, "image/png")])
     .build()  // Returns Err!
 ```
 
 **Workaround**: For multimodal multi-turn, build `Turn` objects with content arrays:
 
 ```rust,ignore
-use genai_rs::{Turn, TurnContent, InteractionContent};
+use genai_rs::{Turn, TurnContent, Content, Role};
 
 let multimodal_turn = Turn {
     role: Role::User,
     content: TurnContent::Parts(vec![
-        InteractionContent::new_text("What's in this image?"),
-        InteractionContent::new_image_data(base64_data, "image/png"),
+        Content::text("What's in this image?"),
+        Content::image_data(base64_data, "image/png"),
     ]),
 };
 
@@ -244,7 +256,7 @@ Prefer the specific method for your use case:
 // Good: Clear intent
 .with_text("Hello")  // Simple text
 .with_history(turns)  // Multi-turn
-.add_image_file("photo.jpg")  // Multimodal
+.with_content(vec![Content::text("Question"), Content::image_data(...)]) // Multimodal
 
 // Avoid: Generic method is less clear
 .with_input(InteractionInput::Text("Hello".to_string()))

@@ -23,8 +23,8 @@ use common::{
     stateful_builder,
 };
 use genai_rs::{
-    InteractionInput, InteractionStatus, audio_from_file, document_from_file, image_from_file,
-    text_content,
+    Content, InteractionInput, InteractionStatus, audio_from_file, document_from_file,
+    image_from_file,
 };
 use tempfile::TempDir;
 
@@ -58,7 +58,7 @@ async fn test_image_from_temp_file() {
 
     // Send to API
     let contents = vec![
-        text_content("What color is this image? Answer with just the color name."),
+        Content::text("What color is this image? Answer with just the color name."),
         image_content,
     ];
 
@@ -71,7 +71,7 @@ async fn test_image_from_temp_file() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("Color response: {}", text);
 
     // The tiny PNG is red - use semantic validation
@@ -110,7 +110,7 @@ async fn test_image_mismatched_mime() {
         .expect("Failed to load image from file");
 
     let contents = vec![
-        text_content("Is this an image? Answer yes or no."),
+        Content::text("Is this an image? Answer yes or no."),
         image_content,
     ];
 
@@ -121,7 +121,7 @@ async fn test_image_mismatched_mime() {
         .expect("Image interaction failed");
 
     assert_eq!(response.status, InteractionStatus::Completed);
-    println!("Response: {:?}", response.text());
+    println!("Response: {:?}", response.as_text());
 }
 
 // =============================================================================
@@ -152,7 +152,7 @@ async fn test_pdf_from_temp_file() {
         .expect("Failed to load PDF from file");
 
     let contents = vec![
-        text_content("What text does this PDF contain? Answer with just the text."),
+        Content::text("What text does this PDF contain? Answer with just the text."),
         doc_content,
     ];
 
@@ -165,7 +165,7 @@ async fn test_pdf_from_temp_file() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("PDF response: {}", text);
 
     // The minimal PDF contains "Hello World" - use semantic validation
@@ -182,10 +182,34 @@ async fn test_pdf_from_temp_file() {
 // Document File Tests (Text Formats)
 // =============================================================================
 
-/// Tests loading a plain text file using document_from_file().
+/// Tests that document_from_file correctly rejects TXT files.
+///
+/// The Gemini Interactions API only supports PDF for document content type.
+#[tokio::test]
+async fn test_document_from_file_rejects_txt() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let txt_path = temp_dir.path().join("test.txt");
+
+    std::fs::write(&txt_path, "Test content").expect("Failed to write TXT");
+
+    let result = document_from_file(&txt_path).await;
+
+    assert!(
+        result.is_err(),
+        "document_from_file should reject TXT files"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("text/plain") && err.contains("application/pdf"),
+        "Error should mention text/plain and application/pdf: {}",
+        err
+    );
+}
+
+/// Tests sending plain text file content (the correct approach for text-based files).
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_txt_from_temp_file() {
+async fn test_txt_as_text_content() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -195,26 +219,25 @@ async fn test_txt_from_temp_file() {
     let txt_path = temp_dir.path().join("test_document.txt");
 
     // Write plain text content
-    std::fs::write(&txt_path, "The quick brown fox jumps over the lazy dog.")
-        .expect("Failed to write TXT");
+    let txt_content = "The quick brown fox jumps over the lazy dog.";
+    std::fs::write(&txt_path, txt_content).expect("Failed to write TXT");
 
-    let doc_content = document_from_file(&txt_path)
-        .await
-        .expect("Failed to load TXT from file");
+    // For text-based files, read the content and send as Content::text()
+    let file_content = std::fs::read_to_string(&txt_path).expect("Failed to read TXT");
 
-    let contents = vec![
-        text_content("What animal jumps in this text? Answer with one word."),
-        doc_content,
-    ];
+    let prompt = format!(
+        "What animal jumps in this text? Answer with one word.\n\n{}",
+        file_content
+    );
 
     let response = stateful_builder(&client)
-        .with_input(InteractionInput::Content(contents))
+        .with_text(&prompt)
         .create()
         .await
         .expect("TXT interaction failed");
 
     assert_eq!(response.status, InteractionStatus::Completed);
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("TXT response: {}", text);
 
     // Use semantic validation - the text asks about which animal jumps
@@ -230,10 +253,34 @@ async fn test_txt_from_temp_file() {
 // Note: JSON test removed - Gemini API does not support application/json MIME type
 // for document inputs. The API returns 404 "No content type found for mime type: application/json"
 
-/// Tests loading a Markdown file using document_from_file().
+/// Tests that document_from_file correctly rejects Markdown files.
+///
+/// The Gemini Interactions API only supports PDF for document content type.
+#[tokio::test]
+async fn test_document_from_file_rejects_markdown() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let md_path = temp_dir.path().join("README.md");
+
+    std::fs::write(&md_path, "# Test").expect("Failed to write Markdown");
+
+    let result = document_from_file(&md_path).await;
+
+    assert!(
+        result.is_err(),
+        "document_from_file should reject Markdown files"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("text/markdown") && err.contains("application/pdf"),
+        "Error should mention text/markdown and application/pdf: {}",
+        err
+    );
+}
+
+/// Tests sending Markdown file content as text (the correct approach for text-based files).
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_markdown_from_temp_file() {
+async fn test_markdown_as_text_content() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -251,23 +298,22 @@ async fn test_markdown_from_temp_file() {
 "#;
     std::fs::write(&md_path, md_content).expect("Failed to write Markdown");
 
-    let doc_content = document_from_file(&md_path)
-        .await
-        .expect("Failed to load Markdown from file");
+    // For text-based files, read the content and send as Content::text()
+    let file_content = std::fs::read_to_string(&md_path).expect("Failed to read Markdown");
 
-    let contents = vec![
-        text_content("How many features are listed in this markdown? Answer with just a number."),
-        doc_content,
-    ];
+    let prompt = format!(
+        "How many features are listed in this markdown? Answer with just a number.\n\n{}",
+        file_content
+    );
 
     let response = stateful_builder(&client)
-        .with_input(InteractionInput::Content(contents))
+        .with_text(&prompt)
         .create()
         .await
         .expect("Markdown interaction failed");
 
     assert_eq!(response.status, InteractionStatus::Completed);
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("Markdown response: {}", text);
 
     // Use semantic validation for the count
@@ -280,10 +326,40 @@ async fn test_markdown_from_temp_file() {
     .await;
 }
 
-/// Tests loading a CSV file using document_from_file().
+/// Tests that document_from_file correctly rejects non-PDF files.
+///
+/// The Gemini Interactions API only supports PDF for document content type.
+/// For text-based files like CSV, the proper approach is to read the file
+/// and send it as Content::text().
+#[tokio::test]
+async fn test_document_from_file_rejects_csv() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let csv_path = temp_dir.path().join("data.csv");
+
+    let csv_content = "name,score\nAlice,95\nBob,87\nCarol,92";
+    std::fs::write(&csv_path, csv_content).expect("Failed to write CSV");
+
+    let result = document_from_file(&csv_path).await;
+
+    assert!(
+        result.is_err(),
+        "document_from_file should reject CSV files"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("text/csv") && err.contains("application/pdf"),
+        "Error should mention text/csv and application/pdf: {}",
+        err
+    );
+}
+
+/// Tests sending CSV data as text content (the correct approach for text-based files).
+///
+/// Since document_from_file only supports PDF, text-based files like CSV should
+/// be read and sent as Content::text() instead.
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_csv_from_temp_file() {
+async fn test_csv_as_text_content() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -295,23 +371,22 @@ async fn test_csv_from_temp_file() {
     let csv_content = "name,score\nAlice,95\nBob,87\nCarol,92";
     std::fs::write(&csv_path, csv_content).expect("Failed to write CSV");
 
-    let doc_content = document_from_file(&csv_path)
-        .await
-        .expect("Failed to load CSV from file");
+    // For text-based files, read the content and send as Content::text()
+    let file_content = std::fs::read_to_string(&csv_path).expect("Failed to read CSV");
 
-    let contents = vec![
-        text_content("Who has the highest score in this CSV? Answer with just the name."),
-        doc_content,
-    ];
+    let prompt = format!(
+        "Who has the highest score in this CSV? Answer with just the name.\n\n{}",
+        file_content
+    );
 
     let response = stateful_builder(&client)
-        .with_input(InteractionInput::Content(contents))
+        .with_text(&prompt)
         .create()
         .await
         .expect("CSV interaction failed");
 
     assert_eq!(response.status, InteractionStatus::Completed);
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("CSV response: {}", text);
 
     // Use semantic validation - Alice has score 95 (highest)
@@ -354,7 +429,7 @@ async fn test_audio_from_temp_file() {
         .expect("Failed to load audio from file");
 
     let contents = vec![
-        text_content("Is this an audio file? Answer yes or no."),
+        Content::text("Is this an audio file? Answer yes or no."),
         audio_content,
     ];
 
@@ -366,7 +441,7 @@ async fn test_audio_from_temp_file() {
 
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
-    println!("Audio response: {:?}", response.text());
+    println!("Audio response: {:?}", response.as_text());
 }
 
 // =============================================================================

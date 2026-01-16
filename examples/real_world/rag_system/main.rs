@@ -280,7 +280,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .await?;
 
         // Step 5: Display response with attribution
-        if let Some(text) = response.text() {
+        if let Some(text) = response.as_text() {
             println!("🤖 Assistant:\n{}\n", text);
         }
 

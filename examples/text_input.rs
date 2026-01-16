@@ -24,10 +24,10 @@
 //! | `.pdf` | `application/pdf` | Native PDF support |
 //!
 //! For JSON, CSV, HTML, and XML files, use `text/plain` as the MIME type
-//! when using `document_data_content()`. The model can still parse the content.
+//! when using `Content::document_data()`. The model can still parse the content.
 
 use base64::Engine;
-use genai_rs::{Client, document_data_content, document_from_file, text_content};
+use genai_rs::{Client, Content, document_from_file};
 use std::env;
 
 /// Helper to base64-encode text for document_data_content
@@ -88,15 +88,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .set_content(vec![
-            text_content("Analyze this JSON data. How many users are there and what roles exist?"),
+        .with_content(vec![
+            Content::text("Analyze this JSON data. How many users are there and what roles exist?"),
             // Note: Use text/plain for JSON - API doesn't support application/json as document type
-            document_data_content(encode_text(SAMPLE_JSON), "text/plain"),
+            Content::document_data(encode_text(SAMPLE_JSON), "text/plain"),
         ])
         .create()
         .await?;
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("JSON Analysis:\n{}\n", text);
     }
 
@@ -108,15 +108,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .set_content(vec![
-            text_content("Parse this CSV and calculate the average age of all employees."),
+        .with_content(vec![
+            Content::text("Parse this CSV and calculate the average age of all employees."),
             // Note: Use text/plain for CSV - API doesn't support text/csv as document type
-            document_data_content(encode_text(SAMPLE_CSV), "text/plain"),
+            Content::document_data(encode_text(SAMPLE_CSV), "text/plain"),
         ])
         .create()
         .await?;
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("CSV Analysis:\n{}\n", text);
     }
 
@@ -128,15 +128,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .set_content(vec![
-            text_content("Summarize this markdown document in one sentence."),
+        .with_content(vec![
+            Content::text("Summarize this markdown document in one sentence."),
             // text/markdown is supported for markdown content
-            document_data_content(encode_text(SAMPLE_MARKDOWN), "text/markdown"),
+            Content::document_data(encode_text(SAMPLE_MARKDOWN), "text/markdown"),
         ])
         .create()
         .await?;
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("Markdown Summary:\n{}\n", text);
     }
 
@@ -151,32 +151,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .set_content(vec![
-            text_content("What is the main purpose of this project based on the README?"),
+        .with_content(vec![
+            Content::text("What is the main purpose of this project based on the README?"),
             readme_content,
         ])
         .create()
         .await?;
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("README Analysis:\n{}\n", text);
     }
 
     // ==========================================================================
-    // Example 5: Builder Pattern with add_document_file()
+    // Example 5: Builder Pattern with document_from_file()
     // ==========================================================================
     println!("--- Example 5: Builder Pattern ---\n");
 
+    let doc = document_from_file("CHANGELOG.md").await?;
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("List the main sections in this markdown file.")
-        .add_document_file("CHANGELOG.md")
-        .await?
+        .with_content(vec![
+            Content::text("List the main sections in this markdown file."),
+            doc,
+        ])
         .create()
         .await?;
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("CHANGELOG Sections:\n{}\n", text);
     }
 
@@ -188,15 +190,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  1. Use document_from_file() for automatic file loading:");
     println!("     let doc = document_from_file(\"data.json\").await?;");
     println!();
-    println!("  2. Use add_document_file() with the builder pattern:");
+    println!("  2. Combine with with_content():");
     println!("     client.interaction()");
-    println!("         .add_document_file(\"README.md\").await?");
-    println!("         .with_text(\"Summarize this\")");
+    println!("         .with_content(vec![");
+    println!("             Content::text(\"Summarize this\"),");
+    println!("             doc,");
+    println!("         ])");
     println!("         .create().await?;");
     println!();
-    println!("  3. For inline data, use document_data_content() with base64:");
+    println!("  3. For inline data, use Content::document_data() with base64:");
     println!("     let encoded = base64::engine::general_purpose::STANDARD.encode(text);");
-    println!("     document_data_content(&encoded, \"text/plain\")");
+    println!("     Content::document_data(&encoded, \"text/plain\")");
     println!();
     println!("Native document types: .txt, .md, .pdf");
     println!("For JSON/CSV/HTML/XML: use text/plain as MIME type");
@@ -208,9 +212,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ Text Document Input Demo Complete\n");
 
     println!("--- Key Takeaways ---");
-    println!("• document_data_content(base64, mime_type) for inline documents");
+    println!("• Content::document_data(base64, mime_type) for inline documents");
     println!("• document_from_file() auto-loads and encodes files");
-    println!("• add_document_file(path) for fluent builder pattern");
+    println!("• with_content(vec![...]) for combining text and documents");
     println!("• Native types: text/plain, text/markdown, application/pdf\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");
@@ -223,7 +227,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  [RES#3] completed: file analysis\n");
 
     println!("--- Production Considerations ---");
-    println!("• document_data_content requires base64-encoded input");
+    println!("• Content::document_data() requires base64-encoded input");
     println!("• Use text/plain for JSON, CSV, HTML, XML content");
     println!("• Model can still parse structured formats from plain text");
     println!("• For very large text files, use Files API");

@@ -446,7 +446,7 @@ async fn with_fallback(
         .await
     {
         Ok(response) => {
-            response.text().unwrap_or(fallback).to_string()
+            response.as_text().unwrap_or(fallback).to_string()
         }
         Err(e) => {
             log::warn!("API error, using fallback: {}", e);
@@ -477,7 +477,7 @@ async fn with_model_fallback(
             .await
         {
             Ok(response) => {
-                return Ok(response.text().unwrap_or("").to_string());
+                return Ok(response.as_text().unwrap_or("").to_string());
             }
             Err(GenaiError::Api { status_code: 429, .. }) => {
                 log::warn!("Rate limited on {}, trying next model", model);
@@ -517,7 +517,7 @@ impl CachedClient {
             .create()
             .await?;
 
-        let text = response.text().unwrap_or("").to_string();
+        let text = response.as_text().unwrap_or("").to_string();
 
         // Cache result
         self.cache.write().unwrap().insert(prompt.to_string(), text.clone());

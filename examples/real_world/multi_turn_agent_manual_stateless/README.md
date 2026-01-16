@@ -40,13 +40,13 @@ LOUD_WIRE=1 cargo run --example multi_turn_agent_manual_stateless
 ```rust
 struct StatelessSession {
     client: Client,
-    conversation_history: Vec<InteractionContent>,  // Manual history
+    conversation_history: Vec<Content>,  // Manual history
 }
 
 impl StatelessSession {
     async fn process_message(&mut self, message: &str) -> Result<String> {
         // Add user message to history
-        self.conversation_history.push(text_content(message));
+        self.conversation_history.push(Content::text(message));
 
         // Send FULL history each time
         let response = self.client.interaction()
@@ -58,8 +58,8 @@ impl StatelessSession {
         // Manual function loop, add results to history...
 
         // Add final response to history
-        self.conversation_history.push(text_content(response.text()));
-        Ok(response.text().to_string())
+        self.conversation_history.push(Content::text(response.as_text()));
+        Ok(response.as_text().to_string())
     }
 }
 ```

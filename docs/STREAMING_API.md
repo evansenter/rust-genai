@@ -43,7 +43,7 @@ let response = client.interaction()
     .await?;
 
 // All content available at once
-println!("{}", response.text().unwrap());
+println!("{}", response.as_text().unwrap());
 ```
 
 **Characteristics:**
@@ -64,7 +64,7 @@ let mut stream = client.interaction()
 while let Some(result) = stream.next().await {
     let event = result?;
     if let StreamChunk::Delta(content) = &event.chunk {
-        if let Some(text) = content.text() {
+        if let Some(text) = content.as_text() {
             print!("{}", text);
         }
     }
@@ -140,11 +140,11 @@ pub enum StreamChunk {
 
     /// Content generation begins for an output position.
     /// NOTE: This event only announces the content type - actual content arrives in Delta events.
-    /// This is why `InteractionContent::Text.text` and `Thought.text` are `Option<String>`.
+    /// This is why `Content::Text.text` and `Thought.text` are `Option<String>`.
     ContentStart { index: usize, content_type: Option<String> },
 
     /// Incremental content (text, thought, function_call)
-    Delta(InteractionContent),
+    Delta(Content),
 
     /// Content generation ends for an output position
     ContentStop { index: usize },
@@ -191,7 +191,7 @@ For auto-function streaming, additional variants track function lifecycle:
 #[non_exhaustive]
 pub enum AutoFunctionStreamChunk {
     /// Incremental content from the model
-    Delta(InteractionContent),
+    Delta(Content),
 
     /// Function calls detected, about to execute
     ExecutingFunctions(InteractionResponse),
@@ -229,7 +229,7 @@ while let Some(result) = stream.next().await {
     let event = result?;
     match &event.chunk {
         StreamChunk::Delta(content) => {
-            if let Some(text) = content.text() {
+            if let Some(text) = content.as_text() {
                 print!("{}", text);
                 io::stdout().flush()?;
             }
@@ -265,7 +265,7 @@ while let Some(result) = stream.next().await {
             eprintln!("[ContentStart] index={}, type={:?}", index, content_type);
         }
         StreamChunk::Delta(content) => {
-            if let Some(text) = content.text() {
+            if let Some(text) = content.as_text() {
                 print!("{}", text);
             }
             if let Some(thought) = content.thought() {
@@ -310,7 +310,7 @@ while let Some(result) = stream.next().await {
 
     match &event.chunk {
         AutoFunctionStreamChunk::Delta(content) => {
-            if let Some(text) = content.text() {
+            if let Some(text) = content.as_text() {
                 print!("{}", text);
             }
         }
@@ -361,7 +361,7 @@ while let Some(event) = stream.next().await {
 
     // Process deltas for UI
     if let AutoFunctionStreamChunk::Delta(content) = &event.chunk {
-        if let Some(text) = content.text() {
+        if let Some(text) = content.as_text() {
             print!("{}", text);
         }
     }
@@ -370,7 +370,7 @@ while let Some(event) = stream.next().await {
     if let Some(result) = accumulator.push(event.chunk) {
         // Stream complete - result has same shape as create_with_auto_functions()
         println!("Executed {} functions", result.executions.len());
-        println!("Final text: {}", result.response.text().unwrap());
+        println!("Final text: {}", result.response.as_text().unwrap());
     }
 }
 ```
@@ -588,7 +588,7 @@ impl StreamingSession {
                     self.interaction_id = interaction.id.clone();
                 }
                 StreamChunk::Delta(content) => {
-                    if let Some(text) = content.text() {
+                    if let Some(text) = content.as_text() {
                         full_text.push_str(text);
                         self.total_chars += text.len();
                     }
@@ -622,7 +622,7 @@ while let Some(event) = stream.next().await {
     let event = event?;
 
     if let StreamChunk::Delta(content) = &event.chunk {
-        if let Some(text) = content.text() {
+        if let Some(text) = content.as_text() {
             buffer.push_str(text);
         }
     }
@@ -679,7 +679,7 @@ async fn stream_with_retry(
                             interaction_id = interaction.id.clone();
                         }
                         StreamChunk::Delta(content) => {
-                            if let Some(text) = content.text() {
+                            if let Some(text) = content.as_text() {
                                 full_text.push_str(text);
                             }
                         }

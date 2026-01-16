@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .create()
         .await?;
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("Pirate says: {text}\n");
     }
 
@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .create()
         .await?;
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("JSON response: {text}\n");
 
         // Parse to verify it's valid JSON
@@ -83,7 +83,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .create()
         .await?;
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("Rust assistant: {text}\n");
     }
 
@@ -106,7 +106,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .await?;
 
     println!("Turn 1 - Student: What is multiplication?");
-    if let Some(text) = first_response.text() {
+    if let Some(text) = first_response.as_text() {
         println!("Tutor: {text}\n");
     }
 
@@ -120,7 +120,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .await?;
 
     println!("Turn 2 - Student: Can you give me an example with cookies?");
-    if let Some(text) = second_response.text() {
+    if let Some(text) = second_response.as_text() {
         println!("Tutor: {text}\n");
     }
 
@@ -144,7 +144,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         match result {
             Ok(event) => match event.chunk {
                 StreamChunk::Delta(content) => {
-                    if let Some(text) = content.text() {
+                    if let Some(text) = content.as_text() {
                         print!("{}", text);
                         stdout().flush()?;
                     }
@@ -176,7 +176,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .await
     {
         Ok(response) => {
-            if let Some(text) = response.text() {
+            if let Some(text) = response.as_text() {
                 println!("Response with empty instruction: {text}\n");
             }
         }

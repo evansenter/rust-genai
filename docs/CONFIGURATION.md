@@ -188,7 +188,7 @@ let response2 = client
     .create()
     .await?;
 
-// response1.text() should equal response2.text()
+// response1.as_text() should equal response2.as_text()
 ```
 
 ### Use Cases for Seeds

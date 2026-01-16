@@ -14,7 +14,7 @@
 mod common;
 
 use common::{get_client, interaction_builder, stateful_builder, validate_response_semantically};
-use genai_rs::{FunctionDeclaration, InteractionStatus, function_result_content};
+use genai_rs::{Content, FunctionDeclaration, InteractionStatus};
 use serde_json::json;
 
 // =============================================================================
@@ -153,7 +153,7 @@ async fn test_very_long_conversation() {
     assert_eq!(final_response.status, InteractionStatus::Completed);
     assert!(final_response.has_text(), "Should have text response");
 
-    let text = final_response.text().unwrap().to_lowercase();
+    let text = final_response.as_text().unwrap().to_lowercase();
     println!("Final response: {}", text);
 
     // Count how many facts the model remembers
@@ -228,7 +228,7 @@ async fn test_conversation_function_then_text() {
     let call = &calls[0];
 
     // Turn 2: Provide function result
-    let result = function_result_content(
+    let result = Content::function_result(
         "get_weather",
         call.id.unwrap().to_string(),
         json!({"temperature": "25°C", "conditions": "sunny"}),
@@ -236,7 +236,7 @@ async fn test_conversation_function_then_text() {
 
     let response2 = stateful_builder(&client)
         .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-        .set_content(vec![result])
+        .with_content(vec![result])
         .add_function(get_weather.clone())
         .create()
         .await
@@ -244,7 +244,7 @@ async fn test_conversation_function_then_text() {
 
     println!("Turn 2 status: {:?}", response2.status);
     if response2.has_text() {
-        println!("Turn 2 text: {}", response2.text().unwrap());
+        println!("Turn 2 text: {}", response2.as_text().unwrap());
     }
 
     // Turn 3: Follow-up text question (no function call expected)
@@ -259,7 +259,7 @@ async fn test_conversation_function_then_text() {
     println!("Turn 3 status: {:?}", response3.status);
     assert!(response3.has_text(), "Turn 3 should have text response");
 
-    let text = response3.text().unwrap();
+    let text = response3.as_text().unwrap();
     println!("Turn 3 text: {}", text);
 
     // Should reference the weather context
@@ -333,7 +333,7 @@ async fn test_conversation_branch() {
 
     assert!(branch_response.has_text(), "Should have text response");
 
-    let text = branch_response.text().unwrap();
+    let text = branch_response.as_text().unwrap();
     println!("Branch response (from turn 2): {}", text);
 
     // Should know about color and number from turns 1-2
@@ -358,7 +358,7 @@ async fn test_conversation_branch() {
     })
     .expect("Continue failed");
 
-    let continue_text = continue_response.text().unwrap();
+    let continue_text = continue_response.as_text().unwrap();
     println!("Continue response (from turn 3): {}", continue_text);
 
     let is_valid = validate_response_semantically(
@@ -498,7 +498,7 @@ async fn test_explicit_turns_basic() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("Response: {}", text);
 
     // Model should compute 4 * 3 = 12 - deterministic value, use .contains()
@@ -533,7 +533,7 @@ async fn test_conversation_builder_fluent_api() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("Response: {}", text);
 
     // Model should remember both facts
@@ -581,7 +581,7 @@ async fn test_explicit_turns_context_preservation() {
 
     assert_eq!(response.status, InteractionStatus::Completed);
 
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("Response: {}", text);
 
     // Should remember both destination and interest
@@ -618,7 +618,7 @@ async fn test_explicit_turns_single_user_message() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("Response: {}", text);
 
     let is_valid = validate_response_semantically(

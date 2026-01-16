@@ -34,9 +34,8 @@ use common::{
     stateful_builder, test_timeout, validate_response_semantically, with_timeout,
 };
 use genai_rs::{
-    CallableFunction, Client, FunctionDeclaration, GenaiError, GenerationConfig, InteractionInput,
-    InteractionRequest, InteractionStatus, function_result_content, image_uri_content,
-    text_content,
+    CallableFunction, Client, Content, FunctionDeclaration, GenaiError, GenerationConfig,
+    InteractionInput, InteractionRequest, InteractionStatus,
 };
 use genai_rs_macros::tool;
 use serde_json::json;
@@ -89,7 +88,7 @@ mod basic {
         assert!(!response.outputs.is_empty(), "Outputs are empty");
 
         assert!(response.has_text(), "Should have text response");
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         let is_valid = validate_response_semantically(
             &client,
             "User asked 'What is 2 + 2?'",
@@ -130,7 +129,7 @@ mod basic {
                 response2.has_text(),
                 "Response should have text answering the question"
             );
-            let text = response2.text().unwrap();
+            let text = response2.as_text().unwrap();
             assert!(!text.is_empty(), "Response should be non-empty");
 
             let is_valid = validate_response_semantically(
@@ -316,7 +315,7 @@ mod streaming {
                     Ok(event) => match event.chunk {
                         StreamChunk::Delta(delta) => {
                             delta_count += 1;
-                            if let Some(text) = delta.text() {
+                            if let Some(text) = delta.as_text() {
                                 println!("Delta #{}: {:?} (len={})", delta_count, text, text.len());
                                 delta_texts.push(text.to_string());
                             }
@@ -324,7 +323,7 @@ mod streaming {
                         StreamChunk::Complete(response) => {
                             println!("\n--- Complete ---");
                             println!("Interaction ID: {:?}", response.id);
-                            if let Some(final_text) = response.text() {
+                            if let Some(final_text) = response.as_text() {
                                 println!("Final text length: {}", final_text.len());
                             }
                         }
@@ -555,7 +554,7 @@ mod function_calling {
 
                 let call_id = call.id.expect("call_id should exist");
 
-                let function_result = function_result_content(
+                let function_result = Content::function_result(
                     "get_weather",
                     call_id,
                     json!({"temperature": "72°F", "conditions": "sunny"}),
@@ -563,7 +562,7 @@ mod function_calling {
 
                 let second_response = interaction_builder(&client)
                     .with_previous_interaction(response.id.as_ref().expect("id should exist"))
-                    .set_content(vec![function_result])
+                    .with_content(vec![function_result])
                     .add_function(get_weather)
                     .create()
                     .await
@@ -575,7 +574,7 @@ mod function_calling {
                     "Expected text response after providing function result"
                 );
 
-                let text = second_response.text().expect("Should have text");
+                let text = second_response.as_text().expect("Should have text");
                 println!("Final response text: {}", text);
 
                 assert!(!text.is_empty(), "Response should be non-empty");
@@ -627,7 +626,7 @@ mod function_calling {
                     let function_calls = response.function_calls();
                     let call_id = function_calls[0].id.expect("call_id should exist");
 
-                    let function_result = function_result_content(
+                    let function_result = Content::function_result(
                         "get_current_time",
                         call_id,
                         json!({"time": "14:30:00", "timezone": "UTC"}),
@@ -635,7 +634,7 @@ mod function_calling {
 
                     let response2 = interaction_builder(&client)
                         .with_previous_interaction(response.id.as_ref().expect("id should exist"))
-                        .set_content(vec![function_result])
+                        .with_content(vec![function_result])
                         .add_function(get_time)
                         .create()
                         .await
@@ -692,7 +691,7 @@ mod function_calling {
                     "Should have text response after auto-function loop"
                 );
 
-                let text = response.text().expect("Should have text");
+                let text = response.as_text().expect("Should have text");
                 println!("Final text: {}", text);
 
                 assert!(!text.is_empty(), "Response should be non-empty");
@@ -734,7 +733,7 @@ mod function_calling {
                 match result {
                     Ok(auto_result) => {
                         println!("Response status: {:?}", auto_result.response.status);
-                        println!("Response text: {:?}", auto_result.response.text());
+                        println!("Response text: {:?}", auto_result.response.as_text());
                         println!("Executions: {:?}", auto_result.executions);
                     }
                     Err(e) => {
@@ -786,7 +785,7 @@ mod function_calling {
                 assert!(call.id.is_some(), "Function call must have an id");
                 let call_id = call.id.expect("call_id should exist");
 
-                let function_result = function_result_content(
+                let function_result = Content::function_result(
                     "get_weather",
                     call_id,
                     json!({"temperature": "18°C", "conditions": "rainy", "precipitation": "80%"}),
@@ -794,7 +793,7 @@ mod function_calling {
 
                 let response2 = interaction_builder(&client)
                     .with_previous_interaction(response1.id.as_ref().expect("id should exist"))
-                    .set_content(vec![function_result])
+                    .with_content(vec![function_result])
                     .add_function(get_weather)
                     .create()
                     .await
@@ -805,7 +804,7 @@ mod function_calling {
                     "Expected text response after function result"
                 );
 
-                let text = response2.text().expect("Should have text");
+                let text = response2.as_text().expect("Should have text");
                 println!("Final response: {}", text);
 
                 let is_valid = validate_response_semantically(
@@ -915,7 +914,7 @@ mod function_calling {
             let response2 = retry_request!([client, prev_id, call_id, get_info] => {
                 interaction_builder(&client)
                     .with_previous_interaction(&prev_id)
-                    .set_content(vec![function_result_content(
+                    .with_content(vec![Content::function_result(
                         "get_info",
                         call_id,
                         json!({"info": "The weather is sunny and warm, about 25°C with clear skies."}),
@@ -937,7 +936,7 @@ mod function_calling {
             }
 
             if response2.has_text() {
-                println!("  Got final text: {}", response2.text().unwrap());
+                println!("  Got final text: {}", response2.as_text().unwrap());
             }
 
             println!("\n✓ Multiple function call rounds completed successfully");
@@ -991,7 +990,7 @@ mod function_calling {
                 let result = retry_request!([client, prev_id, call_id, get_weather] => {
                     interaction_builder(&client)
                         .with_previous_interaction(&prev_id)
-                        .set_content(vec![function_result_content(
+                        .with_content(vec![Content::function_result(
                             "get_weather",
                             call_id,
                             json!({"temperature": "22°C", "conditions": "sunny"}),
@@ -1054,7 +1053,7 @@ mod generation_config {
             .expect("Interaction failed");
 
         assert!(response.has_text(), "Should have text response");
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Response: {}", text);
 
         let is_valid = validate_response_semantically(
@@ -1095,7 +1094,7 @@ mod generation_config {
         println!("Response status: {:?}", response.status);
 
         if response.has_text() {
-            let text = response.text().unwrap();
+            let text = response.as_text().unwrap();
             println!("Response length: {} chars", text.len());
         } else {
             println!("No text in response (may be due to token limit)");
@@ -1128,7 +1127,7 @@ mod system_instructions {
             .expect("Interaction failed");
 
         assert!(response.has_text(), "Should have text response");
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Response: {}", text);
 
         let is_valid = validate_response_semantically(
@@ -1157,7 +1156,7 @@ mod system_instructions {
             .await
             .expect("First interaction failed");
 
-        let text1 = response1.text().unwrap_or_default();
+        let text1 = response1.as_text().unwrap_or_default();
         println!("Turn 1: {}", text1);
 
         let response2 = interaction_builder(&client)
@@ -1167,7 +1166,7 @@ mod system_instructions {
             .await
             .expect("Second interaction failed");
 
-        let text2 = response2.text().unwrap_or_default();
+        let text2 = response2.as_text().unwrap_or_default();
         println!("Turn 2: {}", text2);
 
         assert!(response2.has_text(), "Should have text response");
@@ -1204,7 +1203,7 @@ mod system_instructions {
             let text_to_check = if !result.collected_text.is_empty() {
                 result.collected_text.clone()
             } else if let Some(ref response) = result.final_response {
-                response.text().unwrap_or_default().to_string()
+                response.as_text().unwrap_or_default().to_string()
             } else {
                 String::new()
             };
@@ -1247,7 +1246,7 @@ mod system_instructions {
 
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().expect("Should have text");
+        let text = response.as_text().expect("Should have text");
         println!("Response with pirate instruction: {}", text);
 
         let is_valid = validate_response_semantically(
@@ -1459,7 +1458,7 @@ mod conversations {
                 previous_id = response.id.clone();
 
                 if i == messages.len() - 1 {
-                    let text = response.text().unwrap_or_default();
+                    let text = response.as_text().unwrap_or_default();
                     println!("Final response: {}", text);
 
                     assert!(!text.is_empty(), "Response should be non-empty");
@@ -1484,7 +1483,6 @@ mod conversations {
     #[ignore = "Requires API key"]
     async fn test_manual_history_with_thinking() {
         use genai_rs::ThinkingLevel;
-        use genai_rs::interactions_api::text_content;
 
         let Some(client) = get_client() else {
             println!("Skipping: GEMINI_API_KEY not set");
@@ -1506,7 +1504,7 @@ mod conversations {
 
         assert_eq!(response1.status, InteractionStatus::Completed);
 
-        let answer1 = response1.text().unwrap_or("(no text)");
+        let answer1 = response1.as_text().unwrap_or("(no text)");
         println!("Turn 1 answer: {}", answer1);
 
         let thought_count = response1.thought_signatures().count();
@@ -1516,9 +1514,9 @@ mod conversations {
         );
 
         let history = vec![
-            text_content(initial_prompt),
-            text_content(answer1),
-            text_content("Now divide that result by 5"),
+            Content::text(initial_prompt),
+            Content::text(answer1),
+            Content::text("Now divide that result by 5"),
         ];
 
         println!("\nTurn 2 prompt: Now divide that result by 5");
@@ -1534,7 +1532,7 @@ mod conversations {
         assert_eq!(response2.status, InteractionStatus::Completed);
         assert!(response2.has_text(), "Turn 2 should have text response");
 
-        let answer2 = response2.text().unwrap();
+        let answer2 = response2.as_text().unwrap();
         println!("Turn 2 answer: {}\n", answer2);
 
         let is_valid = validate_response_semantically(
@@ -1575,8 +1573,8 @@ mod multimodal {
         });
 
         let contents = vec![
-            text_content("What is in this image? Describe it briefly."),
-            image_uri_content(&image_url, "image/jpeg"),
+            Content::text("What is in this image? Describe it briefly."),
+            Content::image_uri(&image_url, "image/jpeg"),
         ];
 
         let result = interaction_builder(&client)
@@ -1588,7 +1586,7 @@ mod multimodal {
             Ok(response) => {
                 println!("Status: {:?}", response.status);
                 if response.has_text() {
-                    println!("Image description: {}", response.text().unwrap());
+                    println!("Image description: {}", response.as_text().unwrap());
                 }
             }
             Err(e) => {
@@ -1601,7 +1599,7 @@ mod multimodal {
     #[tokio::test]
     #[ignore = "Requires API key"]
     async fn test_image_generation() {
-        use genai_rs::InteractionContent;
+        use genai_rs::Content;
         use std::time::Duration;
 
         let Some(client) = get_client() else {
@@ -1634,7 +1632,7 @@ mod multimodal {
                 }
 
                 for output in &response.outputs {
-                    if let InteractionContent::Image {
+                    if let Content::Image {
                         data: Some(base64_data),
                         mime_type,
                         ..
@@ -1712,7 +1710,7 @@ mod structured_output {
 
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().expect("Should have text");
+        let text = response.as_text().expect("Should have text");
         println!("Structured output: {}", text);
 
         let parsed: serde_json::Value =
@@ -1766,7 +1764,7 @@ mod response_helpers {
             .await
             .expect("Interaction failed");
 
-        let text = response.text();
+        let text = response.as_text();
         assert!(text.is_some(), "Should have text");
 
         let all_text = response.all_text();
@@ -1849,7 +1847,7 @@ mod deep_research {
                     println!(
                         "Result preview: {}...",
                         initial_response
-                            .text()
+                            .as_text()
                             .unwrap_or("(no text)")
                             .chars()
                             .take(200)
@@ -1865,7 +1863,7 @@ mod deep_research {
                         assert_eq!(final_response.status, InteractionStatus::Completed);
                         assert!(final_response.has_text(), "Should have research results");
 
-                        let text = final_response.text().unwrap_or("(no text)");
+                        let text = final_response.as_text().unwrap_or("(no text)");
                         println!(
                             "Result preview: {}...",
                             text.chars().take(500).collect::<String>()

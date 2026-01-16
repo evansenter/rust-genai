@@ -56,7 +56,7 @@ async fn test_deep_research_agent() {
             if initial_response.status == InteractionStatus::Completed {
                 println!("Task completed immediately");
                 if initial_response.has_text() {
-                    let text = initial_response.text().unwrap();
+                    let text = initial_response.as_text().unwrap();
                     println!(
                         "Research response (truncated): {}...",
                         &text[..text.len().min(500)]
@@ -77,7 +77,7 @@ async fn test_deep_research_agent() {
                 Ok(response) => {
                     println!("Deep research completed!");
                     if response.has_text() {
-                        let text = response.text().unwrap();
+                        let text = response.as_text().unwrap();
                         println!(
                             "Research response (truncated): {}...",
                             &text[..text.len().min(500)]
@@ -153,7 +153,7 @@ async fn test_background_mode_polling() {
             if initial_response.status == InteractionStatus::Completed {
                 println!("Task completed immediately (may not have used background mode)");
                 if initial_response.has_text() {
-                    println!("Result: {}", initial_response.text().unwrap());
+                    println!("Result: {}", initial_response.as_text().unwrap());
                 }
                 return;
             }
@@ -169,7 +169,7 @@ async fn test_background_mode_polling() {
                 Ok(response) => {
                     println!("Task completed!");
                     if response.has_text() {
-                        let text = response.text().unwrap();
+                        let text = response.as_text().unwrap();
                         println!("Result: {}...", &text[..200.min(text.len())]);
                     }
                 }
@@ -237,7 +237,7 @@ async fn test_deep_research_with_agent_config() {
             if initial_response.status == InteractionStatus::Completed {
                 println!("Task completed immediately with AgentConfig");
                 if initial_response.has_text() {
-                    let text = initial_response.text().unwrap();
+                    let text = initial_response.as_text().unwrap();
                     println!(
                         "Research response (truncated): {}...",
                         &text[..text.len().min(500)]
@@ -257,7 +257,7 @@ async fn test_deep_research_with_agent_config() {
                 Ok(response) => {
                     println!("Deep research with AgentConfig completed!");
                     if response.has_text() {
-                        let text = response.text().unwrap();
+                        let text = response.as_text().unwrap();
                         println!(
                             "Research response (truncated): {}...",
                             &text[..text.len().min(500)]

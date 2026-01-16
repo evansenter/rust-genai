@@ -5,16 +5,15 @@ use auto_functions::DEFAULT_MAX_FUNCTION_CALL_LOOPS;
 use crate::GenaiError;
 use crate::client::Client;
 use crate::function_calling::ToolService;
-use base64::Engine;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::debug;
 
 use crate::{
-    AgentConfig, DeepResearchConfig, FunctionCallingMode, FunctionDeclaration, GenerationConfig,
-    InteractionContent, InteractionInput, InteractionRequest, InteractionResponse, Resolution,
-    Role, SpeechConfig, StreamEvent, ThinkingLevel, ThinkingSummaries, Tool as InternalTool, Turn,
+    AgentConfig, Content, DeepResearchConfig, FunctionCallingMode, FunctionDeclaration,
+    GenerationConfig, InteractionInput, InteractionRequest, InteractionResponse, Role,
+    SpeechConfig, StreamEvent, ThinkingLevel, ThinkingSummaries, Tool as InternalTool, Turn,
     TurnContent,
 };
 use futures_util::{StreamExt, stream::BoxStream};
@@ -139,7 +138,7 @@ impl CanAutoFunction for Chained {}
 ///     // event.event_id can be saved for stream resume support
 ///     match event.chunk {
 ///         StreamChunk::Delta(delta) => {
-///             if let Some(text) = delta.text() {
+///             if let Some(text) = delta.as_text() {
 ///                 print!("{}", text);
 ///             }
 ///         }
@@ -161,8 +160,8 @@ pub struct InteractionBuilder<'a, State = FirstTurn> {
     history: Vec<Turn>,
     /// Current user message (set by `with_text()`)
     current_message: Option<String>,
-    /// Content input for function results (set by `set_content()`)
-    content_input: Option<Vec<InteractionContent>>,
+    /// Content input for function results (set by `with_content()`)
+    content_input: Option<Vec<Content>>,
     previous_interaction_id: Option<String>,
     tools: Option<Vec<InternalTool>>,
     response_modalities: Option<Vec<String>>,
@@ -485,10 +484,10 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// This is a convenience method that dispatches to the appropriate setter:
     /// - `InteractionInput::Text(text)` → `with_text(text)`
-    /// - `InteractionInput::Content(content)` → `set_content(content)`
+    /// - `InteractionInput::Content(content)` → `with_content(content)`
     /// - `InteractionInput::Turns(turns)` → `with_history(turns)`
     ///
-    /// For direct usage, prefer the specific methods (`with_text()`, `set_content()`,
+    /// For direct usage, prefer the specific methods (`with_text()`, `with_content()`,
     /// `with_history()`) for clarity.
     #[must_use]
     pub fn with_input(mut self, input: InteractionInput) -> Self {
@@ -590,34 +589,33 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// Sets the input from a vector of content objects, replacing any existing content.
     ///
     /// This is useful for building multi-part inputs or for sending function results.
-    /// Use `add_*` methods (like `add_image_file()`) to accumulate content instead.
     ///
     /// # Panics / Errors
     ///
-    /// Calling `build()` will return an error if `set_content()` is combined with
+    /// Calling `build()` will return an error if `with_content()` is combined with
     /// `with_history()`. If you need to combine function results with conversation
     /// history, include them in the history via [`Turn`] objects instead.
     ///
     /// # Example
     /// ```no_run
-    /// # use genai_rs::{Client, function_result_content};
+    /// # use genai_rs::{Client, Content};
     /// # use serde_json::json;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api_key".to_string()).build()?;
     ///
-    /// let result = function_result_content("my_func", "call_123", json!({"data": "result"}));
+    /// let result = Content::function_result("my_func", "call_123", json!({"data": "result"}));
     ///
     /// let response = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
-    ///     .set_content(vec![result])
+    ///     .with_content(vec![result])
     ///     .create()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
     #[must_use]
-    pub fn set_content(mut self, content: Vec<InteractionContent>) -> Self {
+    pub fn with_content(mut self, content: Vec<Content>) -> Self {
         self.content_input = Some(content);
         self
     }
@@ -671,7 +669,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .create()
     ///     .await?;
     ///
-    /// println!("{}", response.text().unwrap_or("No response"));
+    /// println!("{}", response.as_text().unwrap_or("No response"));
     /// # Ok(())
     /// # }
     /// ```
@@ -710,7 +708,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .create()
     ///     .await?;
     ///
-    /// println!("{}", response.text().unwrap_or("No response"));
+    /// println!("{}", response.as_text().unwrap_or("No response"));
     /// # Ok(())
     /// # }
     /// ```
@@ -721,543 +719,6 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         ConversationBuilder {
             parent: self,
             turns: Vec::new(),
-        }
-    }
-
-    // =========================================================================
-    // Multimodal Content Addition Methods
-    // =========================================================================
-    //
-    // These `add_*` methods allow fluent construction of multimodal content.
-    // Unlike `with_text` and `with_content` which REPLACE the input,
-    // these methods ACCUMULATE content items.
-
-    /// Adds an image from a file to the content.
-    ///
-    /// Reads the file, encodes it as base64, and auto-detects the MIME type
-    /// from the file extension.
-    ///
-    /// This method accumulates content - it can be called multiple times to add
-    /// multiple images, and works alongside `with_text()`.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use genai_rs::Client;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::new("api-key".to_string());
-    ///
-    /// let response = client
-    ///     .interaction()
-    ///     .with_model("gemini-3-flash-preview")
-    ///     .with_text("Compare these two images")
-    ///     .add_image_file("photo1.jpg").await?
-    ///     .add_image_file("photo2.jpg").await?
-    ///     .create()
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn add_image_file(
-        mut self,
-        path: impl AsRef<std::path::Path>,
-    ) -> Result<Self, GenaiError> {
-        let content = crate::multimodal::image_from_file(path).await?;
-        self.add_content_item(content);
-        Ok(self)
-    }
-
-    /// Adds an image from a file to the content with specified resolution.
-    ///
-    /// Controls the quality vs. token cost trade-off when processing the image.
-    ///
-    /// # Resolution Trade-offs
-    ///
-    /// | Level | Token Cost | Detail |
-    /// |-------|-----------|--------|
-    /// | Low | Lowest | Basic shapes and colors |
-    /// | Medium | Moderate | Standard detail |
-    /// | High | Higher | Fine details visible |
-    /// | UltraHigh | Highest | Maximum fidelity |
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use genai_rs::{Client, Resolution};
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::new("api-key".to_string());
-    ///
-    /// let response = client
-    ///     .interaction()
-    ///     .with_model("gemini-3-flash-preview")
-    ///     .with_text("What's in this image?")
-    ///     .add_image_file_with_resolution("photo.jpg", Resolution::Low).await?  // Save tokens
-    ///     .create()
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn add_image_file_with_resolution(
-        mut self,
-        path: impl AsRef<std::path::Path>,
-        resolution: Resolution,
-    ) -> Result<Self, GenaiError> {
-        let mut content = crate::multimodal::image_from_file(path).await?;
-        if let InteractionContent::Image {
-            resolution: ref mut res,
-            ..
-        } = content
-        {
-            *res = Some(resolution);
-        }
-        self.add_content_item(content);
-        Ok(self)
-    }
-
-    /// Adds an image from base64-encoded data to the content.
-    ///
-    /// This method accumulates content - it can be called multiple times.
-    #[must_use]
-    pub fn add_image_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content = crate::interactions_api::image_data_content(data, mime_type);
-        self.add_content_item(content);
-        self
-    }
-
-    /// Adds an image from base64-encoded data with specified resolution.
-    #[must_use]
-    pub fn add_image_data_with_resolution(
-        mut self,
-        data: impl Into<String>,
-        mime_type: impl Into<String>,
-        resolution: Resolution,
-    ) -> Self {
-        let content = crate::interactions_api::image_data_content_with_resolution(
-            data, mime_type, resolution,
-        );
-        self.add_content_item(content);
-        self
-    }
-
-    /// Adds an image from raw bytes to the content.
-    ///
-    /// The bytes are automatically base64-encoded. This is useful when you have
-    /// image data in memory (e.g., downloaded from a URL or generated programmatically).
-    ///
-    /// This method accumulates content - it can be called multiple times.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use genai_rs::Client;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::new("api-key".to_string());
-    ///
-    /// // Read image bytes from file or network
-    /// let image_bytes = std::fs::read("photo.png")?;
-    ///
-    /// let response = client
-    ///     .interaction()
-    ///     .with_model("gemini-3-flash-preview")
-    ///     .with_text("Describe this image")
-    ///     .add_image_bytes(&image_bytes, "image/png")
-    ///     .create()
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[must_use]
-    pub fn add_image_bytes(self, data: &[u8], mime_type: impl Into<String>) -> Self {
-        let encoded = base64::engine::general_purpose::STANDARD.encode(data);
-        self.add_image_data(encoded, mime_type)
-    }
-
-    /// Adds an image from raw bytes with specified resolution.
-    #[must_use]
-    pub fn add_image_bytes_with_resolution(
-        self,
-        data: &[u8],
-        mime_type: impl Into<String>,
-        resolution: Resolution,
-    ) -> Self {
-        let encoded = base64::engine::general_purpose::STANDARD.encode(data);
-        self.add_image_data_with_resolution(encoded, mime_type, resolution)
-    }
-
-    /// Adds an image from a URI to the content.
-    ///
-    /// This method accumulates content - it can be called multiple times.
-    #[must_use]
-    pub fn add_image_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content = crate::interactions_api::image_uri_content(uri, mime_type);
-        self.add_content_item(content);
-        self
-    }
-
-    /// Adds an image from a URI with specified resolution.
-    #[must_use]
-    pub fn add_image_uri_with_resolution(
-        mut self,
-        uri: impl Into<String>,
-        mime_type: impl Into<String>,
-        resolution: Resolution,
-    ) -> Self {
-        let content =
-            crate::interactions_api::image_uri_content_with_resolution(uri, mime_type, resolution);
-        self.add_content_item(content);
-        self
-    }
-
-    /// Adds an audio file to the content.
-    ///
-    /// Reads the file, encodes it as base64, and auto-detects the MIME type.
-    pub async fn add_audio_file(
-        mut self,
-        path: impl AsRef<std::path::Path>,
-    ) -> Result<Self, GenaiError> {
-        let content = crate::multimodal::audio_from_file(path).await?;
-        self.add_content_item(content);
-        Ok(self)
-    }
-
-    /// Adds audio from base64-encoded data to the content.
-    #[must_use]
-    pub fn add_audio_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content = crate::interactions_api::audio_data_content(data, mime_type);
-        self.add_content_item(content);
-        self
-    }
-
-    /// Adds audio from raw bytes to the content.
-    ///
-    /// The bytes are automatically base64-encoded. This is useful when you have
-    /// audio data in memory.
-    ///
-    /// This method accumulates content - it can be called multiple times.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use genai_rs::Client;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::new("api-key".to_string());
-    /// let audio_bytes = std::fs::read("recording.mp3")?;
-    ///
-    /// let response = client
-    ///     .interaction()
-    ///     .with_model("gemini-3-flash-preview")
-    ///     .with_text("Transcribe this audio")
-    ///     .add_audio_bytes(&audio_bytes, "audio/mp3")
-    ///     .create()
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[must_use]
-    pub fn add_audio_bytes(self, data: &[u8], mime_type: impl Into<String>) -> Self {
-        let encoded = base64::engine::general_purpose::STANDARD.encode(data);
-        self.add_audio_data(encoded, mime_type)
-    }
-
-    /// Adds audio from a URI to the content.
-    #[must_use]
-    pub fn add_audio_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content = crate::interactions_api::audio_uri_content(uri, mime_type);
-        self.add_content_item(content);
-        self
-    }
-
-    /// Adds a video file to the content.
-    ///
-    /// Reads the file, encodes it as base64, and auto-detects the MIME type.
-    pub async fn add_video_file(
-        mut self,
-        path: impl AsRef<std::path::Path>,
-    ) -> Result<Self, GenaiError> {
-        let content = crate::multimodal::video_from_file(path).await?;
-        self.add_content_item(content);
-        Ok(self)
-    }
-
-    /// Adds a video file with specified resolution.
-    pub async fn add_video_file_with_resolution(
-        mut self,
-        path: impl AsRef<std::path::Path>,
-        resolution: Resolution,
-    ) -> Result<Self, GenaiError> {
-        let mut content = crate::multimodal::video_from_file(path).await?;
-        if let InteractionContent::Video {
-            resolution: ref mut res,
-            ..
-        } = content
-        {
-            *res = Some(resolution);
-        }
-        self.add_content_item(content);
-        Ok(self)
-    }
-
-    /// Adds video from base64-encoded data to the content.
-    #[must_use]
-    pub fn add_video_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content = crate::interactions_api::video_data_content(data, mime_type);
-        self.add_content_item(content);
-        self
-    }
-
-    /// Adds video from base64-encoded data with specified resolution.
-    #[must_use]
-    pub fn add_video_data_with_resolution(
-        mut self,
-        data: impl Into<String>,
-        mime_type: impl Into<String>,
-        resolution: Resolution,
-    ) -> Self {
-        let content = crate::interactions_api::video_data_content_with_resolution(
-            data, mime_type, resolution,
-        );
-        self.add_content_item(content);
-        self
-    }
-
-    /// Adds video from raw bytes to the content.
-    ///
-    /// The bytes are automatically base64-encoded. This is useful when you have
-    /// video data in memory.
-    ///
-    /// This method accumulates content - it can be called multiple times.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use genai_rs::Client;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::new("api-key".to_string());
-    /// let video_bytes = std::fs::read("clip.mp4")?;
-    ///
-    /// let response = client
-    ///     .interaction()
-    ///     .with_model("gemini-3-flash-preview")
-    ///     .with_text("Describe what happens in this video")
-    ///     .add_video_bytes(&video_bytes, "video/mp4")
-    ///     .create()
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[must_use]
-    pub fn add_video_bytes(self, data: &[u8], mime_type: impl Into<String>) -> Self {
-        let encoded = base64::engine::general_purpose::STANDARD.encode(data);
-        self.add_video_data(encoded, mime_type)
-    }
-
-    /// Adds video from raw bytes with specified resolution.
-    #[must_use]
-    pub fn add_video_bytes_with_resolution(
-        self,
-        data: &[u8],
-        mime_type: impl Into<String>,
-        resolution: Resolution,
-    ) -> Self {
-        let encoded = base64::engine::general_purpose::STANDARD.encode(data);
-        self.add_video_data_with_resolution(encoded, mime_type, resolution)
-    }
-
-    /// Adds video from a URI to the content.
-    #[must_use]
-    pub fn add_video_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content = crate::interactions_api::video_uri_content(uri, mime_type);
-        self.add_content_item(content);
-        self
-    }
-
-    /// Adds video from a URI with specified resolution.
-    #[must_use]
-    pub fn add_video_uri_with_resolution(
-        mut self,
-        uri: impl Into<String>,
-        mime_type: impl Into<String>,
-        resolution: Resolution,
-    ) -> Self {
-        let content =
-            crate::interactions_api::video_uri_content_with_resolution(uri, mime_type, resolution);
-        self.add_content_item(content);
-        self
-    }
-
-    /// Adds a document file (e.g., PDF) to the content.
-    ///
-    /// Reads the file, encodes it as base64, and auto-detects the MIME type.
-    pub async fn add_document_file(
-        mut self,
-        path: impl AsRef<std::path::Path>,
-    ) -> Result<Self, GenaiError> {
-        let content = crate::multimodal::document_from_file(path).await?;
-        self.add_content_item(content);
-        Ok(self)
-    }
-
-    /// Adds a document from base64-encoded data to the content.
-    #[must_use]
-    pub fn add_document_data(
-        mut self,
-        data: impl Into<String>,
-        mime_type: impl Into<String>,
-    ) -> Self {
-        let content = crate::interactions_api::document_data_content(data, mime_type);
-        self.add_content_item(content);
-        self
-    }
-
-    /// Adds a document from raw bytes to the content.
-    ///
-    /// The bytes are automatically base64-encoded. This is useful when you have
-    /// document data in memory (e.g., a PDF generated programmatically).
-    ///
-    /// This method accumulates content - it can be called multiple times.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use genai_rs::Client;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::new("api-key".to_string());
-    /// let pdf_bytes = std::fs::read("document.pdf")?;
-    ///
-    /// let response = client
-    ///     .interaction()
-    ///     .with_model("gemini-3-flash-preview")
-    ///     .with_text("Summarize this document")
-    ///     .add_document_bytes(&pdf_bytes, "application/pdf")
-    ///     .create()
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[must_use]
-    pub fn add_document_bytes(self, data: &[u8], mime_type: impl Into<String>) -> Self {
-        let encoded = base64::engine::general_purpose::STANDARD.encode(data);
-        self.add_document_data(encoded, mime_type)
-    }
-
-    /// Adds a document from a URI to the content.
-    #[must_use]
-    pub fn add_document_uri(
-        mut self,
-        uri: impl Into<String>,
-        mime_type: impl Into<String>,
-    ) -> Self {
-        let content = crate::interactions_api::document_uri_content(uri, mime_type);
-        self.add_content_item(content);
-        self
-    }
-
-    /// Adds a file from the Files API to the content.
-    ///
-    /// Use this to include files uploaded via `client.upload_file()`. The file
-    /// is referenced by its URI, which is more efficient than sending the file
-    /// data inline for large files or files used across multiple interactions.
-    ///
-    /// This method accumulates content - it can be called multiple times.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use genai_rs::Client;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::new("api-key".to_string());
-    ///
-    /// // Upload a file once
-    /// let file = client.upload_file("video.mp4").await?;
-    ///
-    /// // Use in interaction
-    /// let response = client
-    ///     .interaction()
-    ///     .with_model("gemini-3-flash-preview")
-    ///     .with_text("Describe this video")
-    ///     .add_file(&file)
-    ///     .create()
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[must_use]
-    pub fn add_file(mut self, file: &crate::FileMetadata) -> Self {
-        let content = crate::interactions_api::file_uri_content(file);
-        self.add_content_item(content);
-        self
-    }
-
-    /// Adds a file from the Files API using just the URI and MIME type.
-    ///
-    /// Use this when you have the file URI and MIME type but not the full
-    /// `FileMetadata` struct. The content type is inferred from the MIME type.
-    ///
-    /// This method accumulates content - it can be called multiple times.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use genai_rs::Client;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = Client::new("api-key".to_string());
-    ///
-    /// let response = client
-    ///     .interaction()
-    ///     .with_model("gemini-3-flash-preview")
-    ///     .with_text("Describe this video")
-    ///     .add_file_uri(
-    ///         "https://generativelanguage.googleapis.com/v1beta/files/abc123",
-    ///         "video/mp4"
-    ///     )
-    ///     .create()
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[must_use]
-    pub fn add_file_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content =
-            crate::interactions_api::content_from_uri_and_mime(uri.into(), mime_type.into());
-        self.add_content_item(content);
-        self
-    }
-
-    /// Internal helper to add a content item, converting input type if needed.
-    ///
-    /// - If `content_input` is `None` and no `current_message`: creates new `Content` vec
-    /// - If `content_input` is `None` but has `current_message`: converts text to content, combines
-    /// - If `content_input` is `Some`: appends the item to the existing vec
-    fn add_content_item(&mut self, item: InteractionContent) {
-        match &mut self.content_input {
-            None => {
-                // Check if we have a current_message to convert
-                if let Some(text) = self.current_message.take() {
-                    let text_item = crate::interactions_api::text_content(text);
-                    self.content_input = Some(vec![text_item, item]);
-                } else {
-                    self.content_input = Some(vec![item]);
-                }
-            }
-            Some(contents) => {
-                contents.push(item);
-            }
         }
     }
 
@@ -1975,7 +1436,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .await?;
     ///
     /// // Response is guaranteed to be valid JSON matching the schema
-    /// let text = response.text().unwrap();
+    /// let text = response.as_text().unwrap();
     /// let data: serde_json::Value = serde_json::from_str(text)?;
     /// println!("Name: {}", data["name"]);
     /// # Ok(())
@@ -2121,7 +1582,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .create()
     ///     .await?;
     ///
-    /// // response1.text() should equal response2.text()
+    /// // response1.as_text() should equal response2.as_text()
     /// # Ok(())
     /// # }
     /// ```
@@ -2435,7 +1896,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     // event.event_id can be saved for stream resumption
     ///     match &event.chunk {
     ///         StreamChunk::Delta(delta) => {
-    ///             if let Some(text) = delta.text() {
+    ///             if let Some(text) = delta.as_text() {
     ///                 print!("{}", text);
     ///             }
     ///         }
@@ -2517,8 +1978,8 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// # Errors
     ///
     /// Returns [`GenaiError::InvalidInput`] if:
-    /// - No input was provided (via `with_text()`, `with_history()`, `set_content()`, etc.)
-    /// - `set_content()` was combined with `with_history()` (mutually exclusive)
+    /// - No input was provided (via `with_text()`, `with_history()`, `with_content()`, etc.)
+    /// - `with_content()` was combined with `with_history()` (mutually exclusive)
     /// - Neither model nor agent was specified
     /// - Both model and agent were specified (mutually exclusive)
     pub fn build(self) -> Result<InteractionRequest, GenaiError> {
@@ -2526,9 +1987,9 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         // Content input is fundamentally incompatible with multi-turn history
         if self.content_input.is_some() && !self.history.is_empty() {
             return Err(GenaiError::InvalidInput(
-                "Content input (set_content() or add_* methods) cannot be combined with \
-                 with_history(). For multimodal multi-turn conversations, build Turn objects \
-                 with content arrays instead."
+                "Content input (with_content()) cannot be combined with with_history(). \
+                 For multimodal multi-turn conversations, build Turn objects with content arrays \
+                 instead."
                     .to_string(),
             ));
         }
@@ -2550,7 +2011,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
             // Content input mode (single-turn multimodal)
             // If there's also a current_message, prepend it as text content
             if let Some(text) = self.current_message {
-                content.insert(0, crate::interactions_api::text_content(text));
+                content.insert(0, Content::text(text));
             }
             InteractionInput::Content(content)
         } else {
@@ -2662,7 +2123,7 @@ impl<'a, State: Send + 'a> ConversationBuilder<'a, State> {
     ///
     /// Accepts any type that can be converted to [`TurnContent`], including:
     /// - `&str` or `String` for text content
-    /// - `Vec<InteractionContent>` for multimodal content
+    /// - `Vec<Content>` for multimodal content
     ///
     /// # Example
     ///
@@ -2697,7 +2158,7 @@ impl<'a, State: Send + 'a> ConversationBuilder<'a, State> {
     ///
     /// Accepts any type that can be converted to [`TurnContent`], including:
     /// - `&str` or `String` for text content
-    /// - `Vec<InteractionContent>` for multimodal content
+    /// - `Vec<Content>` for multimodal content
     ///
     /// # Example
     ///

@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if !first_response.outputs.is_empty() {
         println!("Assistant:");
         for output in &first_response.outputs {
-            if let Some(t) = output.text() {
+            if let Some(t) = output.as_text() {
                 println!("{t}");
             }
         }
@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if !second_response.outputs.is_empty() {
         println!("Assistant:");
         for output in &second_response.outputs {
-            if let Some(t) = output.text() {
+            if let Some(t) = output.as_text() {
                 println!("{t}");
             }
         }
@@ -92,7 +92,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if !third_response.outputs.is_empty() {
         println!("Assistant:");
         for output in &third_response.outputs {
-            if let Some(t) = output.text() {
+            if let Some(t) = output.as_text() {
                 println!("{t}");
             }
         }

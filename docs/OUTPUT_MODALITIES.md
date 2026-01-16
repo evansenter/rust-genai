@@ -37,7 +37,7 @@ let response = client
     .await?;
 
 // Extract text
-if let Some(text) = response.text() {
+if let Some(text) = response.as_text() {
     println!("{}", text);
 }
 ```
@@ -46,7 +46,7 @@ if let Some(text) = response.text() {
 
 ```rust,ignore
 if response.has_text() {
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     // Process text...
 }
 ```
@@ -235,7 +235,7 @@ let response = client
     .await?;
 
 // Parse the structured response
-let text = response.text().unwrap();
+let text = response.as_text().unwrap();
 let data: serde_json::Value = serde_json::from_str(text)?;
 println!("Name: {}", data["name"]);
 println!("Age: {}", data["age"]);
@@ -334,7 +334,7 @@ let response = client
     .await?;
 
 // Access via text()
-let json_str = response.text().unwrap();
+let json_str = response.as_text().unwrap();
 ```
 
 ### Multiple Content Types in Response
@@ -362,7 +362,7 @@ println!("Thought blocks: {}", summary.thought_count);
 
 ```rust,ignore
 // Get first text content
-let text: Option<&str> = response.text();
+let text: Option<&str> = response.as_text();
 
 // Check for text
 let has_text: bool = response.has_text();
@@ -469,7 +469,7 @@ for image in response.images() {
 ### 5. Validate Structured Output
 
 ```rust,ignore
-let text = response.text().unwrap();
+let text = response.as_text().unwrap();
 
 // Parse and validate
 match serde_json::from_str::<MyStruct>(text) {

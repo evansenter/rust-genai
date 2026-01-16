@@ -129,7 +129,7 @@ Structured code analysis:
 let analysis: CodeAnalysis = client.interaction()
     .with_response_format(schema)
     .create().await?
-    .text()
+    .as_text()
     .and_then(|t| serde_json::from_str(t).ok())
     .unwrap();
 ```

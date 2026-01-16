@@ -7,8 +7,8 @@ use chrono::{DateTime, TimeZone, Utc};
 use proptest::prelude::*;
 
 use super::content::{
-    Annotation, CodeExecutionLanguage, FileSearchResultItem, GoogleSearchResultItem,
-    InteractionContent, Resolution, UrlContextResultItem,
+    Annotation, CodeExecutionLanguage, Content, FileSearchResultItem, GoogleSearchResultItem,
+    Resolution, UrlContextResultItem,
 };
 use super::request::{
     AgentConfig, DeepResearchConfig, DynamicConfig, Role, ThinkingLevel, ThinkingSummaries, Turn,
@@ -480,23 +480,22 @@ fn arb_owned_function_call_info() -> impl Strategy<Value = OwnedFunctionCallInfo
 }
 
 // =============================================================================
-// InteractionContent Strategy
+// Content Strategy
 // =============================================================================
 
-/// Helper to create the known InteractionContent variants (used by both strict and non-strict modes).
-fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> {
+/// Helper to create the known Content variants (used by both strict and non-strict modes).
+fn arb_known_interaction_content() -> impl Strategy<Value = Content> {
     prop_oneof![
         // Text content (with optional annotations)
         (
             proptest::option::of(arb_text()),
             proptest::option::of(proptest::collection::vec(arb_annotation(), 0..3))
         )
-            .prop_map(|(text, annotations)| InteractionContent::Text { text, annotations }),
+            .prop_map(|(text, annotations)| Content::Text { text, annotations }),
         // Thought content (contains signature, not text)
-        proptest::option::of(arb_text())
-            .prop_map(|signature| InteractionContent::Thought { signature }),
+        proptest::option::of(arb_text()).prop_map(|signature| Content::Thought { signature }),
         // ThoughtSignature content
-        arb_text().prop_map(|signature| InteractionContent::ThoughtSignature { signature }),
+        arb_text().prop_map(|signature| Content::ThoughtSignature { signature }),
         // Image content
         (
             proptest::option::of(arb_text()),
@@ -504,21 +503,19 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
             proptest::option::of(arb_text()),
             proptest::option::of(arb_resolution())
         )
-            .prop_map(
-                |(data, uri, mime_type, resolution)| InteractionContent::Image {
-                    data,
-                    uri,
-                    mime_type,
-                    resolution
-                }
-            ),
+            .prop_map(|(data, uri, mime_type, resolution)| Content::Image {
+                data,
+                uri,
+                mime_type,
+                resolution
+            }),
         // Audio content
         (
             proptest::option::of(arb_text()),
             proptest::option::of(arb_text()),
             proptest::option::of(arb_text())
         )
-            .prop_map(|(data, uri, mime_type)| InteractionContent::Audio {
+            .prop_map(|(data, uri, mime_type)| Content::Audio {
                 data,
                 uri,
                 mime_type
@@ -530,21 +527,19 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
             proptest::option::of(arb_text()),
             proptest::option::of(arb_resolution())
         )
-            .prop_map(
-                |(data, uri, mime_type, resolution)| InteractionContent::Video {
-                    data,
-                    uri,
-                    mime_type,
-                    resolution
-                }
-            ),
+            .prop_map(|(data, uri, mime_type, resolution)| Content::Video {
+                data,
+                uri,
+                mime_type,
+                resolution
+            }),
         // Document content
         (
             proptest::option::of(arb_text()),
             proptest::option::of(arb_text()),
             proptest::option::of(arb_text())
         )
-            .prop_map(|(data, uri, mime_type)| InteractionContent::Document {
+            .prop_map(|(data, uri, mime_type)| Content::Document {
                 data,
                 uri,
                 mime_type
@@ -555,7 +550,7 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
             arb_identifier(),
             arb_json_value(),
         )
-            .prop_map(|(id, name, args)| { InteractionContent::FunctionCall { id, name, args } }),
+            .prop_map(|(id, name, args)| { Content::FunctionCall { id, name, args } }),
         // FunctionResult content
         (
             proptest::option::of(arb_identifier()),
@@ -564,7 +559,7 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
             proptest::option::of(proptest::bool::ANY),
         )
             .prop_map(|(name, call_id, result, is_error)| {
-                InteractionContent::FunctionResult {
+                Content::FunctionResult {
                     name,
                     call_id,
                     result,
@@ -577,9 +572,11 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
             arb_code_execution_language(),
             arb_text(),
         )
-            .prop_map(
-                |(id, language, code)| InteractionContent::CodeExecutionCall { id, language, code }
-            ),
+            .prop_map(|(id, language, code)| Content::CodeExecutionCall {
+                id,
+                language,
+                code
+            }),
         // CodeExecutionResult content
         (
             proptest::option::of(arb_identifier()),
@@ -587,7 +584,7 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
             arb_text(),
         )
             .prop_map(|(call_id, is_error, result)| {
-                InteractionContent::CodeExecutionResult {
+                Content::CodeExecutionResult {
                     call_id,
                     is_error,
                     result,
@@ -595,51 +592,47 @@ fn arb_known_interaction_content() -> impl Strategy<Value = InteractionContent> 
             }),
         // GoogleSearchCall content
         (arb_text(), proptest::collection::vec(arb_text(), 0..3))
-            .prop_map(|(id, queries)| InteractionContent::GoogleSearchCall { id, queries }),
+            .prop_map(|(id, queries)| Content::GoogleSearchCall { id, queries }),
         // GoogleSearchResult content
         (
             arb_text(),
             proptest::collection::vec(arb_google_search_result_item(), 0..3)
         )
-            .prop_map(|(call_id, result)| InteractionContent::GoogleSearchResult {
-                call_id,
-                result
-            }),
+            .prop_map(|(call_id, result)| Content::GoogleSearchResult { call_id, result }),
         // UrlContextCall content
         (arb_text(), proptest::collection::vec(arb_text(), 1..3))
-            .prop_map(|(id, urls)| InteractionContent::UrlContextCall { id, urls }),
+            .prop_map(|(id, urls)| Content::UrlContextCall { id, urls }),
         // UrlContextResult content
         (
             arb_text(),
             proptest::collection::vec(arb_url_context_result_item(), 0..3)
         )
-            .prop_map(|(call_id, result)| InteractionContent::UrlContextResult { call_id, result }),
+            .prop_map(|(call_id, result)| Content::UrlContextResult { call_id, result }),
         // FileSearchResult content
         (
             arb_text(),
             proptest::collection::vec(arb_file_search_result_item(), 0..3)
         )
-            .prop_map(|(call_id, result)| InteractionContent::FileSearchResult { call_id, result }),
+            .prop_map(|(call_id, result)| Content::FileSearchResult { call_id, result }),
     ]
 }
 
-/// Strategy for known InteractionContent variants only.
+/// Strategy for known Content variants only.
 /// Used when strict-unknown is enabled (Unknown variants fail to deserialize in strict mode).
 #[cfg(feature = "strict-unknown")]
-fn arb_interaction_content() -> impl Strategy<Value = InteractionContent> {
+fn arb_interaction_content() -> impl Strategy<Value = Content> {
     arb_known_interaction_content()
 }
 
-/// Strategy for all InteractionContent variants including Unknown.
+/// Strategy for all Content variants including Unknown.
 /// Used in normal mode (Unknown variants are gracefully handled).
 #[cfg(not(feature = "strict-unknown"))]
-fn arb_interaction_content() -> impl Strategy<Value = InteractionContent> {
+fn arb_interaction_content() -> impl Strategy<Value = Content> {
     prop_oneof![
         arb_known_interaction_content(),
         // Unknown content (for forward compatibility testing)
-        (arb_identifier(), arb_json_value()).prop_map(|(content_type, data)| {
-            InteractionContent::Unknown { content_type, data }
-        }),
+        (arb_identifier(), arb_json_value())
+            .prop_map(|(content_type, data)| { Content::Unknown { content_type, data } }),
     ]
 }
 
@@ -963,28 +956,28 @@ proptest! {
 
     /// Test that TurnContent roundtrips correctly through JSON.
     ///
-    /// Note: Uses JSON comparison since TurnContent can contain InteractionContent::Unknown
+    /// Note: Uses JSON comparison since TurnContent can contain Content::Unknown
     /// which doesn't preserve exact data structure through roundtrip.
     #[test]
     fn turn_content_roundtrip(content in arb_turn_content()) {
         let json = serde_json::to_string(&content).expect("Serialization should succeed");
         let restored: TurnContent = serde_json::from_str(&json).expect("Deserialization should succeed");
 
-        // Use JSON comparison since InteractionContent::Unknown doesn't roundtrip exactly
+        // Use JSON comparison since Content::Unknown doesn't roundtrip exactly
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
         prop_assert_eq!(json, restored_json);
     }
 
     /// Test that Turn roundtrips correctly through JSON.
     ///
-    /// Note: Uses JSON comparison since Turn can contain InteractionContent::Unknown
+    /// Note: Uses JSON comparison since Turn can contain Content::Unknown
     /// which doesn't preserve exact data structure through roundtrip.
     #[test]
     fn turn_roundtrip(turn in arb_turn()) {
         let json = serde_json::to_string(&turn).expect("Serialization should succeed");
         let restored: Turn = serde_json::from_str(&json).expect("Deserialization should succeed");
 
-        // Use JSON comparison since InteractionContent::Unknown doesn't roundtrip exactly
+        // Use JSON comparison since Content::Unknown doesn't roundtrip exactly
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
         prop_assert_eq!(json, restored_json);
     }
@@ -1053,15 +1046,15 @@ proptest! {
         prop_assert_eq!(json, restored_json);
     }
 
-    /// Test that InteractionContent roundtrips correctly through JSON.
+    /// Test that Content roundtrips correctly through JSON.
     ///
-    /// Note: This uses structural comparison since InteractionContent doesn't derive PartialEq.
+    /// Note: This uses structural comparison since Content doesn't derive PartialEq.
     #[test]
     fn interaction_content_roundtrip(content in arb_interaction_content()) {
         let json = serde_json::to_string(&content).expect("Serialization should succeed");
-        let restored: InteractionContent = serde_json::from_str(&json).expect("Deserialization should succeed");
+        let restored: Content = serde_json::from_str(&json).expect("Deserialization should succeed");
 
-        // Compare by re-serializing since InteractionContent doesn't derive PartialEq
+        // Compare by re-serializing since Content doesn't derive PartialEq
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
         prop_assert_eq!(json, restored_json);
     }
@@ -1119,9 +1112,9 @@ proptest! {
     /// Test empty strings are handled correctly.
     #[test]
     fn empty_text_content_roundtrip(_unused in Just(())) {
-        let content = InteractionContent::Text { text: Some(String::new()), annotations: None };
+        let content = Content::Text { text: Some(String::new()), annotations: None };
         let json = serde_json::to_string(&content).expect("Serialization should succeed");
-        let restored: InteractionContent = serde_json::from_str(&json).expect("Deserialization should succeed");
+        let restored: Content = serde_json::from_str(&json).expect("Deserialization should succeed");
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
         prop_assert_eq!(json, restored_json);
     }
@@ -1129,9 +1122,9 @@ proptest! {
     /// Test None text content is handled correctly.
     #[test]
     fn none_text_content_roundtrip(_unused in Just(())) {
-        let content = InteractionContent::Text { text: None, annotations: None };
+        let content = Content::Text { text: None, annotations: None };
         let json = serde_json::to_string(&content).expect("Serialization should succeed");
-        let restored: InteractionContent = serde_json::from_str(&json).expect("Deserialization should succeed");
+        let restored: Content = serde_json::from_str(&json).expect("Deserialization should succeed");
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
         prop_assert_eq!(json, restored_json);
     }
@@ -1139,9 +1132,9 @@ proptest! {
     /// Test special characters in strings are handled correctly.
     #[test]
     fn special_chars_in_text(text in ".*[\n\r\t\"\\\\].*") {
-        let content = InteractionContent::Text { text: Some(text), annotations: None };
+        let content = Content::Text { text: Some(text), annotations: None };
         let json = serde_json::to_string(&content).expect("Serialization should succeed");
-        let restored: InteractionContent = serde_json::from_str(&json).expect("Deserialization should succeed");
+        let restored: Content = serde_json::from_str(&json).expect("Deserialization should succeed");
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
         prop_assert_eq!(json, restored_json);
     }
@@ -1149,9 +1142,9 @@ proptest! {
     /// Test Unicode in strings is handled correctly.
     #[test]
     fn unicode_in_text(text in ".*[\\u{1F600}-\\u{1F64F}].*") {
-        let content = InteractionContent::Text { text: Some(text), annotations: None };
+        let content = Content::Text { text: Some(text), annotations: None };
         let json = serde_json::to_string(&content).expect("Serialization should succeed");
-        let restored: InteractionContent = serde_json::from_str(&json).expect("Deserialization should succeed");
+        let restored: Content = serde_json::from_str(&json).expect("Deserialization should succeed");
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
         prop_assert_eq!(json, restored_json);
     }
@@ -1195,14 +1188,14 @@ proptest! {
             }
         });
 
-        let content = InteractionContent::FunctionCall {
+        let content = Content::FunctionCall {
             id: Some("call_123".to_string()),
             name: "deep_function".to_string(),
             args: nested_args,
         };
 
         let json = serde_json::to_string(&content).expect("Serialization should succeed");
-        let restored: InteractionContent = serde_json::from_str(&json).expect("Deserialization should succeed");
+        let restored: Content = serde_json::from_str(&json).expect("Deserialization should succeed");
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
         prop_assert_eq!(json, restored_json);
     }
@@ -1232,7 +1225,7 @@ proptest! {
             }
         });
 
-        let content = InteractionContent::FunctionResult {
+        let content = Content::FunctionResult {
             name: Some("deep_function".to_string()),
             call_id: "call_123".to_string(),
             result: nested_result,
@@ -1240,7 +1233,7 @@ proptest! {
         };
 
         let json = serde_json::to_string(&content).expect("Serialization should succeed");
-        let restored: InteractionContent = serde_json::from_str(&json).expect("Deserialization should succeed");
+        let restored: Content = serde_json::from_str(&json).expect("Deserialization should succeed");
         let restored_json = serde_json::to_string(&restored).expect("Re-serialization should succeed");
         prop_assert_eq!(json, restored_json);
     }

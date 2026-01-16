@@ -21,8 +21,7 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use genai_rs::interactions_api::text_content;
-use genai_rs::{Client, InteractionContent, InteractionInput, ThinkingLevel};
+use genai_rs::{Client, Content, InteractionInput, ThinkingLevel};
 use std::env;
 
 #[tokio::main]
@@ -62,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    if let Some(text) = response1.text() {
+    if let Some(text) = response1.as_text() {
         println!("\nModel's answer: {}\n", text);
     }
 
@@ -94,7 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    if let Some(text) = response2.text() {
+    if let Some(text) = response2.as_text() {
         println!("\nModel's answer: {}\n", text);
     }
 
@@ -116,14 +115,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    let answer = resp_manual.text().unwrap_or("(no answer)");
+    let answer = resp_manual.as_text().unwrap_or("(no answer)");
     println!("Model's answer: {}\n", answer);
 
     // Build manual history - TEXT ONLY (no thoughts!)
-    let history: Vec<InteractionContent> = vec![
-        text_content(prompt),
-        text_content(answer),
-        text_content("Now divide that by 13."),
+    let history: Vec<Content> = vec![
+        Content::text(prompt),
+        Content::text(answer),
+        Content::text("Now divide that by 13."),
     ];
 
     println!("User: Now divide that by 13.\n");
@@ -136,7 +135,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    if let Some(text) = resp_followup.text() {
+    if let Some(text) = resp_followup.as_text() {
         println!("Model's answer: {}\n", text);
     }
 

@@ -125,7 +125,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     AutoFunctionStreamChunk::Delta(content) => {
                         delta_count += 1;
                         // Print text content as it arrives
-                        if let Some(t) = content.text() {
+                        if let Some(t) = content.as_text() {
                             print!("{}", t);
                             stdout().flush()?;
                         }

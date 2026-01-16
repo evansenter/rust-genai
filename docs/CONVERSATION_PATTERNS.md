@@ -116,14 +116,14 @@ let response = client
 ### With Multimodal Content
 
 ```rust,ignore
-use genai_rs::{Turn, TurnContent, image_data_content, text_content};
+use genai_rs::{Content, Turn, TurnContent};
 
 // Build multimodal turn manually
 let multimodal_turn = Turn {
     role: Role::User,
     content: TurnContent::Parts(vec![
-        text_content("What's in this image?"),
-        image_data_content(base64_image, "image/png"),
+        Content::text("What's in this image?"),
+        Content::image_data(base64_image, "image/png"),
     ]),
 };
 
@@ -217,7 +217,7 @@ loop {
         .create()
         .await?;
 
-    let model_response = response.text().unwrap_or("No response");
+    let model_response = response.as_text().unwrap_or("No response");
     println!("Model: {}", model_response);
 
     // Add model response to history
@@ -278,7 +278,7 @@ async fn summarize_and_trim(
 
     // Insert summary as context at the beginning
     history.insert(0, Turn::user("Previous conversation summary:"));
-    history.insert(1, Turn::model(summary.text().unwrap_or("...")));
+    history.insert(1, Turn::model(summary.as_text().unwrap_or("...")));
 
     Ok(())
 }

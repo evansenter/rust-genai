@@ -176,7 +176,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!(
         "Assistant: {}\n",
-        result1.response.text().unwrap_or_default()
+        result1.response.as_text().unwrap_or_default()
     );
 
     // --- Change precision on the SAME service instance ---
@@ -202,7 +202,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         println!();
     }
-    println!("Assistant: {}", result2.response.text().unwrap_or_default());
+    println!(
+        "Assistant: {}",
+        result2.response.as_text().unwrap_or_default()
+    );
 
     // =========================================================================
     // Summary

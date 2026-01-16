@@ -143,7 +143,7 @@ impl TestingAssistant {
             .create()
             .await?;
 
-        let text = response.text().ok_or("No response text")?;
+        let text = response.as_text().ok_or("No response text")?;
         let suite: TestSuite = serde_json::from_str(text)?;
         Ok(suite)
     }
@@ -188,7 +188,7 @@ impl TestingAssistant {
             .create()
             .await?;
 
-        let text = response.text().ok_or("No response text")?;
+        let text = response.as_text().ok_or("No response text")?;
         let analysis: CoverageAnalysis = serde_json::from_str(text)?;
         Ok(analysis)
     }
@@ -244,7 +244,7 @@ impl TestingAssistant {
             .create()
             .await?;
 
-        let text = response.text().ok_or("No response text")?;
+        let text = response.as_text().ok_or("No response text")?;
         let ideas: Vec<PropertyTestIdea> = serde_json::from_str(text)?;
         Ok(ideas)
     }
@@ -278,7 +278,7 @@ impl TestingAssistant {
             .await?;
 
         Ok(response
-            .text()
+            .as_text()
             .unwrap_or("Unable to generate test.")
             .to_string())
     }

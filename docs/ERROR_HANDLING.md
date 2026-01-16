@@ -414,7 +414,7 @@ loop {
                     last_event_id = Some(id.clone());
                 }
                 if let StreamChunk::Delta(delta) = event.chunk {
-                    if let Some(text) = delta.text() {
+                    if let Some(text) = delta.as_text() {
                         collected_text.push_str(text);
                     }
                 }

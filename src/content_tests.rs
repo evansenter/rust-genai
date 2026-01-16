@@ -1,4 +1,4 @@
-//! Unit tests for InteractionContent types, serialization, and Unknown variant handling.
+//! Unit tests for Content types, serialization, and Unknown variant handling.
 
 use super::*;
 
@@ -6,7 +6,7 @@ use super::*;
 
 #[test]
 fn test_serialize_interaction_content() {
-    let content = InteractionContent::Text {
+    let content = Content::Text {
         text: Some("Hello".to_string()),
         annotations: None,
     };
@@ -23,11 +23,10 @@ fn test_deserialize_function_call_content() {
     let content_json =
         r#"{"type": "function_call", "name": "get_weather", "arguments": {"location": "Paris"}}"#;
 
-    let content: InteractionContent =
-        serde_json::from_str(content_json).expect("Deserialization failed");
+    let content: Content = serde_json::from_str(content_json).expect("Deserialization failed");
 
     match content {
-        InteractionContent::FunctionCall { name, args, .. } => {
+        Content::FunctionCall { name, args, .. } => {
             assert_eq!(name, "get_weather");
             assert_eq!(args["location"], "Paris");
         }
@@ -37,39 +36,39 @@ fn test_deserialize_function_call_content() {
 
 #[test]
 fn test_content_empty_text_returns_none() {
-    let content = InteractionContent::Text {
+    let content = Content::Text {
         text: Some(String::new()),
         annotations: None,
     };
-    assert_eq!(content.text(), None);
+    assert_eq!(content.as_text(), None);
 
-    let content_none = InteractionContent::Text {
+    let content_none = Content::Text {
         text: None,
         annotations: None,
     };
-    assert_eq!(content_none.text(), None);
+    assert_eq!(content_none.as_text(), None);
 }
 
 #[test]
 fn test_content_thought_signature_accessor() {
     // Non-empty thought signature returns Some
-    let content = InteractionContent::Thought {
+    let content = Content::Thought {
         signature: Some("EosFCogFAXLI2...".to_string()),
     };
     assert_eq!(content.thought_signature(), Some("EosFCogFAXLI2..."));
 
     // Empty signature returns None
-    let empty = InteractionContent::Thought {
+    let empty = Content::Thought {
         signature: Some(String::new()),
     };
     assert_eq!(empty.thought_signature(), None);
 
     // None signature returns None
-    let none = InteractionContent::Thought { signature: None };
+    let none = Content::Thought { signature: None };
     assert_eq!(none.thought_signature(), None);
 
     // Text variant returns None for thought_signature()
-    let text_content = InteractionContent::Text {
+    let text_content = Content::Text {
         text: Some("hello".to_string()),
         annotations: None,
     };
@@ -87,11 +86,11 @@ fn test_deserialize_unknown_interaction_content() {
     // Note: code_execution_result is now a known type, so use a truly unknown type
     let unknown_json = r#"{"type": "future_api_feature", "data_field": "some_value", "count": 42}"#;
 
-    let content: InteractionContent =
+    let content: Content =
         serde_json::from_str(unknown_json).expect("Should deserialize as Unknown");
 
     match &content {
-        InteractionContent::Unknown { content_type, data } => {
+        Content::Unknown { content_type, data } => {
             assert_eq!(content_type, "future_api_feature");
             assert_eq!(data["data_field"], "some_value");
             assert_eq!(data["count"], 42);
@@ -110,14 +109,14 @@ fn test_deserialize_unknown_streaming_content() {
     // Simulate a new streaming content type that this library doesn't know about
     let unknown_json = r#"{"type": "new_feature_delta", "data": "some_value"}"#;
 
-    let content: InteractionContent =
+    let content: Content =
         serde_json::from_str(unknown_json).expect("Should deserialize as Unknown");
 
     assert!(content.is_unknown());
     assert_eq!(content.unknown_content_type(), Some("new_feature_delta"));
 
     match &content {
-        InteractionContent::Unknown { content_type, data } => {
+        Content::Unknown { content_type, data } => {
             assert_eq!(content_type, "new_feature_delta");
             assert_eq!(data["data"], "some_value");
         }
@@ -129,33 +128,30 @@ fn test_deserialize_unknown_streaming_content() {
 fn test_known_types_still_work() {
     // Ensure adding Unknown doesn't break known types
     let text_json = r#"{"type": "text", "text": "Hello"}"#;
-    let content: InteractionContent = serde_json::from_str(text_json).unwrap();
-    assert!(matches!(content, InteractionContent::Text { .. }));
+    let content: Content = serde_json::from_str(text_json).unwrap();
+    assert!(matches!(content, Content::Text { .. }));
     assert!(!content.is_unknown());
 
     let thought_json = r#"{"type": "thought", "text": "Thinking..."}"#;
-    let content: InteractionContent = serde_json::from_str(thought_json).unwrap();
-    assert!(matches!(content, InteractionContent::Thought { .. }));
+    let content: Content = serde_json::from_str(thought_json).unwrap();
+    assert!(matches!(content, Content::Thought { .. }));
     assert!(!content.is_unknown());
 
     let signature_json = r#"{"type": "thought_signature", "signature": "sig123"}"#;
-    let content: InteractionContent = serde_json::from_str(signature_json).unwrap();
-    assert!(matches!(
-        content,
-        InteractionContent::ThoughtSignature { .. }
-    ));
+    let content: Content = serde_json::from_str(signature_json).unwrap();
+    assert!(matches!(content, Content::ThoughtSignature { .. }));
     assert!(!content.is_unknown());
 
     let function_json = r#"{"type": "function_call", "name": "test", "arguments": {}}"#;
-    let content: InteractionContent = serde_json::from_str(function_json).unwrap();
-    assert!(matches!(content, InteractionContent::FunctionCall { .. }));
+    let content: Content = serde_json::from_str(function_json).unwrap();
+    assert!(matches!(content, Content::FunctionCall { .. }));
     assert!(!content.is_unknown());
 }
 
 #[test]
 fn test_serialize_unknown_content_roundtrip() {
     // Create an Unknown content (simulating what we'd receive from API)
-    let unknown = InteractionContent::Unknown {
+    let unknown = Content::Unknown {
         content_type: "code_execution_result".to_string(),
         data: serde_json::json!({
             "outcome": "success",
@@ -176,7 +172,7 @@ fn test_serialize_unknown_content_roundtrip() {
 #[test]
 fn test_serialize_known_variant_with_none_fields() {
     // Test that known variants with None fields serialize correctly (omit None fields)
-    let text = InteractionContent::Text {
+    let text = Content::Text {
         text: None,
         annotations: None,
     };
@@ -186,7 +182,7 @@ fn test_serialize_known_variant_with_none_fields() {
     assert!(value.get("text").is_none());
     assert!(value.get("annotations").is_none());
 
-    let image = InteractionContent::Image {
+    let image = Content::Image {
         data: Some("base64data".to_string()),
         uri: None,
         mime_type: None,
@@ -200,7 +196,7 @@ fn test_serialize_known_variant_with_none_fields() {
     assert!(value.get("mime_type").is_none());
     assert!(value.get("resolution").is_none());
 
-    let fc = InteractionContent::FunctionCall {
+    let fc = Content::FunctionCall {
         id: None,
         name: "test_fn".to_string(),
         args: serde_json::json!({"arg": "value"}),
@@ -215,7 +211,7 @@ fn test_serialize_known_variant_with_none_fields() {
 #[test]
 fn test_serialize_unknown_with_non_object_data() {
     // Test that Unknown with non-object data (array, string, number) is preserved
-    let unknown_array = InteractionContent::Unknown {
+    let unknown_array = Content::Unknown {
         content_type: "weird_type".to_string(),
         data: serde_json::json!([1, 2, 3]),
     };
@@ -224,7 +220,7 @@ fn test_serialize_unknown_with_non_object_data() {
     assert_eq!(value["type"], "weird_type");
     assert_eq!(value["data"], serde_json::json!([1, 2, 3]));
 
-    let unknown_string = InteractionContent::Unknown {
+    let unknown_string = Content::Unknown {
         content_type: "string_type".to_string(),
         data: serde_json::json!("just a string"),
     };
@@ -233,7 +229,7 @@ fn test_serialize_unknown_with_non_object_data() {
     assert_eq!(value["type"], "string_type");
     assert_eq!(value["data"], "just a string");
 
-    let unknown_null = InteractionContent::Unknown {
+    let unknown_null = Content::Unknown {
         content_type: "null_type".to_string(),
         data: serde_json::Value::Null,
     };
@@ -248,7 +244,7 @@ fn test_serialize_unknown_with_non_object_data() {
 fn test_serialize_unknown_with_duplicate_type_field() {
     // When data contains a "type" field, it should be ignored in serialization
     // (the content_type takes precedence)
-    let unknown = InteractionContent::Unknown {
+    let unknown = Content::Unknown {
         content_type: "correct_type".to_string(),
         data: serde_json::json!({
             "type": "should_be_ignored",
@@ -274,7 +270,7 @@ fn test_serialize_unknown_with_duplicate_type_field() {
 #[test]
 fn test_serialize_unknown_with_empty_content_type() {
     // Empty content_type is allowed but not recommended
-    let unknown = InteractionContent::Unknown {
+    let unknown = Content::Unknown {
         content_type: String::new(),
         data: serde_json::json!({"field": "value"}),
     };
@@ -289,7 +285,7 @@ fn test_serialize_unknown_with_empty_content_type() {
 #[test]
 fn test_serialize_unknown_with_special_characters() {
     // Type names with special characters should be preserved
-    let unknown = InteractionContent::Unknown {
+    let unknown = Content::Unknown {
         content_type: "special/type:with.chars-and_underscores".to_string(),
         data: serde_json::json!({"key": "value"}),
     };
@@ -304,7 +300,7 @@ fn test_serialize_unknown_with_special_characters() {
 #[test]
 fn test_unknown_manual_construction_roundtrip() {
     // Test that manually constructed Unknown variants can round-trip through JSON
-    let original = InteractionContent::Unknown {
+    let original = Content::Unknown {
         content_type: "manual_test".to_string(),
         data: serde_json::json!({
             "nested": {"deeply": {"nested": "value"}},
@@ -319,15 +315,14 @@ fn test_unknown_manual_construction_roundtrip() {
     let json = serde_json::to_string(&original).expect("Serialization should work");
 
     // Deserialize back
-    let deserialized: InteractionContent =
-        serde_json::from_str(&json).expect("Deserialization should work");
+    let deserialized: Content = serde_json::from_str(&json).expect("Deserialization should work");
 
     // Verify it's still Unknown with same type
     assert!(deserialized.is_unknown());
     assert_eq!(deserialized.unknown_content_type(), Some("manual_test"));
 
     // Verify the data was preserved (check a few fields)
-    if let InteractionContent::Unknown { data, .. } = deserialized {
+    if let Content::Unknown { data, .. } = deserialized {
         assert_eq!(data["nested"]["deeply"]["nested"], "value");
         assert_eq!(data["array"], serde_json::json!([1, 2, 3]));
         assert_eq!(data["number"], 42);
@@ -344,9 +339,9 @@ fn test_unknown_manual_construction_roundtrip() {
 fn test_deserialize_unknown_with_missing_type() {
     // Edge case: JSON object without a type field
     let malformed_json = r#"{"foo": "bar", "baz": 42}"#;
-    let content: InteractionContent = serde_json::from_str(malformed_json).unwrap();
+    let content: Content = serde_json::from_str(malformed_json).unwrap();
     match content {
-        InteractionContent::Unknown { content_type, data } => {
+        Content::Unknown { content_type, data } => {
             assert_eq!(content_type, "<missing type>");
             assert_eq!(data["foo"], "bar");
             assert_eq!(data["baz"], 42);
@@ -360,9 +355,9 @@ fn test_deserialize_unknown_with_missing_type() {
 fn test_deserialize_unknown_with_null_type() {
     // Edge case: JSON object with null type field
     let null_type_json = r#"{"type": null, "content": "test"}"#;
-    let content: InteractionContent = serde_json::from_str(null_type_json).unwrap();
+    let content: Content = serde_json::from_str(null_type_json).unwrap();
     match content {
-        InteractionContent::Unknown { content_type, data } => {
+        Content::Unknown { content_type, data } => {
             assert_eq!(content_type, "<missing type>");
             assert_eq!(data["content"], "test");
         }
@@ -376,10 +371,10 @@ fn test_deserialize_unknown_with_null_type() {
 fn test_deserialize_code_execution_call() {
     // Test deserialization from the API format (arguments object)
     let json = r#"{"type": "code_execution_call", "id": "call_123", "arguments": {"code": "print(42)", "language": "PYTHON"}}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::CodeExecutionCall { id, language, code } => {
+        Content::CodeExecutionCall { id, language, code } => {
             assert_eq!(*id, Some("call_123".to_string()));
             assert_eq!(*language, CodeExecutionLanguage::Python);
             assert_eq!(code, "print(42)");
@@ -395,10 +390,10 @@ fn test_deserialize_code_execution_call() {
 fn test_deserialize_code_execution_call_direct_fields() {
     // Test deserialization from direct fields (new format)
     let json = r#"{"type": "code_execution_call", "id": "call_123", "language": "PYTHON", "code": "print(42)"}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::CodeExecutionCall { id, language, code } => {
+        Content::CodeExecutionCall { id, language, code } => {
             assert_eq!(*id, Some("call_123".to_string()));
             assert_eq!(*language, CodeExecutionLanguage::Python);
             assert_eq!(code, "print(42)");
@@ -413,18 +408,18 @@ fn test_deserialize_code_execution_call_malformed_becomes_unknown() {
     // should become Unknown variant per Evergreen philosophy, not silently fall back to empty code.
     let json =
         r#"{"type": "code_execution_call", "id": "call_malformed", "extra_field": "unexpected"}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     // Should be Unknown, not a CodeExecutionCall with empty code
     match &content {
-        InteractionContent::Unknown { content_type, data } => {
+        Content::Unknown { content_type, data } => {
             assert_eq!(content_type, "code_execution_call");
             // Verify the original data is preserved for debugging
             assert_eq!(data["id"], "call_malformed");
             assert_eq!(data["extra_field"], "unexpected");
             assert_eq!(data["type"], "code_execution_call");
         }
-        InteractionContent::CodeExecutionCall { code, .. } => {
+        Content::CodeExecutionCall { code, .. } => {
             panic!(
                 "Should NOT be CodeExecutionCall with empty code (got code={:?}). \
                  Malformed responses should become Unknown variant.",
@@ -444,7 +439,7 @@ fn test_deserialize_code_execution_call_malformed_roundtrip() {
     // Verify malformed CodeExecutionCall can roundtrip through Unknown variant
     let json =
         r#"{"type": "code_execution_call", "id": "call_malformed", "custom": {"nested": true}}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     assert!(content.is_unknown());
 
@@ -464,16 +459,16 @@ fn test_deserialize_code_execution_call_arguments_missing_code_becomes_unknown()
     // Arguments path: when arguments object exists but code is missing, treat as Unknown
     // This is the same Evergreen pattern as the direct fields path
     let json = r#"{"type": "code_execution_call", "id": "call_args_no_code", "arguments": {"language": "PYTHON"}}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     // Should be Unknown, not CodeExecutionCall with empty code
     match &content {
-        InteractionContent::Unknown { content_type, data } => {
+        Content::Unknown { content_type, data } => {
             assert_eq!(content_type, "code_execution_call");
             assert_eq!(data["id"], "call_args_no_code");
             assert_eq!(data["arguments"]["language"], "PYTHON");
         }
-        InteractionContent::CodeExecutionCall { code, .. } => {
+        Content::CodeExecutionCall { code, .. } => {
             panic!(
                 "Should NOT be CodeExecutionCall with empty code (got code={:?}). \
                  Arguments path should also treat missing code as Unknown.",
@@ -490,10 +485,10 @@ fn test_deserialize_code_execution_call_arguments_missing_code_becomes_unknown()
 fn test_deserialize_code_execution_call_arguments_valid() {
     // Arguments path: when arguments object has code, should work normally
     let json = r#"{"type": "code_execution_call", "id": "call_valid", "arguments": {"language": "PYTHON", "code": "print('hi')"}}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::CodeExecutionCall { id, language, code } => {
+        Content::CodeExecutionCall { id, language, code } => {
             assert_eq!(*id, Some("call_valid".to_string()));
             assert_eq!(*language, CodeExecutionLanguage::Python);
             assert_eq!(code, "print('hi')");
@@ -509,10 +504,10 @@ fn test_deserialize_code_execution_call_arguments_valid() {
 fn test_deserialize_code_execution_result() {
     // Test deserialization from API wire format (is_error + result)
     let json = r#"{"type": "code_execution_result", "call_id": "call_123", "is_error": false, "result": "42\n"}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::CodeExecutionResult {
+        Content::CodeExecutionResult {
             call_id,
             is_error,
             result,
@@ -531,10 +526,10 @@ fn test_deserialize_code_execution_result() {
 #[test]
 fn test_deserialize_code_execution_result_error() {
     let json = r#"{"type": "code_execution_result", "call_id": "call_456", "is_error": true, "result": "NameError: x not defined"}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::CodeExecutionResult {
+        Content::CodeExecutionResult {
             call_id,
             is_error,
             result,
@@ -597,10 +592,10 @@ fn test_code_execution_language_known_variants_serde() {
 fn test_deserialize_google_search_call() {
     // Test the actual API format: arguments.queries is an array
     let json = r#"{"type": "google_search_call", "id": "call123", "arguments": {"queries": ["Rust programming", "latest version"]}}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::GoogleSearchCall { id, queries } => {
+        Content::GoogleSearchCall { id, queries } => {
             assert_eq!(id, "call123");
             assert_eq!(queries.len(), 2);
             assert_eq!(queries[0], "Rust programming");
@@ -617,10 +612,10 @@ fn test_deserialize_google_search_call() {
 fn test_deserialize_google_search_result() {
     // Test the actual API format: result is an array of objects with title/url
     let json = r#"{"type": "google_search_result", "call_id": "call123", "result": [{"title": "Rust", "url": "https://rust-lang.org", "rendered_content": "Some content"}]}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::GoogleSearchResult { call_id, result } => {
+        Content::GoogleSearchResult { call_id, result } => {
             assert_eq!(call_id, "call123");
             assert_eq!(result.len(), 1);
             assert_eq!(result[0].title, "Rust");
@@ -638,10 +633,10 @@ fn test_deserialize_google_search_result() {
 fn test_deserialize_url_context_call() {
     // Wire format from LOUD_WIRE: {"type": "url_context_call", "id": "...", "arguments": {"urls": [...]}}
     let json = r#"{"type": "url_context_call", "id": "ctx_123", "arguments": {"urls": ["https://example.com", "https://example.org"]}}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::UrlContextCall { id, urls } => {
+        Content::UrlContextCall { id, urls } => {
             assert_eq!(id, "ctx_123");
             assert_eq!(urls.len(), 2);
             assert_eq!(urls[0], "https://example.com");
@@ -658,10 +653,10 @@ fn test_deserialize_url_context_call() {
 fn test_deserialize_url_context_result() {
     // Wire format from LOUD_WIRE: {"type": "url_context_result", "call_id": "...", "result": [{"url": "...", "status": "..."}]}
     let json = r#"{"type": "url_context_result", "call_id": "ctx_123", "result": [{"url": "https://example.com", "status": "success"}, {"url": "https://example.org", "status": "error"}]}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::UrlContextResult { call_id, result } => {
+        Content::UrlContextResult { call_id, result } => {
             assert_eq!(call_id, "ctx_123");
             assert_eq!(result.len(), 2);
             assert_eq!(result[0].url, "https://example.com");
@@ -681,7 +676,7 @@ fn test_deserialize_url_context_result() {
 #[test]
 fn test_url_context_result_with_empty_result_array() {
     // Test UrlContextResult with empty result array
-    let content = InteractionContent::UrlContextResult {
+    let content = Content::UrlContextResult {
         call_id: "ctx_empty".to_string(),
         result: vec![],
     };
@@ -697,11 +692,11 @@ fn test_url_context_result_with_empty_result_array() {
     // Deserialize with empty result array
     let json_empty_result =
         r#"{"type": "url_context_result", "call_id": "ctx_empty", "result": []}"#;
-    let deserialized: InteractionContent =
+    let deserialized: Content =
         serde_json::from_str(json_empty_result).expect("Should deserialize");
 
     match &deserialized {
-        InteractionContent::UrlContextResult { call_id, result } => {
+        Content::UrlContextResult { call_id, result } => {
             assert_eq!(call_id, "ctx_empty");
             assert!(result.is_empty());
         }
@@ -731,7 +726,7 @@ fn test_url_context_result_item_status_helpers() {
 
 #[test]
 fn test_serialize_code_execution_call() {
-    let content = InteractionContent::CodeExecutionCall {
+    let content = Content::CodeExecutionCall {
         id: Some("call_123".to_string()),
         language: CodeExecutionLanguage::Python,
         code: "print(42)".to_string(),
@@ -749,7 +744,7 @@ fn test_serialize_code_execution_call() {
 
 #[test]
 fn test_serialize_code_execution_result() {
-    let content = InteractionContent::CodeExecutionResult {
+    let content = Content::CodeExecutionResult {
         call_id: Some("call_123".to_string()),
         is_error: false,
         result: "42".to_string(),
@@ -766,7 +761,7 @@ fn test_serialize_code_execution_result() {
 
 #[test]
 fn test_serialize_code_execution_result_error() {
-    let content = InteractionContent::CodeExecutionResult {
+    let content = Content::CodeExecutionResult {
         call_id: Some("call_456".to_string()),
         is_error: true,
         result: "NameError: x not defined".to_string(),
@@ -784,92 +779,74 @@ fn test_serialize_code_execution_result_error() {
 #[test]
 fn test_roundtrip_built_in_tool_content() {
     // CodeExecutionCall roundtrip
-    let original = InteractionContent::CodeExecutionCall {
+    let original = Content::CodeExecutionCall {
         id: Some("call_123".to_string()),
         language: CodeExecutionLanguage::Python,
         code: "print('hello')".to_string(),
     };
     let json = serde_json::to_string(&original).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
-    assert!(matches!(
-        restored,
-        InteractionContent::CodeExecutionCall { .. }
-    ));
+    let restored: Content = serde_json::from_str(&json).unwrap();
+    assert!(matches!(restored, Content::CodeExecutionCall { .. }));
 
     // CodeExecutionResult roundtrip
-    let original = InteractionContent::CodeExecutionResult {
+    let original = Content::CodeExecutionResult {
         call_id: Some("call_123".to_string()),
         is_error: false,
         result: "hello\n".to_string(),
     };
     let json = serde_json::to_string(&original).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
-    assert!(matches!(
-        restored,
-        InteractionContent::CodeExecutionResult { .. }
-    ));
+    let restored: Content = serde_json::from_str(&json).unwrap();
+    assert!(matches!(restored, Content::CodeExecutionResult { .. }));
 
     // GoogleSearchCall roundtrip
-    let original = InteractionContent::GoogleSearchCall {
+    let original = Content::GoogleSearchCall {
         id: "call123".to_string(),
         queries: vec!["test query".to_string()],
     };
     let json = serde_json::to_string(&original).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
-    assert!(matches!(
-        restored,
-        InteractionContent::GoogleSearchCall { .. }
-    ));
+    let restored: Content = serde_json::from_str(&json).unwrap();
+    assert!(matches!(restored, Content::GoogleSearchCall { .. }));
 
     // GoogleSearchResult roundtrip
-    let original = InteractionContent::GoogleSearchResult {
+    let original = Content::GoogleSearchResult {
         call_id: "call123".to_string(),
         result: vec![],
     };
     let json = serde_json::to_string(&original).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
-    assert!(matches!(
-        restored,
-        InteractionContent::GoogleSearchResult { .. }
-    ));
+    let restored: Content = serde_json::from_str(&json).unwrap();
+    assert!(matches!(restored, Content::GoogleSearchResult { .. }));
 
     // UrlContextCall roundtrip
-    let original = InteractionContent::UrlContextCall {
+    let original = Content::UrlContextCall {
         id: "ctx_123".to_string(),
         urls: vec!["https://example.com".to_string()],
     };
     let json = serde_json::to_string(&original).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
-    assert!(matches!(
-        restored,
-        InteractionContent::UrlContextCall { .. }
-    ));
+    let restored: Content = serde_json::from_str(&json).unwrap();
+    assert!(matches!(restored, Content::UrlContextCall { .. }));
 
     // UrlContextResult roundtrip
-    let original = InteractionContent::UrlContextResult {
+    let original = Content::UrlContextResult {
         call_id: "ctx_123".to_string(),
         result: vec![UrlContextResultItem::new("https://example.com", "success")],
     };
     let json = serde_json::to_string(&original).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
-    assert!(matches!(
-        restored,
-        InteractionContent::UrlContextResult { .. }
-    ));
+    let restored: Content = serde_json::from_str(&json).unwrap();
+    assert!(matches!(restored, Content::UrlContextResult { .. }));
 }
 
 #[test]
 fn test_edge_cases_empty_values() {
     // Empty code in CodeExecutionCall
-    let content = InteractionContent::CodeExecutionCall {
+    let content = Content::CodeExecutionCall {
         id: Some("call_empty".to_string()),
         language: CodeExecutionLanguage::Python,
         code: "".to_string(),
     };
     let json = serde_json::to_string(&content).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+    let restored: Content = serde_json::from_str(&json).unwrap();
     match restored {
-        InteractionContent::CodeExecutionCall { id, language, code } => {
+        Content::CodeExecutionCall { id, language, code } => {
             assert_eq!(id, Some("call_empty".to_string()));
             assert_eq!(language, CodeExecutionLanguage::Python);
             assert!(code.is_empty());
@@ -878,19 +855,16 @@ fn test_edge_cases_empty_values() {
     }
 
     // Empty results in GoogleSearchResult
-    let content = InteractionContent::GoogleSearchResult {
+    let content = Content::GoogleSearchResult {
         call_id: "call_empty".to_string(),
         result: vec![],
     };
     let json = serde_json::to_string(&content).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
-    assert!(matches!(
-        restored,
-        InteractionContent::GoogleSearchResult { .. }
-    ));
+    let restored: Content = serde_json::from_str(&json).unwrap();
+    assert!(matches!(restored, Content::GoogleSearchResult { .. }));
 
     // UrlContextResult with unsafe status item
-    let content = InteractionContent::UrlContextResult {
+    let content = Content::UrlContextResult {
         call_id: "ctx_unsafe".to_string(),
         result: vec![UrlContextResultItem::new(
             "https://blocked.example.com",
@@ -898,9 +872,9 @@ fn test_edge_cases_empty_values() {
         )],
     };
     let json = serde_json::to_string(&content).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+    let restored: Content = serde_json::from_str(&json).unwrap();
     match restored {
-        InteractionContent::UrlContextResult { call_id, result } => {
+        Content::UrlContextResult { call_id, result } => {
             assert_eq!(call_id, "ctx_unsafe");
             assert_eq!(result.len(), 1);
             assert!(result[0].is_unsafe());
@@ -909,15 +883,15 @@ fn test_edge_cases_empty_values() {
     }
 
     // Empty result string in CodeExecutionResult
-    let content = InteractionContent::CodeExecutionResult {
+    let content = Content::CodeExecutionResult {
         call_id: Some("call_no_output".to_string()),
         is_error: false,
         result: "".to_string(),
     };
     let json = serde_json::to_string(&content).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+    let restored: Content = serde_json::from_str(&json).unwrap();
     match restored {
-        InteractionContent::CodeExecutionResult {
+        Content::CodeExecutionResult {
             call_id, result, ..
         } => {
             assert_eq!(call_id, Some("call_no_output".to_string()));
@@ -1082,7 +1056,7 @@ fn test_serialize_text_with_annotations() {
         },
     ];
 
-    let content = InteractionContent::Text {
+    let content = Content::Text {
         text: Some("Hello, world! This is grounded text.".to_string()),
         annotations: Some(annotations),
     };
@@ -1105,7 +1079,7 @@ fn test_serialize_text_with_annotations() {
 #[test]
 fn test_serialize_text_with_empty_annotations_omitted() {
     // Empty annotations array should not be serialized
-    let content = InteractionContent::Text {
+    let content = Content::Text {
         text: Some("Plain text".to_string()),
         annotations: Some(vec![]),
     };
@@ -1130,10 +1104,10 @@ fn test_deserialize_text_with_annotations() {
         ]
     }"#;
 
-    let content: InteractionContent = serde_json::from_str(json).expect("Deserialization failed");
+    let content: Content = serde_json::from_str(json).expect("Deserialization failed");
 
     match content {
-        InteractionContent::Text { text, annotations } => {
+        Content::Text { text, annotations } => {
             assert_eq!(text, Some("This is grounded text.".to_string()));
             let annots = annotations.expect("Should have annotations");
             assert_eq!(annots.len(), 2);
@@ -1152,10 +1126,10 @@ fn test_deserialize_text_with_annotations() {
 fn test_deserialize_text_without_annotations() {
     let json = r#"{"type": "text", "text": "Plain text"}"#;
 
-    let content: InteractionContent = serde_json::from_str(json).expect("Deserialization failed");
+    let content: Content = serde_json::from_str(json).expect("Deserialization failed");
 
     match content {
-        InteractionContent::Text { text, annotations } => {
+        Content::Text { text, annotations } => {
             assert_eq!(text, Some("Plain text".to_string()));
             assert!(annotations.is_none());
         }
@@ -1171,14 +1145,13 @@ fn test_text_with_annotations_roundtrip() {
         source: Some("https://source.example.com".to_string()),
     }];
 
-    let original = InteractionContent::Text {
+    let original = Content::Text {
         text: Some("Some grounded content here.".to_string()),
         annotations: Some(annotations),
     };
 
     let json = serde_json::to_string(&original).expect("Serialization failed");
-    let deserialized: InteractionContent =
-        serde_json::from_str(&json).expect("Deserialization failed");
+    let deserialized: Content = serde_json::from_str(&json).expect("Deserialization failed");
 
     // Compare by re-serializing and checking the JSON
     let roundtrip_json = serde_json::to_string(&deserialized).expect("Serialization failed");
@@ -1186,7 +1159,7 @@ fn test_text_with_annotations_roundtrip() {
 
     // Also verify content matches
     match deserialized {
-        InteractionContent::Text { text, annotations } => {
+        Content::Text { text, annotations } => {
             assert_eq!(text, Some("Some grounded content here.".to_string()));
             let annots = annotations.expect("Should have annotations");
             assert_eq!(annots.len(), 1);
@@ -1203,7 +1176,7 @@ fn test_text_with_annotations_roundtrip() {
 
 #[test]
 fn test_annotations_helper_method() {
-    let content_with_annotations = InteractionContent::Text {
+    let content_with_annotations = Content::Text {
         text: Some("Hello".to_string()),
         annotations: Some(vec![Annotation {
             start_index: 0,
@@ -1215,7 +1188,7 @@ fn test_annotations_helper_method() {
     assert!(content_with_annotations.annotations().is_some());
     assert_eq!(content_with_annotations.annotations().unwrap().len(), 1);
 
-    let content_without_annotations = InteractionContent::Text {
+    let content_without_annotations = Content::Text {
         text: Some("Hello".to_string()),
         annotations: None,
     };
@@ -1223,7 +1196,7 @@ fn test_annotations_helper_method() {
     assert!(content_without_annotations.annotations().is_none());
 
     // Non-text content returns None
-    let thought = InteractionContent::Thought {
+    let thought = Content::Thought {
         signature: Some("sig_thinking".to_string()),
     };
     assert!(thought.annotations().is_none());
@@ -1362,7 +1335,7 @@ fn test_resolution_default_is_medium() {
 
 #[test]
 fn test_image_with_resolution_serialization() {
-    let image = InteractionContent::Image {
+    let image = Content::Image {
         data: Some("base64data".to_string()),
         uri: None,
         mime_type: Some("image/png".to_string()),
@@ -1380,7 +1353,7 @@ fn test_image_with_resolution_serialization() {
 
 #[test]
 fn test_image_with_ultra_high_resolution_serialization() {
-    let image = InteractionContent::Image {
+    let image = Content::Image {
         data: None,
         uri: Some("https://example.com/image.png".to_string()),
         mime_type: Some("image/png".to_string()),
@@ -1397,7 +1370,7 @@ fn test_image_with_ultra_high_resolution_serialization() {
 
 #[test]
 fn test_video_with_resolution_serialization() {
-    let video = InteractionContent::Video {
+    let video = Content::Video {
         data: Some("videobytes".to_string()),
         uri: None,
         mime_type: Some("video/mp4".to_string()),
@@ -1416,10 +1389,10 @@ fn test_video_with_resolution_serialization() {
 #[test]
 fn test_image_with_resolution_deserialization() {
     let json = r#"{"type": "image", "data": "base64data", "mime_type": "image/png", "resolution": "high"}"#;
-    let content: InteractionContent = serde_json::from_str(json).unwrap();
+    let content: Content = serde_json::from_str(json).unwrap();
 
     match content {
-        InteractionContent::Image {
+        Content::Image {
             data,
             uri,
             mime_type,
@@ -1437,10 +1410,10 @@ fn test_image_with_resolution_deserialization() {
 #[test]
 fn test_video_with_resolution_deserialization() {
     let json = r#"{"type": "video", "uri": "https://example.com/video.mp4", "mime_type": "video/mp4", "resolution": "ultra_high"}"#;
-    let content: InteractionContent = serde_json::from_str(json).unwrap();
+    let content: Content = serde_json::from_str(json).unwrap();
 
     match content {
-        InteractionContent::Video {
+        Content::Video {
             data,
             uri,
             mime_type,
@@ -1459,10 +1432,10 @@ fn test_video_with_resolution_deserialization() {
 fn test_image_without_resolution_deserialization() {
     // Verify backward compatibility: images without resolution field should work
     let json = r#"{"type": "image", "data": "base64data", "mime_type": "image/png"}"#;
-    let content: InteractionContent = serde_json::from_str(json).unwrap();
+    let content: Content = serde_json::from_str(json).unwrap();
 
     match content {
-        InteractionContent::Image { resolution, .. } => {
+        Content::Image { resolution, .. } => {
             assert_eq!(resolution, None);
         }
         _ => panic!("Expected Image variant"),
@@ -1471,7 +1444,7 @@ fn test_image_without_resolution_deserialization() {
 
 #[test]
 fn test_image_with_resolution_roundtrip() {
-    let original = InteractionContent::Image {
+    let original = Content::Image {
         data: Some("testdata".to_string()),
         uri: None,
         mime_type: Some("image/jpeg".to_string()),
@@ -1479,10 +1452,10 @@ fn test_image_with_resolution_roundtrip() {
     };
 
     let json = serde_json::to_string(&original).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+    let restored: Content = serde_json::from_str(&json).unwrap();
 
     match restored {
-        InteractionContent::Image {
+        Content::Image {
             data,
             uri,
             mime_type,
@@ -1499,7 +1472,7 @@ fn test_image_with_resolution_roundtrip() {
 
 #[test]
 fn test_video_with_resolution_roundtrip() {
-    let original = InteractionContent::Video {
+    let original = Content::Video {
         data: None,
         uri: Some("gs://bucket/video.mp4".to_string()),
         mime_type: Some("video/mp4".to_string()),
@@ -1507,10 +1480,10 @@ fn test_video_with_resolution_roundtrip() {
     };
 
     let json = serde_json::to_string(&original).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+    let restored: Content = serde_json::from_str(&json).unwrap();
 
     match restored {
-        InteractionContent::Video {
+        Content::Video {
             data,
             uri,
             mime_type,
@@ -1575,10 +1548,10 @@ fn test_resolution_unknown_in_image_content() {
     // Test that unknown resolution works within Image content
     let json =
         r#"{"type": "image", "data": "base64", "mime_type": "image/png", "resolution": "auto"}"#;
-    let content: InteractionContent = serde_json::from_str(json).unwrap();
+    let content: Content = serde_json::from_str(json).unwrap();
 
     match content {
-        InteractionContent::Image { resolution, .. } => {
+        Content::Image { resolution, .. } => {
             let res = resolution.expect("resolution should be present");
             assert!(res.is_unknown());
             assert_eq!(res.unknown_resolution_type(), Some("auto"));
@@ -1615,10 +1588,10 @@ fn test_resolution_unknown_object_form() {
 fn test_deserialize_file_search_result() {
     // Test the actual API format
     let json = r#"{"type": "file_search_result", "call_id": "call123", "result": [{"title": "Document.pdf", "text": "Relevant content", "file_search_store": "store-1"}]}"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::FileSearchResult { call_id, result } => {
+        Content::FileSearchResult { call_id, result } => {
             assert_eq!(call_id, "call123");
             assert_eq!(result.len(), 1);
             assert_eq!(result[0].title, "Document.pdf");
@@ -1642,10 +1615,10 @@ fn test_deserialize_file_search_result_multiple_items() {
             {"title": "Second.pdf", "text": "Second content", "file_search_store": "store-b"}
         ]
     }"#;
-    let content: InteractionContent = serde_json::from_str(json).expect("Should deserialize");
+    let content: Content = serde_json::from_str(json).expect("Should deserialize");
 
     match &content {
-        InteractionContent::FileSearchResult { call_id, result } => {
+        Content::FileSearchResult { call_id, result } => {
             assert_eq!(call_id, "call456");
             assert_eq!(result.len(), 2);
             assert_eq!(result[0].title, "First.pdf");
@@ -1657,7 +1630,7 @@ fn test_deserialize_file_search_result_multiple_items() {
 
 #[test]
 fn test_serialize_file_search_result() {
-    let content = InteractionContent::FileSearchResult {
+    let content = Content::FileSearchResult {
         call_id: "call789".to_string(),
         result: vec![FileSearchResultItem {
             title: "Results.pdf".to_string(),
@@ -1679,7 +1652,7 @@ fn test_serialize_file_search_result() {
 
 #[test]
 fn test_file_search_result_roundtrip() {
-    let original = InteractionContent::FileSearchResult {
+    let original = Content::FileSearchResult {
         call_id: "roundtrip_test".to_string(),
         result: vec![
             FileSearchResultItem {
@@ -1696,10 +1669,10 @@ fn test_file_search_result_roundtrip() {
     };
 
     let json = serde_json::to_string(&original).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+    let restored: Content = serde_json::from_str(&json).unwrap();
 
     match restored {
-        InteractionContent::FileSearchResult { call_id, result } => {
+        Content::FileSearchResult { call_id, result } => {
             assert_eq!(call_id, "roundtrip_test");
             assert_eq!(result.len(), 2);
             assert_eq!(result[0].title, "Doc1.pdf");
@@ -1713,16 +1686,16 @@ fn test_file_search_result_roundtrip() {
 #[test]
 fn test_file_search_result_empty_results() {
     // Test empty results array
-    let content = InteractionContent::FileSearchResult {
+    let content = Content::FileSearchResult {
         call_id: "no_results".to_string(),
         result: vec![],
     };
 
     let json = serde_json::to_string(&content).unwrap();
-    let restored: InteractionContent = serde_json::from_str(&json).unwrap();
+    let restored: Content = serde_json::from_str(&json).unwrap();
 
     match restored {
-        InteractionContent::FileSearchResult { call_id, result } => {
+        Content::FileSearchResult { call_id, result } => {
             assert_eq!(call_id, "no_results");
             assert!(result.is_empty());
         }
@@ -1744,37 +1717,37 @@ fn test_file_search_result_item_default() {
 
 #[test]
 fn test_new_text_creates_correct_variant() {
-    let content = InteractionContent::new_text("Hello world");
+    let content = Content::text("Hello world");
     match &content {
-        InteractionContent::Text { text, annotations } => {
+        Content::Text { text, annotations } => {
             assert_eq!(*text, Some("Hello world".to_string()));
             assert!(annotations.is_none());
         }
         _ => panic!("Expected Text variant"),
     }
     assert!(content.is_text());
-    assert_eq!(content.text(), Some("Hello world"));
+    assert_eq!(content.as_text(), Some("Hello world"));
 }
 
 #[test]
 fn test_new_text_with_empty_string() {
-    let content = InteractionContent::new_text("");
+    let content = Content::text("");
     match &content {
-        InteractionContent::Text { text, .. } => {
+        Content::Text { text, .. } => {
             assert_eq!(*text, Some(String::new()));
         }
         _ => panic!("Expected Text variant"),
     }
     // Empty string returns None from text() accessor
-    assert_eq!(content.text(), None);
+    assert_eq!(content.as_text(), None);
 }
 
 #[test]
 fn test_new_thought_creates_correct_variant() {
     // Note: new_thought() now takes a signature value (Thought content contains signature, not text)
-    let content = InteractionContent::new_thought("EosFCogFAXLI2...");
+    let content = Content::thought("EosFCogFAXLI2...");
     match &content {
-        InteractionContent::Thought { signature } => {
+        Content::Thought { signature } => {
             assert_eq!(*signature, Some("EosFCogFAXLI2...".to_string()));
         }
         _ => panic!("Expected Thought variant"),
@@ -1785,9 +1758,9 @@ fn test_new_thought_creates_correct_variant() {
 
 #[test]
 fn test_new_thought_with_empty_string() {
-    let content = InteractionContent::new_thought("");
+    let content = Content::thought("");
     match &content {
-        InteractionContent::Thought { signature } => {
+        Content::Thought { signature } => {
             assert_eq!(*signature, Some(String::new()));
         }
         _ => panic!("Expected Thought variant"),
@@ -1798,10 +1771,9 @@ fn test_new_thought_with_empty_string() {
 
 #[test]
 fn test_new_function_call_creates_correct_variant() {
-    let content =
-        InteractionContent::new_function_call("get_weather", serde_json::json!({"location": "SF"}));
+    let content = Content::function_call("get_weather", serde_json::json!({"location": "SF"}));
     match &content {
-        InteractionContent::FunctionCall { id, name, args } => {
+        Content::FunctionCall { id, name, args } => {
             assert!(id.is_none());
             assert_eq!(name, "get_weather");
             assert_eq!(args["location"], "SF");
@@ -1813,13 +1785,13 @@ fn test_new_function_call_creates_correct_variant() {
 
 #[test]
 fn test_new_function_call_with_id_creates_correct_variant() {
-    let content = InteractionContent::new_function_call_with_id(
+    let content = Content::function_call_with_id(
         Some("call_123"),
         "get_weather",
         serde_json::json!({"location": "San Francisco"}),
     );
     match content {
-        InteractionContent::FunctionCall { id, name, args } => {
+        Content::FunctionCall { id, name, args } => {
             assert_eq!(id, Some("call_123".to_string()));
             assert_eq!(name, "get_weather");
             assert_eq!(args["location"], "San Francisco");
@@ -1830,13 +1802,9 @@ fn test_new_function_call_with_id_creates_correct_variant() {
 
 #[test]
 fn test_new_function_call_with_id_none_id() {
-    let content = InteractionContent::new_function_call_with_id(
-        None::<String>,
-        "my_func",
-        serde_json::json!({}),
-    );
+    let content = Content::function_call_with_id(None::<String>, "my_func", serde_json::json!({}));
     match content {
-        InteractionContent::FunctionCall { id, name, .. } => {
+        Content::FunctionCall { id, name, .. } => {
             assert!(id.is_none());
             assert_eq!(name, "my_func");
         }
@@ -1846,13 +1814,13 @@ fn test_new_function_call_with_id_none_id() {
 
 #[test]
 fn test_new_function_result_creates_correct_variant() {
-    let content = InteractionContent::new_function_result(
+    let content = Content::function_result(
         "get_weather",
         "call_abc123",
         serde_json::json!({"temperature": "72F", "conditions": "sunny"}),
     );
     match content {
-        InteractionContent::FunctionResult {
+        Content::FunctionResult {
             name,
             call_id,
             result,
@@ -1869,9 +1837,9 @@ fn test_new_function_result_creates_correct_variant() {
 
 #[test]
 fn test_new_image_data_creates_correct_variant() {
-    let content = InteractionContent::new_image_data("base64encodeddata", "image/png");
+    let content = Content::image_data("base64encodeddata", "image/png");
     match content {
-        InteractionContent::Image {
+        Content::Image {
             data,
             uri,
             mime_type,
@@ -1888,13 +1856,10 @@ fn test_new_image_data_creates_correct_variant() {
 
 #[test]
 fn test_new_image_data_with_resolution_creates_correct_variant() {
-    let content = InteractionContent::new_image_data_with_resolution(
-        "base64encodeddata",
-        "image/png",
-        Resolution::High,
-    );
+    let content =
+        Content::image_data_with_resolution("base64encodeddata", "image/png", Resolution::High);
     match content {
-        InteractionContent::Image {
+        Content::Image {
             data,
             uri,
             mime_type,
@@ -1911,9 +1876,9 @@ fn test_new_image_data_with_resolution_creates_correct_variant() {
 
 #[test]
 fn test_new_image_uri_creates_correct_variant() {
-    let content = InteractionContent::new_image_uri("https://example.com/image.png", "image/png");
+    let content = Content::image_uri("https://example.com/image.png", "image/png");
     match content {
-        InteractionContent::Image {
+        Content::Image {
             data,
             uri,
             mime_type,
@@ -1930,13 +1895,13 @@ fn test_new_image_uri_creates_correct_variant() {
 
 #[test]
 fn test_new_image_uri_with_resolution_creates_correct_variant() {
-    let content = InteractionContent::new_image_uri_with_resolution(
+    let content = Content::image_uri_with_resolution(
         "https://example.com/image.png",
         "image/png",
         Resolution::Low,
     );
     match content {
-        InteractionContent::Image {
+        Content::Image {
             data,
             uri,
             resolution,
@@ -1952,9 +1917,9 @@ fn test_new_image_uri_with_resolution_creates_correct_variant() {
 
 #[test]
 fn test_new_audio_data_creates_correct_variant() {
-    let content = InteractionContent::new_audio_data("base64audiodata", "audio/mp3");
+    let content = Content::audio_data("base64audiodata", "audio/mp3");
     match content {
-        InteractionContent::Audio {
+        Content::Audio {
             data,
             uri,
             mime_type,
@@ -1969,9 +1934,9 @@ fn test_new_audio_data_creates_correct_variant() {
 
 #[test]
 fn test_new_audio_uri_creates_correct_variant() {
-    let content = InteractionContent::new_audio_uri("https://example.com/audio.mp3", "audio/mp3");
+    let content = Content::audio_uri("https://example.com/audio.mp3", "audio/mp3");
     match content {
-        InteractionContent::Audio {
+        Content::Audio {
             data,
             uri,
             mime_type,
@@ -1986,9 +1951,9 @@ fn test_new_audio_uri_creates_correct_variant() {
 
 #[test]
 fn test_new_video_data_creates_correct_variant() {
-    let content = InteractionContent::new_video_data("base64videodata", "video/mp4");
+    let content = Content::video_data("base64videodata", "video/mp4");
     match content {
-        InteractionContent::Video {
+        Content::Video {
             data,
             uri,
             mime_type,
@@ -2005,13 +1970,10 @@ fn test_new_video_data_creates_correct_variant() {
 
 #[test]
 fn test_new_video_data_with_resolution_creates_correct_variant() {
-    let content = InteractionContent::new_video_data_with_resolution(
-        "base64videodata",
-        "video/mp4",
-        Resolution::Low,
-    );
+    let content =
+        Content::video_data_with_resolution("base64videodata", "video/mp4", Resolution::Low);
     match content {
-        InteractionContent::Video {
+        Content::Video {
             data, resolution, ..
         } => {
             assert_eq!(data, Some("base64videodata".to_string()));
@@ -2023,9 +1985,9 @@ fn test_new_video_data_with_resolution_creates_correct_variant() {
 
 #[test]
 fn test_new_video_uri_creates_correct_variant() {
-    let content = InteractionContent::new_video_uri("https://example.com/video.mp4", "video/mp4");
+    let content = Content::video_uri("https://example.com/video.mp4", "video/mp4");
     match content {
-        InteractionContent::Video {
+        Content::Video {
             data,
             uri,
             mime_type,
@@ -2042,13 +2004,13 @@ fn test_new_video_uri_creates_correct_variant() {
 
 #[test]
 fn test_new_video_uri_with_resolution_creates_correct_variant() {
-    let content = InteractionContent::new_video_uri_with_resolution(
+    let content = Content::video_uri_with_resolution(
         "https://example.com/video.mp4",
         "video/mp4",
         Resolution::Medium,
     );
     match content {
-        InteractionContent::Video {
+        Content::Video {
             uri, resolution, ..
         } => {
             assert_eq!(uri, Some("https://example.com/video.mp4".to_string()));
@@ -2060,9 +2022,9 @@ fn test_new_video_uri_with_resolution_creates_correct_variant() {
 
 #[test]
 fn test_new_document_data_creates_correct_variant() {
-    let content = InteractionContent::new_document_data("base64pdfdata", "application/pdf");
+    let content = Content::document_data("base64pdfdata", "application/pdf");
     match content {
-        InteractionContent::Document {
+        Content::Document {
             data,
             uri,
             mime_type,
@@ -2077,10 +2039,9 @@ fn test_new_document_data_creates_correct_variant() {
 
 #[test]
 fn test_new_document_uri_creates_correct_variant() {
-    let content =
-        InteractionContent::new_document_uri("https://example.com/doc.pdf", "application/pdf");
+    let content = Content::document_uri("https://example.com/doc.pdf", "application/pdf");
     match content {
-        InteractionContent::Document {
+        Content::Document {
             data,
             uri,
             mime_type,
@@ -2095,9 +2056,9 @@ fn test_new_document_uri_creates_correct_variant() {
 
 #[test]
 fn test_from_uri_and_mime_infers_image() {
-    let content = InteractionContent::from_uri_and_mime("files/abc123", "image/png");
+    let content = Content::from_uri_and_mime("files/abc123", "image/png");
     match content {
-        InteractionContent::Image { uri, mime_type, .. } => {
+        Content::Image { uri, mime_type, .. } => {
             assert_eq!(uri, Some("files/abc123".to_string()));
             assert_eq!(mime_type, Some("image/png".to_string()));
         }
@@ -2107,9 +2068,9 @@ fn test_from_uri_and_mime_infers_image() {
 
 #[test]
 fn test_from_uri_and_mime_infers_audio() {
-    let content = InteractionContent::from_uri_and_mime("files/abc123", "audio/wav");
+    let content = Content::from_uri_and_mime("files/abc123", "audio/wav");
     match content {
-        InteractionContent::Audio { uri, mime_type, .. } => {
+        Content::Audio { uri, mime_type, .. } => {
             assert_eq!(uri, Some("files/abc123".to_string()));
             assert_eq!(mime_type, Some("audio/wav".to_string()));
         }
@@ -2119,9 +2080,9 @@ fn test_from_uri_and_mime_infers_audio() {
 
 #[test]
 fn test_from_uri_and_mime_infers_video() {
-    let content = InteractionContent::from_uri_and_mime("files/abc123", "video/webm");
+    let content = Content::from_uri_and_mime("files/abc123", "video/webm");
     match content {
-        InteractionContent::Video { uri, mime_type, .. } => {
+        Content::Video { uri, mime_type, .. } => {
             assert_eq!(uri, Some("files/abc123".to_string()));
             assert_eq!(mime_type, Some("video/webm".to_string()));
         }
@@ -2131,9 +2092,9 @@ fn test_from_uri_and_mime_infers_video() {
 
 #[test]
 fn test_from_uri_and_mime_infers_document_for_pdf() {
-    let content = InteractionContent::from_uri_and_mime("files/abc123", "application/pdf");
+    let content = Content::from_uri_and_mime("files/abc123", "application/pdf");
     match content {
-        InteractionContent::Document { uri, mime_type, .. } => {
+        Content::Document { uri, mime_type, .. } => {
             assert_eq!(uri, Some("files/abc123".to_string()));
             assert_eq!(mime_type, Some("application/pdf".to_string()));
         }
@@ -2143,9 +2104,9 @@ fn test_from_uri_and_mime_infers_document_for_pdf() {
 
 #[test]
 fn test_from_uri_and_mime_infers_document_for_text() {
-    let content = InteractionContent::from_uri_and_mime("files/abc123", "text/plain");
+    let content = Content::from_uri_and_mime("files/abc123", "text/plain");
     match content {
-        InteractionContent::Document { uri, mime_type, .. } => {
+        Content::Document { uri, mime_type, .. } => {
             assert_eq!(uri, Some("files/abc123".to_string()));
             assert_eq!(mime_type, Some("text/plain".to_string()));
         }
@@ -2156,11 +2117,11 @@ fn test_from_uri_and_mime_infers_document_for_text() {
 #[test]
 fn test_constructors_accept_string_types() {
     // Test that constructors work with various string types via Into<String>
-    let text1 = InteractionContent::new_text(String::from("owned string"));
-    assert_eq!(text1.text(), Some("owned string"));
+    let text1 = Content::text(String::from("owned string"));
+    assert_eq!(text1.as_text(), Some("owned string"));
 
-    let text2 = InteractionContent::new_text("&str literal");
-    assert_eq!(text2.text(), Some("&str literal"));
+    let text2 = Content::text("&str literal");
+    assert_eq!(text2.as_text(), Some("&str literal"));
 
     // Cow, Box<str>, etc. would also work via Into<String>
 }
@@ -2168,13 +2129,12 @@ fn test_constructors_accept_string_types() {
 #[test]
 fn test_constructor_serialization_roundtrip() {
     // Test that content created via constructors serializes correctly
-    let content = InteractionContent::new_text("Test message");
+    let content = Content::text("Test message");
     let json = serde_json::to_string(&content).expect("Should serialize");
-    let deserialized: InteractionContent = serde_json::from_str(&json).expect("Should deserialize");
-    assert_eq!(deserialized.text(), Some("Test message"));
+    let deserialized: Content = serde_json::from_str(&json).expect("Should deserialize");
+    assert_eq!(deserialized.as_text(), Some("Test message"));
 
-    let image =
-        InteractionContent::new_image_data_with_resolution("data", "image/png", Resolution::High);
+    let image = Content::image_data_with_resolution("data", "image/png", Resolution::High);
     let json = serde_json::to_string(&image).expect("Should serialize");
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(value["type"], "image");
@@ -2230,4 +2190,142 @@ fn test_file_search_result_item_new() {
 fn test_file_search_result_item_has_text_empty() {
     let item = FileSearchResultItem::new("Title", "", "store");
     assert!(!item.has_text());
+}
+
+// =============================================================================
+// Builder Method Tests (with_resolution)
+// =============================================================================
+
+#[test]
+fn test_with_resolution_on_image() {
+    let content = Content::image_uri("files/abc123", "image/png").with_resolution(Resolution::High);
+    match content {
+        Content::Image { resolution, .. } => {
+            assert_eq!(resolution, Some(Resolution::High));
+        }
+        _ => panic!("Expected Image variant"),
+    }
+}
+
+#[test]
+fn test_with_resolution_on_video() {
+    let content = Content::video_uri("files/def456", "video/mp4").with_resolution(Resolution::Low);
+    match content {
+        Content::Video { resolution, .. } => {
+            assert_eq!(resolution, Some(Resolution::Low));
+        }
+        _ => panic!("Expected Video variant"),
+    }
+}
+
+#[test]
+fn test_with_resolution_preserves_other_fields() {
+    let content =
+        Content::image_data("base64data", "image/jpeg").with_resolution(Resolution::UltraHigh);
+    match content {
+        Content::Image {
+            data,
+            uri,
+            mime_type,
+            resolution,
+        } => {
+            assert_eq!(data, Some("base64data".to_string()));
+            assert!(uri.is_none());
+            assert_eq!(mime_type, Some("image/jpeg".to_string()));
+            assert_eq!(resolution, Some(Resolution::UltraHigh));
+        }
+        _ => panic!("Expected Image variant"),
+    }
+}
+
+#[test]
+fn test_with_resolution_on_non_media_returns_unchanged() {
+    // with_resolution on non-media content should return unchanged
+    let original = Content::text("Hello");
+    let after = original.clone().with_resolution(Resolution::High);
+    assert_eq!(original, after);
+}
+
+#[test]
+fn test_with_resolution_overwrites_existing() {
+    let content = Content::image_uri("files/abc123", "image/png")
+        .with_resolution(Resolution::Low)
+        .with_resolution(Resolution::High);
+    match content {
+        Content::Image { resolution, .. } => {
+            assert_eq!(resolution, Some(Resolution::High));
+        }
+        _ => panic!("Expected Image variant"),
+    }
+}
+
+// =============================================================================
+// with_result() and with_result_error() Tests
+// =============================================================================
+
+#[test]
+fn test_with_result_creates_function_result() {
+    let call = Content::function_call_with_id(
+        Some("call_123"),
+        "get_weather",
+        serde_json::json!({"location": "SF"}),
+    );
+    let result = call.with_result(serde_json::json!({"temp": 72}));
+
+    match result {
+        Content::FunctionResult {
+            name,
+            call_id,
+            result,
+            is_error,
+        } => {
+            assert_eq!(name, Some("get_weather".to_string()));
+            assert_eq!(call_id, "call_123");
+            assert_eq!(result["temp"], 72);
+            assert!(is_error.is_none());
+        }
+        _ => panic!("Expected FunctionResult variant"),
+    }
+}
+
+#[test]
+fn test_with_result_error_sets_is_error() {
+    let call =
+        Content::function_call_with_id(Some("call_456"), "api_request", serde_json::json!({}));
+    let result = call.with_result_error(serde_json::json!({"error": "timeout"}));
+
+    match result {
+        Content::FunctionResult {
+            name,
+            call_id,
+            is_error,
+            ..
+        } => {
+            assert_eq!(name, Some("api_request".to_string()));
+            assert_eq!(call_id, "call_456");
+            assert_eq!(is_error, Some(true));
+        }
+        _ => panic!("Expected FunctionResult variant"),
+    }
+}
+
+#[test]
+fn test_with_result_on_non_function_call_returns_unchanged() {
+    let text = Content::text("Hello");
+    let after = text.clone().with_result(serde_json::json!({"data": 1}));
+    assert_eq!(text, after);
+}
+
+#[test]
+fn test_with_result_uses_empty_call_id_when_none() {
+    // Function call without ID should use empty string for call_id
+    let call = Content::function_call("get_data", serde_json::json!({}));
+    let result = call.with_result(serde_json::json!({"value": 42}));
+
+    match result {
+        Content::FunctionResult { call_id, .. } => {
+            assert_eq!(call_id, "");
+        }
+        _ => panic!("Expected FunctionResult variant"),
+    }
 }

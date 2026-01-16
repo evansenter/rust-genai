@@ -25,7 +25,7 @@
 //! Gemini's image pricing (see <https://ai.google.dev/gemini-api/docs/document-processing>).
 
 use futures_util::StreamExt;
-use genai_rs::{Client, StreamChunk, document_data_content, text_content};
+use genai_rs::{Client, Content, StreamChunk};
 use std::env;
 use std::io::{Write, stdout};
 
@@ -47,24 +47,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ==========================================================================
     println!("--- Example 1: Basic PDF Analysis ---\n");
 
-    // Using the fluent builder pattern with add_document_data()
-    // In a real application, use add_document_file() for automatic file loading:
-    //   .add_document_file("document.pdf").await?
+    // Using with_content() with Content::document_data()
+    // In a real application, use document_from_file() for automatic file loading:
+    //   let doc = document_from_file("document.pdf").await?;
     //
     println!("Sending PDF to Gemini for analysis...\n");
 
     let response = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .with_text("What text content does this PDF document contain?")
-        .add_document_data(SAMPLE_PDF_BASE64, "application/pdf")
+        .with_content(vec![
+            Content::text("What text content does this PDF document contain?"),
+            Content::document_data(SAMPLE_PDF_BASE64, "application/pdf"),
+        ])
         .with_store_enabled()
         .create()
         .await?;
 
     println!("Status: {:?}\n", response.status);
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("Analysis:\n{}\n", text);
     }
 
@@ -88,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    if let Some(text) = follow_up.text() {
+    if let Some(text) = follow_up.as_text() {
         println!("Follow-up Response:\n{}\n", text);
     }
 
@@ -103,21 +105,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Alternative: Using with_content() for dynamic content construction
     let stream_contents = vec![
-        text_content("Describe the structure of this PDF document in detail."),
-        document_data_content(SAMPLE_PDF_BASE64, "application/pdf"),
+        Content::text("Describe the structure of this PDF document in detail."),
+        Content::document_data(SAMPLE_PDF_BASE64, "application/pdf"),
     ];
 
     let mut stream = client
         .interaction()
         .with_model("gemini-3-flash-preview")
-        .set_content(stream_contents)
+        .with_content(stream_contents)
         .create_stream();
 
     while let Some(result) = stream.next().await {
         match result {
             Ok(event) => match event.chunk {
                 StreamChunk::Delta(content) => {
-                    if let Some(text) = content.text() {
+                    if let Some(text) = content.as_text() {
                         print!("{}", text);
                         // Flush each chunk immediately for real-time streaming effect
                         stdout().flush()?;
@@ -148,16 +150,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ==========================================================================
     println!("\n--- Usage Notes ---\n");
     println!("PDF Document Input Tips:");
-    println!("  1. Use add_document_file() for automatic file loading");
-    println!("  2. Use add_document_data() for inline base64 data");
+    println!("  1. Use Content::document_data(base64, \"application/pdf\") for inline");
+    println!("  2. Use document_from_file() to load and encode files");
     println!("  3. PDFs up to 1000 pages are supported");
     println!("  4. Each page costs approximately 258 tokens");
     println!("  5. Native text extraction works for most PDFs");
     println!("  6. OCR is applied automatically to scanned pages");
-    println!("\nRecommended: Use built-in file helpers:");
-    println!("  .add_document_file(\"doc.pdf\").await?");
-    println!("  ");
-    println!("Or use document_from_file() for programmatic loading:");
+    println!("\nRecommended: Use document_from_file() helper:");
     println!("  use genai_rs::document_from_file;");
     println!("  let doc = document_from_file(\"doc.pdf\").await?;");
 
@@ -168,9 +167,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ PDF Document Input Demo Complete\n");
 
     println!("--- Key Takeaways ---");
-    println!("• add_document_data(base64, \"application/pdf\") for inline PDF");
-    println!("• add_document_file(path) loads PDF automatically");
-    println!("• document_from_file() helper for programmatic loading");
+    println!("• Content::document_data(base64, \"application/pdf\") for inline PDF");
+    println!("• document_from_file() helper loads and encodes files");
+    println!("• with_content() accepts mixed Content::text() + Content::document_data()");
     println!("• PDFs up to 1000 pages supported (~258 tokens/page)\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");

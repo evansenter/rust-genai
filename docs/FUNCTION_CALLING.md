@@ -82,7 +82,7 @@ let result = client
     .create_with_auto_functions()  // Auto-discovers and executes
     .await?;
 
-println!("{}", result.response.text().unwrap());
+println!("{}", result.response.as_text().unwrap());
 ```
 
 ### Limiting Available Functions
@@ -229,7 +229,7 @@ For full control over execution, handle function calls manually.
 ### Manual Loop Pattern
 
 ```rust,ignore
-use genai_rs::{FunctionDeclaration, function_result_content};
+use genai_rs::{Content, FunctionDeclaration};
 
 // Define declarations (schemas only)
 let get_weather = FunctionDeclaration::builder("get_weather")
@@ -255,7 +255,7 @@ while response.has_function_calls() {
         // YOUR execution logic here
         let result = execute_my_function(&call.name, &call.args);
 
-        results.push(function_result_content(
+        results.push(Content::function_result(
             call.name.clone(),
             call.id.unwrap(),  // Required for multi-turn
             result,
@@ -273,7 +273,7 @@ while response.has_function_calls() {
 }
 
 // Final text response
-println!("{}", response.text().unwrap());
+println!("{}", response.as_text().unwrap());
 ```
 
 ### When to Use Manual Handling

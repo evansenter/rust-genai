@@ -24,7 +24,7 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use genai_rs::{Client, FunctionDeclaration, function_result_content};
+use genai_rs::{Client, Content, FunctionDeclaration};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -370,7 +370,7 @@ impl SupportSession {
             for call in &function_calls {
                 let call_id = call.id.ok_or("Missing call_id")?;
                 let result = execute_function(call.name, call.args);
-                results.push(function_result_content(
+                results.push(Content::function_result(
                     call.name.to_string(),
                     call_id.to_string(),
                     result,
@@ -388,7 +388,7 @@ impl SupportSession {
                 .interaction()
                 .with_model("gemini-3-flash-preview")
                 .with_previous_interaction(response.id.as_ref().ok_or("Missing interaction ID")?)
-                .set_content(results)
+                .with_content(results)
                 .with_store_enabled()
                 .create()
                 .await?;
@@ -399,7 +399,7 @@ impl SupportSession {
 
         // Extract and return the text response
         Ok(response
-            .text()
+            .as_text()
             .unwrap_or("I apologize, but I couldn't process that request. Please try again.")
             .to_string())
     }

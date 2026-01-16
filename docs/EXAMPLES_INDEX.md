@@ -155,7 +155,7 @@ Full control over the function execution loop.
 ```bash
 cargo run --example manual_function_calling
 ```
-**Learn**: Manual loop, `function_result_content()`, custom execution logic.
+**Learn**: Manual loop, `Content::function_result()`, custom execution logic.
 
 #### tool_service
 Dependency injection for functions that need shared state.
@@ -201,7 +201,7 @@ Send images for analysis with resolution control.
 ```bash
 cargo run --example multimodal_image
 ```
-**Learn**: `add_image_file()`, `Resolution`, image comparison.
+**Learn**: `with_content()`, `Content::image_data()`, `Resolution`, image comparison.
 
 #### files_api
 Upload files once, reference many times.

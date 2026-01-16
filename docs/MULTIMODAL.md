@@ -21,38 +21,23 @@ Gemini supports multimodal inputs through three methods:
 |--------|----------|------------|
 | Inline base64 | Small files (<20MB) | ~20MB |
 | URI reference | Files API uploads | Large files |
-| Builder helpers | Ergonomic file loading | Varies |
+| File helpers | Ergonomic file loading | Varies |
 
 ## Images
 
-### Method 1: Builder Pattern (Recommended)
+### Method 1: Content Constructors with with_content() (Recommended)
 
 ```rust,ignore
-// From file path (async, reads and encodes)
-let response = client
-    .interaction()
-    .with_model("gemini-3-flash-preview")
-    .with_text("Describe this image")
-    .add_image_file("photo.jpg")
-    .await?
-    .create()
-    .await?;
+use genai_rs::{Client, Content};
 
-// From base64 data (sync)
+// From base64 data
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("What's in this image?")
-    .add_image_data(base64_string, "image/png")
-    .create()
-    .await?;
-
-// From bytes (sync, auto-encodes)
-let response = client
-    .interaction()
-    .with_model("gemini-3-flash-preview")
-    .with_text("Analyze this")
-    .add_image_bytes(&image_bytes, "image/jpeg")
+    .with_content(vec![
+        Content::text("What's in this image?"),
+        Content::image_data(base64_string, "image/png"),
+    ])
     .create()
     .await?;
 
@@ -60,45 +45,47 @@ let response = client
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("Describe the uploaded image")
-    .add_image_uri(&file_metadata.uri, "image/png")
+    .with_content(vec![
+        Content::text("Describe the uploaded image"),
+        Content::image_uri(&file_metadata.uri, "image/png"),
+    ])
     .create()
     .await?;
 ```
 
-### Method 2: Content Constructors
+### Method 2: File Helper Functions
 
 ```rust,ignore
-use genai_rs::{text_content, image_data_content};
-
-// Build content vector manually
-let contents = vec![
-    text_content("Compare these images:"),
-    image_data_content(base64_image1, "image/png"),
-    image_data_content(base64_image2, "image/png"),
-];
-
-let response = client
-    .interaction()
-    .with_model("gemini-3-flash-preview")
-    .set_content(contents)
-    .create()
-    .await?;
-```
-
-### Method 3: File Helpers
-
-```rust,ignore
-use genai_rs::image_from_file;
+use genai_rs::{Client, Content, image_from_file};
 
 // Load and encode from filesystem
-let content = image_from_file("photo.jpg").await?;
+let image_content = image_from_file("photo.jpg").await?;
 
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("What do you see?")
-    .set_content(vec![content])
+    .with_content(vec![
+        Content::text("What do you see?"),
+        image_content,
+    ])
+    .create()
+    .await?;
+```
+
+### Method 3: Multiple Images
+
+```rust,ignore
+use genai_rs::{Client, Content};
+
+// Compare multiple images
+let response = client
+    .interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_content(vec![
+        Content::text("Compare these images:"),
+        Content::image_data(base64_image1, "image/png"),
+        Content::image_data(base64_image2, "image/png"),
+    ])
     .create()
     .await?;
 ```
@@ -117,13 +104,17 @@ let response = client
 ### Input
 
 ```rust,ignore
-// From file
+use genai_rs::{Client, Content, audio_from_file};
+
+// From file helper
+let audio_content = audio_from_file("recording.mp3").await?;
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("Transcribe this audio")
-    .add_audio_file("recording.mp3")
-    .await?
+    .with_content(vec![
+        Content::text("Transcribe this audio"),
+        audio_content,
+    ])
     .create()
     .await?;
 
@@ -131,8 +122,10 @@ let response = client
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("What's being said?")
-    .add_audio_data(base64_audio, "audio/mp3")
+    .with_content(vec![
+        Content::text("What's being said?"),
+        Content::audio_data(base64_audio, "audio/mp3"),
+    ])
     .create()
     .await?;
 ```
@@ -176,13 +169,17 @@ for (i, audio) in response.audios().enumerate() {
 ## Video
 
 ```rust,ignore
-// From file
+use genai_rs::{Client, Content, video_from_file};
+
+// From file helper
+let video_content = video_from_file("clip.mp4").await?;
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("Describe what happens in this video")
-    .add_video_file("clip.mp4")
-    .await?
+    .with_content(vec![
+        Content::text("Describe what happens in this video"),
+        video_content,
+    ])
     .create()
     .await?;
 
@@ -190,8 +187,10 @@ let response = client
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("Summarize this video")
-    .add_video_data(base64_video, "video/mp4")
+    .with_content(vec![
+        Content::text("Summarize this video"),
+        Content::video_data(base64_video, "video/mp4"),
+    ])
     .create()
     .await?;
 
@@ -202,8 +201,10 @@ client.wait_for_file_active(&file.name, Duration::from_secs(120)).await?;
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("What's in this video?")
-    .add_video_uri(&file.uri, "video/mp4")
+    .with_content(vec![
+        Content::text("What's in this video?"),
+        Content::video_uri(&file.uri, "video/mp4"),
+    ])
     .create()
     .await?;
 ```
@@ -223,13 +224,17 @@ let response = client
 ### PDF Files
 
 ```rust,ignore
-// From file
+use genai_rs::{Client, Content, document_from_file};
+
+// From file helper
+let doc_content = document_from_file("report.pdf").await?;
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("Summarize this document")
-    .add_document_file("report.pdf")
-    .await?
+    .with_content(vec![
+        Content::text("Summarize this document"),
+        doc_content,
+    ])
     .create()
     .await?;
 
@@ -237,8 +242,10 @@ let response = client
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("Extract key points from this PDF")
-    .add_document_data(base64_pdf, "application/pdf")
+    .with_content(vec![
+        Content::text("Extract key points from this PDF"),
+        Content::document_data(base64_pdf, "application/pdf"),
+    ])
     .create()
     .await?;
 ```
@@ -249,8 +256,10 @@ let response = client
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("Analyze this code")
-    .add_document_data(base64_text, "text/plain")
+    .with_content(vec![
+        Content::text("Analyze this code"),
+        Content::document_data(base64_text, "text/plain"),
+    ])
     .create()
     .await?;
 ```
@@ -316,8 +325,10 @@ match metadata.state {
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("Analyze this file")
-    .add_file_uri(&file.uri, &file.mime_type)
+    .with_content(vec![
+        Content::text("Analyze this file"),
+        Content::from_file(&file),
+    ])
     .create()
     .await?;
 ```
@@ -353,21 +364,21 @@ Control the trade-off between image quality and token cost.
 ### Usage
 
 ```rust,ignore
-use genai_rs::Resolution;
+use genai_rs::{Client, Content, Resolution};
 
-// Builder pattern
+// With resolution using builder method
 let response = client
     .interaction()
     .with_model("gemini-3-flash-preview")
-    .with_text("What color is this?")
-    .add_image_data_with_resolution(base64, "image/png", Resolution::Low)
+    .with_content(vec![
+        Content::text("What color is this?"),
+        Content::image_data(base64, "image/png").with_resolution(Resolution::Low),
+    ])
     .create()
     .await?;
 
-// Content constructor
-use genai_rs::image_data_content_with_resolution;
-
-let content = image_data_content_with_resolution(
+// Using constructor with resolution
+let content = Content::image_data_with_resolution(
     base64,
     "image/png",
     Resolution::High
@@ -385,73 +396,75 @@ let content = image_data_content_with_resolution(
 
 ## Content Constructors
 
-All constructors are re-exported from the crate root.
+All constructors are static methods on `Content`, re-exported from the crate root.
 
 ### Text
 
 ```rust,ignore
-use genai_rs::text_content;
+use genai_rs::Content;
 
-let content = text_content("Analyze the following:");
+let content = Content::text("Analyze the following:");
 ```
 
 ### Images
 
 ```rust,ignore
-use genai_rs::{
-    image_data_content,
-    image_data_content_with_resolution,
-    image_uri_content,
-    image_uri_content_with_resolution,
-};
+use genai_rs::{Content, Resolution};
 
 // Inline base64
-let content = image_data_content(base64, "image/png");
-let content = image_data_content_with_resolution(base64, "image/png", Resolution::High);
+let content = Content::image_data(base64, "image/png");
+let content = Content::image_data_with_resolution(base64, "image/png", Resolution::High);
 
 // URI reference
-let content = image_uri_content(uri, "image/png");
+let content = Content::image_uri(uri, "image/png");
+let content = Content::image_uri_with_resolution(uri, "image/png", Resolution::High);
 ```
 
 ### Audio
 
 ```rust,ignore
-use genai_rs::{audio_data_content, audio_uri_content};
+use genai_rs::Content;
 
-let content = audio_data_content(base64, "audio/mp3");
-let content = audio_uri_content(uri, "audio/mp3");
+let content = Content::audio_data(base64, "audio/mp3");
+let content = Content::audio_uri(uri, "audio/mp3");
 ```
 
 ### Video
 
 ```rust,ignore
-use genai_rs::{
-    video_data_content,
-    video_data_content_with_resolution,
-    video_uri_content,
-    video_uri_content_with_resolution,
-};
+use genai_rs::{Content, Resolution};
 
-let content = video_data_content(base64, "video/mp4");
-let content = video_uri_content(uri, "video/mp4");
+let content = Content::video_data(base64, "video/mp4");
+let content = Content::video_data_with_resolution(base64, "video/mp4", Resolution::High);
+let content = Content::video_uri(uri, "video/mp4");
+let content = Content::video_uri_with_resolution(uri, "video/mp4", Resolution::High);
 ```
 
 ### Documents
 
 ```rust,ignore
-use genai_rs::{document_data_content, document_uri_content};
+use genai_rs::Content;
 
-let content = document_data_content(base64, "application/pdf");
-let content = document_uri_content(uri, "application/pdf");
+let content = Content::document_data(base64, "application/pdf");
+let content = Content::document_uri(uri, "application/pdf");
 ```
 
 ### From File Metadata
 
 ```rust,ignore
-use genai_rs::file_uri_content;
+use genai_rs::Content;
 
 let file = client.upload_file("document.pdf").await?;
-let content = file_uri_content(&file);
+let content = Content::from_file(&file);
+```
+
+### From Any URI
+
+```rust,ignore
+use genai_rs::Content;
+
+// Generic URI + MIME type
+let content = Content::from_uri_and_mime(uri, "video/mp4");
 ```
 
 ## Image Generation

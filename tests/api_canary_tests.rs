@@ -90,7 +90,7 @@ async fn canary_streaming_interaction() {
         let event = result.expect("Stream event should be valid");
         match event.chunk {
             genai_rs::StreamChunk::Delta(content) => {
-                if let genai_rs::InteractionContent::Unknown { content_type, .. } = &content
+                if let genai_rs::Content::Unknown { content_type, .. } = &content
                     && !unknown_types_found.contains(content_type)
                 {
                     unknown_types_found.push(content_type.clone());
@@ -149,16 +149,14 @@ async fn canary_function_calling_interaction() {
     if !response.function_calls().is_empty() {
         let call = &response.function_calls()[0];
 
-        use genai_rs::interactions_api::{
-            function_call_content, function_result_content, text_content,
-        };
+        use genai_rs::Content;
 
         // Build conversation history with the function call and result
         let call_id = call.id.unwrap_or("call_1");
         let history = InteractionInput::Content(vec![
-            text_content("What time is it?"),
-            function_call_content(call.name, json!({})),
-            function_result_content(call.name, call_id, json!({"time": "12:00 PM"})),
+            Content::text("What time is it?"),
+            Content::function_call(call.name, json!({})),
+            Content::function_result(call.name, call_id, json!({"time": "12:00 PM"})),
         ]);
 
         let followup = client
@@ -217,14 +215,14 @@ async fn canary_code_execution_interaction() {
 #[tokio::test]
 #[ignore] // Requires GEMINI_API_KEY
 async fn canary_multimodal_interaction() {
-    use genai_rs::interactions_api::{image_data_content, text_content};
+    use genai_rs::Content;
 
     let client = get_client().expect("GEMINI_API_KEY must be set");
 
     // Use a tiny 1x1 red PNG
     let input = InteractionInput::Content(vec![
-        text_content("What color is this image?"),
-        image_data_content(common::TINY_RED_PNG_BASE64, "image/png"),
+        Content::text("What color is this image?"),
+        Content::image_data(common::TINY_RED_PNG_BASE64, "image/png"),
     ]);
 
     let response = client
