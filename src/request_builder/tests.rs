@@ -488,6 +488,38 @@ async fn test_auto_functions_rejects_store_disabled() {
 }
 
 #[tokio::test]
+async fn test_stream_auto_functions_rejects_store_disabled() {
+    use futures_util::StreamExt;
+
+    // Streaming auto-function execution also requires storage
+    let client = create_test_client();
+    let func = FunctionDeclaration::builder("test_func")
+        .description("Test function")
+        .build();
+
+    let mut stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Test")
+        .add_function(func)
+        .with_store_disabled() // This should be rejected
+        .create_stream_with_auto_functions();
+
+    // Should return an error stream immediately
+    let first_item = stream.next().await;
+    assert!(first_item.is_some(), "Stream should have at least one item");
+    let result = first_item.unwrap();
+    assert!(result.is_err(), "First stream item should be an error");
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("create_with_auto_functions() requires storage"),
+        "Expected auto-functions+store error, got: {}",
+        err
+    );
+}
+
+#[tokio::test]
 async fn test_auto_functions_allows_store_true() {
     // This test verifies that store=true (explicit) doesn't trigger the validation error.
     // The actual API call will fail (invalid key), but validation should pass.
