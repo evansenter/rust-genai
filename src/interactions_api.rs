@@ -499,8 +499,7 @@ pub fn file_uri_content(file: &crate::FileMetadata) -> Content {
 /// **Prefer:** [`Content::from_uri_and_mime()`] for new code.
 ///
 /// This is the shared implementation used by [`file_uri_content`] and
-/// [`crate::InteractionBuilder::add_file_uri`]. The content type is inferred
-/// from the MIME type:
+/// [`Content::from_uri_and_mime`]. The content type is inferred from the MIME type:
 ///
 /// - `image/*` → [`Content::Image`]
 /// - `audio/*` → [`Content::Audio`]
