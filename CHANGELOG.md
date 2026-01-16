@@ -68,16 +68,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING**: Removed `CodeExecutionOutcome` enum - actual wire format uses `is_error: bool` and `result: String` fields directly, not `outcome`/`output` as documented
 - `CodeExecutionResultInfo` now has `is_error: bool` and `result: &str` fields instead of `outcome: CodeExecutionOutcome` and `output: &str`
-- `InteractionContent::CodeExecutionResult` variant now uses `is_error: bool, result: String` instead of `outcome: CodeExecutionOutcome, output: String`
+- `Content::CodeExecutionResult` variant now uses `is_error: bool, result: String` instead of `outcome: CodeExecutionOutcome, output: String`
 - `InteractionResponse::successful_code_output()` now checks `!is_error` instead of `outcome.is_success()`
 - **BREAKING**: `FunctionCallInfo` and `OwnedFunctionCallInfo` no longer have `thought_signature` field - API never sends this on function calls
-- Renamed `InteractionContent::new_function_call_with_signature()` to `new_function_call_with_id()` and removed `thought_signature` parameter
+- Renamed `Content::new_function_call_with_signature()` to `Content::function_call_with_id()` and removed `thought_signature` parameter
 - Renamed `function_call_content_with_signature()` to `function_call_content_with_id()` and removed `thought_signature` parameter
 
 ### Removed
 
 - **BREAKING**: `CodeExecutionOutcome` enum - the actual API wire format doesn't use this enum
-- **BREAKING**: `thought_signature` field from `InteractionContent::FunctionCall` variant - API does not send this field on function calls (thought signatures appear only on `Thought` content blocks)
+- **BREAKING**: `thought_signature` field from `Content::FunctionCall` variant - API does not send this field on function calls (thought signatures appear only on `Thought` content blocks)
 
 ### Migration Guide
 
