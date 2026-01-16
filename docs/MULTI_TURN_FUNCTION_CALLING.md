@@ -275,7 +275,7 @@ for _ in 0..MAX_ITERATIONS {
     response = client.interaction()
         .with_model("gemini-3-flash-preview")
         .with_previous_interaction(response.id.as_ref().unwrap())
-        .set_content(results)
+        .with_content(results)
         .create()
         .await?;
 }
@@ -317,7 +317,7 @@ let result_contents: Vec<_> = calls.iter().zip(results.iter())
 // Function result turn - no need to resend tools
 response = client.interaction()
     .with_previous_interaction(&response.id.unwrap())
-    .set_content(result_contents)
+    .with_content(result_contents)
     .create()
     .await?;
 ```
@@ -438,7 +438,7 @@ let results = execute_functions(&calls);
 // Function result turn - no tools needed
 response = client.interaction()
     .with_previous_interaction(&response.id.unwrap())
-    .set_content(results)  // Just the function results
+    .with_content(results)  // Just the function results
     .create()
     .await?;
 ```

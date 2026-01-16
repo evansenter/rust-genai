@@ -405,12 +405,12 @@ for audio in response.audios() {
 ### Thought Helpers (Thinking Mode)
 
 ```rust,ignore
-// Check for reasoning content
+// Check for thinking content
 let has_thoughts: bool = response.has_thoughts();
 
-// Iterate thoughts
-for thought in response.thoughts() {
-    println!("Reasoning: {}", thought);
+// Iterate thought signatures (cryptographic proofs, not readable reasoning)
+for signature in response.thought_signatures() {
+    println!("Thought signature: {}", signature);
 }
 ```
 

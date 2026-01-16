@@ -242,7 +242,7 @@ Expose chain-of-thought reasoning.
 ```bash
 cargo run --example thinking
 ```
-**Learn**: `with_thinking_level()`, `response.thoughts()`.
+**Learn**: `with_thinking_level()`, `response.has_thoughts()`, `response.thought_signatures()`.
 
 #### deep_research
 Long-running research with background execution.
