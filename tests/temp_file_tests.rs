@@ -209,7 +209,7 @@ async fn test_document_from_file_rejects_txt() {
 /// Tests sending plain text file content (the correct approach for text-based files).
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_txt_as_text_content() {
+async fn test_txt_file_as_text_input() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -280,7 +280,7 @@ async fn test_document_from_file_rejects_markdown() {
 /// Tests sending Markdown file content as text (the correct approach for text-based files).
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_markdown_as_text_content() {
+async fn test_markdown_file_as_text_input() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -359,7 +359,7 @@ async fn test_document_from_file_rejects_csv() {
 /// be read and sent as Content::text() instead.
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_csv_as_text_content() {
+async fn test_csv_file_as_text_input() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;

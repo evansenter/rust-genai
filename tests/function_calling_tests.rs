@@ -540,7 +540,7 @@ mod parallel {
     }
 
     #[tokio::test]
-    #[ignore = "requires GEMINI_API_KEY"]
+    #[ignore = "Requires API key"]
     async fn test_parallel_function_result_order_independence() {
         with_timeout(test_timeout(), async {
             let client = get_client().expect("GEMINI_API_KEY required");
@@ -617,7 +617,7 @@ mod parallel {
     }
 
     #[tokio::test]
-    #[ignore = "requires GEMINI_API_KEY"]
+    #[ignore = "Requires API key"]
     async fn test_parallel_function_partial_failure() {
         with_timeout(test_timeout(), async {
             let client = get_client().expect("GEMINI_API_KEY required");
@@ -1209,7 +1209,7 @@ mod auto_execution {
     }
 
     #[tokio::test]
-    #[ignore = "requires GEMINI_API_KEY"]
+    #[ignore = "Requires API key"]
     async fn test_auto_functions_timeout_returns_error() {
         with_timeout(test_timeout(), async {
             let client = get_client().expect("GEMINI_API_KEY required");
@@ -1231,7 +1231,7 @@ mod auto_execution {
     }
 
     #[tokio::test]
-    #[ignore = "requires GEMINI_API_KEY"]
+    #[ignore = "Requires API key"]
     async fn test_auto_functions_stream_timeout_returns_error() {
         use futures_util::StreamExt;
 
@@ -1336,7 +1336,7 @@ mod stateless {
     use super::*;
 
     #[tokio::test]
-    #[ignore = "requires GEMINI_API_KEY"]
+    #[ignore = "Requires API key"]
     async fn test_stateless_function_calling_multi_turn() {
         with_timeout(extended_test_timeout(), async {
             let client = get_client().expect("GEMINI_API_KEY required");
@@ -1413,7 +1413,7 @@ mod stateless {
     ///
     /// Note: Thought signatures appear on Thought content blocks, not on function calls.
     #[tokio::test]
-    #[ignore = "requires GEMINI_API_KEY"]
+    #[ignore = "Requires API key"]
     async fn test_stateless_with_thinking_function_calling() {
         use genai_rs::FunctionCallingMode;
 
@@ -2717,7 +2717,7 @@ mod multiturn {
 
     /// Test ThinkingLevel::High with function calling.
     #[tokio::test]
-    #[ignore = "requires GEMINI_API_KEY"]
+    #[ignore = "Requires API key"]
     async fn test_thinking_level_high_function_calling() {
         use genai_rs::FunctionCallingMode;
 
@@ -2762,7 +2762,7 @@ mod multiturn {
 
     /// Test FunctionCallingMode::Any forces function calling.
     #[tokio::test]
-    #[ignore = "requires GEMINI_API_KEY"]
+    #[ignore = "Requires API key"]
     async fn test_function_calling_mode_any() {
         use genai_rs::FunctionCallingMode;
 

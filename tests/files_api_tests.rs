@@ -12,7 +12,7 @@ fn get_client() -> Client {
 
 /// Tests uploading a small text file.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_upload_text_file() {
     let client = get_client();
 
@@ -48,7 +48,7 @@ async fn test_upload_text_file() {
 
 /// Tests uploading bytes directly.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_upload_bytes() {
     let client = get_client();
 
@@ -68,7 +68,7 @@ async fn test_upload_bytes() {
 
 /// Tests getting file metadata.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_get_file() {
     let client = get_client();
 
@@ -94,7 +94,7 @@ async fn test_get_file() {
 
 /// Tests listing files.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_list_files() {
     let client = get_client();
 
@@ -121,7 +121,7 @@ async fn test_list_files() {
 
 /// Tests deleting a file.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_delete_file() {
     let client = get_client();
 
@@ -148,7 +148,7 @@ async fn test_delete_file() {
 /// with the Interactions API. This test validates the upload and API mechanics work,
 /// but the model may not always access the file content properly.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_file_in_interaction() {
     let client = get_client();
 
@@ -195,7 +195,7 @@ async fn test_file_in_interaction() {
 
 /// Tests that Content::from_file() correctly infers content type.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_content_from_file_type_inference() {
     use genai_rs::Content;
 
@@ -259,7 +259,7 @@ async fn test_content_from_file_type_inference() {
 
 /// Tests pagination when listing files.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_list_files_pagination() {
     let client = get_client();
 
@@ -308,7 +308,7 @@ async fn test_list_files_pagination() {
 
 /// Tests the wait_for_file_ready function with an already active file.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_wait_for_file_ready_immediate() {
     let client = get_client();
 
@@ -337,7 +337,7 @@ async fn test_wait_for_file_ready_immediate() {
 /// Tests that wait_for_file_ready times out appropriately.
 /// Note: This is a synthetic test since we can't easily create a file that stays processing.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_wait_for_file_ready_timeout() {
     // This test is more about verifying the timeout mechanism works
     // We can't easily test a real timeout without a file that processes slowly
@@ -372,7 +372,7 @@ async fn test_wait_for_file_ready_timeout() {
 
 /// Tests that get_file returns an error for non-existent files.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_get_nonexistent_file_returns_error() {
     let client = get_client();
 
@@ -400,7 +400,7 @@ async fn test_get_nonexistent_file_returns_error() {
 /// This test creates a file larger than the default chunk size to verify
 /// the streaming mechanism works correctly across multiple chunks.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_upload_file_chunked() {
     let client = get_client();
 
@@ -461,7 +461,7 @@ async fn test_upload_file_chunked() {
 
 /// Tests chunked upload with automatic MIME type detection.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_upload_file_chunked_auto_mime() {
     let client = get_client();
 
@@ -492,7 +492,7 @@ async fn test_upload_file_chunked_auto_mime() {
 
 /// Tests chunked upload with a custom chunk size.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_upload_file_chunked_custom_chunk_size() {
     let client = get_client();
 
@@ -521,7 +521,7 @@ async fn test_upload_file_chunked_custom_chunk_size() {
 
 /// Tests chunked upload validates empty files.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_upload_file_chunked_empty_file_error() {
     let client = get_client();
 
@@ -546,7 +546,7 @@ async fn test_upload_file_chunked_empty_file_error() {
 
 /// Tests chunked upload with nonexistent file returns appropriate error.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_upload_file_chunked_nonexistent_file_error() {
     let client = get_client();
 
@@ -566,7 +566,7 @@ async fn test_upload_file_chunked_nonexistent_file_error() {
 
 /// Tests that file uploaded via chunked method can be used in an interaction.
 #[tokio::test]
-#[ignore] // Requires API key
+#[ignore = "Requires API key"]
 async fn test_chunked_upload_in_interaction() {
     let client = get_client();
 

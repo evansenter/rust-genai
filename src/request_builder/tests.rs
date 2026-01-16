@@ -845,6 +845,11 @@ fn test_with_content_and_text_merge() {
         }
         _ => panic!("Expected Content input"),
     }
+
+    // Verify order-independence: both orders produce identical serialized output
+    let json1 = serde_json::to_string(&request.input).unwrap();
+    let json2 = serde_json::to_string(&request2.input).unwrap();
+    assert_eq!(json1, json2, "Builder order should not affect result");
 }
 
 #[test]

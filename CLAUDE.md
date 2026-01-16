@@ -39,8 +39,10 @@ make clean     # Clean build artifacts
 
 **Default**: Always run `make test-all` for full integration testing.
 
+**Note**: Doctests run only in CI (`cargo test --workspace --doc`), not via `make test` or `make test-all`. This is intentional—doctests add compile overhead and CI catches them.
+
 ```bash
-make test-all                                    # Full test suite (requires GEMINI_API_KEY)
+make test-all                                    # Integration tests (requires GEMINI_API_KEY)
 make test                                        # Unit tests only
 cargo nextest run -E 'test(/test_name/)'         # Single test by name
 cargo nextest run --test integration_file        # Single integration test file
@@ -55,6 +57,7 @@ cargo nextest run --test integration_file        # Single integration test file
 | Include ignored | `-- --include-ignored` | `--run-ignored all` |
 | Single test | `test_name` | `test_name` (or `-E 'test(/regex/)'`) |
 | Release mode | `--release` | `--cargo-profile release` |
+| Show output | `-- --nocapture` | `--no-capture` |
 
 ### Quality Checks
 
@@ -156,6 +159,11 @@ Unknown {
 
 Helper methods: `is_unknown()`, `unknown_<context>_type()`, `unknown_data()`
 
+**When adding enums with Unknown variants**, implement all three helper methods:
+- `fn is_unknown(&self) -> bool`
+- `fn unknown_<context>_type(&self) -> Option<&str>`
+- `fn unknown_data(&self) -> Option<&serde_json::Value>`
+
 See `Content` in `src/content.rs` for reference implementation.
 
 **When adding/updating enums**: Always update `docs/ENUM_WIRE_FORMATS.md` with verified wire format and Unknown variant info. Test with `LOUD_WIRE=1` to confirm actual API format.
@@ -169,6 +177,10 @@ See `Content` in `src/content.rs` for reference implementation.
 - **Property-based tests** (proptest): Serialization roundtrip verification
   - `src/proptest_tests.rs`: Strategy generators
   - `tests/proptest_roundtrip_tests.rs`: Integration proptests
+
+**Test conventions**:
+- Use `#[ignore = "Requires API key"]` (exact format) for tests needing `GEMINI_API_KEY`
+- New public constructors need unit tests, not just integration tests (e.g., `Content::from_file()` should have unit tests for MIME type inference logic)
 
 ### Test Assertion Strategies
 

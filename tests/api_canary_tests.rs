@@ -53,7 +53,7 @@ fn assert_no_unknown_content(response: &genai_rs::InteractionResponse, context: 
 /// Tests the simplest API call pattern to detect any new content types
 /// in basic text responses.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_basic_text_interaction() {
     let client = get_client().expect("GEMINI_API_KEY must be set");
 
@@ -72,7 +72,7 @@ async fn canary_basic_text_interaction() {
 ///
 /// Tests streaming responses to detect any new delta content types.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_streaming_interaction() {
     let client = get_client().expect("GEMINI_API_KEY must be set");
 
@@ -121,7 +121,7 @@ async fn canary_streaming_interaction() {
 /// Tests function calling responses to detect any new content types
 /// in function call/result handling.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_function_calling_interaction() {
     use genai_rs::FunctionDeclaration;
     use serde_json::json;
@@ -176,7 +176,7 @@ async fn canary_function_calling_interaction() {
 /// Tests the built-in code execution tool to detect any new content types.
 /// Uses timeout protection since code execution sandbox can be slow/unavailable.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_code_execution_interaction() {
     use genai_rs::Tool;
     use std::time::Duration;
@@ -213,7 +213,7 @@ async fn canary_code_execution_interaction() {
 ///
 /// Tests image input to detect any new content types in multimodal responses.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_multimodal_interaction() {
     use genai_rs::Content;
 
@@ -240,7 +240,7 @@ async fn canary_multimodal_interaction() {
 ///
 /// Tests models with extended thinking to detect any new thought-related content types.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_thinking_model_interaction() {
     use genai_rs::{GenerationConfig, ThinkingLevel};
 
