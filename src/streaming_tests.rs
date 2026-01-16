@@ -118,5 +118,5 @@ fn test_deserialize_interaction_complete_event() {
 
     let interaction = event.interaction.unwrap();
     assert_eq!(interaction.id.as_deref(), Some("interaction_456"));
-    assert_eq!(interaction.text(), Some("1, 2, 3"));
+    assert_eq!(interaction.as_text(), Some("1, 2, 3"));
 }

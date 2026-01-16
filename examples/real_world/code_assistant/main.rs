@@ -160,7 +160,7 @@ impl CodeAssistant {
             .create()
             .await?;
 
-        let text = response.text().ok_or("No response text")?;
+        let text = response.as_text().ok_or("No response text")?;
         let analysis: CodeAnalysis = serde_json::from_str(text)?;
         Ok(analysis)
     }
@@ -217,7 +217,7 @@ impl CodeAssistant {
             .create()
             .await?;
 
-        let text = response.text().ok_or("No response text")?;
+        let text = response.as_text().ok_or("No response text")?;
         let docs: DocumentationResult = serde_json::from_str(text)?;
         Ok(docs)
     }
@@ -247,7 +247,7 @@ impl CodeAssistant {
             .create()
             .await?;
 
-        let text = response.text().ok_or("No response text")?;
+        let text = response.as_text().ok_or("No response text")?;
         Ok(text.to_string())
     }
 
@@ -283,7 +283,7 @@ impl CodeAssistant {
             .create()
             .await?;
 
-        let text = response.text().ok_or("No response text")?;
+        let text = response.as_text().ok_or("No response text")?;
         Ok(text.to_string())
     }
 }

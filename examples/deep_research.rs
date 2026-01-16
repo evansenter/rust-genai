@@ -257,7 +257,7 @@ fn display_research_results(response: &genai_rs::InteractionResponse) {
     println!("Status: {:?}", response.status);
     println!("Interaction ID: {:?}\n", response.id);
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         let display_text = truncate_for_display(text, DISPLAY_LIMIT);
         println!("Research Results:\n{display_text}\n");
     } else {

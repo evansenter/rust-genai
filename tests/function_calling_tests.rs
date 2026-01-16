@@ -33,10 +33,9 @@ use common::{
     interaction_builder, retry_on_any_error, stateful_builder, test_timeout,
     validate_response_semantically, with_timeout,
 };
-use genai_rs::interactions_api::{function_call_content, text_content};
 use genai_rs::{
-    CallableFunction, FunctionDeclaration, FunctionExecutionResult, GenaiError, InteractionInput,
-    InteractionStatus, ThinkingLevel, function_result_content,
+    CallableFunction, Content, FunctionDeclaration, FunctionExecutionResult, GenaiError,
+    InteractionInput, InteractionStatus, ThinkingLevel,
 };
 use genai_rs_macros::tool;
 use serde_json::json;
@@ -204,7 +203,7 @@ mod basic {
             assert_eq!(call.name, "get_server_status");
             assert!(call.id.is_some(), "Should have call ID");
 
-            let result = function_result_content(
+            let result = Content::function_result(
                 "get_server_status",
                 call.id.unwrap().to_string(),
                 json!({"status": "online", "uptime": "99.9%"}),
@@ -219,7 +218,7 @@ mod basic {
                 .expect("Second interaction failed");
 
             assert!(response2.has_text(), "Should have final response");
-            println!("Final response: {}", response2.text().unwrap());
+            println!("Final response: {}", response2.as_text().unwrap());
         }
     }
 
@@ -301,7 +300,7 @@ mod basic {
         }
 
         let call = &calls[0];
-        let error_result = function_result_content(
+        let error_result = Content::function_result(
             "get_secret_data",
             call.id.unwrap().to_string(),
             json!({"error": "Access denied: insufficient permissions"}),
@@ -318,7 +317,7 @@ mod basic {
         println!("Response after error: {:?}", response2.status);
 
         if response2.has_text() {
-            let text = response2.text().unwrap();
+            let text = response2.as_text().unwrap();
             println!("Model's response to error: {}", text);
             assert!(
                 !text.is_empty(),
@@ -515,7 +514,7 @@ mod parallel {
                         "get_time" => json!({"timezone": "CET", "time": "14:30"}),
                         _ => json!({"result": "ok"}),
                     };
-                    function_result_content(
+                    Content::function_result(
                         call.name.to_string(),
                         call.id.expect("Should have ID").to_string(),
                         result_data,
@@ -589,7 +588,7 @@ mod parallel {
                         "get_time" => json!({"timezone": "JST", "time": "14:30"}),
                         _ => json!({"result": "unknown"}),
                     };
-                    results.push(function_result_content(
+                    results.push(Content::function_result(
                         name,
                         id.as_ref().expect("call should have ID"),
                         result,
@@ -606,7 +605,7 @@ mod parallel {
                     .expect("Function result turn failed - order might matter?");
 
                 assert!(
-                    response2.text().is_some(),
+                    response2.as_text().is_some(),
                     "Expected text response after reversed results"
                 );
                 println!("✓ Parallel results accepted in reverse order");
@@ -669,7 +668,7 @@ mod parallel {
                         }
                         _ => json!({"result": "ok"}),
                     };
-                    results.push(function_result_content(
+                    results.push(Content::function_result(
                         name,
                         id.as_ref().expect("call should have ID"),
                         result,
@@ -685,7 +684,7 @@ mod parallel {
                     .await
                     .expect("Function result turn failed");
 
-                let text = response2.text();
+                let text = response2.as_text();
                 assert!(
                     text.is_some(),
                     "Expected text response with partial results"
@@ -756,7 +755,7 @@ mod sequential {
 
             // Step 2: Provide first function result
             let call1 = &calls1[0];
-            let result1 = function_result_content(
+            let result1 = Content::function_result(
                 call1.name.to_string(),
                 call1.id.unwrap().to_string(),
                 json!({"city": "Tokyo", "temperature": 22.0, "unit": "celsius"}),
@@ -780,7 +779,7 @@ mod sequential {
                     call2.name, call2.args
                 );
 
-                let result2 = function_result_content(
+                let result2 = Content::function_result(
                     call2.name.to_string(),
                     call2.id.unwrap().to_string(),
                     json!({"value": 71.6, "unit": "fahrenheit"}),
@@ -795,7 +794,7 @@ mod sequential {
                     .expect("Third interaction failed");
 
                 if response3.has_text() {
-                    let text = response3.text().unwrap();
+                    let text = response3.as_text().unwrap();
                     println!("Final response: {}", text);
                     assert!(!text.is_empty(), "Response should have non-empty text");
                 }
@@ -834,7 +833,7 @@ mod sequential {
             }
 
             let call = &calls[0];
-            let result = function_result_content(
+            let result = Content::function_result(
                 call.name.to_string(),
                 call.id.expect("Should have ID").to_string(),
                 json!({"city": "Tokyo", "temperature": "22°C", "conditions": "sunny"}),
@@ -909,7 +908,7 @@ mod sequential {
                             "get_weather" => json!({"city": "Tokyo", "temperature": "22°C", "conditions": "sunny"}),
                             _ => json!({"result": "ok"}),
                         };
-                        function_result_content(
+                        Content::function_result(
                             call.name.clone(),
                             call.id.as_ref().expect("Should have ID").clone(),
                             result_data,
@@ -1362,7 +1361,7 @@ mod stateless {
             ];
 
             let mut history: Vec<genai_rs::Content> =
-                vec![text_content("What's the weather in Tokyo?")];
+                vec![Content::text("What's the weather in Tokyo?")];
 
             let response1 = client
                 .interaction()
@@ -1382,9 +1381,9 @@ mod stateless {
 
             for call in &calls {
                 let call_id = call.id.expect("Function call should have ID");
-                history.push(function_call_content(call.name, call.args.clone()));
+                history.push(Content::function_call(call.name, call.args.clone()));
                 let result = json!({"city": "Tokyo", "temperature": "22°C", "conditions": "sunny"});
-                history.push(function_result_content(call.name, call_id, result));
+                history.push(Content::function_result(call.name, call_id, result));
             }
 
             let response2 = client
@@ -1397,7 +1396,7 @@ mod stateless {
                 .await
                 .expect("Function result turn failed");
 
-            let text = response2.text();
+            let text = response2.as_text();
             assert!(
                 text.is_some(),
                 "Expected text response after function result"
@@ -1429,7 +1428,7 @@ mod stateless {
             .required(vec!["city".to_string()])
             .build();
 
-        let history: Vec<genai_rs::Content> = vec![text_content("What's the weather in Paris?")];
+        let history: Vec<genai_rs::Content> = vec![Content::text("What's the weather in Paris?")];
 
         // Stateless with thinking enabled, force function calling
         let response = client
@@ -1509,7 +1508,7 @@ mod thinking {
         assert!(call.id.is_some(), "Function call must have an id");
 
         // Turn 2: Provide function result
-        let function_result = function_result_content(
+        let function_result = Content::function_result(
             "get_weather",
             call.id.expect("call_id should exist").to_string(),
             json!({"temperature": "18°C", "conditions": "rainy", "precipitation": "80%", "humidity": "85%"}),
@@ -1535,7 +1534,7 @@ mod thinking {
             "Turn 2 should have text response about the weather"
         );
 
-        let text2 = response2.text().unwrap();
+        let text2 = response2.as_text().unwrap();
         let is_valid = validate_response_semantically(
             &client,
             "User asked 'What's the weather in Tokyo? Should I bring an umbrella?' and received weather data showing 18°C, rainy conditions, 80% precipitation",
@@ -1607,7 +1606,7 @@ mod thinking {
                 "get_time" => json!({"time": "14:30", "timezone": "JST", "date": "2025-01-15"}),
                 _ => json!({"status": "unknown function"}),
             };
-            results.push(function_result_content(
+            results.push(Content::function_result(
                 call.name,
                 call.id.expect("call should have ID"),
                 result_data,
@@ -1680,7 +1679,7 @@ mod thinking {
             }
 
             let call = &function_calls[0];
-            let function_result = function_result_content(
+            let function_result = Content::function_result(
                 "get_weather",
                 call.id.expect("call should have ID"),
                 json!({"temperature": "15°C", "conditions": "sunny"}),
@@ -1756,7 +1755,7 @@ mod thinking {
         println!("Function call: {} (id: {:?})", call.name, call.id);
 
         // Turn 2: Provide result
-        let function_result = function_result_content(
+        let function_result = Content::function_result(
             "get_weather",
             call.id.expect("call_id should exist"),
             json!({"temperature": "22°C", "conditions": "clear", "humidity": "45%"}),
@@ -1831,7 +1830,7 @@ mod thinking {
 
         // Turn 2: Stream the follow-up
         let call = &function_calls[0];
-        let function_result = function_result_content(
+        let function_result = Content::function_result(
             "get_weather",
             call.id.expect("call should have ID"),
             json!({"temperature": "18°C", "conditions": "rainy", "precipitation": "85%", "humidity": "90%"}),
@@ -1962,7 +1961,7 @@ mod thinking {
             println!("Step 1 function call: {} (id: {:?})", call1.name, call1.id);
 
             // Provide result
-            let result1 = function_result_content(
+            let result1 = Content::function_result(
                 "get_weather",
                 call1.id.unwrap().to_string(),
                 json!({"temperature": "22°C"}),
@@ -2117,7 +2116,7 @@ mod thinking {
                 _ => json!({"status": "unknown function"}),
             };
 
-            results1.push(function_result_content(
+            results1.push(Content::function_result(
                 call.name,
                 call.id.expect("call should have ID"),
                 result_data,
@@ -2184,7 +2183,7 @@ mod thinking {
                     _ => json!({"status": "ok"}),
                 };
 
-                results2.push(function_result_content(
+                results2.push(Content::function_result(
                     call.name,
                     call.id.expect("call should have ID"),
                     result_data,
@@ -2224,7 +2223,7 @@ mod thinking {
             }
 
             if response3.has_text() {
-                let text = response3.text().unwrap();
+                let text = response3.as_text().unwrap();
                 println!("Step 3 text preview: {}...", &text[..text.len().min(200)]);
 
                 // Use semantic validation instead of brittle keyword matching
@@ -2249,7 +2248,7 @@ mod thinking {
             println!("ℹ Model completed in 2 steps (no sequential chain needed)");
 
             if response2.has_text() {
-                let text = response2.text().unwrap();
+                let text = response2.as_text().unwrap();
                 println!("Step 2 text preview: {}...", &text[..text.len().min(200)]);
             }
 
@@ -2346,7 +2345,7 @@ mod multiturn {
         let response3 = result3.response;
         assert!(response3.has_text(), "Turn 3 should have text response");
 
-        let text = response3.text().unwrap();
+        let text = response3.as_text().unwrap();
         println!("Turn 3 response: {}", text);
 
         let is_valid = validate_response_semantically(
@@ -2440,7 +2439,7 @@ mod multiturn {
                 "get_time" => json!({"timezone": "GMT", "time": "14:30:00"}),
                 _ => json!({"error": "Unknown function"}),
             };
-            results.push(function_result_content(
+            results.push(Content::function_result(
                 call.name.to_string(),
                 call_id.to_string(),
                 result,
@@ -2463,7 +2462,7 @@ mod multiturn {
             response2.has_text(),
             "Should have text response after function results"
         );
-        println!("Response: {}", response2.text().unwrap());
+        println!("Response: {}", response2.as_text().unwrap());
 
         // Turn 3: Chained follow-up
         let response3 = client
@@ -2478,7 +2477,7 @@ mod multiturn {
             .expect("Turn 3 should succeed");
 
         if response3.has_text() {
-            let text = response3.text().unwrap();
+            let text = response3.as_text().unwrap();
             println!("Turn 3 response: {}", text);
         }
     }
@@ -2519,7 +2518,7 @@ mod multiturn {
                     .create()
                     .await?;
 
-                let text = response2.text().ok_or("Turn 2 should have text")?;
+                let text = response2.as_text().ok_or("Turn 2 should have text")?;
 
                 let is_valid = validate_response_semantically(
                     &client,
@@ -2677,7 +2676,7 @@ mod multiturn {
 
         // Return error result
         let call = &function_calls[0];
-        let error_result = function_result_content(
+        let error_result = Content::function_result(
             "get_secret_data".to_string(),
             call.id.expect("Should have ID").to_string(),
             json!({"error": "Permission denied: insufficient privileges for key 'test123'"}),
@@ -2701,7 +2700,7 @@ mod multiturn {
             "Should have text response explaining error"
         );
 
-        let text = response2.text().unwrap();
+        let text = response2.as_text().unwrap();
         println!("Response: {}", text);
 
         // Model should explain the error to user - use semantic validation to avoid brittle keyword matching
@@ -2835,7 +2834,7 @@ mod builtins_multiturn {
         let response1 = match result1 {
             Ok(response) => {
                 println!("Turn 1 status: {:?}", response.status);
-                if let Some(text) = response.text() {
+                if let Some(text) = response.as_text() {
                     println!("Turn 1 response: {}", text);
                 }
                 response
@@ -2870,7 +2869,7 @@ mod builtins_multiturn {
         match result2 {
             Ok(response2) => {
                 println!("Turn 2 status: {:?}", response2.status);
-                if let Some(text) = response2.text() {
+                if let Some(text) = response2.as_text() {
                     println!("Turn 2 response: {}", text);
                     assert!(
                         !text.is_empty(),
@@ -2918,7 +2917,7 @@ mod builtins_multiturn {
         let response1 = match result1 {
             Ok(response) => {
                 println!("Turn 1 status: {:?}", response.status);
-                if let Some(text) = response.text() {
+                if let Some(text) = response.as_text() {
                     println!("Turn 1 response: {}", text);
                 }
                 response
@@ -2952,7 +2951,7 @@ mod builtins_multiturn {
         match result2 {
             Ok(response2) => {
                 println!("Turn 2 status: {:?}", response2.status);
-                if let Some(text) = response2.text() {
+                if let Some(text) = response2.as_text() {
                     println!("Turn 2 response: {}", text);
                     assert!(
                         !text.is_empty(),
@@ -3000,7 +2999,7 @@ mod builtins_multiturn {
         let response1 = match result1 {
             Ok(response) => {
                 println!("Turn 1 status: {:?}", response.status);
-                if let Some(text) = response.text() {
+                if let Some(text) = response.as_text() {
                     println!("Turn 1 response: {}", text);
                 }
                 response
@@ -3036,13 +3035,13 @@ mod builtins_multiturn {
         match result2 {
             Ok(response2) => {
                 println!("Turn 2 status: {:?}", response2.status);
-                if let Some(text) = response2.text() {
+                if let Some(text) = response2.as_text() {
                     println!("Turn 2 response: {}", text);
                 }
                 // Check for the expected calculation (5! * 2 = 240)
                 let results = response2.code_execution_results();
                 let has_correct_result = results.iter().any(|r| r.result.contains("240"))
-                    || response2.text().is_some_and(|t| t.contains("240"));
+                    || response2.as_text().is_some_and(|t| t.contains("240"));
                 assert!(has_correct_result, "Turn 2 should calculate 120 * 2 = 240");
                 assert_eq!(
                     response2.status,

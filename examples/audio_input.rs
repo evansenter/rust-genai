@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     match response {
         Ok(r) => {
-            if let Some(text) = r.text() {
+            if let Some(text) = r.as_text() {
                 println!("Response: {text}\n");
             }
         }
@@ -161,7 +161,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .await
     {
         Ok(response) => {
-            if let Some(text) = response.text() {
+            if let Some(text) = response.as_text() {
                 println!("Response: {text}\n");
             }
         }

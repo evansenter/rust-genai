@@ -598,13 +598,13 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// # Example
     /// ```no_run
-    /// # use genai_rs::{Client, function_result_content};
+    /// # use genai_rs::{Client, Content};
     /// # use serde_json::json;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api_key".to_string()).build()?;
     ///
-    /// let result = function_result_content("my_func", "call_123", json!({"data": "result"}));
+    /// let result = Content::function_result("my_func", "call_123", json!({"data": "result"}));
     ///
     /// let response = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
@@ -669,7 +669,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .create()
     ///     .await?;
     ///
-    /// println!("{}", response.text().unwrap_or("No response"));
+    /// println!("{}", response.as_text().unwrap_or("No response"));
     /// # Ok(())
     /// # }
     /// ```
@@ -708,7 +708,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .create()
     ///     .await?;
     ///
-    /// println!("{}", response.text().unwrap_or("No response"));
+    /// println!("{}", response.as_text().unwrap_or("No response"));
     /// # Ok(())
     /// # }
     /// ```
@@ -1436,7 +1436,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///     .await?;
     ///
     /// // Response is guaranteed to be valid JSON matching the schema
-    /// let text = response.text().unwrap();
+    /// let text = response.as_text().unwrap();
     /// let data: serde_json::Value = serde_json::from_str(text)?;
     /// println!("Name: {}", data["name"]);
     /// # Ok(())
@@ -2011,7 +2011,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
             // Content input mode (single-turn multimodal)
             // If there's also a current_message, prepend it as text content
             if let Some(text) = self.current_message {
-                content.insert(0, crate::interactions_api::text_content(text));
+                content.insert(0, Content::text(text));
             }
             InteractionInput::Content(content)
         } else {

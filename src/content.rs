@@ -47,7 +47,7 @@ use std::fmt;
 /// # use genai_rs::{InteractionResponse, Annotation};
 /// # let response: InteractionResponse = todo!();
 /// # let annotation: &Annotation = todo!();
-/// if let Some(text) = response.text() {
+/// if let Some(text) = response.as_text() {
 ///     // Use byte slicing since indices are byte positions
 ///     let bytes = text.as_bytes();
 ///     if annotation.end_index <= bytes.len() {

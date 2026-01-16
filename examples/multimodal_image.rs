@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("=== MULTIMODAL IMAGE INPUT EXAMPLE ===\n");
 
-    // Method 1: Fluent builder pattern with add_image_data()
+    // Method 1: Fluent builder pattern with Content::image_data()
     // This is the most ergonomic approach for inline multimodal content
     println!("Sending image to Gemini for analysis...\n");
 
@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Status: {:?}", response.status);
     println!();
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("Image Description:");
         println!("{}", text);
     }
@@ -84,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    if let Some(text) = comparison.text() {
+    if let Some(text) = comparison.as_text() {
         println!("Comparison: {}", text);
     }
 
@@ -105,7 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     println!("Low resolution analysis:");
-    if let Some(text) = low_res_response.text() {
+    if let Some(text) = low_res_response.as_text() {
         println!("  {}", text);
     }
     if let Some(usage) = &low_res_response.usage {
@@ -124,7 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     println!("\nHigh resolution analysis:");
-    if let Some(text) = high_res_response.text() {
+    if let Some(text) = high_res_response.as_text() {
         println!("  {}", text);
     }
     if let Some(usage) = &high_res_response.usage {
@@ -144,7 +144,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    if let Some(text) = helper_response.text() {
+    if let Some(text) = helper_response.as_text() {
         println!("  {}", text);
     }
 
@@ -166,7 +166,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    if let Some(text) = follow_up.text() {
+    if let Some(text) = follow_up.as_text() {
         println!("Assistant: {}", text);
     }
 

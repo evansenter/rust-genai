@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
 
             // Display the model's response
-            if let Some(text) = response.text() {
+            if let Some(text) = response.as_text() {
                 println!("\nModel Response:");
                 println!("{text}");
             }
@@ -87,7 +87,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             println!("Content summary: {}", summary);
 
             // Display the model's response
-            if let Some(text) = response.text() {
+            if let Some(text) = response.as_text() {
                 println!("\nModel Response:");
                 println!("{text}");
             }

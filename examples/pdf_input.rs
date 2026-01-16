@@ -66,7 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Status: {:?}\n", response.status);
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("Analysis:\n{}\n", text);
     }
 
@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    if let Some(text) = follow_up.text() {
+    if let Some(text) = follow_up.as_text() {
         println!("Follow-up Response:\n{}\n", text);
     }
 

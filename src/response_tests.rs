@@ -111,7 +111,7 @@ fn test_interaction_response_text() {
         updated: None,
     };
 
-    assert_eq!(response.text(), Some("Hello"));
+    assert_eq!(response.as_text(), Some("Hello"));
     assert_eq!(response.all_text(), "HelloWorld");
     assert!(response.has_text());
     assert!(!response.has_function_calls());
@@ -156,7 +156,7 @@ fn test_interaction_response_thoughts() {
     assert_eq!(signatures[1], "sig_2");
 
     // Verify text() still works (only returns Text content)
-    assert_eq!(response.text(), Some("The answer is 42."));
+    assert_eq!(response.as_text(), Some("The answer is 42."));
 }
 
 #[test]
@@ -295,7 +295,7 @@ fn test_interaction_response_mixed_content() {
         updated: None,
     };
 
-    assert_eq!(response.text(), Some("Let me check"));
+    assert_eq!(response.as_text(), Some("Let me check"));
     assert_eq!(response.all_text(), "Let me checkDone!");
     assert_eq!(response.function_calls().len(), 1);
     assert!(response.has_text());
@@ -320,7 +320,7 @@ fn test_interaction_response_empty_outputs() {
         updated: None,
     };
 
-    assert_eq!(response.text(), None);
+    assert_eq!(response.as_text(), None);
     assert_eq!(response.all_text(), "");
     assert_eq!(response.function_calls().len(), 0);
     assert!(!response.has_text());

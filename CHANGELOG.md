@@ -46,6 +46,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   **Migration**: Use `with_content(vec![Content::*(...)])` instead. See migration guide below.
 
+- **BREAKING**: Removed all `*_content()` free functions from `interactions_api`:
+  - `text_content()`, `image_data_content()`, `image_uri_content()`, `audio_data_content()`, `audio_uri_content()`
+  - `video_data_content()`, `video_uri_content()`, `document_data_content()`, `document_uri_content()`
+  - `function_call_content()`, `function_result_content()`, `file_data_content()`, `file_uri_content()`
+
+  **Migration**: Use `Content::*()` static constructors instead (e.g., `text_content("hi")` → `Content::text("hi")`).
+
+  **Note**: Model output constructors for testing remain in `interactions_api`: `code_execution_*`, `google_search_*`, `url_context_*`, `file_search_*`.
+
 ### Fixed
 
 - `AgentConfig` (DeepResearchConfig) now serializes `thinking_summaries` with snake_case per API spec, not camelCase `thinkingSummaries`

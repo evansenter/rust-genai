@@ -55,7 +55,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             println!("Status: {:?}\n", response.status);
 
             // Display the model's text response
-            if let Some(text) = response.text() {
+            if let Some(text) = response.as_text() {
                 println!("Model Response:\n{text}\n");
             }
 
@@ -99,7 +99,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     match advanced_result {
         Ok(response) => {
             println!("Status: {:?}", response.status);
-            if let Some(text) = response.text() {
+            if let Some(text) = response.as_text() {
                 let preview: String = text.chars().take(200).collect();
                 println!("Response: {preview}\n");
             }
@@ -133,7 +133,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 has_file_results, has_web_results
             );
 
-            if let Some(text) = response.text() {
+            if let Some(text) = response.as_text() {
                 let preview: String = text.chars().take(300).collect();
                 println!("Response preview: {preview}...");
             }

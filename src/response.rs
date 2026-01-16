@@ -1093,12 +1093,12 @@ impl InteractionResponse {
     /// ```no_run
     /// # use genai_rs::InteractionResponse;
     /// # let response: InteractionResponse = todo!();
-    /// if let Some(text) = response.text() {
+    /// if let Some(text) = response.as_text() {
     ///     println!("Response: {}", text);
     /// }
     /// ```
     #[must_use]
-    pub fn text(&self) -> Option<&str> {
+    pub fn as_text(&self) -> Option<&str> {
         self.outputs.iter().find_map(|content| {
             if let Content::Text { text: Some(t), .. } = content {
                 Some(t.as_str())

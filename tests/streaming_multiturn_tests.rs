@@ -14,7 +14,7 @@
 mod common;
 
 use common::{consume_stream, get_client, stateful_builder, validate_response_semantically};
-use genai_rs::{FunctionDeclaration, InteractionStatus, function_result_content};
+use genai_rs::{Content, FunctionDeclaration, InteractionStatus};
 use serde_json::json;
 
 // =============================================================================
@@ -126,7 +126,7 @@ async fn test_streaming_multi_turn_function_calling() {
     println!("Function call: {} with args: {:?}", call.name, call.args);
 
     // Turn 2: Provide function result
-    let function_result = function_result_content(
+    let function_result = Content::function_result(
         "get_weather",
         call.id.expect("Function call should have ID").to_string(),
         json!({"temperature": "18°C", "conditions": "rainy", "humidity": "85%"}),
@@ -146,7 +146,7 @@ async fn test_streaming_multi_turn_function_calling() {
 
     println!("Turn 2 status: {:?}", response2.status);
     if response2.has_text() {
-        println!("Turn 2 text: {}", response2.text().unwrap());
+        println!("Turn 2 text: {}", response2.as_text().unwrap());
     }
 
     // Turn 3: Stream a follow-up question about the weather context

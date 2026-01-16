@@ -829,7 +829,7 @@ mod tests {
             StreamChunk::Complete(response) => {
                 assert_eq!(response.id.as_deref(), Some("test-interaction-123"));
                 assert_eq!(response.status, InteractionStatus::Completed);
-                assert_eq!(response.text(), Some("The answer is 4."));
+                assert_eq!(response.as_text(), Some("The answer is 4."));
             }
             _ => panic!("Expected Complete variant"),
         }

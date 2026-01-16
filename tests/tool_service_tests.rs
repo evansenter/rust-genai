@@ -160,7 +160,7 @@ async fn test_tool_service_non_streaming() {
         // Verify final response
         let response = &result.response;
         assert!(response.has_text(), "Should have text response");
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Final response: {}", text);
 
         // Should mention the sum (912.468)
@@ -228,7 +228,7 @@ async fn test_tool_service_streaming() {
             "Should have text response"
         );
 
-        let text = response.text().unwrap_or(&result.collected_text);
+        let text = response.as_text().unwrap_or(&result.collected_text);
         println!("Final response: {}", text);
 
         // Should mention 150 (the result of 50 * 3)
@@ -442,7 +442,7 @@ async fn test_tool_service_streaming_with_multiple_functions() {
 
         // Response should contain the answers
         let response = result.final_response.unwrap();
-        let text = response.text().unwrap_or(&result.collected_text);
+        let text = response.as_text().unwrap_or(&result.collected_text);
         println!("Final response: {}", text);
 
         // Should mention 8 (5+3) or 28 (4*7)

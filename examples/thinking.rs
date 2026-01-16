@@ -68,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Print the final answer
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("Final Answer:\n{}\n", text);
     }
 
@@ -115,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         let preview = if text.len() > 200 {
             format!("{}...", &text[..200])
         } else {
@@ -161,7 +161,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Received {} thought signature(s)\n", sig_count);
         }
 
-        if let Some(text) = response.text() {
+        if let Some(text) = response.as_text() {
             let preview = if text.len() > 150 {
                 format!("{}...", &text[..150])
             } else {

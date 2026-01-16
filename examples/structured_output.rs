@@ -117,7 +117,7 @@ async fn basic_structured_output(client: &Client) -> Result<(), Box<dyn Error>> 
 
     // The response is guaranteed to be valid JSON matching our schema.
     // Note: In production code, handle the Option properly instead of using expect().
-    let text = response.text().expect("Should have text response");
+    let text = response.as_text().expect("Should have text response");
     println!("Raw JSON response:\n{}\n", text);
 
     // Parse into our Rust struct
@@ -182,7 +182,7 @@ async fn complex_nested_schema(client: &Client) -> Result<(), Box<dyn Error>> {
         .await?;
 
     // Note: In production code, handle the Option properly instead of using expect().
-    let text = response.text().expect("Should have text response");
+    let text = response.as_text().expect("Should have text response");
 
     // Parse and pretty-print the JSON
     let json: serde_json::Value = serde_json::from_str(text)?;
@@ -237,7 +237,7 @@ async fn structured_with_search(client: &Client) -> Result<(), Box<dyn Error>> {
         .await?;
 
     // Note: In production code, handle the Option properly instead of using expect().
-    let text = response.text().expect("Should have text response");
+    let text = response.as_text().expect("Should have text response");
     let json: serde_json::Value = serde_json::from_str(text)?;
     println!("Stock Info JSON:\n{}", serde_json::to_string_pretty(&json)?);
 
@@ -309,7 +309,7 @@ async fn streaming_structured_output(client: &Client) -> Result<(), Box<dyn Erro
     println!("\n");
 
     // Parse and display the final structured result
-    if let Some(text) = final_response.as_ref().and_then(|r| r.text()) {
+    if let Some(text) = final_response.as_ref().and_then(|r| r.as_text()) {
         let json: serde_json::Value = serde_json::from_str(text)?;
         println!("Parsed result:");
         println!(

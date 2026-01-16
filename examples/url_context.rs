@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
 
             // 5. Display the model's response
-            if let Some(text) = response.text() {
+            if let Some(text) = response.as_text() {
                 println!("\nModel Response:");
                 println!("{text}");
             }

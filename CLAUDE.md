@@ -156,7 +156,7 @@ Unknown {
 
 Helper methods: `is_unknown()`, `unknown_<context>_type()`, `unknown_data()`
 
-See `InteractionContent` in `src/content.rs` for reference implementation.
+See `Content` in `src/content.rs` for reference implementation.
 
 **When adding/updating enums**: Always update `docs/ENUM_WIRE_FORMATS.md` with verified wire format and Unknown variant info. Test with `LOUD_WIRE=1` to confirm actual API format.
 

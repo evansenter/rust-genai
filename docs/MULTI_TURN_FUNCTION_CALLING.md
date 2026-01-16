@@ -62,10 +62,10 @@ let response = client.interaction()
 ### Stateless Mode (`store: false`)
 
 ```rust,ignore
-let mut history: Vec<InteractionContent> = vec![];
+let mut history: Vec<Content> = vec![];
 
 // First turn
-history.push(text_content("Hi, I'm Alice"));
+history.push(Content::text("Hi, I'm Alice"));
 
 let response = client.interaction()
     .with_model("gemini-3-flash-preview")
@@ -76,10 +76,10 @@ let response = client.interaction()
     .await?;
 
 // Add response to history
-history.push(text_content(response.text().unwrap()));
+history.push(Content::text(response.as_text().unwrap()));
 
 // Second turn - must include full history
-history.push(text_content("What's my name?"));
+history.push(Content::text("What's my name?"));
 
 let response = client.interaction()
     .with_model("gemini-3-flash-preview")
@@ -237,7 +237,7 @@ let result = client.interaction()
 for exec in &result.executions {
     println!("{} -> {}", exec.name, exec.result);
 }
-println!("Final: {}", result.response.text().unwrap());
+println!("Final: {}", result.response.as_text().unwrap());
 ```
 
 **Characteristics:**
@@ -265,7 +265,7 @@ for _ in 0..MAX_ITERATIONS {
     for call in &calls {
         let call_id = call.id.ok_or("Missing call_id")?;
         let result = execute_function(call.name, call.args);
-        results.push(function_result_content(
+        results.push(Content::function_result(
             call.name.to_string(),
             call_id.to_string(),
             result,
@@ -307,7 +307,7 @@ let results: Vec<_> = futures::future::join_all(
 
 // Send all results back together
 let result_contents: Vec<_> = calls.iter().zip(results.iter())
-    .map(|(call, result)| function_result_content(
+    .map(|(call, result)| Content::function_result(
         call.name,
         call.id.unwrap(),
         result.clone(),
@@ -503,13 +503,13 @@ for call in response.function_calls() {
 
     // Execute and add result
     let result = execute_function(call.name, call.args);
-    history.push(function_result_content(call.name, call_id, result));
+    history.push(Content::function_result(call.name, call_id, result));
 }
 ```
 
 **For thought echo**: Echoing thoughts back to the model works **without** including signatures. See `test_thought_echo_manual_history` in `tests/interactions_api_tests.rs`.
 
-**For compliance/auditing**: Capture signatures from `InteractionContent::Thought { signature }`. The signature IS populated on thought outputs.
+**For compliance/auditing**: Capture signatures from `Content::Thought { signature }`. The signature IS populated on thought outputs.
 
 ### Tests
 
@@ -554,7 +554,7 @@ impl Agent {
         };
 
         self.last_id = response.id.clone();
-        Ok(response.text().unwrap_or("").to_string())
+        Ok(response.as_text().unwrap_or("").to_string())
     }
 }
 ```
@@ -573,14 +573,14 @@ The match pattern is verbose but clear about the two distinct states.
 ```rust,ignore
 struct StatelessSession {
     client: Client,
-    history: Vec<InteractionContent>,
+    history: Vec<Content>,
     functions: Vec<FunctionDeclaration>,
     system_instruction: String,
 }
 
 impl StatelessSession {
     async fn process(&mut self, message: &str) -> Result<String, Error> {
-        self.history.push(text_content(message));
+        self.history.push(Content::text(message));
 
         let mut response = self.client.interaction()
             .with_model("gemini-3-flash-preview")
@@ -593,8 +593,8 @@ impl StatelessSession {
 
         // Handle function calls...
 
-        if let Some(text) = response.text() {
-            self.history.push(text_content(text));
+        if let Some(text) = response.as_text() {
+            self.history.push(Content::text(text));
             Ok(text.to_string())
         } else {
             Ok(String::new())

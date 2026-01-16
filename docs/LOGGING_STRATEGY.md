@@ -62,7 +62,7 @@ tracing::warn!(
 
 // Unknown API type (src/content.rs)
 tracing::warn!(
-    "Encountered unknown InteractionContent type '{}'. \
+    "Encountered unknown Content type '{}'. \
      Parse error: {}. \
      This may indicate a new API feature or a malformed response. \
      The content will be preserved in the Unknown variant.",
@@ -175,7 +175,7 @@ All Evergreen-pattern `Unknown` variants log when encountered:
 
 | Type | Location |
 |------|----------|
-| `InteractionContent::Unknown` | `src/content.rs` |
+| `Content::Unknown` | `src/content.rs` |
 | `InteractionStatus::Unknown` | `src/response.rs` |
 | `Tool::Unknown` | `src/tools.rs` |
 | `StreamChunk::Unknown` | `src/wire_streaming.rs` |

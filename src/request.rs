@@ -167,7 +167,7 @@ impl From<Vec<Content>> for TurnContent {
 impl TurnContent {
     /// Returns the text content if this is a `Text` variant.
     #[must_use]
-    pub fn text(&self) -> Option<&str> {
+    pub fn as_text(&self) -> Option<&str> {
         match self {
             Self::Text(t) => Some(t),
             Self::Parts(_) => None,
@@ -217,7 +217,7 @@ impl TurnContent {
 ///
 /// // Access via getters
 /// assert!(matches!(turn.role(), &Role::User));
-/// assert_eq!(turn.content().text(), Some("Hello!"));
+/// assert_eq!(turn.content().as_text(), Some("Hello!"));
 /// ```
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Turn {
@@ -286,8 +286,8 @@ impl Turn {
 
     /// Returns the text content if this turn contains text.
     #[must_use]
-    pub fn text(&self) -> Option<&str> {
-        self.content().text()
+    pub fn as_text(&self) -> Option<&str> {
+        self.content().as_text()
     }
 }
 

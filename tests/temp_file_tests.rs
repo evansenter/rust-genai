@@ -23,8 +23,8 @@ use common::{
     stateful_builder,
 };
 use genai_rs::{
-    InteractionInput, InteractionStatus, audio_from_file, document_from_file, image_from_file,
-    text_content,
+    Content, InteractionInput, InteractionStatus, audio_from_file, document_from_file,
+    image_from_file,
 };
 use tempfile::TempDir;
 
@@ -58,7 +58,7 @@ async fn test_image_from_temp_file() {
 
     // Send to API
     let contents = vec![
-        text_content("What color is this image? Answer with just the color name."),
+        Content::text("What color is this image? Answer with just the color name."),
         image_content,
     ];
 
@@ -71,7 +71,7 @@ async fn test_image_from_temp_file() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("Color response: {}", text);
 
     // The tiny PNG is red - use semantic validation
@@ -110,7 +110,7 @@ async fn test_image_mismatched_mime() {
         .expect("Failed to load image from file");
 
     let contents = vec![
-        text_content("Is this an image? Answer yes or no."),
+        Content::text("Is this an image? Answer yes or no."),
         image_content,
     ];
 
@@ -121,7 +121,7 @@ async fn test_image_mismatched_mime() {
         .expect("Image interaction failed");
 
     assert_eq!(response.status, InteractionStatus::Completed);
-    println!("Response: {:?}", response.text());
+    println!("Response: {:?}", response.as_text());
 }
 
 // =============================================================================
@@ -152,7 +152,7 @@ async fn test_pdf_from_temp_file() {
         .expect("Failed to load PDF from file");
 
     let contents = vec![
-        text_content("What text does this PDF contain? Answer with just the text."),
+        Content::text("What text does this PDF contain? Answer with just the text."),
         doc_content,
     ];
 
@@ -165,7 +165,7 @@ async fn test_pdf_from_temp_file() {
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
 
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("PDF response: {}", text);
 
     // The minimal PDF contains "Hello World" - use semantic validation
@@ -203,7 +203,7 @@ async fn test_txt_from_temp_file() {
         .expect("Failed to load TXT from file");
 
     let contents = vec![
-        text_content("What animal jumps in this text? Answer with one word."),
+        Content::text("What animal jumps in this text? Answer with one word."),
         doc_content,
     ];
 
@@ -214,7 +214,7 @@ async fn test_txt_from_temp_file() {
         .expect("TXT interaction failed");
 
     assert_eq!(response.status, InteractionStatus::Completed);
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("TXT response: {}", text);
 
     // Use semantic validation - the text asks about which animal jumps
@@ -256,7 +256,7 @@ async fn test_markdown_from_temp_file() {
         .expect("Failed to load Markdown from file");
 
     let contents = vec![
-        text_content("How many features are listed in this markdown? Answer with just a number."),
+        Content::text("How many features are listed in this markdown? Answer with just a number."),
         doc_content,
     ];
 
@@ -267,7 +267,7 @@ async fn test_markdown_from_temp_file() {
         .expect("Markdown interaction failed");
 
     assert_eq!(response.status, InteractionStatus::Completed);
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("Markdown response: {}", text);
 
     // Use semantic validation for the count
@@ -300,7 +300,7 @@ async fn test_csv_from_temp_file() {
         .expect("Failed to load CSV from file");
 
     let contents = vec![
-        text_content("Who has the highest score in this CSV? Answer with just the name."),
+        Content::text("Who has the highest score in this CSV? Answer with just the name."),
         doc_content,
     ];
 
@@ -311,7 +311,7 @@ async fn test_csv_from_temp_file() {
         .expect("CSV interaction failed");
 
     assert_eq!(response.status, InteractionStatus::Completed);
-    let text = response.text().unwrap();
+    let text = response.as_text().unwrap();
     println!("CSV response: {}", text);
 
     // Use semantic validation - Alice has score 95 (highest)
@@ -354,7 +354,7 @@ async fn test_audio_from_temp_file() {
         .expect("Failed to load audio from file");
 
     let contents = vec![
-        text_content("Is this an audio file? Answer yes or no."),
+        Content::text("Is this an audio file? Answer yes or no."),
         audio_content,
     ];
 
@@ -366,7 +366,7 @@ async fn test_audio_from_temp_file() {
 
     assert_eq!(response.status, InteractionStatus::Completed);
     assert!(response.has_text(), "Should have text response");
-    println!("Audio response: {:?}", response.text());
+    println!("Audio response: {:?}", response.as_text());
 }
 
 // =============================================================================

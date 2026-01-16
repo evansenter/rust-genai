@@ -38,7 +38,7 @@ let response = client
     .await?;
 
 // Response available immediately
-println!("{}", response.text().unwrap());
+println!("{}", response.as_text().unwrap());
 ```
 
 ### Agents
@@ -138,7 +138,7 @@ match response.status {
         println!("Task running, ID: {:?}", response.id);
     }
     InteractionStatus::Completed => {
-        println!("Completed immediately: {}", response.text().unwrap());
+        println!("Completed immediately: {}", response.as_text().unwrap());
     }
     _ => {}
 }
@@ -211,7 +211,7 @@ let result = poll_for_completion(
     Duration::from_secs(120),
 ).await?;
 
-println!("Research complete: {}", result.text().unwrap());
+println!("Research complete: {}", result.as_text().unwrap());
 ```
 
 ### Streaming During Polling
@@ -227,7 +227,7 @@ while let Some(result) = stream.next().await {
     match result {
         Ok(event) => {
             if let StreamChunk::Delta(delta) = event.chunk {
-                if let Some(text) = delta.text() {
+                if let Some(text) = delta.as_text() {
                     print!("{}", text);
                 }
             }

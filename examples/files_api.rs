@@ -74,7 +74,7 @@ to analyze multiple times without resending the data.
         .await?;
 
     println!("   Response:");
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         for line in text.lines() {
             println!("   {line}");
         }
@@ -94,7 +94,7 @@ to analyze multiple times without resending the data.
         .await?;
 
     println!("   Response:");
-    if let Some(text) = response2.text() {
+    if let Some(text) = response2.as_text() {
         for line in text.lines() {
             println!("   {line}");
         }

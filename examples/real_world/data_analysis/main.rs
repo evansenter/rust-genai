@@ -401,7 +401,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
 
         // Show the analysis result
-        if let Some(text) = result.response.text() {
+        if let Some(text) = result.response.as_text() {
             println!("📊 Analysis:\n{}\n", text);
         }
     }

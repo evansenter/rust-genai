@@ -659,7 +659,7 @@ mod duration_millis {
 ///     .await?;
 ///
 /// // Access the final response
-/// if let Some(text) = result.response.text() {
+/// if let Some(text) = result.response.as_text() {
 ///     println!("Answer: {}", text);
 /// }
 ///

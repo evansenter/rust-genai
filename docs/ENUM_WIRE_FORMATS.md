@@ -11,7 +11,7 @@ All types below implement graceful handling of unrecognized values via an `Unkno
 | # | Type | Location | Context Field | Notes |
 |---|------|----------|---------------|-------|
 | 1 | `Resolution` | src/content.rs | `resolution_type` | Image/video quality |
-| 2 | `InteractionContent` | src/content.rs | `content_type` | 18+ content types |
+| 2 | `Content` | src/content.rs | `content_type` | 18+ content types |
 | 3 | `StreamChunk` | src/wire_streaming.rs | `chunk_type` | Low-level SSE chunks |
 | 4 | `AutoFunctionStreamChunk` | src/streaming.rs | `chunk_type` | High-level streaming |
 | 5 | `FileState` | src/http/files.rs | `state_type` | File upload states |
@@ -59,19 +59,19 @@ Helper methods on each type:
 | `Tool::FileSearch` | snake_case object | `{"type": "file_search", ...}` | Rust: `store_names`, Wire: `file_search_store_names` |
 | `FileSearchResult` | snake_case | `{"type": "file_search_result", "call_id": ...}` | Rust: `store`, Wire: `file_search_store` |
 | `Tool::ComputerUse` | snake_case | `"computer_use"` | **UNVERIFIED** - from docs |
-| `InteractionContent::ComputerUseCall` | snake_case | `"computer_use_call"` | **UNVERIFIED** - from docs |
-| `InteractionContent::ComputerUseResult` | snake_case | `"computer_use_result"` | **UNVERIFIED** - from docs |
+| `Content::ComputerUseCall` | snake_case | `"computer_use_call"` | **UNVERIFIED** - from docs |
+| `Content::ComputerUseResult` | snake_case | `"computer_use_result"` | **UNVERIFIED** - from docs |
 | `SpeechConfig` | camelCase fields | `{"voice": "Kore", "language": "en-US"}` | Inside generationConfig |
 | Audio MIME type (TTS response) | with params | `"audio/L16;codec=pcm;rate=24000"` | Raw PCM audio |
-| `InteractionContent::Thought` | snake_case + signature | `{"type": "thought", "signature": "..."}` | Cryptographic, not text |
-| `InteractionContent::GoogleSearchCall` | snake_case + nested args | `{"type": "google_search_call", "id": "...", "arguments": {"queries": [...]}}` | Verified 2026-01-13 |
-| `InteractionContent::GoogleSearchResult` | snake_case | `{"type": "google_search_result", "call_id": "...", "result": [...]}` | Verified 2026-01-13 |
+| `Content::Thought` | snake_case + signature | `{"type": "thought", "signature": "..."}` | Cryptographic, not text |
+| `Content::GoogleSearchCall` | snake_case + nested args | `{"type": "google_search_call", "id": "...", "arguments": {"queries": [...]}}` | Verified 2026-01-13 |
+| `Content::GoogleSearchResult` | snake_case | `{"type": "google_search_result", "call_id": "...", "result": [...]}` | Verified 2026-01-13 |
 | `GoogleSearchResultItem` | snake_case | `{"title": "...", "url": "...", "rendered_content": "..."}` | Verified 2026-01-13 - all snake_case |
-| `InteractionContent::UrlContextCall` | snake_case + nested args | `{"type": "url_context_call", "id": "...", "arguments": {"urls": [...]}}` | Verified 2026-01-13 |
-| `InteractionContent::UrlContextResult` | snake_case + result array | `{"type": "url_context_result", "call_id": "...", "result": [...]}` | Verified 2026-01-13 |
+| `Content::UrlContextCall` | snake_case + nested args | `{"type": "url_context_call", "id": "...", "arguments": {"urls": [...]}}` | Verified 2026-01-13 |
+| `Content::UrlContextResult` | snake_case + result array | `{"type": "url_context_result", "call_id": "...", "result": [...]}` | Verified 2026-01-13 |
 | `UrlContextResultItem` | snake_case | `{"url": "...", "status": "success"}` | Verified 2026-01-13 - no paywall field |
-| `InteractionContent::CodeExecutionCall` | snake_case + nested args | `{"type": "code_execution_call", "id": "...", "arguments": {"language": "...", "code": "..."}}` | Verified 2026-01-13 |
-| `InteractionContent::CodeExecutionResult` | snake_case + is_error/result | `{"type": "code_execution_result", "call_id": "...", "is_error": false, "result": "..."}` | Verified 2026-01-13 - no signature field |
+| `Content::CodeExecutionCall` | snake_case + nested args | `{"type": "code_execution_call", "id": "...", "arguments": {"language": "...", "code": "..."}}` | Verified 2026-01-13 |
+| `Content::CodeExecutionResult` | snake_case + is_error/result | `{"type": "code_execution_result", "call_id": "...", "is_error": false, "result": "..."}` | Verified 2026-01-13 - no signature field |
 | `CodeExecutionLanguage` | SCREAMING_SNAKE_CASE | `"PYTHON"` | Currently only Python supported |
 | `UrlRetrievalStatus` | SCREAMING_SNAKE_CASE | `"URL_RETRIEVAL_STATUS_SUCCESS"` | URL fetch result status |
 
@@ -264,8 +264,8 @@ Content types (assumed):
 | `Tool::ComputerUse` | `"computer_use"` | Tool type |
 | `Tool::ComputerUse.environment` | `"browser"` | Only supported value |
 | `Tool::ComputerUse.excluded_predefined_functions` | `"excludedPredefinedFunctions"` | camelCase field name |
-| `InteractionContent::ComputerUseCall` | `"computer_use_call"` | Content type |
-| `InteractionContent::ComputerUseResult` | `"computer_use_result"` | Content type |
+| `Content::ComputerUseCall` | `"computer_use_call"` | Content type |
+| `Content::ComputerUseResult` | `"computer_use_result"` | Content type |
 
 **TODO**: Verify with `LOUD_WIRE=1 cargo run --example computer_use` when API access is available.
 

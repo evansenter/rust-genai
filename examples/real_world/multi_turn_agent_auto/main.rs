@@ -291,7 +291,7 @@ impl SupportSession {
         // Extract and return the text response
         Ok(result
             .response
-            .text()
+            .as_text()
             .unwrap_or("I apologize, but I couldn't process that request. Please try again.")
             .to_string())
     }

@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "Model response: {}\n",
-        response.text().unwrap_or("No response")
+        response.as_text().unwrap_or("No response")
     );
 
     // Approach 2: Using with_history() with pre-built history
@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "Model response: {}\n",
-        response.text().unwrap_or("No response")
+        response.as_text().unwrap_or("No response")
     );
 
     // Approach 3: Building history dynamically
@@ -94,7 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .create()
             .await?;
 
-        let model_response = response.text().unwrap_or("No response");
+        let model_response = response.as_text().unwrap_or("No response");
         println!("Model: {}\n", model_response);
 
         // Add model response to history for next turn

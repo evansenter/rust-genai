@@ -36,9 +36,7 @@ mod image {
         SAMPLE_IMAGE_URL, TINY_BLUE_PNG_BASE64, TINY_RED_PNG_BASE64, assert_response_semantic,
         get_client, stateful_builder, test_timeout, with_timeout,
     };
-    use genai_rs::{
-        InteractionInput, InteractionStatus, image_data_content, image_uri_content, text_content,
-    };
+    use genai_rs::{Content, InteractionInput, InteractionStatus};
 
     /// Tests image input via GCS URI (gs://) which may not be supported by the Interactions API.
     /// This test documents the expected "Unsupported file uri" error behavior when the API rejects
@@ -53,8 +51,8 @@ mod image {
         };
 
         let contents = vec![
-            text_content("What is in this image? Describe it briefly in 1-2 sentences."),
-            image_uri_content(SAMPLE_IMAGE_URL, "image/jpeg"),
+            Content::text("What is in this image? Describe it briefly in 1-2 sentences."),
+            Content::image_uri(SAMPLE_IMAGE_URL, "image/jpeg"),
         ];
 
         let result = stateful_builder(&client)
@@ -69,7 +67,7 @@ mod image {
                     response.has_text(),
                     "Should have text response describing image"
                 );
-                let text = response.text().unwrap().to_lowercase();
+                let text = response.as_text().unwrap().to_lowercase();
                 println!("Image description: {}", text);
             }
             Err(e) => {
@@ -97,8 +95,8 @@ mod image {
 
         // Use tiny red PNG for testing base64 input
         let contents = vec![
-            text_content("What color is this image? Answer with just the color name."),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+            Content::text("What color is this image? Answer with just the color name."),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
         ];
 
         let response = stateful_builder(&client)
@@ -110,7 +108,7 @@ mod image {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Color response: {}", text);
 
         // The tiny PNG is red
@@ -134,11 +132,11 @@ mod image {
 
         // Send two images in a single request (both base64)
         let contents = vec![
-            text_content(
+            Content::text(
                 "I'm showing you two small colored images. What colors are they? List both.",
             ),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+            Content::image_data(TINY_BLUE_PNG_BASE64, "image/png"),
         ];
 
         let response = stateful_builder(&client)
@@ -150,7 +148,7 @@ mod image {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Multiple images response: {}", text);
 
         // Should mention the colors from both images
@@ -174,8 +172,8 @@ mod image {
         with_timeout(test_timeout(), async {
             // First turn: describe the base64 image
             let contents = vec![
-                text_content("What color is this image?"),
-                image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+                Content::text("What color is this image?"),
+                Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
             ];
 
             let response1 = stateful_builder(&client)
@@ -185,7 +183,7 @@ mod image {
                 .expect("First interaction failed");
 
             assert_eq!(response1.status, InteractionStatus::Completed);
-            println!("First response: {:?}", response1.text());
+            println!("First response: {:?}", response1.as_text());
 
             // Second turn: ask follow-up about the same image
             let response2 = stateful_builder(&client)
@@ -198,7 +196,7 @@ mod image {
             assert_eq!(response2.status, InteractionStatus::Completed);
             assert!(response2.has_text(), "Should have follow-up response");
 
-            let text = response2.text().unwrap();
+            let text = response2.as_text().unwrap();
             println!("Follow-up response: {}", text);
 
             // Red is a warm color - use semantic validation
@@ -216,7 +214,7 @@ mod image {
 
 mod audio {
     use crate::common::{SAMPLE_AUDIO_URL, TINY_WAV_BASE64, get_client, stateful_builder};
-    use genai_rs::{InteractionInput, audio_uri_content, text_content};
+    use genai_rs::{Content, InteractionInput};
 
     /// Tests audio input from URI.
     /// Note: GCS URIs are not supported by the Interactions API.
@@ -229,8 +227,8 @@ mod audio {
         };
 
         let contents = vec![
-            text_content("What is this audio about? Summarize briefly."),
-            audio_uri_content(SAMPLE_AUDIO_URL, "audio/mpeg"),
+            Content::text("What is this audio about? Summarize briefly."),
+            Content::audio_uri(SAMPLE_AUDIO_URL, "audio/mpeg"),
         ];
 
         let result = stateful_builder(&client)
@@ -242,7 +240,7 @@ mod audio {
             Ok(response) => {
                 println!("Audio response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Audio transcription/summary: {}", text);
                 }
             }
@@ -270,8 +268,8 @@ mod audio {
         // Use tiny WAV for testing base64 audio input
         // Note: This is a minimal header with no actual audio, so the model may report it's empty/silent
         let contents = vec![
-            text_content("Describe what you hear in this audio file."),
-            genai_rs::audio_data_content(TINY_WAV_BASE64, "audio/wav"),
+            Content::text("Describe what you hear in this audio file."),
+            genai_rs::Content::audio_data(TINY_WAV_BASE64, "audio/wav"),
         ];
 
         let result = stateful_builder(&client)
@@ -283,7 +281,7 @@ mod audio {
             Ok(response) => {
                 println!("Base64 audio response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Audio response: {}", text);
                     // Just verify we got some response - the content can vary
                     assert!(!text.is_empty(), "Should get some response about the audio");
@@ -301,7 +299,7 @@ mod audio {
 
 mod video {
     use crate::common::{SAMPLE_VIDEO_URL, TINY_MP4_BASE64, get_client, stateful_builder};
-    use genai_rs::{InteractionInput, text_content, video_data_content, video_uri_content};
+    use genai_rs::{Content, InteractionInput};
 
     /// Tests video input from URI.
     /// Note: GCS URIs are not supported by the Interactions API.
@@ -314,8 +312,8 @@ mod video {
         };
 
         let contents = vec![
-            text_content("What animals appear in this video? List them."),
-            video_uri_content(SAMPLE_VIDEO_URL, "video/mp4"),
+            Content::text("What animals appear in this video? List them."),
+            Content::video_uri(SAMPLE_VIDEO_URL, "video/mp4"),
         ];
 
         let result = stateful_builder(&client)
@@ -327,7 +325,7 @@ mod video {
             Ok(response) => {
                 println!("Video response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Video description: {}", text);
                 }
             }
@@ -357,8 +355,8 @@ mod video {
         // Use minimal MP4 for testing base64 video input
         // Note: This is a minimal header with no actual video frames, so the model may report it's empty
         let contents = vec![
-            text_content("Describe what you see in this video file."),
-            video_data_content(TINY_MP4_BASE64, "video/mp4"),
+            Content::text("Describe what you see in this video file."),
+            Content::video_data(TINY_MP4_BASE64, "video/mp4"),
         ];
 
         let result = stateful_builder(&client)
@@ -370,7 +368,7 @@ mod video {
             Ok(response) => {
                 println!("Base64 video response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Video response: {}", text);
                     // Just verify we got some response - the content can vary
                     assert!(!text.is_empty(), "Should get some response about the video");
@@ -392,7 +390,7 @@ mod mixed_content {
         TINY_BLUE_PNG_BASE64, TINY_RED_PNG_BASE64, assert_response_semantic, get_client,
         stateful_builder,
     };
-    use genai_rs::{InteractionInput, InteractionStatus, image_data_content, text_content};
+    use genai_rs::{Content, InteractionInput, InteractionStatus};
 
     #[tokio::test]
     #[ignore = "Requires API key"]
@@ -404,9 +402,9 @@ mod mixed_content {
 
         // Interleave text and base64 image content
         let contents = vec![
-            text_content("I'm going to show you an image."),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            text_content("Based on the color above, what emotion might it represent?"),
+            Content::text("I'm going to show you an image."),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+            Content::text("Based on the color above, what emotion might it represent?"),
         ];
 
         let response = stateful_builder(&client)
@@ -418,7 +416,7 @@ mod mixed_content {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Interleaved content response: {}", text);
 
         // Red is associated with passion, anger, love, energy - use semantic validation
@@ -441,11 +439,11 @@ mod mixed_content {
 
         // Ask model to compare two base64 images
         let contents = vec![
-            text_content(
+            Content::text(
                 "Compare these two colored squares. What are their colors and how do they differ?",
             ),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+            Content::image_data(TINY_BLUE_PNG_BASE64, "image/png"),
         ];
 
         let response = stateful_builder(&client)
@@ -457,7 +455,7 @@ mod mixed_content {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Comparison response: {}", text);
 
         // Should mention differences or colors - use semantic validation
@@ -476,10 +474,7 @@ mod mixed_media {
         TINY_MP4_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, assert_response_semantic,
         get_client, stateful_builder,
     };
-    use genai_rs::{
-        InteractionInput, InteractionStatus, audio_data_content, image_data_content, text_content,
-        video_data_content,
-    };
+    use genai_rs::{Content, InteractionInput, InteractionStatus};
 
     /// Tests combining multiple media types (image + audio) in a single interaction.
     ///
@@ -498,14 +493,14 @@ mod mixed_media {
 
         // Combine image and audio with a question about both
         let contents = vec![
-            text_content(
+            Content::text(
                 "I'm sending you an image and an audio file. \
                  For the image, tell me what color it is. \
                  For the audio, describe what kind of audio file it appears to be. \
                  Keep your response brief.",
             ),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            audio_data_content(TINY_WAV_BASE64, "audio/wav"),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+            Content::audio_data(TINY_WAV_BASE64, "audio/wav"),
         ];
 
         let result = stateful_builder(&client)
@@ -522,7 +517,7 @@ mod mixed_media {
                 );
                 assert!(response.has_text(), "Should have text response");
 
-                let text = response.text().unwrap();
+                let text = response.as_text().unwrap();
                 println!("Mixed media response: {}", text);
 
                 // Verify the model acknowledged at least one input using semantic validation
@@ -572,13 +567,13 @@ mod mixed_media {
 
         // Combine all three media types
         let contents = vec![
-            text_content(
+            Content::text(
                 "I'm sending you an image, an audio file, and a video file. \
                  Please briefly acknowledge each one.",
             ),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            audio_data_content(TINY_WAV_BASE64, "audio/wav"),
-            video_data_content(TINY_MP4_BASE64, "video/mp4"),
+            Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
+            Content::audio_data(TINY_WAV_BASE64, "audio/wav"),
+            Content::video_data(TINY_MP4_BASE64, "video/mp4"),
         ];
 
         let result = stateful_builder(&client)
@@ -590,7 +585,7 @@ mod mixed_media {
             Ok(response) => {
                 println!("All media types response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("All media types response: {}", text);
                 }
                 // If we get here, the API accepted all three types
@@ -612,7 +607,7 @@ mod mixed_media {
 
 mod document {
     use crate::common::{TINY_PDF_BASE64, assert_response_semantic, get_client, stateful_builder};
-    use genai_rs::{InteractionInput, InteractionStatus, document_data_content, text_content};
+    use genai_rs::{Content, InteractionInput, InteractionStatus};
 
     /// Tests PDF document input from base64.
     /// This tests the ability to send PDF documents to the model for analysis.
@@ -626,10 +621,10 @@ mod document {
 
         // Use minimal PDF containing "Hello World" text
         let contents = vec![
-            text_content(
+            Content::text(
                 "What text does this PDF document contain? Answer with just the text you find.",
             ),
-            document_data_content(TINY_PDF_BASE64, "application/pdf"),
+            Content::document_data(TINY_PDF_BASE64, "application/pdf"),
         ];
 
         let result = stateful_builder(&client)
@@ -642,7 +637,7 @@ mod document {
                 println!("PDF document response status: {:?}", response.status);
                 assert_eq!(response.status, InteractionStatus::Completed);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("PDF response: {}", text);
                     // The minimal PDF contains "Hello World" - use semantic validation
                     assert_response_semantic(
@@ -674,9 +669,9 @@ mod document {
         };
 
         let contents = vec![
-            text_content("I'm sending you a PDF document."),
-            document_data_content(TINY_PDF_BASE64, "application/pdf"),
-            text_content("Is this a valid PDF? What can you tell me about its structure?"),
+            Content::text("I'm sending you a PDF document."),
+            Content::document_data(TINY_PDF_BASE64, "application/pdf"),
+            Content::text("Is this a valid PDF? What can you tell me about its structure?"),
         ];
 
         let result = stateful_builder(&client)
@@ -688,7 +683,7 @@ mod document {
             Ok(response) => {
                 assert_eq!(response.status, InteractionStatus::Completed);
                 assert!(response.has_text(), "Should have text response");
-                let text = response.text().unwrap();
+                let text = response.as_text().unwrap();
                 println!("PDF question response: {}", text);
                 // Should mention something about the PDF - use semantic validation
                 assert_response_semantic(
@@ -711,7 +706,7 @@ mod streaming {
         TINY_RED_PNG_BASE64, assert_response_semantic, consume_stream, get_client,
         interaction_builder, test_timeout, with_timeout,
     };
-    use genai_rs::{InteractionInput, InteractionStatus, image_data_content, text_content};
+    use genai_rs::{Content, InteractionInput, InteractionStatus};
 
     /// Test streaming with multimodal (image) input.
     ///
@@ -732,8 +727,8 @@ mod streaming {
 
             // Create content with text and image
             let contents = vec![
-                text_content("What color is this image? Answer in one word."),
-                image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+                Content::text("What color is this image? Answer in one word."),
+                Content::image_data(TINY_RED_PNG_BASE64, "image/png"),
             ];
 
             // Stream the response using with_input for multimodal content
@@ -756,7 +751,7 @@ mod streaming {
             let text_to_check = if !result.collected_text.is_empty() {
                 result.collected_text.clone()
             } else if let Some(ref response) = result.final_response {
-                response.text().unwrap_or_default().to_string()
+                response.as_text().unwrap_or_default().to_string()
             } else {
                 String::new()
             };
@@ -792,9 +787,9 @@ mod file_loading {
     use base64::Engine;
     use genai_rs::{Content, InteractionStatus, image_from_file};
 
-    /// Tests the add_image_file() builder method.
+    /// Tests loading images from files with image_from_file() helper.
     ///
-    /// This validates the fluent builder pattern for loading images directly from files,
+    /// This validates loading images from files using the image_from_file() helper,
     /// which auto-detects MIME type from the file extension and base64 encodes the content.
     #[tokio::test]
     #[ignore = "Requires API key"]
@@ -834,7 +829,7 @@ mod file_loading {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Color response: {}", text);
 
         // The tiny PNG is red - use semantic validation
@@ -847,10 +842,10 @@ mod file_loading {
         .await;
     }
 
-    /// Tests chaining multiple add_image_file() calls.
+    /// Tests loading multiple images from files.
     ///
-    /// Validates that the builder correctly accumulates multiple images when
-    /// chaining add_image_file() calls.
+    /// Validates that with_content() correctly handles multiple images loaded
+    /// using image_from_file() helpers.
     #[tokio::test]
     #[ignore = "Requires API key"]
     async fn test_add_multiple_image_files_builder() {
@@ -901,7 +896,7 @@ mod file_loading {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Multiple images response: {}", text);
 
         // Should mention at least one color - use semantic validation
@@ -970,7 +965,7 @@ mod bytes_loading {
         assert_eq!(response.status, InteractionStatus::Completed);
         assert!(response.has_text(), "Should have text response");
 
-        let text = response.text().unwrap();
+        let text = response.as_text().unwrap();
         println!("Color response: {}", text);
 
         // Use semantic validation instead of brittle content checks
@@ -1011,7 +1006,7 @@ mod bytes_loading {
             Ok(response) => {
                 println!("Audio bytes response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Audio response: {}", text);
                     // Just verify we got some response - the content can vary
                     assert!(!text.is_empty(), "Should get some response about the audio");
@@ -1055,7 +1050,7 @@ mod bytes_loading {
             Ok(response) => {
                 println!("Video bytes response status: {:?}", response.status);
                 if response.has_text() {
-                    let text = response.text().unwrap();
+                    let text = response.as_text().unwrap();
                     println!("Video response: {}", text);
                     // Just verify we got some response - the content can vary
                     assert!(!text.is_empty(), "Should get some response about the video");
@@ -1106,7 +1101,7 @@ mod bytes_loading {
                 assert_eq!(response.status, InteractionStatus::Completed);
                 assert!(response.has_text(), "Should have text response");
 
-                let text = response.text().unwrap();
+                let text = response.as_text().unwrap();
                 println!("PDF response: {}", text);
 
                 // Use semantic validation instead of brittle content checks

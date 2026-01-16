@@ -24,7 +24,7 @@ async fn main() -> Result<(), genai_rs::GenaiError> {
         .create()
         .await?;
 
-    println!("{}", response.text().unwrap_or_default());
+    println!("{}", response.as_text().unwrap_or_default());
     Ok(())
 }
 ```
@@ -107,7 +107,7 @@ let mut stream = client.interaction()
 
 while let Some(Ok(event)) = stream.next().await {
     if let StreamChunk::Delta(delta) = &event.chunk {
-        if let Some(text) = delta.text() {
+        if let Some(text) = delta.as_text() {
             print!("{}", text);
         }
     }
@@ -237,7 +237,7 @@ This library follows the [Evergreen philosophy](https://github.com/google-deepmi
 
 ```rust,ignore
 match content {
-    InteractionContent::Text { text } => println!("{}", text.unwrap_or_default()),
+    Content::Text { text } => println!("{}", text.unwrap_or_default()),
     _ => {}  // Handles future variants gracefully
 }
 ```

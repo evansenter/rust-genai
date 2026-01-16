@@ -80,7 +80,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Step 3: Process response
     println!("--- Response ---");
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("{}", text);
     }
 

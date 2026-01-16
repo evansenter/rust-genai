@@ -82,7 +82,7 @@ for signature in response.thought_signatures() {
 }
 
 // Get final answer
-if let Some(text) = response.text() {
+if let Some(text) = response.as_text() {
     println!("Final Answer: {}", text);
 }
 ```
@@ -155,7 +155,7 @@ while let Some(Ok(event)) = stream.next().await {
                 println!("=== Thinking ===");
                 in_thought = true;
             }
-            if let Some(text) = delta.text() {
+            if let Some(text) = delta.as_text() {
                 print!("{}", text);
             }
         } else if delta.is_text() {
@@ -163,7 +163,7 @@ while let Some(Ok(event)) = stream.next().await {
                 println!("\n=== Response ===");
                 in_thought = false;
             }
-            if let Some(text) = delta.text() {
+            if let Some(text) = delta.as_text() {
                 print!("{}", text);
             }
         }
@@ -278,7 +278,7 @@ if response.has_thoughts() {
 }
 
 // Actual reasoning is reflected in the final response text
-if let Some(text) = response.text() {
+if let Some(text) = response.as_text() {
     println!("DEBUG - Model response: {}", text);
 }
 ```

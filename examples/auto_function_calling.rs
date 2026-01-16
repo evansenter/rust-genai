@@ -109,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- Final Response ---");
     println!("Status: {:?}", result.response.status);
 
-    if let Some(text) = result.response.text() {
+    if let Some(text) = result.response.as_text() {
         println!("\nAssistant: {}", text);
     }
 
@@ -134,7 +134,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create_with_auto_functions()
         .await?;
 
-    if let Some(text) = result2.response.text() {
+    if let Some(text) = result2.response.as_text() {
         println!("Assistant: {}", text);
     }
 
@@ -218,7 +218,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "  Model chose to call: {} (decided function was appropriate)",
             result.function_calls()[0].name
         );
-    } else if let Some(text) = result.text() {
+    } else if let Some(text) = result.as_text() {
         println!(
             "  Model chose text response: {}",
             text.chars().take(100).collect::<String>()
@@ -243,7 +243,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "  Model called: {} (as required by ANY mode)",
             result.function_calls()[0].name
         );
-    } else if let Some(text) = result.text() {
+    } else if let Some(text) = result.as_text() {
         println!("  Unexpected text response: {}", text);
     }
 
@@ -260,7 +260,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    if let Some(text) = result.text() {
+    if let Some(text) = result.as_text() {
         println!(
             "  Text response (no function call): {}",
             text.chars().take(100).collect::<String>()
@@ -285,7 +285,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "  Model called: {} (with schema adherence guaranteed)",
             result.function_calls()[0].name
         );
-    } else if let Some(text) = result.text() {
+    } else if let Some(text) = result.as_text() {
         println!(
             "  Text response (with schema adherence): {}",
             text.chars().take(100).collect::<String>()

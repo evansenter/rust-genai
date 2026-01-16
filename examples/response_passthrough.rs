@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    let answer1 = response1.text().unwrap_or("No response");
+    let answer1 = response1.as_text().unwrap_or("No response");
     println!("Response 1: {}\n", answer1);
 
     // ==========================================================================
@@ -71,7 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    let answer2 = response2.text().unwrap_or("No response");
+    let answer2 = response2.as_text().unwrap_or("No response");
     println!("Response 2: {}\n", answer2);
 
     // ==========================================================================
@@ -94,7 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    let answer3 = response3.text().unwrap_or("No response");
+    let answer3 = response3.as_text().unwrap_or("No response");
     println!("Response 3 (recall check): {}\n", answer3);
 
     // ==========================================================================
@@ -114,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    println!("Colors: {}", resp.text().unwrap_or("No response"));
+    println!("Colors: {}", resp.as_text().unwrap_or("No response"));
 
     // Add model response to history and continue
     history.push(resp.as_model_turn());
@@ -129,7 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    println!("Sky color: {}\n", resp2.text().unwrap_or("No response"));
+    println!("Sky color: {}\n", resp2.as_text().unwrap_or("No response"));
 
     println!("=== Example Complete ===\n");
 

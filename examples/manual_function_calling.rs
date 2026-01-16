@@ -13,7 +13,7 @@
 //! 1. Send a request with function declarations using `create()` (not `create_with_auto_functions()`)
 //! 2. Check if the response contains function calls with `response.has_function_calls()`
 //! 3. Execute the functions yourself
-//! 4. Send results back using `function_result_content()` and `with_previous_interaction()`
+//! 4. Send results back using `Content::function_result()` and `with_previous_interaction()`
 //! 5. Repeat until the model returns a text response
 //!
 //! # Comparison with Auto Function Calling
@@ -35,7 +35,7 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use genai_rs::{Client, FunctionDeclaration, function_result_content};
+use genai_rs::{Client, Content, FunctionDeclaration};
 use serde_json::json;
 use std::env;
 
@@ -136,7 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     call.name
                 )
             })?;
-            results.push(function_result_content(
+            results.push(Content::function_result(
                 call.name.to_string(),
                 call_id,
                 result,
@@ -164,7 +164,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Loops executed: {}", loop_count);
     println!("Status: {:?}", response.status);
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("\nAssistant: {}", text);
     }
 
@@ -181,7 +181,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- Key Takeaways ---");
     println!("• Use create() (not create_with_auto_functions()) for manual control");
     println!("• Check response.has_function_calls() to detect pending calls");
-    println!("• Execute functions yourself, then send results with function_result_content()");
+    println!("• Execute functions yourself, then send results with Content::function_result()");
     println!("• Use with_previous_interaction() to maintain conversation context\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");

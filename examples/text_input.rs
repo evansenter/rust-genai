@@ -96,7 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("JSON Analysis:\n{}\n", text);
     }
 
@@ -116,7 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("CSV Analysis:\n{}\n", text);
     }
 
@@ -136,7 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("Markdown Summary:\n{}\n", text);
     }
 
@@ -158,7 +158,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("README Analysis:\n{}\n", text);
     }
 
@@ -178,7 +178,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create()
         .await?;
 
-    if let Some(text) = response.text() {
+    if let Some(text) = response.as_text() {
         println!("CHANGELOG Sections:\n{}\n", text);
     }
 
@@ -227,7 +227,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  [RES#3] completed: file analysis\n");
 
     println!("--- Production Considerations ---");
-    println!("• document_data_content requires base64-encoded input");
+    println!("• Content::document_data() requires base64-encoded input");
     println!("• Use text/plain for JSON, CSV, HTML, XML content");
     println!("• Model can still parse structured formats from plain text");
     println!("• For very large text files, use Files API");

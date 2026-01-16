@@ -14,10 +14,10 @@ use futures_util::stream::BoxStream;
 use serde_json::{Value, json};
 use tracing::{debug, error, warn};
 
+use crate::Content;
 use crate::GenaiError;
 use crate::ToolService;
 use crate::function_calling::{CallableFunction, FunctionRegistry, get_global_function_registry};
-use crate::interactions_api::function_result_content;
 use crate::streaming::{
     AutoFunctionResult, AutoFunctionStreamChunk, AutoFunctionStreamEvent, FunctionExecutionResult,
 };
@@ -154,7 +154,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     ///     .await?;
     ///
     /// // Access the final response
-    /// println!("{}", result.response.text().unwrap_or("No text"));
+    /// println!("{}", result.response.as_text().unwrap_or("No text"));
     ///
     /// // Access execution history
     /// for exec in &result.executions {
@@ -374,7 +374,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                 ));
 
                 // Add function result (only the result, not the call - server has it via previous_interaction_id)
-                function_results.push(function_result_content(
+                function_results.push(Content::function_result(
                     call.name.to_string(),
                     call_id,
                     result,
@@ -751,7 +751,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                     ));
 
                     // Add function result content for API
-                    function_results_content.push(function_result_content(
+                    function_results_content.push(Content::function_result(
                         name.clone(),
                         call_id.clone(),
                         result,

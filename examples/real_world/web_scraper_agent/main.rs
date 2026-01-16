@@ -140,7 +140,7 @@ impl WebResearchAgent {
             println!();
         }
 
-        let text = response.text().ok_or("No response text")?;
+        let text = response.as_text().ok_or("No response text")?;
         let report: ResearchReport = serde_json::from_str(text)?;
         Ok(report)
     }
@@ -207,7 +207,7 @@ impl WebResearchAgent {
             );
         }
 
-        let text = response.text().ok_or("No response text")?;
+        let text = response.as_text().ok_or("No response text")?;
         let analysis: CompetitorAnalysis = serde_json::from_str(text)?;
         Ok(analysis)
     }
@@ -291,7 +291,7 @@ impl WebResearchAgent {
         }
 
         Ok(response
-            .text()
+            .as_text()
             .unwrap_or("Unable to verify claim.")
             .to_string())
     }

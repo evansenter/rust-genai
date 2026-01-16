@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             println!("--- Key Takeaways ---");
             println!("• Client::builder(api_key).build()? creates the API client");
             println!("• client.interaction().with_model().with_text().create() sends a request");
-            println!("• response.text() extracts the model's text output");
+            println!("• response.as_text() extracts the model's text output");
             println!("• with_store_enabled() saves the interaction for potential follow-ups\n");
 
             println!("--- What You'll See with LOUD_WIRE=1 ---");
