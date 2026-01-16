@@ -28,7 +28,11 @@ Building reliable AI applications requires handling:
 
 ## Retry Strategies
 
-### Basic Retry
+> **Note**: genai-rs provides built-in retry primitives. See [Retry Patterns](RETRY_PATTERNS.md) for the philosophy and available primitives (`is_retryable()`, `retry_after()`).
+
+### Using Built-in Primitives
+
+The simplest approach uses `GenaiError::is_retryable()`:
 
 ```rust,ignore
 use genai_rs::{Client, GenaiError};
@@ -48,8 +52,9 @@ where
     for attempt in 0..=max_retries {
         match operation().await {
             Ok(result) => return Ok(result),
-            Err(e) if should_retry(&e) && attempt < max_retries => {
-                let delay = Duration::from_secs(1 << attempt);
+            Err(e) if e.is_retryable() && attempt < max_retries => {
+                // Use server-suggested delay if available, otherwise exponential backoff
+                let delay = e.retry_after().unwrap_or(Duration::from_secs(1 << attempt));
                 println!("Attempt {} failed, retrying in {:?}", attempt + 1, delay);
                 last_error = Some(e);
                 sleep(delay).await;
@@ -59,17 +64,6 @@ where
     }
 
     Err(last_error.unwrap())
-}
-
-fn should_retry(error: &GenaiError) -> bool {
-    match error {
-        GenaiError::Api { status_code, .. } => {
-            *status_code == 429 || *status_code >= 500
-        }
-        GenaiError::Http(e) => e.is_connect() || e.is_timeout(),
-        GenaiError::Timeout(_) => true,
-        _ => false,
-    }
 }
 ```
 
@@ -153,36 +147,37 @@ fn delay_with_jitter(base: Duration, attempt: u32, max: Duration) -> Duration {
 
 ## Transient Error Detection
 
-### Known Transient Errors
+### Built-in Detection
+
+Use `GenaiError::is_retryable()` for standard transient error detection (429, 5xx, timeouts, connection errors):
+
+```rust,ignore
+if error.is_retryable() {
+    // Safe to retry
+}
+```
+
+### Custom Detection
+
+For application-specific transient errors, extend the built-in detection:
 
 ```rust,ignore
 fn is_transient_error(err: &GenaiError) -> bool {
-    match err {
-        GenaiError::Api { status_code, message, .. } => {
-            // Rate limited
-            if *status_code == 429 {
-                return true;
-            }
-
-            // Server errors (5xx)
-            if *status_code >= 500 {
-                return true;
-            }
-
-            // Known Google backend issue
-            let lower = message.to_lowercase();
-            if lower.contains("spanner") && lower.contains("utf-8") {
-                return true;
-            }
-
-            false
-        }
-        GenaiError::Http(e) => {
-            e.is_connect() || e.is_timeout()
-        }
-        GenaiError::Timeout(_) => true,
-        _ => false,
+    // Start with built-in detection
+    if err.is_retryable() {
+        return true;
     }
+
+    // Add application-specific patterns
+    if let GenaiError::Api { message, .. } = err {
+        let lower = message.to_lowercase();
+        // Known Google backend issue
+        if lower.contains("spanner") && lower.contains("utf-8") {
+            return true;
+        }
+    }
+
+    false
 }
 ```
 
@@ -632,12 +627,14 @@ impl ReliableClient {
 
             match result {
                 Ok(response) => return Ok(response),
-                Err(e) if self.should_retry(&e) && attempt < self.max_retries => {
+                Err(e) if e.is_retryable() && attempt < self.max_retries => {
+                    // Prefer server-suggested delay, fall back to exponential backoff
+                    let wait = e.retry_after().unwrap_or(delay);
                     log::warn!(
                         "Attempt {} failed, retrying in {:?}: {}",
-                        attempt + 1, delay, e
+                        attempt + 1, wait, e
                     );
-                    sleep(delay).await;
+                    sleep(wait).await;
                     delay = (delay * 2).min(self.max_delay);
                 }
                 Err(e) => return Err(e),
@@ -646,22 +643,12 @@ impl ReliableClient {
 
         unreachable!()
     }
-
-    fn should_retry(&self, error: &GenaiError) -> bool {
-        match error {
-            GenaiError::Api { status_code, .. } => {
-                *status_code == 429 || *status_code >= 500
-            }
-            GenaiError::Http(e) => e.is_connect() || e.is_timeout(),
-            GenaiError::Timeout(_) => true,
-            _ => false,
-        }
-    }
 }
 ```
 
 ## Related Documentation
 
+- [Retry Patterns](RETRY_PATTERNS.md) - Philosophy and built-in retry primitives
 - [Error Handling](ERROR_HANDLING.md) - Error types and recovery
 - [Agents and Background](AGENTS_AND_BACKGROUND.md) - Background execution patterns
 - [Configuration](CONFIGURATION.md) - Timeout and client configuration
