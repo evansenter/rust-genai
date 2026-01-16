@@ -182,10 +182,34 @@ async fn test_pdf_from_temp_file() {
 // Document File Tests (Text Formats)
 // =============================================================================
 
-/// Tests loading a plain text file using document_from_file().
+/// Tests that document_from_file correctly rejects TXT files.
+///
+/// The Gemini Interactions API only supports PDF for document content type.
+#[tokio::test]
+async fn test_document_from_file_rejects_txt() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let txt_path = temp_dir.path().join("test.txt");
+
+    std::fs::write(&txt_path, "Test content").expect("Failed to write TXT");
+
+    let result = document_from_file(&txt_path).await;
+
+    assert!(
+        result.is_err(),
+        "document_from_file should reject TXT files"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("text/plain") && err.contains("application/pdf"),
+        "Error should mention text/plain and application/pdf: {}",
+        err
+    );
+}
+
+/// Tests sending plain text file content (the correct approach for text-based files).
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_txt_from_temp_file() {
+async fn test_txt_as_text_content() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -195,20 +219,19 @@ async fn test_txt_from_temp_file() {
     let txt_path = temp_dir.path().join("test_document.txt");
 
     // Write plain text content
-    std::fs::write(&txt_path, "The quick brown fox jumps over the lazy dog.")
-        .expect("Failed to write TXT");
+    let txt_content = "The quick brown fox jumps over the lazy dog.";
+    std::fs::write(&txt_path, txt_content).expect("Failed to write TXT");
 
-    let doc_content = document_from_file(&txt_path)
-        .await
-        .expect("Failed to load TXT from file");
+    // For text-based files, read the content and send as Content::text()
+    let file_content = std::fs::read_to_string(&txt_path).expect("Failed to read TXT");
 
-    let contents = vec![
-        Content::text("What animal jumps in this text? Answer with one word."),
-        doc_content,
-    ];
+    let prompt = format!(
+        "What animal jumps in this text? Answer with one word.\n\n{}",
+        file_content
+    );
 
     let response = stateful_builder(&client)
-        .with_input(InteractionInput::Content(contents))
+        .with_text(&prompt)
         .create()
         .await
         .expect("TXT interaction failed");
@@ -230,10 +253,34 @@ async fn test_txt_from_temp_file() {
 // Note: JSON test removed - Gemini API does not support application/json MIME type
 // for document inputs. The API returns 404 "No content type found for mime type: application/json"
 
-/// Tests loading a Markdown file using document_from_file().
+/// Tests that document_from_file correctly rejects Markdown files.
+///
+/// The Gemini Interactions API only supports PDF for document content type.
+#[tokio::test]
+async fn test_document_from_file_rejects_markdown() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let md_path = temp_dir.path().join("README.md");
+
+    std::fs::write(&md_path, "# Test").expect("Failed to write Markdown");
+
+    let result = document_from_file(&md_path).await;
+
+    assert!(
+        result.is_err(),
+        "document_from_file should reject Markdown files"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("text/markdown") && err.contains("application/pdf"),
+        "Error should mention text/markdown and application/pdf: {}",
+        err
+    );
+}
+
+/// Tests sending Markdown file content as text (the correct approach for text-based files).
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_markdown_from_temp_file() {
+async fn test_markdown_as_text_content() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -251,17 +298,16 @@ async fn test_markdown_from_temp_file() {
 "#;
     std::fs::write(&md_path, md_content).expect("Failed to write Markdown");
 
-    let doc_content = document_from_file(&md_path)
-        .await
-        .expect("Failed to load Markdown from file");
+    // For text-based files, read the content and send as Content::text()
+    let file_content = std::fs::read_to_string(&md_path).expect("Failed to read Markdown");
 
-    let contents = vec![
-        Content::text("How many features are listed in this markdown? Answer with just a number."),
-        doc_content,
-    ];
+    let prompt = format!(
+        "How many features are listed in this markdown? Answer with just a number.\n\n{}",
+        file_content
+    );
 
     let response = stateful_builder(&client)
-        .with_input(InteractionInput::Content(contents))
+        .with_text(&prompt)
         .create()
         .await
         .expect("Markdown interaction failed");
