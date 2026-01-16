@@ -200,7 +200,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("--- Key Takeaways ---");
     println!("• with_system_instruction() sets model behavior for a turn");
-    println!("• Available on all builder states (FirstTurn, Chained, StoreDisabled)");
+    println!("• Available at any point in builder chaining");
     println!("• API does NOT inherit system_instruction via previousInteractionId");
     println!("• Set explicitly on each turn if needed; auto_functions reuses request internally");
     println!("• Use for personas, output format control, and behavioral constraints\n");

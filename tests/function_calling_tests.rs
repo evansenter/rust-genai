@@ -2281,8 +2281,8 @@ mod multiturn {
 
         let functions = vec![get_weather_function()];
 
-        // Turn 1: FirstTurn with system instruction, trigger function call
-        println!("--- Turn 1: FirstTurn with system instruction ---");
+        // Turn 1: Initial request with system instruction, trigger function call
+        println!("--- Turn 1: Initial request with system instruction ---");
         let result1 = client
             .interaction()
             .with_model("gemini-3-flash-preview")
@@ -2310,8 +2310,8 @@ mod multiturn {
         let response1 = result1.response;
         let turn1_id = response1.id.clone().expect("Turn 1 should have ID");
 
-        // Turn 2: Chained (must resend tools)
-        println!("\n--- Turn 2: Chained conversation ---");
+        // Turn 2: Follow-up (must resend tools)
+        println!("\n--- Turn 2: Follow-up conversation ---");
         let result2 = client
             .interaction()
             .with_model("gemini-3-flash-preview")
@@ -2369,7 +2369,7 @@ mod multiturn {
 
         let functions = vec![get_weather_function()];
 
-        // Turn 1: FirstTurn with functions
+        // Turn 1: Initial request with functions
         let result1 = client
             .interaction()
             .with_model("gemini-3-flash-preview")
@@ -2382,7 +2382,7 @@ mod multiturn {
 
         let turn1_id = result1.id.clone().expect("Turn 1 should have ID");
 
-        // Turn 2: Chained WITHOUT resending tools
+        // Turn 2: Follow-up WITHOUT resending tools
         let result2 = client
             .interaction()
             .with_model("gemini-3-flash-preview")
@@ -2412,7 +2412,7 @@ mod multiturn {
 
         let functions = vec![get_weather_function(), get_time_function()];
 
-        // Turn 1: FirstTurn with system instruction
+        // Turn 1: Initial request with system instruction
         let response1 = client
             .interaction()
             .with_model("gemini-3-flash-preview")
@@ -2466,7 +2466,7 @@ mod multiturn {
         );
         println!("Response: {}", response2.as_text().unwrap());
 
-        // Turn 3: Chained follow-up
+        // Turn 3: Follow-up
         let response3 = client
             .interaction()
             .with_model("gemini-3-flash-preview")
@@ -2510,7 +2510,7 @@ mod multiturn {
 
                 let turn1_id = response1.id.clone().ok_or("Turn 1 should have ID")?;
 
-                // Turn 2: Chained - system instruction should still be in effect
+                // Turn 2: Follow-up - system instruction should still be in effect
                 let response2 = client
                     .interaction()
                     .with_model("gemini-3-flash-preview")
@@ -2560,7 +2560,7 @@ mod multiturn {
 
         let functions = vec![get_weather_function()];
 
-        // Turn 1: FirstTurn streaming with auto functions
+        // Turn 1: Initial request streaming with auto functions
         let mut stream = client
             .interaction()
             .with_model("gemini-3-flash-preview")
@@ -2599,7 +2599,7 @@ mod multiturn {
             "Should have executed at least one function"
         );
 
-        // Turn 2: Chained streaming
+        // Turn 2: Follow-up streaming
         let mut stream2 = client
             .interaction()
             .with_model("gemini-3-flash-preview")
@@ -2626,15 +2626,15 @@ mod multiturn {
     }
 
     #[test]
-    fn test_typestate_constraints_documented() {
-        // The typestate pattern enforces certain constraints at compile time:
+    fn test_storage_constraints_documented() {
+        // The builder enforces storage-related constraints at runtime via build():
         //
-        // - with_store_disabled() transitions FirstTurn -> StoreDisabled
-        // - with_previous_interaction() transitions FirstTurn -> Chained
-        // - create_with_auto_functions() requires store=true (not available on StoreDisabled)
+        // - with_store_disabled() + with_previous_interaction() = error (chaining needs storage)
+        // - with_store_disabled() + with_background(true) = error (background needs storage)
+        // - with_store_disabled() + create_with_auto_functions() = error (auto-functions need storage)
         //
-        // Compile-fail tests are in tests/ui_tests.rs
-        println!("Typestate constraints are enforced at compile time.");
+        // See src/request_builder/tests.rs for validation tests
+        println!("Storage constraints are enforced at runtime in build().");
     }
 
     /// Test multi-turn function calling with error handling.

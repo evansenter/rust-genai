@@ -22,7 +22,7 @@ use crate::streaming::{
     AutoFunctionResult, AutoFunctionStreamChunk, AutoFunctionStreamEvent, FunctionExecutionResult,
 };
 
-use super::{CanAutoFunction, InteractionBuilder};
+use super::InteractionBuilder;
 
 /// Default maximum iterations for auto function calling.
 pub(crate) const DEFAULT_MAX_FUNCTION_CALL_LOOPS: usize = 5;
@@ -107,7 +107,7 @@ async fn execute_function(
     }
 }
 
-impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
+impl<'a> InteractionBuilder<'a> {
     /// Creates interaction with automatic function call handling.
     ///
     /// This method implements the auto-function execution loop:
@@ -132,12 +132,10 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// See <https://ai.google.dev/gemini-api/docs/thought-signatures> for more details.
     ///
-    /// # Availability
+    /// # Runtime Validation
     ///
-    /// This method is available on [`super::FirstTurn`] and [`super::Chained`] builders.
-    /// It is NOT available on [`super::StoreDisabled`] builders because auto-function
-    /// calling requires stored interactions to maintain conversation context across
-    /// multiple function execution rounds via `previous_interaction_id`.
+    /// This method requires storage to be enabled. If you've called `with_store_disabled()`,
+    /// this method will return an error with a helpful message explaining why and how to fix it.
     ///
     /// # Example
     /// ```no_run
@@ -245,8 +243,8 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     ///   a partial `AutoFunctionResult`. Use `previous_interaction_id` to continue.
     /// - `max_function_call_loops` is set to 0 (invalid configuration)
     pub async fn create_with_auto_functions(self) -> Result<AutoFunctionResult, GenaiError> {
-        // Note: The `CanAutoFunction` trait bound ensures at compile-time that this method
-        // is not available on `StoreDisabled` builders. No runtime check needed.
+        // Runtime validation: auto-functions require storage
+        self.validate_for_auto_functions()?;
 
         let client = self.client;
         let timeout = self.timeout;
@@ -529,8 +527,11 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     pub fn create_stream_with_auto_functions(
         self,
     ) -> BoxStream<'a, Result<AutoFunctionStreamEvent, GenaiError>> {
-        // Note: The `CanAutoFunction` trait bound ensures at compile-time that this method
-        // is not available on `StoreDisabled` builders. No runtime check needed.
+        // Runtime validation: auto-functions require storage
+        // We do this early so errors are returned immediately, not mid-stream
+        if let Err(e) = self.validate_for_auto_functions() {
+            return Box::pin(futures_util::stream::once(async move { Err(e) }));
+        }
 
         let client = self.client;
         let max_loops = self.max_function_call_loops;

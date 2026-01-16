@@ -373,7 +373,7 @@ When using `previous_interaction_id` (stateful mode), some settings are inherite
 
 ### System Instruction
 
-`with_system_instruction()` is available on **all builder states** (FirstTurn, Chained, and StoreDisabled). Set it on each turn where you want it to apply.
+`with_system_instruction()` can be called at any point in builder chaining. Set it on each turn where you want it to apply.
 
 ```rust,ignore
 // First turn

@@ -5,12 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.1] - 2026-01-17
 
 ### Changed
 
+- **BREAKING**: Removed typestate pattern from `InteractionBuilder`. The builder no longer uses `FirstTurn`, `Chained`, or `StoreDisabled` marker types. Invalid combinations (e.g., `store=false` with `with_previous_interaction()`) are now caught at runtime in `build()` with descriptive error messages instead of compile-time type errors. This enables conditional chaining patterns that were previously impossible:
+  ```rust
+  // Now possible - conditional chaining
+  let mut builder = client.interaction()
+      .with_model("gemini-3-flash-preview")
+      .with_text("Hello");
+
+  if let Some(prev_id) = previous_interaction_id {
+      builder = builder.with_previous_interaction(prev_id);
+  }
+
+  let response = builder.create().await?;
+  ```
 - **BREAKING**: `FunctionExecutionResult::new()` now requires `args` parameter (position 3, before `result`)
 - `FunctionExecutionResult` now includes `args` field for complete execution context - enables logging function calls with their arguments after execution completes
+
+### Migration
+
+If you relied on compile-time enforcement of builder constraints, you'll now get runtime errors from `build()` instead:
+- `with_store_disabled()` + `with_previous_interaction()` → `GenaiError::InvalidInput("Chained interactions require storage...")`
+- `with_store_disabled()` + `with_background(true)` → `GenaiError::InvalidInput("Background execution requires storage...")`
+- `with_store_disabled()` + `create_with_auto_functions()` → `GenaiError::InvalidInput("create_with_auto_functions() requires storage...")`
 
 ## [0.7.0] - 2026-01-15
 
