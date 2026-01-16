@@ -3189,7 +3189,7 @@ fn test_as_model_turn_includes_all_outputs() {
 
     let turn = response.as_model_turn();
     // The turn should contain all outputs
-    if let Some(parts) = turn.content().parts() {
+    if let Some(parts) = turn.content().as_parts() {
         assert_eq!(parts.len(), 2);
     } else {
         panic!("Expected Parts variant");

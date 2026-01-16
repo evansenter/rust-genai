@@ -176,7 +176,7 @@ impl TurnContent {
 
     /// Returns the content parts if this is a `Parts` variant.
     #[must_use]
-    pub fn parts(&self) -> Option<&[Content]> {
+    pub fn as_parts(&self) -> Option<&[Content]> {
         match self {
             Self::Parts(p) => Some(p),
             Self::Text(_) => None,

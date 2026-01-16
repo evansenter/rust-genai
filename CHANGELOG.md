@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING**: Renamed `InteractionContent` → `Content` for ergonomics. Update imports: `use genai_rs::Content;`
 - **BREAKING**: Renamed `Content::text()` getter → `Content::as_text()` to follow Rust getter conventions
 - **BREAKING**: Renamed `InteractionResponse::text()` getter → `InteractionResponse::as_text()` for consistency
+- **BREAKING**: Renamed `TurnContent::parts()` → `TurnContent::as_parts()` for consistency with `as_text()`
 - **BREAKING**: Renamed `with_turns()` to `with_history()`. The new name better reflects that this sets conversation history, and now composes correctly with `with_text()`: calling both produces `[...history, Turn::user(current_message)]` regardless of call order.
 - **BREAKING**: `with_text()` now sets `current_message` instead of replacing `input`. This fixes issue #359 where `with_turns().with_text()` silently overwrote the history.
 - **BREAKING**: `with_system_instruction()` is now available on ALL builder states (FirstTurn, Chained, StoreDisabled), not just FirstTurn. The API does NOT inherit system instructions via `previousInteractionId`, so users should set it explicitly on each turn if needed. For `create_with_auto_functions()`, the SDK automatically includes system_instruction on all internal turns.
