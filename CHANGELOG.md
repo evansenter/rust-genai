@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `AgentConfig` (DeepResearchConfig) now serializes `thinking_summaries` with snake_case per API spec, not camelCase `thinkingSummaries`
+- **BREAKING**: `document_from_file()` now correctly rejects non-PDF files. The Gemini API only supports `application/pdf` for document content type. For text-based files (CSV, TXT, JSON, etc.), read the file and send as `Content::text()` instead.
 - `FileSearchResult` now serializes `call_id` with snake_case per API spec, not camelCase `callId`
 - `CodeExecutionCall` now serializes with nested `arguments` object containing `language` and `code` per API spec
 - `GoogleSearchResultItem.rendered_content` now uses snake_case per API spec

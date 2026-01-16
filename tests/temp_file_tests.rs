@@ -280,10 +280,40 @@ async fn test_markdown_from_temp_file() {
     .await;
 }
 
-/// Tests loading a CSV file using document_from_file().
+/// Tests that document_from_file correctly rejects non-PDF files.
+///
+/// The Gemini Interactions API only supports PDF for document content type.
+/// For text-based files like CSV, the proper approach is to read the file
+/// and send it as Content::text().
+#[tokio::test]
+async fn test_document_from_file_rejects_csv() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let csv_path = temp_dir.path().join("data.csv");
+
+    let csv_content = "name,score\nAlice,95\nBob,87\nCarol,92";
+    std::fs::write(&csv_path, csv_content).expect("Failed to write CSV");
+
+    let result = document_from_file(&csv_path).await;
+
+    assert!(
+        result.is_err(),
+        "document_from_file should reject CSV files"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("text/csv") && err.contains("application/pdf"),
+        "Error should mention text/csv and application/pdf: {}",
+        err
+    );
+}
+
+/// Tests sending CSV data as text content (the correct approach for text-based files).
+///
+/// Since document_from_file only supports PDF, text-based files like CSV should
+/// be read and sent as Content::text() instead.
 #[tokio::test]
 #[ignore = "Requires API key"]
-async fn test_csv_from_temp_file() {
+async fn test_csv_as_text_content() {
     let Some(client) = get_client() else {
         println!("Skipping: GEMINI_API_KEY not set");
         return;
@@ -295,17 +325,16 @@ async fn test_csv_from_temp_file() {
     let csv_content = "name,score\nAlice,95\nBob,87\nCarol,92";
     std::fs::write(&csv_path, csv_content).expect("Failed to write CSV");
 
-    let doc_content = document_from_file(&csv_path)
-        .await
-        .expect("Failed to load CSV from file");
+    // For text-based files, read the content and send as Content::text()
+    let file_content = std::fs::read_to_string(&csv_path).expect("Failed to read CSV");
 
-    let contents = vec![
-        Content::text("Who has the highest score in this CSV? Answer with just the name."),
-        doc_content,
-    ];
+    let prompt = format!(
+        "Who has the highest score in this CSV? Answer with just the name.\n\n{}",
+        file_content
+    );
 
     let response = stateful_builder(&client)
-        .with_input(InteractionInput::Content(contents))
+        .with_text(&prompt)
         .create()
         .await
         .expect("CSV interaction failed");

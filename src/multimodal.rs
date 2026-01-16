@@ -517,28 +517,27 @@ pub async fn video_from_file_with_mime(
 
 /// Loads a document file with automatic MIME type detection.
 ///
-/// Reads the file, encodes it as base64, and detects the MIME type from
-/// the file extension.
+/// Reads the file, encodes it as base64, and validates the MIME type.
 ///
 /// # Supported Formats
+///
+/// The Gemini Interactions API only supports PDF for document content:
 ///
 /// | Extension | MIME Type |
 /// |-----------|-----------|
 /// | `.pdf` | `application/pdf` |
-/// | `.txt` | `text/plain` |
-/// | `.md` | `text/markdown` |
-/// | `.json` | `application/json` |
-/// | `.csv` | `text/csv` |
-/// | `.html` | `text/html` |
-/// | `.xml` | `application/xml` |
+///
+/// For text-based files (TXT, CSV, JSON, etc.), read the file content and send
+/// it as [`Content::text()`] instead. Document content type is specifically for
+/// PDF files that need visual processing (understanding charts, tables, images
+/// within the PDF).
 ///
 /// # Errors
 ///
 /// Returns [`GenaiError::InvalidInput`] if:
 /// - The file cannot be read (with a suggestion based on the error type)
 /// - The file has no extension
-/// - The extension is not recognized as a document type
-/// - The extension maps to a non-document MIME type (e.g., `.jpg`)
+/// - The file is not a PDF
 ///
 /// # Example
 ///
@@ -560,27 +559,32 @@ pub async fn document_from_file(path: impl AsRef<Path>) -> Result<Content, Genai
     let mime_type = detect_mime_type(path).ok_or_else(|| {
         GenaiError::InvalidInput(format!(
             "Unsupported document extension '.{}' for file '{}'. \
-             Supported extensions: pdf, txt, md, json, csv, html, xml. \
              Use document_from_file_with_mime() to override.",
             ext,
             path.display()
         ))
     })?;
 
-    // Validate this is actually a document MIME type (application/* or text/*)
-    if !mime_type.starts_with("application/") && !mime_type.starts_with("text/") {
+    // The Gemini Interactions API only supports PDF for document content type.
+    // Other text-based formats should be sent as Content::text() instead.
+    if mime_type != "application/pdf" {
         let suggestion = if mime_type.starts_with("image/") {
             "image_from_file()"
         } else if mime_type.starts_with("audio/") {
             "audio_from_file()"
         } else if mime_type.starts_with("video/") {
             "video_from_file()"
+        } else if mime_type.starts_with("text/") || mime_type == "application/json" {
+            // Suggest reading as text for text-based formats
+            "Content::text() with the file contents read via std::fs::read_to_string()"
         } else {
             "the appropriate *_from_file() function"
         };
 
         return Err(GenaiError::InvalidInput(format!(
-            "File '{}' has MIME type '{}' which is not a document type. Did you mean to use {}?",
+            "File '{}' has MIME type '{}' which is not supported for document content. \
+             The Gemini API only supports 'application/pdf' for documents. \
+             For text-based files, use {}.",
             path.display(),
             mime_type,
             suggestion
