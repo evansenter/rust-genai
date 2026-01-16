@@ -2247,6 +2247,14 @@ fn test_with_resolution_on_non_media_returns_unchanged() {
 }
 
 #[test]
+fn test_with_resolution_on_audio_returns_unchanged() {
+    // Audio content doesn't support resolution (unlike Image/Video)
+    let original = Content::audio_uri("files/abc123", "audio/mp3");
+    let after = original.clone().with_resolution(Resolution::High);
+    assert_eq!(original, after);
+}
+
+#[test]
 fn test_with_resolution_overwrites_existing() {
     let content = Content::image_uri("files/abc123", "image/png")
         .with_resolution(Resolution::Low)
@@ -2254,6 +2262,25 @@ fn test_with_resolution_overwrites_existing() {
     match content {
         Content::Image { resolution, .. } => {
             assert_eq!(resolution, Some(Resolution::High));
+        }
+        _ => panic!("Expected Image variant"),
+    }
+}
+
+#[test]
+fn test_with_resolution_unknown_variant() {
+    // Unknown resolution variants can be used in builder and roundtrip
+    let unknown_res = Resolution::Unknown {
+        resolution_type: "ULTRA_MEGA_HD".to_string(),
+        data: serde_json::json!("ULTRA_MEGA_HD"),
+    };
+    let content = Content::image_uri("files/abc123", "image/png").with_resolution(unknown_res);
+
+    match content {
+        Content::Image { resolution, .. } => {
+            let res = resolution.expect("Should have resolution");
+            assert!(res.is_unknown());
+            assert_eq!(res.unknown_resolution_type(), Some("ULTRA_MEGA_HD"));
         }
         _ => panic!("Expected Image variant"),
     }
@@ -2327,5 +2354,96 @@ fn test_with_result_uses_empty_call_id_when_none() {
             assert_eq!(call_id, "");
         }
         _ => panic!("Expected FunctionResult variant"),
+    }
+}
+
+#[test]
+fn test_function_result_error_constructor() {
+    let content = Content::function_result_error(
+        "api_call",
+        "call_123",
+        serde_json::json!({"error": "timeout", "code": 504}),
+    );
+
+    match content {
+        Content::FunctionResult {
+            name,
+            call_id,
+            result,
+            is_error,
+        } => {
+            assert_eq!(name, Some("api_call".to_string()));
+            assert_eq!(call_id, "call_123");
+            assert_eq!(result, serde_json::json!({"error": "timeout", "code": 504}));
+            assert_eq!(is_error, Some(true));
+        }
+        _ => panic!("Expected FunctionResult variant"),
+    }
+}
+
+// =============================================================================
+// from_uri_and_mime MIME Type Routing Tests
+// =============================================================================
+
+#[test]
+fn test_from_uri_and_mime_image_types() {
+    for mime in ["image/png", "image/jpeg", "image/gif", "image/webp"] {
+        let content = Content::from_uri_and_mime("files/abc123", mime);
+        assert!(
+            matches!(content, Content::Image { .. }),
+            "Expected Image for {mime}"
+        );
+    }
+}
+
+#[test]
+fn test_from_uri_and_mime_audio_types() {
+    for mime in ["audio/mp3", "audio/wav", "audio/ogg", "audio/mpeg"] {
+        let content = Content::from_uri_and_mime("files/abc123", mime);
+        assert!(
+            matches!(content, Content::Audio { .. }),
+            "Expected Audio for {mime}"
+        );
+    }
+}
+
+#[test]
+fn test_from_uri_and_mime_video_types() {
+    for mime in ["video/mp4", "video/webm", "video/quicktime"] {
+        let content = Content::from_uri_and_mime("files/abc123", mime);
+        assert!(
+            matches!(content, Content::Video { .. }),
+            "Expected Video for {mime}"
+        );
+    }
+}
+
+#[test]
+fn test_from_uri_and_mime_document_fallback() {
+    // PDFs, text files, and unknown types all become Document
+    for mime in [
+        "application/pdf",
+        "text/plain",
+        "text/csv",
+        "application/json",
+        "application/octet-stream",
+    ] {
+        let content = Content::from_uri_and_mime("files/abc123", mime);
+        assert!(
+            matches!(content, Content::Document { .. }),
+            "Expected Document for {mime}"
+        );
+    }
+}
+
+#[test]
+fn test_from_uri_and_mime_preserves_values() {
+    let content = Content::from_uri_and_mime("files/test123", "image/png");
+    match content {
+        Content::Image { uri, mime_type, .. } => {
+            assert_eq!(uri, Some("files/test123".to_string()));
+            assert_eq!(mime_type, Some("image/png".to_string()));
+        }
+        _ => panic!("Expected Image variant"),
     }
 }

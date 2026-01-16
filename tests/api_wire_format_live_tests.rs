@@ -55,7 +55,7 @@ macro_rules! require_api_key {
 /// This test makes a simple text request and verifies no Unknown variants
 /// appear in the response outputs.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_basic_interaction_no_unknown_content() {
     require_api_key!(client);
 
@@ -93,7 +93,7 @@ async fn canary_basic_interaction_no_unknown_content() {
 ///
 /// This test verifies the interaction status is a known variant.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_response_status_is_known() {
     require_api_key!(client);
 
@@ -122,7 +122,7 @@ async fn canary_response_status_is_known() {
 /// Function calling responses can include additional content types like
 /// FunctionCall. This test ensures we handle all of them.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_function_calling_no_unknown_content() {
     require_api_key!(client);
 
@@ -171,7 +171,7 @@ async fn canary_function_calling_no_unknown_content() {
 /// Thinking mode responses include Thought content. This test ensures
 /// we handle all content types in thinking responses.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_thinking_mode_no_unknown_content() {
     require_api_key!(client);
 
@@ -207,7 +207,7 @@ async fn canary_thinking_mode_no_unknown_content() {
 /// Streaming responses use different chunk types. This test ensures
 /// we handle all streaming chunk types correctly.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_streaming_no_unknown_chunks() {
     require_api_key!(client);
 
@@ -246,7 +246,7 @@ async fn canary_streaming_no_unknown_chunks() {
 /// Google Search returns specific content types. This test ensures
 /// we handle all search-related content types.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_google_search_no_unknown_content() {
     require_api_key!(client);
 
@@ -276,7 +276,7 @@ async fn canary_google_search_no_unknown_content() {
 /// Code execution returns specific content types for results.
 /// Uses timeout protection since code execution sandbox can be slow/unavailable.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_code_execution_no_unknown_content() {
     use std::time::Duration;
 
@@ -351,7 +351,7 @@ fn canary_builtin_tools_are_known() {
 /// This test exercises multiple features and checks for Unknown variants
 /// across the entire response structure.
 #[tokio::test]
-#[ignore] // Requires GEMINI_API_KEY
+#[ignore = "Requires API key"]
 async fn canary_comprehensive_response_check() {
     require_api_key!(client);
 

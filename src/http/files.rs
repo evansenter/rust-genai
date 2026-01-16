@@ -329,6 +329,8 @@ pub struct FileUploadResponse {
 const BASE_URL: &str = "https://generativelanguage.googleapis.com";
 const UPLOAD_URL: &str = "https://generativelanguage.googleapis.com/upload/v1beta/files";
 const API_VERSION: &str = "v1beta";
+/// Maximum file size for uploads (2 GB)
+const MAX_FILE_SIZE: u64 = 2_147_483_648;
 
 /// Uploads a file to the Files API using the resumable upload protocol.
 ///
@@ -358,8 +360,7 @@ pub async fn upload_file(
     }
 
     // Validate file size doesn't exceed API limit (2 GB)
-    const MAX_FILE_SIZE: usize = 2_147_483_648; // 2 GB
-    let file_size = file_data.len();
+    let file_size = file_data.len() as u64;
     if file_size > MAX_FILE_SIZE {
         return Err(GenaiError::InvalidInput(format!(
             "File size {} bytes exceeds maximum allowed size of {} bytes (2 GB)",
@@ -383,7 +384,7 @@ pub async fn upload_file(
         request_id,
         display_name.unwrap_or("(unnamed)"),
         mime_type,
-        file_size as u64,
+        file_size,
     );
 
     // Step 1: Start the resumable upload
@@ -745,7 +746,6 @@ pub async fn upload_file_chunked_with_chunk_size(
     }
 
     // Validate file size doesn't exceed API limit (2 GB)
-    const MAX_FILE_SIZE: u64 = 2_147_483_648; // 2 GB
     if file_size > MAX_FILE_SIZE {
         return Err(GenaiError::InvalidInput(format!(
             "File size {} bytes exceeds maximum allowed size of {} bytes (2 GB)",
