@@ -520,14 +520,16 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamEvent {
 ///
 /// This represents the output from a function that was executed by the library
 /// during automatic function calling. It contains the function name, the call ID
-/// (used to match with the original request), and the result value.
+/// (used to match with the original request), the arguments that were passed,
+/// and the result value.
 ///
 /// # Example
 ///
 /// ```no_run
 /// # use genai_rs::FunctionExecutionResult;
 /// # let result: FunctionExecutionResult = todo!();
-/// println!("Function {} returned: {}", result.name, result.result);
+/// println!("Function {} called with: {}", result.name, result.args);
+/// println!("  Returned: {}", result.result);
 /// println!("  Call ID: {}, Duration: {:?}", result.call_id, result.duration);
 /// ```
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
