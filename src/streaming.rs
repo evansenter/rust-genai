@@ -336,44 +336,28 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                     }
                 };
 
-                // Support both new format (with response + pending_calls) and
-                // legacy format (bare InteractionResponse) for backward compatibility
-                let (response, pending_calls): (InteractionResponse, Vec<PendingFunctionCall>) =
-                    if data.get("response").is_some() {
-                        // New format with nested response and pending_calls
-                        let response = serde_json::from_value(
-                            data.get("response")
-                                .cloned()
-                                .unwrap_or(serde_json::Value::Null),
-                        )
-                        .map_err(|e| {
-                            serde::de::Error::custom(format!(
-                                "Failed to deserialize ExecutingFunctions response: {}",
-                                e
-                            ))
-                        })?;
-                        let pending_calls = serde_json::from_value(
-                            data.get("pending_calls")
-                                .cloned()
-                                .unwrap_or(serde_json::json!([])),
-                        )
-                        .map_err(|e| {
-                            serde::de::Error::custom(format!(
-                                "Failed to deserialize ExecutingFunctions pending_calls: {}",
-                                e
-                            ))
-                        })?;
-                        (response, pending_calls)
-                    } else {
-                        // Legacy format: bare InteractionResponse (pending_calls defaults to empty)
-                        let response = serde_json::from_value(data).map_err(|e| {
-                            serde::de::Error::custom(format!(
-                                "Failed to deserialize ExecutingFunctions (legacy format): {}",
-                                e
-                            ))
-                        })?;
-                        (response, Vec::new())
-                    };
+                let response = serde_json::from_value(
+                    data.get("response")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null),
+                )
+                .map_err(|e| {
+                    serde::de::Error::custom(format!(
+                        "Failed to deserialize ExecutingFunctions response: {}",
+                        e
+                    ))
+                })?;
+                let pending_calls = serde_json::from_value(
+                    data.get("pending_calls")
+                        .cloned()
+                        .unwrap_or(serde_json::json!([])),
+                )
+                .map_err(|e| {
+                    serde::de::Error::custom(format!(
+                        "Failed to deserialize ExecutingFunctions pending_calls: {}",
+                        e
+                    ))
+                })?;
 
                 Ok(Self::ExecutingFunctions {
                     response,
@@ -1488,49 +1472,6 @@ mod tests {
         let deserialized: PendingFunctionCall =
             serde_json::from_str(&json_str).expect("Deserialization should succeed");
         assert_eq!(deserialized, call);
-    }
-
-    #[test]
-    fn test_executing_functions_legacy_format_deserialization() {
-        use crate::InteractionStatus;
-
-        // Legacy format: ExecutingFunctions with bare InteractionResponse (pre-0.8.0)
-        // Note: InteractionStatus uses snake_case wire format (e.g., "completed")
-        let legacy_json = r#"{
-            "chunk_type": "executing_functions",
-            "data": {
-                "id": "interaction-legacy",
-                "model": "gemini-3-flash-preview",
-                "agent": null,
-                "input": [],
-                "outputs": [],
-                "status": "completed",
-                "usage": null,
-                "tools": null,
-                "grounding_metadata": null,
-                "url_context_metadata": null,
-                "previous_interaction_id": null
-            }
-        }"#;
-
-        let deserialized: AutoFunctionStreamChunk =
-            serde_json::from_str(legacy_json).expect("Should deserialize legacy format");
-
-        match deserialized {
-            AutoFunctionStreamChunk::ExecutingFunctions {
-                response,
-                pending_calls,
-            } => {
-                assert_eq!(response.id.as_deref(), Some("interaction-legacy"));
-                assert_eq!(response.status, InteractionStatus::Completed);
-                // Legacy format should have empty pending_calls
-                assert!(
-                    pending_calls.is_empty(),
-                    "Legacy format should have empty pending_calls"
-                );
-            }
-            _ => panic!("Expected ExecutingFunctions variant"),
-        }
     }
 
     #[test]
