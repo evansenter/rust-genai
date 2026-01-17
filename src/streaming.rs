@@ -537,6 +537,8 @@ pub struct FunctionExecutionResult {
     pub name: String,
     /// The call_id from the FunctionCall this result responds to
     pub call_id: String,
+    /// The arguments passed to the function
+    pub args: serde_json::Value,
     /// The result returned by the function
     pub result: serde_json::Value,
     /// How long the function took to execute
@@ -550,12 +552,14 @@ impl FunctionExecutionResult {
     pub fn new(
         name: impl Into<String>,
         call_id: impl Into<String>,
+        args: serde_json::Value,
         result: serde_json::Value,
         duration: Duration,
     ) -> Self {
         Self {
             name: name.into(),
             call_id: call_id.into(),
+            args,
             result,
             duration,
         }
@@ -840,12 +844,14 @@ mod tests {
         let result = FunctionExecutionResult::new(
             "get_weather",
             "call-123",
+            json!({"city": "Seattle"}),
             json!({"temp": 20, "unit": "celsius"}),
             Duration::from_millis(42),
         );
 
         assert_eq!(result.name, "get_weather");
         assert_eq!(result.call_id, "call-123");
+        assert_eq!(result.args, json!({"city": "Seattle"}));
         assert_eq!(result.result, json!({"temp": 20, "unit": "celsius"}));
         assert_eq!(result.duration, Duration::from_millis(42));
     }
@@ -861,6 +867,7 @@ mod tests {
         let _results = AutoFunctionStreamChunk::FunctionResults(vec![FunctionExecutionResult {
             name: "test".to_string(),
             call_id: "1".to_string(),
+            args: json!({}),
             result: json!({"ok": true}),
             duration: Duration::from_millis(10),
         }]);
@@ -873,6 +880,7 @@ mod tests {
         let result = FunctionExecutionResult::new(
             "get_weather",
             "call-456",
+            json!({"city": "Miami"}),
             json!({"temp": 22, "conditions": "sunny"}),
             Duration::from_millis(150),
         );
@@ -921,12 +929,14 @@ mod tests {
             FunctionExecutionResult::new(
                 "get_weather",
                 "call-1",
+                json!({"city": "Tokyo"}),
                 json!({"temp": 20}),
                 Duration::from_millis(50),
             ),
             FunctionExecutionResult::new(
                 "get_time",
                 "call-2",
+                json!({"timezone": "UTC"}),
                 json!({"time": "14:30"}),
                 Duration::from_millis(30),
             ),
@@ -1019,12 +1029,14 @@ mod tests {
                 FunctionExecutionResult::new(
                     "get_weather",
                     "call-001",
+                    json!({"city": "Paris"}),
                     json!({"city": "Paris", "temp": 18, "unit": "celsius"}),
                     Duration::from_millis(120),
                 ),
                 FunctionExecutionResult::new(
                     "get_weather",
                     "call-002",
+                    json!({"city": "London"}),
                     json!({"city": "London", "temp": 15, "unit": "celsius"}),
                     Duration::from_millis(95),
                 ),
@@ -1132,6 +1144,7 @@ mod tests {
             executions: vec![FunctionExecutionResult::new(
                 "get_weather",
                 "call-1",
+                json!({"city": "Berlin"}),
                 json!({"temp": 25}),
                 Duration::from_millis(50),
             )],
@@ -1245,6 +1258,7 @@ mod tests {
         let results = AutoFunctionStreamChunk::FunctionResults(vec![FunctionExecutionResult::new(
             "test_func",
             "call-1",
+            json!({}),
             json!({"ok": true}),
             Duration::from_millis(10),
         )]);
@@ -1320,6 +1334,7 @@ mod tests {
             AutoFunctionStreamChunk::FunctionResults(vec![FunctionExecutionResult::new(
                 "weather",
                 "call-123",
+                json!({"city": "Denver"}),
                 json!({"temp": 72}),
                 Duration::from_millis(50),
             )]),
