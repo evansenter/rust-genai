@@ -10,6 +10,7 @@ use crate::{
 use async_stream::try_stream;
 use futures_util::{Stream, StreamExt};
 use reqwest::Client as ReqwestClient;
+use std::collections::HashMap;
 use tracing::{debug, warn};
 
 /// Creates a new interaction with the Gemini API.
@@ -126,6 +127,15 @@ pub fn create_interaction_stream<'a>(
     loud_wire::log_request(request_id, "POST (stream)", &url, request_body.as_deref());
 
     try_stream! {
+        // Accumulate content from deltas to include in Complete response.
+        // In streaming, the API sends content via delta events, but the final
+        // interaction.complete event has empty outputs. We accumulate here so
+        // that response.function_calls() and response.as_text() work consistently.
+        //
+        // We track content by index because content can arrive in multiple chunks
+        // that need to be merged (e.g., text fragments, function call arguments).
+        let mut content_by_index: HashMap<usize, Content> = HashMap::new();
+
         let response = http_client
             .post(&url)
             .header(API_KEY_HEADER, api_key)
@@ -217,7 +227,13 @@ pub fn create_interaction_stream<'a>(
                 }
                 "content.delta" => {
                     // Incremental content update
-                    if let Some(delta) = event.delta {
+                    if let Some(delta) = event.delta.clone() {
+                        // Accumulate content for the Complete response by merging
+                        // deltas at the same index. This ensures response.function_calls()
+                        // and response.as_text() work in streaming mode.
+                        if let Some(index) = event.index {
+                            merge_content_at_index(&mut content_by_index, index, delta.clone());
+                        }
                         yield StreamEvent::new(StreamChunk::Delta(delta), event_id);
                     } else {
                         warn!("content.delta event missing delta field - event dropped");
@@ -233,7 +249,16 @@ pub fn create_interaction_stream<'a>(
                 }
                 "interaction.complete" => {
                     // Final complete response
-                    if let Some(interaction) = event.interaction {
+                    if let Some(mut interaction) = event.interaction {
+                        // Merge accumulated delta content into outputs.
+                        // The API's Complete event has empty outputs in streaming mode,
+                        // but users expect response.function_calls() and as_text() to work.
+                        if !content_by_index.is_empty() {
+                            // Sort by index to maintain order
+                            let mut outputs: Vec<_> = content_by_index.drain().collect();
+                            outputs.sort_by_key(|(idx, _)| *idx);
+                            interaction.outputs = outputs.into_iter().map(|(_, c)| c).collect();
+                        }
                         yield StreamEvent::new(StreamChunk::Complete(interaction), event_id);
                     } else {
                         warn!("interaction.complete event missing interaction field - event dropped");
@@ -379,6 +404,9 @@ pub fn get_interaction_stream<'a>(
     );
 
     try_stream! {
+        // Accumulate content by index (same as create_interaction_stream)
+        let mut content_by_index: HashMap<usize, Content> = HashMap::new();
+
         let response = http_client
             .get(&url)
             .header(API_KEY_HEADER, api_key)
@@ -409,12 +437,20 @@ pub fn get_interaction_stream<'a>(
             // Handle different event types (same logic as create_interaction_stream)
             match event.event_type.as_str() {
                 "content.delta" => {
-                    if let Some(delta) = event.delta {
+                    if let Some(delta) = event.delta.clone() {
+                        if let Some(index) = event.index {
+                            merge_content_at_index(&mut content_by_index, index, delta.clone());
+                        }
                         yield StreamEvent::new(StreamChunk::Delta(delta), event_id);
                     }
                 }
                 "interaction.complete" => {
-                    if let Some(interaction) = event.interaction {
+                    if let Some(mut interaction) = event.interaction {
+                        if !content_by_index.is_empty() {
+                            let mut outputs: Vec<_> = content_by_index.drain().collect();
+                            outputs.sort_by_key(|(idx, _)| *idx);
+                            interaction.outputs = outputs.into_iter().map(|(_, c)| c).collect();
+                        }
                         yield StreamEvent::new(StreamChunk::Complete(interaction), event_id);
                     }
                 }
@@ -516,6 +552,67 @@ pub async fn cancel_interaction(
         deserialize_with_context(&response_text, "InteractionResponse from cancel")?;
 
     Ok(interaction_response)
+}
+
+/// Merges a delta Content into the accumulated content at a given index.
+///
+/// For text content, this concatenates the text. For function calls, arguments
+/// are merged as JSON string chunks. For other content types, the delta replaces
+/// any existing content.
+fn merge_content_at_index(content_map: &mut HashMap<usize, Content>, index: usize, delta: Content) {
+    match content_map.get_mut(&index) {
+        Some(existing) => {
+            // Merge based on content type
+            match (existing, &delta) {
+                // Text content: concatenate the text
+                (
+                    Content::Text {
+                        text: Some(existing_text),
+                        ..
+                    },
+                    Content::Text {
+                        text: Some(delta_text),
+                        ..
+                    },
+                ) => {
+                    existing_text.push_str(delta_text);
+                }
+                // FunctionCall: merge name and arguments as they stream in
+                (
+                    Content::FunctionCall {
+                        name: existing_name,
+                        args: existing_args,
+                        ..
+                    },
+                    Content::FunctionCall {
+                        name: delta_name,
+                        args: delta_args,
+                        ..
+                    },
+                ) => {
+                    // Name is a String, concatenate if delta has content
+                    if !delta_name.is_empty() {
+                        existing_name.push_str(delta_name);
+                    }
+                    // Args: if both are strings, concatenate the JSON string chunks
+                    if let (serde_json::Value::String(es), serde_json::Value::String(ds)) =
+                        (existing_args, delta_args)
+                    {
+                        es.push_str(ds);
+                    }
+                    // If delta args isn't a string, just keep existing
+                }
+                // For other types, just replace
+                _ => {
+                    content_map.insert(index, delta);
+                }
+            }
+        }
+        None => {
+            // No existing content at this index, just insert
+            content_map.insert(index, delta);
+        }
+    }
 }
 
 #[cfg(test)]
