@@ -88,6 +88,55 @@ while let Some(result) = stream.next().await {
 | Simple code preferred | ✅ | |
 | Background/batch processing | ✅ | |
 
+### Important: Function Calls in Streaming Mode
+
+When using basic streaming (`create_stream()`) with function calling, there's a key difference from non-streaming:
+
+**Non-streaming:** Function calls are in the response
+```rust,ignore
+let response = client.interaction()
+    .with_functions_from_registry()
+    .with_text("What's the weather?")
+    .create()
+    .await?;
+
+// ✅ Function calls available directly
+for call in response.function_calls() {
+    println!("Call: {}({})", call.name, call.args);
+}
+```
+
+**Streaming:** Function calls arrive as Delta events, NOT in Complete
+```rust,ignore
+let mut stream = client.interaction()
+    .with_functions_from_registry()
+    .with_text("What's the weather?")
+    .create_stream();
+
+let mut function_calls = Vec::new();
+
+while let Some(result) = stream.next().await {
+    match result?.chunk {
+        StreamChunk::Delta(content) => {
+            // ✅ Function calls arrive here as Content::FunctionCall
+            if let Content::FunctionCall { id, name, args } = content {
+                function_calls.push((id, name, args));
+            }
+        }
+        StreamChunk::Complete(response) => {
+            // ❌ response.function_calls() is EMPTY!
+            // The Complete event only has metadata (id, usage),
+            // not the accumulated content from deltas.
+        }
+        _ => {}
+    }
+}
+```
+
+**Why?** In streaming, the API sends content incrementally. The `Complete` event signals "stream finished" but doesn't re-aggregate all the delta content. You must accumulate `Content::FunctionCall` items from `Delta` events yourself.
+
+**Recommendation:** Use `create_stream_with_auto_functions()` instead, which handles accumulation and function execution automatically. See [Auto-Function Streaming](#auto-function-streaming).
+
 ## Type Hierarchy
 
 The streaming API has a layered type design with consistent naming:
