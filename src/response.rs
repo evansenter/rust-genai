@@ -399,7 +399,7 @@ impl UsageMetadata {
     /// - If self has None, takes the other's value
     ///
     /// Note: `*_by_modality` fields are not accumulated (would require complex merging).
-    pub fn accumulate(&mut self, other: &UsageMetadata) {
+    pub(crate) fn accumulate(&mut self, other: &UsageMetadata) {
         fn add_option(a: &mut Option<u32>, b: Option<u32>) {
             if let Some(b_val) = b {
                 *a = Some(a.unwrap_or(0).saturating_add(b_val));

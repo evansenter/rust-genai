@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Auto-function execution (`create_with_auto_functions()` and `create_stream_with_auto_functions()`) now reports accurate accumulated token usage across all API calls. Previously, the final response could show 0 input tokens because the API only reports input tokens on the first call. Added `UsageMetadata::accumulate()` method for combining usage across multiple responses.
+- Auto-function execution (`create_with_auto_functions()` and `create_stream_with_auto_functions()`) now reports accurate accumulated token usage across all API calls. Previously, the final response could show 0 input tokens because the API only reports input tokens on the first call.
 
 ### Migration
 
