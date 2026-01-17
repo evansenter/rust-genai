@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING**: `FunctionExecutionResult::new()` now requires `args` parameter (position 3, before `result`)
 - `FunctionExecutionResult` now includes `args` field for complete execution context - enables logging function calls with their arguments after execution completes
 
+### Fixed
+
+- Auto-function execution (`create_with_auto_functions()` and `create_stream_with_auto_functions()`) now reports accurate accumulated token usage across all API calls. Previously, the final response could show 0 input tokens because the API only reports input tokens on the first call. Added `UsageMetadata::accumulate()` method for combining usage across multiple responses.
+
 ### Migration
 
 If you relied on compile-time enforcement of builder constraints, you'll now get runtime errors from `build()` instead:

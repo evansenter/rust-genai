@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::{InteractionInput, InteractionResponse, StreamChunk};
+use crate::{InteractionInput, InteractionResponse, StreamChunk, UsageMetadata};
 use futures_util::StreamExt;
 use futures_util::stream::BoxStream;
 use serde_json::{Value, json};
@@ -299,6 +299,11 @@ impl<'a> InteractionBuilder<'a> {
         // Track the last response for returning partial results if max loops is reached
         let mut last_response: Option<InteractionResponse> = None;
 
+        // Accumulate usage across all loop iterations.
+        // The API may report 0 input tokens on the final response, so we track
+        // total usage ourselves for accurate reporting.
+        let mut accumulated_usage = UsageMetadata::default();
+
         // Main auto-function loop (configurable iterations to prevent infinite loops)
         for loop_count in 0..max_loops {
             debug!(
@@ -330,14 +335,24 @@ impl<'a> InteractionBuilder<'a> {
                 ));
             }
 
+            // Accumulate usage from this response
+            if let Some(ref usage) = response.usage {
+                accumulated_usage.accumulate(usage);
+            }
+
             // Extract function calls using convenience method
             let function_calls = response.function_calls();
 
             // If no function calls, we're done!
             if function_calls.is_empty() {
                 debug!("No function calls in response, completing auto-function loop");
+                // Create final response with accumulated usage across all API calls
+                let final_response = InteractionResponse {
+                    usage: Some(accumulated_usage),
+                    ..response
+                };
                 return Ok(AutoFunctionResult {
-                    response,
+                    response: final_response,
                     executions: all_executions,
                     reached_max_loops: false,
                 });
@@ -407,8 +422,14 @@ impl<'a> InteractionBuilder<'a> {
             ))
         })?;
 
+        // Create final response with accumulated usage across all API calls
+        let final_response = InteractionResponse {
+            usage: Some(accumulated_usage),
+            ..response
+        };
+
         Ok(AutoFunctionResult {
-            response,
+            response: final_response,
             executions: all_executions,
             reached_max_loops: true,
         })
@@ -587,6 +608,11 @@ impl<'a> InteractionBuilder<'a> {
             // Track the last response for returning partial results if max loops is reached
             let mut last_response: Option<InteractionResponse> = None;
 
+            // Accumulate usage across all loop iterations.
+            // The API may report 0 input tokens on the final response (especially in
+            // streaming), so we track total usage ourselves for accurate reporting.
+            let mut accumulated_usage = UsageMetadata::default();
+
             // Main auto-function streaming loop
             for loop_count in 0..max_loops {
                 debug!("Auto-function streaming loop iteration {}/{}", loop_count + 1, max_loops);
@@ -659,6 +685,11 @@ impl<'a> InteractionBuilder<'a> {
                     )
                 })?;
 
+                // Accumulate usage from this response
+                if let Some(ref usage) = response.usage {
+                    accumulated_usage.accumulate(usage);
+                }
+
                 // When store != false (validated at function entry), the API should always
                 // return an interaction ID. Return an error if the API violates this contract,
                 // as continuing would silently lose conversation context.
@@ -685,8 +716,13 @@ impl<'a> InteractionBuilder<'a> {
                 // If no function calls, we're done!
                 if !has_function_calls {
                     debug!("No function calls in response, completing auto-function streaming loop");
+                    // Create final response with accumulated usage across all API calls
+                    let final_response = InteractionResponse {
+                        usage: Some(accumulated_usage),
+                        ..response
+                    };
                     yield AutoFunctionStreamEvent::new(
-                        AutoFunctionStreamChunk::Complete(response),
+                        AutoFunctionStreamChunk::Complete(final_response),
                         last_event_id.clone(),
                     );
                     return;
@@ -792,9 +828,15 @@ impl<'a> InteractionBuilder<'a> {
                 ))
             })?;
 
+            // Create final response with accumulated usage across all API calls
+            let final_response = InteractionResponse {
+                usage: Some(accumulated_usage),
+                ..response
+            };
+
             // MaxLoopsReached is client-generated (loop limit hit), no API event_id
             yield AutoFunctionStreamEvent::new(
-                AutoFunctionStreamChunk::MaxLoopsReached(response),
+                AutoFunctionStreamChunk::MaxLoopsReached(final_response),
                 None,
             );
         })
