@@ -2284,9 +2284,12 @@ impl<'de> Deserialize<'de> for Content {
                 mime_type: Option<String>,
             },
             FunctionCall {
+                #[serde(default)]
                 id: Option<String>,
-                name: String,
-                #[serde(rename = "arguments")]
+                // In streaming, content.start events may not include name yet
+                #[serde(default)]
+                name: Option<String>,
+                #[serde(rename = "arguments", default)]
                 args: serde_json::Value,
             },
             FunctionResult {
@@ -2407,7 +2410,13 @@ impl<'de> Deserialize<'de> for Content {
                     mime_type,
                 },
                 KnownContent::FunctionCall { id, name, args } => {
-                    Content::FunctionCall { id, name, args }
+                    // In streaming, content.start may not include name yet;
+                    // deltas will fill it in. Use empty string as placeholder.
+                    Content::FunctionCall {
+                        id,
+                        name: name.unwrap_or_default(),
+                        args,
+                    }
                 }
                 KnownContent::FunctionResult {
                     name,

@@ -35,6 +35,26 @@ fn test_deserialize_function_call_content() {
 }
 
 #[test]
+fn test_deserialize_function_call_streaming_start() {
+    // In streaming, content.start events may only have id and type (no name/arguments).
+    // This simulates what the API sends in an SSE content.start event for function_call.
+    let content_json = r#"{"type": "function_call", "id": "call-abc123"}"#;
+
+    let content: Content = serde_json::from_str(content_json).expect("Deserialization failed");
+
+    match content {
+        Content::FunctionCall { id, name, args } => {
+            assert_eq!(id.as_deref(), Some("call-abc123"));
+            // Name defaults to empty string when not provided
+            assert_eq!(name, "");
+            // Args defaults to null when not provided
+            assert_eq!(args, serde_json::Value::Null);
+        }
+        _ => panic!("Expected FunctionCall variant, got {:?}", content),
+    }
+}
+
+#[test]
 fn test_content_empty_text_returns_none() {
     let content = Content::Text {
         text: Some(String::new()),
