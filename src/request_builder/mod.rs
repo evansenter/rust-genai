@@ -79,21 +79,21 @@ pub struct InteractionBuilder<'a> {
     agent: Option<String>,
     agent_config: Option<AgentConfig>,
     /// Conversation history (set by `with_history()`)
-    pub(crate) history: Vec<Turn>,
+    history: Vec<Turn>,
     /// Current user message (set by `with_text()`)
     current_message: Option<String>,
     /// Content input for function results (set by `with_content()`)
     content_input: Option<Vec<Content>>,
     previous_interaction_id: Option<String>,
-    pub(crate) tools: Option<Vec<InternalTool>>,
+    tools: Option<Vec<InternalTool>>,
     response_modalities: Option<Vec<String>>,
     response_format: Option<serde_json::Value>,
     response_mime_type: Option<String>,
     generation_config: Option<GenerationConfig>,
     speech_config: Option<SpeechConfig>,
     background: Option<bool>,
-    pub(crate) store: Option<bool>,
-    pub(crate) system_instruction: Option<InteractionInput>,
+    store: Option<bool>,
+    system_instruction: Option<InteractionInput>,
     /// Maximum iterations for auto function calling loop
     max_function_call_loops: usize,
     /// Tool service for dependency-injected functions
