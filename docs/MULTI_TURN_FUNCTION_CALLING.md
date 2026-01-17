@@ -62,10 +62,12 @@ let response = client.interaction()
 ### Stateless Mode (`store: false`)
 
 ```rust,ignore
+use genai_rs::InteractionContent;
+
 let mut history: Vec<InteractionContent> = vec![];
 
 // First turn
-history.push(text_content("Hi, I'm Alice"));
+history.push(InteractionContent::new_text("Hi, I'm Alice"));
 
 let response = client.interaction()
     .with_model("gemini-3-flash-preview")
@@ -76,10 +78,10 @@ let response = client.interaction()
     .await?;
 
 // Add response to history
-history.push(text_content(response.text().unwrap()));
+history.push(InteractionContent::new_text(response.text().unwrap()));
 
 // Second turn - must include full history
-history.push(text_content("What's my name?"));
+history.push(InteractionContent::new_text("What's my name?"));
 
 let response = client.interaction()
     .with_model("gemini-3-flash-preview")
@@ -249,6 +251,8 @@ println!("Final: {}", result.response.text().unwrap());
 ### Manual (`create()`)
 
 ```rust,ignore
+use genai_rs::InteractionContent;
+
 let mut response = client.interaction()
     .with_text("What's the weather in Tokyo?")
     .with_functions(functions)
@@ -265,7 +269,7 @@ for _ in 0..MAX_ITERATIONS {
     for call in &calls {
         let call_id = call.id.ok_or("Missing call_id")?;
         let result = execute_function(call.name, call.args);
-        results.push(function_result_content(
+        results.push(InteractionContent::new_function_result(
             call.name.to_string(),
             call_id.to_string(),
             result,
@@ -307,7 +311,7 @@ let results: Vec<_> = futures::future::join_all(
 
 // Send all results back together
 let result_contents: Vec<_> = calls.iter().zip(results.iter())
-    .map(|(call, result)| function_result_content(
+    .map(|(call, result)| InteractionContent::new_function_result(
         call.name,
         call.id.unwrap(),
         result.clone(),
@@ -465,16 +469,18 @@ Our testing confirms signatures are present on thought outputs across all config
 **For function calling**: You do NOT need to handle thought signatures on function calls:
 
 ```rust,ignore
+use genai_rs::InteractionContent;
+
 // This works fine - no thought signature needed on FC
 for call in response.function_calls() {
     let call_id = call.id.ok_or("Missing call_id")?;
 
     // Just add the function call (no thought signature)
-    history.push(function_call_content(call.name, call.args.clone()));
+    history.push(InteractionContent::new_function_call(call.name, call.args.clone()));
 
     // Execute and add result
     let result = execute_function(call.name, call.args);
-    history.push(function_result_content(call.name, call_id, result));
+    history.push(InteractionContent::new_function_result(call.name, call_id, result));
 }
 ```
 
@@ -542,6 +548,8 @@ The match pattern is verbose but clear about the two distinct states.
 ### Pattern 2: Stateless History Builder
 
 ```rust,ignore
+use genai_rs::InteractionContent;
+
 struct StatelessSession {
     client: Client,
     history: Vec<InteractionContent>,
@@ -551,7 +559,7 @@ struct StatelessSession {
 
 impl StatelessSession {
     async fn process(&mut self, message: &str) -> Result<String, Error> {
-        self.history.push(text_content(message));
+        self.history.push(InteractionContent::new_text(message));
 
         let mut response = self.client.interaction()
             .with_model("gemini-3-flash-preview")
@@ -565,7 +573,7 @@ impl StatelessSession {
         // Handle function calls...
 
         if let Some(text) = response.text() {
-            self.history.push(text_content(text));
+            self.history.push(InteractionContent::new_text(text));
             Ok(text.to_string())
         } else {
             Ok(String::new())

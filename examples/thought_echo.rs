@@ -21,7 +21,6 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use genai_rs::interactions_api::text_content;
 use genai_rs::{Client, InteractionContent, InteractionInput, ThinkingLevel};
 use std::env;
 
@@ -121,9 +120,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Build manual history - TEXT ONLY (no thoughts!)
     let history: Vec<InteractionContent> = vec![
-        text_content(prompt),
-        text_content(answer),
-        text_content("Now divide that by 13."),
+        InteractionContent::new_text(prompt),
+        InteractionContent::new_text(answer),
+        InteractionContent::new_text("Now divide that by 13."),
     ];
 
     println!("User: Now divide that by 13.\n");

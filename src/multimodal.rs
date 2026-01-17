@@ -60,7 +60,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use genai_rs::{Client, image_from_file, text_content};
+//! use genai_rs::{Client, image_from_file, InteractionContent};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let client = Client::new("api-key".to_string());
@@ -69,7 +69,7 @@
 //! let image = image_from_file("photo.jpg").await?;
 //!
 //! let contents = vec![
-//!     text_content("What's in this image?"),
+//!     InteractionContent::new_text("What's in this image?"),
 //!     image,
 //! ];
 //!
@@ -85,9 +85,6 @@
 
 use crate::InteractionContent;
 use crate::errors::GenaiError;
-use crate::interactions_api::{
-    audio_data_content, document_data_content, image_data_content, video_data_content,
-};
 use base64::Engine;
 use std::path::Path;
 
@@ -346,7 +343,7 @@ pub async fn image_from_file_with_mime(
     mime_type: impl Into<String>,
 ) -> Result<InteractionContent, GenaiError> {
     let data = load_and_encode_file(&path).await?;
-    Ok(image_data_content(data, mime_type))
+    Ok(InteractionContent::new_image_data(data, mime_type))
 }
 
 /// Loads an audio file with automatic MIME type detection.
@@ -430,7 +427,7 @@ pub async fn audio_from_file_with_mime(
     mime_type: impl Into<String>,
 ) -> Result<InteractionContent, GenaiError> {
     let data = load_and_encode_file(&path).await?;
-    Ok(audio_data_content(data, mime_type))
+    Ok(InteractionContent::new_audio_data(data, mime_type))
 }
 
 /// Loads a video file with automatic MIME type detection.
@@ -513,7 +510,7 @@ pub async fn video_from_file_with_mime(
     mime_type: impl Into<String>,
 ) -> Result<InteractionContent, GenaiError> {
     let data = load_and_encode_file(&path).await?;
-    Ok(video_data_content(data, mime_type))
+    Ok(InteractionContent::new_video_data(data, mime_type))
 }
 
 /// Loads a document file with automatic MIME type detection.
@@ -612,7 +609,7 @@ pub async fn document_from_file_with_mime(
     mime_type: impl Into<String>,
 ) -> Result<InteractionContent, GenaiError> {
     let data = load_and_encode_file(&path).await?;
-    Ok(document_data_content(data, mime_type))
+    Ok(InteractionContent::new_document_data(data, mime_type))
 }
 
 #[cfg(test)]

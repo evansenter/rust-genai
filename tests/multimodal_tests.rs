@@ -36,9 +36,7 @@ mod image {
         SAMPLE_IMAGE_URL, TINY_BLUE_PNG_BASE64, TINY_RED_PNG_BASE64, assert_response_semantic,
         get_client, stateful_builder, test_timeout, with_timeout,
     };
-    use genai_rs::{
-        InteractionInput, InteractionStatus, image_data_content, image_uri_content, text_content,
-    };
+    use genai_rs::{InteractionContent, InteractionInput, InteractionStatus};
 
     /// Tests image input via GCS URI (gs://) which may not be supported by the Interactions API.
     /// This test documents the expected "Unsupported file uri" error behavior when the API rejects
@@ -53,8 +51,10 @@ mod image {
         };
 
         let contents = vec![
-            text_content("What is in this image? Describe it briefly in 1-2 sentences."),
-            image_uri_content(SAMPLE_IMAGE_URL, "image/jpeg"),
+            InteractionContent::new_text(
+                "What is in this image? Describe it briefly in 1-2 sentences.",
+            ),
+            InteractionContent::new_image_uri(SAMPLE_IMAGE_URL, "image/jpeg"),
         ];
 
         let result = stateful_builder(&client)
@@ -97,8 +97,10 @@ mod image {
 
         // Use tiny red PNG for testing base64 input
         let contents = vec![
-            text_content("What color is this image? Answer with just the color name."),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+            InteractionContent::new_text(
+                "What color is this image? Answer with just the color name.",
+            ),
+            InteractionContent::new_image_data(TINY_RED_PNG_BASE64, "image/png"),
         ];
 
         let response = stateful_builder(&client)
@@ -134,11 +136,11 @@ mod image {
 
         // Send two images in a single request (both base64)
         let contents = vec![
-            text_content(
+            InteractionContent::new_text(
                 "I'm showing you two small colored images. What colors are they? List both.",
             ),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
+            InteractionContent::new_image_data(TINY_RED_PNG_BASE64, "image/png"),
+            InteractionContent::new_image_data(TINY_BLUE_PNG_BASE64, "image/png"),
         ];
 
         let response = stateful_builder(&client)
@@ -174,8 +176,8 @@ mod image {
         with_timeout(test_timeout(), async {
             // First turn: describe the base64 image
             let contents = vec![
-                text_content("What color is this image?"),
-                image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+                InteractionContent::new_text("What color is this image?"),
+                InteractionContent::new_image_data(TINY_RED_PNG_BASE64, "image/png"),
             ];
 
             let response1 = stateful_builder(&client)
@@ -216,7 +218,7 @@ mod image {
 
 mod audio {
     use crate::common::{SAMPLE_AUDIO_URL, TINY_WAV_BASE64, get_client, stateful_builder};
-    use genai_rs::{InteractionInput, audio_uri_content, text_content};
+    use genai_rs::{InteractionContent, InteractionInput};
 
     /// Tests audio input from URI.
     /// Note: GCS URIs are not supported by the Interactions API.
@@ -229,8 +231,8 @@ mod audio {
         };
 
         let contents = vec![
-            text_content("What is this audio about? Summarize briefly."),
-            audio_uri_content(SAMPLE_AUDIO_URL, "audio/mpeg"),
+            InteractionContent::new_text("What is this audio about? Summarize briefly."),
+            InteractionContent::new_audio_uri(SAMPLE_AUDIO_URL, "audio/mpeg"),
         ];
 
         let result = stateful_builder(&client)
@@ -270,8 +272,8 @@ mod audio {
         // Use tiny WAV for testing base64 audio input
         // Note: This is a minimal header with no actual audio, so the model may report it's empty/silent
         let contents = vec![
-            text_content("Describe what you hear in this audio file."),
-            genai_rs::audio_data_content(TINY_WAV_BASE64, "audio/wav"),
+            InteractionContent::new_text("Describe what you hear in this audio file."),
+            InteractionContent::new_audio_data(TINY_WAV_BASE64, "audio/wav"),
         ];
 
         let result = stateful_builder(&client)
@@ -301,7 +303,7 @@ mod audio {
 
 mod video {
     use crate::common::{SAMPLE_VIDEO_URL, TINY_MP4_BASE64, get_client, stateful_builder};
-    use genai_rs::{InteractionInput, text_content, video_data_content, video_uri_content};
+    use genai_rs::{InteractionContent, InteractionInput};
 
     /// Tests video input from URI.
     /// Note: GCS URIs are not supported by the Interactions API.
@@ -314,8 +316,8 @@ mod video {
         };
 
         let contents = vec![
-            text_content("What animals appear in this video? List them."),
-            video_uri_content(SAMPLE_VIDEO_URL, "video/mp4"),
+            InteractionContent::new_text("What animals appear in this video? List them."),
+            InteractionContent::new_video_uri(SAMPLE_VIDEO_URL, "video/mp4"),
         ];
 
         let result = stateful_builder(&client)
@@ -357,8 +359,8 @@ mod video {
         // Use minimal MP4 for testing base64 video input
         // Note: This is a minimal header with no actual video frames, so the model may report it's empty
         let contents = vec![
-            text_content("Describe what you see in this video file."),
-            video_data_content(TINY_MP4_BASE64, "video/mp4"),
+            InteractionContent::new_text("Describe what you see in this video file."),
+            InteractionContent::new_video_data(TINY_MP4_BASE64, "video/mp4"),
         ];
 
         let result = stateful_builder(&client)
@@ -392,7 +394,7 @@ mod mixed_content {
         TINY_BLUE_PNG_BASE64, TINY_RED_PNG_BASE64, assert_response_semantic, get_client,
         stateful_builder,
     };
-    use genai_rs::{InteractionInput, InteractionStatus, image_data_content, text_content};
+    use genai_rs::{InteractionContent, InteractionInput, InteractionStatus};
 
     #[tokio::test]
     #[ignore = "Requires API key"]
@@ -404,9 +406,11 @@ mod mixed_content {
 
         // Interleave text and base64 image content
         let contents = vec![
-            text_content("I'm going to show you an image."),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            text_content("Based on the color above, what emotion might it represent?"),
+            InteractionContent::new_text("I'm going to show you an image."),
+            InteractionContent::new_image_data(TINY_RED_PNG_BASE64, "image/png"),
+            InteractionContent::new_text(
+                "Based on the color above, what emotion might it represent?",
+            ),
         ];
 
         let response = stateful_builder(&client)
@@ -441,11 +445,11 @@ mod mixed_content {
 
         // Ask model to compare two base64 images
         let contents = vec![
-            text_content(
+            InteractionContent::new_text(
                 "Compare these two colored squares. What are their colors and how do they differ?",
             ),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
+            InteractionContent::new_image_data(TINY_RED_PNG_BASE64, "image/png"),
+            InteractionContent::new_image_data(TINY_BLUE_PNG_BASE64, "image/png"),
         ];
 
         let response = stateful_builder(&client)
@@ -476,10 +480,7 @@ mod mixed_media {
         TINY_MP4_BASE64, TINY_RED_PNG_BASE64, TINY_WAV_BASE64, assert_response_semantic,
         get_client, stateful_builder,
     };
-    use genai_rs::{
-        InteractionInput, InteractionStatus, audio_data_content, image_data_content, text_content,
-        video_data_content,
-    };
+    use genai_rs::{InteractionContent, InteractionInput, InteractionStatus};
 
     /// Tests combining multiple media types (image + audio) in a single interaction.
     ///
@@ -498,14 +499,14 @@ mod mixed_media {
 
         // Combine image and audio with a question about both
         let contents = vec![
-            text_content(
+            InteractionContent::new_text(
                 "I'm sending you an image and an audio file. \
                  For the image, tell me what color it is. \
                  For the audio, describe what kind of audio file it appears to be. \
                  Keep your response brief.",
             ),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            audio_data_content(TINY_WAV_BASE64, "audio/wav"),
+            InteractionContent::new_image_data(TINY_RED_PNG_BASE64, "image/png"),
+            InteractionContent::new_audio_data(TINY_WAV_BASE64, "audio/wav"),
         ];
 
         let result = stateful_builder(&client)
@@ -572,13 +573,13 @@ mod mixed_media {
 
         // Combine all three media types
         let contents = vec![
-            text_content(
+            InteractionContent::new_text(
                 "I'm sending you an image, an audio file, and a video file. \
                  Please briefly acknowledge each one.",
             ),
-            image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-            audio_data_content(TINY_WAV_BASE64, "audio/wav"),
-            video_data_content(TINY_MP4_BASE64, "video/mp4"),
+            InteractionContent::new_image_data(TINY_RED_PNG_BASE64, "image/png"),
+            InteractionContent::new_audio_data(TINY_WAV_BASE64, "audio/wav"),
+            InteractionContent::new_video_data(TINY_MP4_BASE64, "video/mp4"),
         ];
 
         let result = stateful_builder(&client)
@@ -612,7 +613,7 @@ mod mixed_media {
 
 mod document {
     use crate::common::{TINY_PDF_BASE64, assert_response_semantic, get_client, stateful_builder};
-    use genai_rs::{InteractionInput, InteractionStatus, document_data_content, text_content};
+    use genai_rs::{InteractionContent, InteractionInput, InteractionStatus};
 
     /// Tests PDF document input from base64.
     /// This tests the ability to send PDF documents to the model for analysis.
@@ -626,10 +627,10 @@ mod document {
 
         // Use minimal PDF containing "Hello World" text
         let contents = vec![
-            text_content(
+            InteractionContent::new_text(
                 "What text does this PDF document contain? Answer with just the text you find.",
             ),
-            document_data_content(TINY_PDF_BASE64, "application/pdf"),
+            InteractionContent::new_document_data(TINY_PDF_BASE64, "application/pdf"),
         ];
 
         let result = stateful_builder(&client)
@@ -674,9 +675,11 @@ mod document {
         };
 
         let contents = vec![
-            text_content("I'm sending you a PDF document."),
-            document_data_content(TINY_PDF_BASE64, "application/pdf"),
-            text_content("Is this a valid PDF? What can you tell me about its structure?"),
+            InteractionContent::new_text("I'm sending you a PDF document."),
+            InteractionContent::new_document_data(TINY_PDF_BASE64, "application/pdf"),
+            InteractionContent::new_text(
+                "Is this a valid PDF? What can you tell me about its structure?",
+            ),
         ];
 
         let result = stateful_builder(&client)
@@ -711,7 +714,7 @@ mod streaming {
         TINY_RED_PNG_BASE64, assert_response_semantic, consume_stream, get_client,
         interaction_builder, test_timeout, with_timeout,
     };
-    use genai_rs::{InteractionInput, InteractionStatus, image_data_content, text_content};
+    use genai_rs::{InteractionContent, InteractionInput, InteractionStatus};
 
     /// Test streaming with multimodal (image) input.
     ///
@@ -732,8 +735,8 @@ mod streaming {
 
             // Create content with text and image
             let contents = vec![
-                text_content("What color is this image? Answer in one word."),
-                image_data_content(TINY_RED_PNG_BASE64, "image/png"),
+                InteractionContent::new_text("What color is this image? Answer in one word."),
+                InteractionContent::new_image_data(TINY_RED_PNG_BASE64, "image/png"),
             ];
 
             // Stream the response using with_input for multimodal content

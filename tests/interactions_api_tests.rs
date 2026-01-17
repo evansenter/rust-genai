@@ -34,9 +34,8 @@ use common::{
     stateful_builder, test_timeout, validate_response_semantically, with_timeout,
 };
 use genai_rs::{
-    CallableFunction, Client, FunctionDeclaration, GenaiError, GenerationConfig, InteractionInput,
-    InteractionRequest, InteractionStatus, function_result_content, image_uri_content,
-    text_content,
+    CallableFunction, Client, FunctionDeclaration, GenaiError, GenerationConfig,
+    InteractionContent, InteractionInput, InteractionRequest, InteractionStatus,
 };
 use genai_rs_macros::tool;
 use serde_json::json;
@@ -555,7 +554,7 @@ mod function_calling {
 
                 let call_id = call.id.expect("call_id should exist");
 
-                let function_result = function_result_content(
+                let function_result = InteractionContent::new_function_result(
                     "get_weather",
                     call_id,
                     json!({"temperature": "72°F", "conditions": "sunny"}),
@@ -627,7 +626,7 @@ mod function_calling {
                     let function_calls = response.function_calls();
                     let call_id = function_calls[0].id.expect("call_id should exist");
 
-                    let function_result = function_result_content(
+                    let function_result = InteractionContent::new_function_result(
                         "get_current_time",
                         call_id,
                         json!({"time": "14:30:00", "timezone": "UTC"}),
@@ -789,7 +788,7 @@ mod function_calling {
                 assert!(call.id.is_some(), "Function call must have an id");
                 let call_id = call.id.expect("call_id should exist");
 
-                let function_result = function_result_content(
+                let function_result = InteractionContent::new_function_result(
                     "get_weather",
                     call_id,
                     json!({"temperature": "18°C", "conditions": "rainy", "precipitation": "80%"}),
@@ -924,7 +923,7 @@ mod function_calling {
             let response2 = retry_request!([client, prev_id, call_id, get_info] => {
                 interaction_builder(&client)
                     .with_previous_interaction(&prev_id)
-                    .with_content(vec![function_result_content(
+                    .with_content(vec![InteractionContent::new_function_result(
                         "get_info",
                         call_id,
                         json!({"info": "The weather is sunny and warm, about 25°C with clear skies."}),
@@ -1000,7 +999,7 @@ mod function_calling {
                 let result = retry_request!([client, prev_id, call_id, get_weather] => {
                     interaction_builder(&client)
                         .with_previous_interaction(&prev_id)
-                        .with_content(vec![function_result_content(
+                        .with_content(vec![InteractionContent::new_function_result(
                             "get_weather",
                             call_id,
                             json!({"temperature": "22°C", "conditions": "sunny"}),
@@ -1492,8 +1491,7 @@ mod conversations {
     #[tokio::test]
     #[ignore = "Requires API key"]
     async fn test_manual_history_with_thinking() {
-        use genai_rs::ThinkingLevel;
-        use genai_rs::interactions_api::text_content;
+        use genai_rs::{InteractionContent, ThinkingLevel};
 
         let Some(client) = get_client() else {
             println!("Skipping: GEMINI_API_KEY not set");
@@ -1525,9 +1523,9 @@ mod conversations {
         );
 
         let history = vec![
-            text_content(initial_prompt),
-            text_content(answer1),
-            text_content("Now divide that result by 5"),
+            InteractionContent::new_text(initial_prompt),
+            InteractionContent::new_text(answer1),
+            InteractionContent::new_text("Now divide that result by 5"),
         ];
 
         println!("\nTurn 2 prompt: Now divide that result by 5");
@@ -1584,8 +1582,8 @@ mod multimodal {
         });
 
         let contents = vec![
-            text_content("What is in this image? Describe it briefly."),
-            image_uri_content(&image_url, "image/jpeg"),
+            InteractionContent::new_text("What is in this image? Describe it briefly."),
+            InteractionContent::new_image_uri(&image_url, "image/jpeg"),
         ];
 
         let result = interaction_builder(&client)

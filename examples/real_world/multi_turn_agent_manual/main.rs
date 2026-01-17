@@ -24,7 +24,7 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use genai_rs::{Client, FunctionDeclaration, function_result_content};
+use genai_rs::{Client, FunctionDeclaration, InteractionContent};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -371,7 +371,7 @@ impl SupportSession {
             for call in &function_calls {
                 let call_id = call.id.ok_or("Missing call_id")?;
                 let result = execute_function(call.name, call.args);
-                results.push(function_result_content(
+                results.push(InteractionContent::new_function_result(
                     call.name.to_string(),
                     call_id.to_string(),
                     result,

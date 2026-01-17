@@ -191,11 +191,11 @@ async fn test_file_in_interaction() {
     client.delete_file(&file.name).await.unwrap();
 }
 
-/// Tests that file_uri_content correctly infers content type.
+/// Tests that InteractionContent::from_file() correctly infers content type.
 #[tokio::test]
 #[ignore] // Requires API key
 async fn test_file_uri_content_type_inference() {
-    use genai_rs::{InteractionContent, file_uri_content};
+    use genai_rs::InteractionContent;
 
     let client = get_client();
 
@@ -225,25 +225,25 @@ async fn test_file_uri_content_type_inference() {
         .unwrap();
 
     // Verify content type inference
-    let video_content = file_uri_content(&video_file);
+    let video_content = InteractionContent::from_file(&video_file);
     assert!(
         matches!(video_content, InteractionContent::Video { .. }),
         "video/mp4 should create Video content"
     );
 
-    let image_content = file_uri_content(&image_file);
+    let image_content = InteractionContent::from_file(&image_file);
     assert!(
         matches!(image_content, InteractionContent::Image { .. }),
         "image/png should create Image content"
     );
 
-    let audio_content = file_uri_content(&audio_file);
+    let audio_content = InteractionContent::from_file(&audio_file);
     assert!(
         matches!(audio_content, InteractionContent::Audio { .. }),
         "audio/mp3 should create Audio content"
     );
 
-    let doc_content = file_uri_content(&doc_file);
+    let doc_content = InteractionContent::from_file(&doc_file);
     assert!(
         matches!(doc_content, InteractionContent::Document { .. }),
         "application/pdf should create Document content"

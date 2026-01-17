@@ -5,6 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### BREAKING CHANGES
+
+#### User Input Constructor Functions Removed
+
+Free functions for constructing user input content have been removed. Use `InteractionContent::new_*()` methods instead.
+
+**Removed functions:**
+- `text_content()` → `InteractionContent::new_text()`
+- `image_data_content()` → `InteractionContent::new_image_data()`
+- `image_uri_content()` → `InteractionContent::new_image_uri()`
+- `audio_data_content()` → `InteractionContent::new_audio_data()`
+- `audio_uri_content()` → `InteractionContent::new_audio_uri()`
+- `video_data_content()` → `InteractionContent::new_video_data()`
+- `video_uri_content()` → `InteractionContent::new_video_uri()`
+- `document_data_content()` → `InteractionContent::new_document_data()`
+- `document_uri_content()` → `InteractionContent::new_document_uri()`
+- `function_call_content()` → `InteractionContent::new_function_call()`
+- `function_call_content_with_signature()` → `InteractionContent::new_function_call_with_signature()`
+- `function_result_content()` → `InteractionContent::new_function_result()`
+- `thought_content()` → `InteractionContent::new_thought()`
+- `file_uri_content()` → `InteractionContent::from_file()`
+
+**Model output constructors retained** (for testing): `code_execution_call_content()`, `code_execution_result_content()`, `google_search_call_content()`, `google_search_result_content()`, `file_search_call_content()`, `file_search_result_content()`, `url_context_call_content()`, `url_context_result_content()`.
+
+**Migration guide:**
+
+```rust
+// Before:
+use genai_rs::{text_content, image_data_content, function_result_content};
+
+let contents = vec![
+    text_content("Describe this image"),
+    image_data_content(&base64_data, "image/png"),
+];
+
+let result = function_result_content("get_weather", "call_123", json!({"temp": 72}));
+
+// After:
+use genai_rs::InteractionContent;
+
+let contents = vec![
+    InteractionContent::new_text("Describe this image"),
+    InteractionContent::new_image_data(&base64_data, "image/png"),
+];
+
+let result = InteractionContent::new_function_result("get_weather", "call_123", json!({"temp": 72}));
+
+// For file URIs from uploaded files:
+// Before:
+let content = file_uri_content(&file.uri, &file.mime_type.unwrap());
+
+// After:
+let content = InteractionContent::from_file(&file);
+```
+
+**Rationale:** This consolidates the API surface - `InteractionContent` methods are more discoverable via IDE autocomplete and reduce the number of imports needed.
+
 ## [0.6.0] - 2025-01-11
 
 ### Added

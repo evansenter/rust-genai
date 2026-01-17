@@ -15,9 +15,9 @@ use serde_json::{Value, json};
 use tracing::{debug, error, warn};
 
 use crate::GenaiError;
+use crate::InteractionContent;
 use crate::ToolService;
 use crate::function_calling::{CallableFunction, FunctionRegistry, get_global_function_registry};
-use crate::interactions_api::function_result_content;
 use crate::streaming::{
     AutoFunctionResult, AutoFunctionStreamChunk, AutoFunctionStreamEvent, FunctionExecutionResult,
 };
@@ -374,7 +374,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                 ));
 
                 // Add function result (only the result, not the call - server has it via previous_interaction_id)
-                function_results.push(function_result_content(
+                function_results.push(InteractionContent::new_function_result(
                     call.name.to_string(),
                     call_id,
                     result,
@@ -751,7 +751,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                     ));
 
                     // Add function result content for API
-                    function_results_content.push(function_result_content(
+                    function_results_content.push(InteractionContent::new_function_result(
                         name.clone(),
                         call_id.clone(),
                         result,

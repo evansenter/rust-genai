@@ -23,8 +23,8 @@ use common::{
     stateful_builder,
 };
 use genai_rs::{
-    InteractionInput, InteractionStatus, audio_from_file, document_from_file, image_from_file,
-    text_content,
+    InteractionContent, InteractionInput, InteractionStatus, audio_from_file, document_from_file,
+    image_from_file,
 };
 use tempfile::TempDir;
 
@@ -58,7 +58,7 @@ async fn test_image_from_temp_file() {
 
     // Send to API
     let contents = vec![
-        text_content("What color is this image? Answer with just the color name."),
+        InteractionContent::new_text("What color is this image? Answer with just the color name."),
         image_content,
     ];
 
@@ -110,7 +110,7 @@ async fn test_image_mismatched_mime() {
         .expect("Failed to load image from file");
 
     let contents = vec![
-        text_content("Is this an image? Answer yes or no."),
+        InteractionContent::new_text("Is this an image? Answer yes or no."),
         image_content,
     ];
 
@@ -152,7 +152,7 @@ async fn test_pdf_from_temp_file() {
         .expect("Failed to load PDF from file");
 
     let contents = vec![
-        text_content("What text does this PDF contain? Answer with just the text."),
+        InteractionContent::new_text("What text does this PDF contain? Answer with just the text."),
         doc_content,
     ];
 
@@ -203,7 +203,7 @@ async fn test_txt_from_temp_file() {
         .expect("Failed to load TXT from file");
 
     let contents = vec![
-        text_content("What animal jumps in this text? Answer with one word."),
+        InteractionContent::new_text("What animal jumps in this text? Answer with one word."),
         doc_content,
     ];
 
@@ -256,7 +256,9 @@ async fn test_markdown_from_temp_file() {
         .expect("Failed to load Markdown from file");
 
     let contents = vec![
-        text_content("How many features are listed in this markdown? Answer with just a number."),
+        InteractionContent::new_text(
+            "How many features are listed in this markdown? Answer with just a number.",
+        ),
         doc_content,
     ];
 
@@ -300,7 +302,9 @@ async fn test_csv_from_temp_file() {
         .expect("Failed to load CSV from file");
 
     let contents = vec![
-        text_content("Who has the highest score in this CSV? Answer with just the name."),
+        InteractionContent::new_text(
+            "Who has the highest score in this CSV? Answer with just the name.",
+        ),
         doc_content,
     ];
 
@@ -354,7 +358,7 @@ async fn test_audio_from_temp_file() {
         .expect("Failed to load audio from file");
 
     let contents = vec![
-        text_content("Is this an audio file? Answer yes or no."),
+        InteractionContent::new_text("Is this an audio file? Answer yes or no."),
         audio_content,
     ];
 

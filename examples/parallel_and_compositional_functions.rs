@@ -25,7 +25,7 @@
 //! ```
 
 use futures_util::future::join_all;
-use genai_rs::{Client, FunctionDeclaration, function_result_content};
+use genai_rs::{Client, FunctionDeclaration, InteractionContent};
 use serde_json::{Value, json};
 use std::env;
 use std::error::Error;
@@ -234,7 +234,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .iter()
             .zip(results.iter())
             .map(|(call, result)| {
-                function_result_content(
+                InteractionContent::new_function_result(
                     call.name,
                     call.id.expect("Function call should have an ID"),
                     result.clone(),
@@ -305,7 +305,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .iter()
             .zip(results.iter())
             .map(|(call, result)| {
-                function_result_content(
+                InteractionContent::new_function_result(
                     call.name,
                     call.id.expect("Function call should have an ID"),
                     result.clone(),

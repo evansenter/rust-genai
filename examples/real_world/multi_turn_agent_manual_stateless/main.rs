@@ -32,7 +32,6 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use genai_rs::interactions_api::{function_call_content, function_result_content, text_content};
 use genai_rs::{Client, FunctionDeclaration, InteractionContent, InteractionInput};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -281,7 +280,8 @@ impl StatelessSupportSession {
     /// 2. We use `with_store_disabled()` on every request
     async fn process_message(&mut self, message: &str) -> Result<String, Box<dyn Error>> {
         // Add user message to history
-        self.conversation_history.push(text_content(message));
+        self.conversation_history
+            .push(InteractionContent::new_text(message));
 
         // Build request with full history
         let mut response = self
@@ -318,14 +318,19 @@ impl StatelessSupportSession {
 
                 // Add function call to history
                 self.conversation_history
-                    .push(function_call_content(call.name, call.args.clone()));
+                    .push(InteractionContent::new_function_call(
+                        call.name,
+                        call.args.clone(),
+                    ));
 
                 // Execute the function
                 let result = execute_function(call.name, call.args);
 
                 // Add function result to history
                 self.conversation_history
-                    .push(function_result_content(call.name, call_id, result));
+                    .push(InteractionContent::new_function_result(
+                        call.name, call_id, result,
+                    ));
             }
 
             // Send updated history back to model
@@ -343,7 +348,8 @@ impl StatelessSupportSession {
 
         // Add model's final response to history
         if let Some(text) = response.text() {
-            self.conversation_history.push(text_content(text));
+            self.conversation_history
+                .push(InteractionContent::new_text(text));
             Ok(text.to_string())
         } else {
             Ok("I apologize, but I couldn't process that request.".to_string())

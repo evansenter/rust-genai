@@ -15,9 +15,7 @@
 //!
 //! Set the `GEMINI_API_KEY` environment variable with your API key.
 
-use genai_rs::{
-    Client, Resolution, image_data_content, image_data_content_with_resolution, text_content,
-};
+use genai_rs::{Client, InteractionContent, Resolution};
 use std::env;
 
 // A tiny red PNG image (1x1 pixel) encoded as base64
@@ -71,9 +69,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n=== IMAGE COMPARISON ===\n");
 
     let comparison_contents = vec![
-        text_content("Compare these two colored images. What are their colors?"),
-        image_data_content(TINY_RED_PNG_BASE64, "image/png"),
-        image_data_content(TINY_BLUE_PNG_BASE64, "image/png"),
+        InteractionContent::new_text("Compare these two colored images. What are their colors?"),
+        InteractionContent::new_image_data(TINY_RED_PNG_BASE64, "image/png"),
+        InteractionContent::new_image_data(TINY_BLUE_PNG_BASE64, "image/png"),
     ];
 
     let comparison = client
@@ -128,8 +126,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Using the helper function with resolution
-    println!("\nUsing image_data_content_with_resolution() helper:");
-    let content_with_res = image_data_content_with_resolution(
+    println!("\nUsing InteractionContent::new_image_data_with_resolution() helper:");
+    let content_with_res = InteractionContent::new_image_data_with_resolution(
         TINY_BLUE_PNG_BASE64,
         "image/png",
         Resolution::Medium, // Default balance of cost and quality
@@ -138,7 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_content(vec![
-            text_content("Describe this image briefly."),
+            InteractionContent::new_text("Describe this image briefly."),
             content_with_res,
         ])
         .create()
@@ -181,7 +179,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("• add_image_data_with_resolution() to control quality vs. cost");
     println!("• Resolution levels: Low, Medium (default), High, UltraHigh");
     println!("• with_content() accepts mixed text + image vectors");
-    println!("• image_data_content_with_resolution() helper with resolution support");
+    println!(
+        "• InteractionContent::new_image_data_with_resolution() helper with resolution support"
+    );
     println!("• Follow-up questions work with with_previous_interaction()\n");
 
     println!("--- What You'll See with LOUD_WIRE=1 ---");

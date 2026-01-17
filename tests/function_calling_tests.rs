@@ -33,10 +33,9 @@ use common::{
     interaction_builder, retry_on_any_error, stateful_builder, test_timeout,
     validate_response_semantically, with_timeout,
 };
-use genai_rs::interactions_api::{function_call_content, text_content};
 use genai_rs::{
-    CallableFunction, FunctionDeclaration, FunctionExecutionResult, GenaiError, InteractionInput,
-    InteractionStatus, ThinkingLevel, function_result_content,
+    CallableFunction, FunctionDeclaration, FunctionExecutionResult, GenaiError, InteractionContent,
+    InteractionInput, InteractionStatus, ThinkingLevel,
 };
 use genai_rs_macros::tool;
 use serde_json::json;
@@ -204,7 +203,7 @@ mod basic {
             assert_eq!(call.name, "get_server_status");
             assert!(call.id.is_some(), "Should have call ID");
 
-            let result = function_result_content(
+            let result = InteractionContent::new_function_result(
                 "get_server_status",
                 call.id.unwrap().to_string(),
                 json!({"status": "online", "uptime": "99.9%"}),
@@ -301,7 +300,7 @@ mod basic {
         }
 
         let call = &calls[0];
-        let error_result = function_result_content(
+        let error_result = InteractionContent::new_function_result(
             "get_secret_data",
             call.id.unwrap().to_string(),
             json!({"error": "Access denied: insufficient permissions"}),
@@ -522,7 +521,7 @@ mod parallel {
                         "get_time" => json!({"timezone": "CET", "time": "14:30"}),
                         _ => json!({"result": "ok"}),
                     };
-                    function_result_content(
+                    InteractionContent::new_function_result(
                         call.name.to_string(),
                         call.id.expect("Should have ID").to_string(),
                         result_data,
@@ -596,7 +595,7 @@ mod parallel {
                         "get_time" => json!({"timezone": "JST", "time": "14:30"}),
                         _ => json!({"result": "unknown"}),
                     };
-                    results.push(function_result_content(
+                    results.push(InteractionContent::new_function_result(
                         name,
                         id.as_ref().expect("call should have ID"),
                         result,
@@ -676,7 +675,7 @@ mod parallel {
                         }
                         _ => json!({"result": "ok"}),
                     };
-                    results.push(function_result_content(
+                    results.push(InteractionContent::new_function_result(
                         name,
                         id.as_ref().expect("call should have ID"),
                         result,
@@ -763,7 +762,7 @@ mod sequential {
 
             // Step 2: Provide first function result
             let call1 = &calls1[0];
-            let result1 = function_result_content(
+            let result1 = InteractionContent::new_function_result(
                 call1.name.to_string(),
                 call1.id.unwrap().to_string(),
                 json!({"city": "Tokyo", "temperature": 22.0, "unit": "celsius"}),
@@ -787,7 +786,7 @@ mod sequential {
                     call2.name, call2.args
                 );
 
-                let result2 = function_result_content(
+                let result2 = InteractionContent::new_function_result(
                     call2.name.to_string(),
                     call2.id.unwrap().to_string(),
                     json!({"value": 71.6, "unit": "fahrenheit"}),
@@ -841,7 +840,7 @@ mod sequential {
             }
 
             let call = &calls[0];
-            let result = function_result_content(
+            let result = InteractionContent::new_function_result(
                 call.name.to_string(),
                 call.id.expect("Should have ID").to_string(),
                 json!({"city": "Tokyo", "temperature": "22°C", "conditions": "sunny"}),
@@ -916,7 +915,7 @@ mod sequential {
                             "get_weather" => json!({"city": "Tokyo", "temperature": "22°C", "conditions": "sunny"}),
                             _ => json!({"result": "ok"}),
                         };
-                        function_result_content(
+                        InteractionContent::new_function_result(
                             call.name.clone(),
                             call.id.as_ref().expect("Should have ID").clone(),
                             result_data,
@@ -1369,7 +1368,7 @@ mod stateless {
             ];
 
             let mut history: Vec<genai_rs::InteractionContent> =
-                vec![text_content("What's the weather in Tokyo?")];
+                vec![InteractionContent::new_text("What's the weather in Tokyo?")];
 
             let response1 = client
                 .interaction()
@@ -1389,9 +1388,14 @@ mod stateless {
 
             for call in &calls {
                 let call_id = call.id.expect("Function call should have ID");
-                history.push(function_call_content(call.name, call.args.clone()));
+                history.push(InteractionContent::new_function_call(
+                    call.name,
+                    call.args.clone(),
+                ));
                 let result = json!({"city": "Tokyo", "temperature": "22°C", "conditions": "sunny"});
-                history.push(function_result_content(call.name, call_id, result));
+                history.push(InteractionContent::new_function_result(
+                    call.name, call_id, result,
+                ));
             }
 
             let response2 = client
@@ -1438,7 +1442,7 @@ mod stateless {
             .build();
 
         let history: Vec<genai_rs::InteractionContent> =
-            vec![text_content("What's the weather in Paris?")];
+            vec![InteractionContent::new_text("What's the weather in Paris?")];
 
         // Stateless with thinking enabled, force function calling
         let response = client
@@ -1530,7 +1534,7 @@ mod thinking {
         assert!(call.id.is_some(), "Function call must have an id");
 
         // Turn 2: Provide function result
-        let function_result = function_result_content(
+        let function_result = InteractionContent::new_function_result(
             "get_weather",
             call.id.expect("call_id should exist").to_string(),
             json!({"temperature": "18°C", "conditions": "rainy", "precipitation": "80%", "humidity": "85%"}),
@@ -1628,7 +1632,7 @@ mod thinking {
                 "get_time" => json!({"time": "14:30", "timezone": "JST", "date": "2025-01-15"}),
                 _ => json!({"status": "unknown function"}),
             };
-            results.push(function_result_content(
+            results.push(InteractionContent::new_function_result(
                 call.name,
                 call.id.expect("call should have ID"),
                 result_data,
@@ -1701,7 +1705,7 @@ mod thinking {
             }
 
             let call = &function_calls[0];
-            let function_result = function_result_content(
+            let function_result = InteractionContent::new_function_result(
                 "get_weather",
                 call.id.expect("call should have ID"),
                 json!({"temperature": "15°C", "conditions": "sunny"}),
@@ -1779,7 +1783,7 @@ mod thinking {
         }
 
         // Turn 2: Provide result
-        let function_result = function_result_content(
+        let function_result = InteractionContent::new_function_result(
             "get_weather",
             call.id.expect("call_id should exist"),
             json!({"temperature": "22°C", "conditions": "clear", "humidity": "45%"}),
@@ -1854,7 +1858,7 @@ mod thinking {
 
         // Turn 2: Stream the follow-up
         let call = &function_calls[0];
-        let function_result = function_result_content(
+        let function_result = InteractionContent::new_function_result(
             "get_weather",
             call.id.expect("call should have ID"),
             json!({"temperature": "18°C", "conditions": "rainy", "precipitation": "85%", "humidity": "90%"}),
@@ -1988,7 +1992,7 @@ mod thinking {
             );
 
             // Provide result
-            let result1 = function_result_content(
+            let result1 = InteractionContent::new_function_result(
                 "get_weather",
                 call1.id.unwrap().to_string(),
                 json!({"temperature": "22°C"}),
@@ -2157,7 +2161,7 @@ mod thinking {
                 _ => json!({"status": "unknown function"}),
             };
 
-            results1.push(function_result_content(
+            results1.push(InteractionContent::new_function_result(
                 call.name,
                 call.id.expect("call should have ID"),
                 result_data,
@@ -2229,7 +2233,7 @@ mod thinking {
                     _ => json!({"status": "ok"}),
                 };
 
-                results2.push(function_result_content(
+                results2.push(InteractionContent::new_function_result(
                     call.name,
                     call.id.expect("call should have ID"),
                     result_data,
@@ -2485,7 +2489,7 @@ mod multiturn {
                 "get_time" => json!({"timezone": "GMT", "time": "14:30:00"}),
                 _ => json!({"error": "Unknown function"}),
             };
-            results.push(function_result_content(
+            results.push(InteractionContent::new_function_result(
                 call.name.to_string(),
                 call_id.to_string(),
                 result,
@@ -2725,7 +2729,7 @@ mod multiturn {
 
         // Return error result
         let call = &function_calls[0];
-        let error_result = function_result_content(
+        let error_result = InteractionContent::new_function_result(
             "get_secret_data".to_string(),
             call.id.expect("Should have ID").to_string(),
             json!({"error": "Permission denied: insufficient privileges for key 'test123'"}),

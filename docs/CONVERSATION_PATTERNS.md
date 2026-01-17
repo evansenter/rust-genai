@@ -116,14 +116,14 @@ let response = client
 ### With Multimodal Content
 
 ```rust,ignore
-use genai_rs::{Turn, TurnContent, image_data_content, text_content};
+use genai_rs::{Turn, TurnContent, InteractionContent};
 
 // Build multimodal turn manually
 let multimodal_turn = Turn {
     role: Role::User,
     content: TurnContent::Parts(vec![
-        text_content("What's in this image?"),
-        image_data_content(base64_image, "image/png"),
+        InteractionContent::new_text("What's in this image?"),
+        InteractionContent::new_image_data(base64_image, "image/png"),
     ]),
 };
 

@@ -14,7 +14,7 @@
 mod common;
 
 use common::{get_client, interaction_builder, stateful_builder, validate_response_semantically};
-use genai_rs::{FunctionDeclaration, InteractionStatus, function_result_content};
+use genai_rs::{FunctionDeclaration, InteractionContent, InteractionStatus};
 use serde_json::json;
 
 // =============================================================================
@@ -228,7 +228,7 @@ async fn test_conversation_function_then_text() {
     let call = &calls[0];
 
     // Turn 2: Provide function result
-    let result = function_result_content(
+    let result = InteractionContent::new_function_result(
         "get_weather",
         call.id.unwrap().to_string(),
         json!({"temperature": "25°C", "conditions": "sunny"}),

@@ -73,8 +73,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
    // Alternative: content vector (useful for dynamic content)
    let contents = vec![
-       text_content("Transcribe this audio with proper punctuation."),
-       audio_data_content(&base64_audio, "audio/mp3"),
+       InteractionContent::new_text("Transcribe this audio with proper punctuation."),
+       InteractionContent::new_audio_data(&base64_audio, "audio/mp3"),
    ];
    let response = client
        .interaction()
@@ -210,7 +210,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
        .interaction()
        .with_model("gemini-3-flash-preview")
        .with_content(vec![
-           text_content("Transcribe this audio."),
+           InteractionContent::new_text("Transcribe this audio."),
            audio_content,
        ])
        .create()

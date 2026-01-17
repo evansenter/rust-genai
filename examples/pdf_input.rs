@@ -25,7 +25,7 @@
 //! Gemini's image pricing (see <https://ai.google.dev/gemini-api/docs/document-processing>).
 
 use futures_util::StreamExt;
-use genai_rs::{Client, StreamChunk, document_data_content, text_content};
+use genai_rs::{Client, InteractionContent, StreamChunk};
 use std::env;
 use std::io::{Write, stdout};
 
@@ -103,8 +103,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Alternative: Using with_content() for dynamic content construction
     let stream_contents = vec![
-        text_content("Describe the structure of this PDF document in detail."),
-        document_data_content(SAMPLE_PDF_BASE64, "application/pdf"),
+        InteractionContent::new_text("Describe the structure of this PDF document in detail."),
+        InteractionContent::new_document_data(SAMPLE_PDF_BASE64, "application/pdf"),
     ];
 
     let mut stream = client

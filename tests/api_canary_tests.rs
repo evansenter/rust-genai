@@ -149,16 +149,18 @@ async fn canary_function_calling_interaction() {
     if !response.function_calls().is_empty() {
         let call = &response.function_calls()[0];
 
-        use genai_rs::interactions_api::{
-            function_call_content, function_result_content, text_content,
-        };
+        use genai_rs::InteractionContent;
 
         // Build conversation history with the function call and result
         let call_id = call.id.unwrap_or("call_1");
         let history = InteractionInput::Content(vec![
-            text_content("What time is it?"),
-            function_call_content(call.name, json!({})),
-            function_result_content(call.name, call_id, json!({"time": "12:00 PM"})),
+            InteractionContent::new_text("What time is it?"),
+            InteractionContent::new_function_call(call.name, json!({})),
+            InteractionContent::new_function_result(
+                call.name,
+                call_id,
+                json!({"time": "12:00 PM"}),
+            ),
         ]);
 
         let followup = client
@@ -217,14 +219,14 @@ async fn canary_code_execution_interaction() {
 #[tokio::test]
 #[ignore] // Requires GEMINI_API_KEY
 async fn canary_multimodal_interaction() {
-    use genai_rs::interactions_api::{image_data_content, text_content};
+    use genai_rs::InteractionContent;
 
     let client = get_client().expect("GEMINI_API_KEY must be set");
 
     // Use a tiny 1x1 red PNG
     let input = InteractionInput::Content(vec![
-        text_content("What color is this image?"),
-        image_data_content(common::TINY_RED_PNG_BASE64, "image/png"),
+        InteractionContent::new_text("What color is this image?"),
+        InteractionContent::new_image_data(common::TINY_RED_PNG_BASE64, "image/png"),
     ]);
 
     let response = client

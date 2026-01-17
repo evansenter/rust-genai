@@ -502,13 +502,13 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// # Example
     /// ```no_run
-    /// # use genai_rs::{Client, function_result_content};
+    /// # use genai_rs::{Client, InteractionContent};
     /// # use serde_json::json;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::builder("api_key".to_string()).build()?;
     ///
-    /// let result = function_result_content("my_func", "call_123", json!({"data": "result"}));
+    /// let result = InteractionContent::new_function_result("my_func", "call_123", json!({"data": "result"}));
     ///
     /// let response = client.interaction()
     ///     .with_model("gemini-3-flash-preview")
@@ -707,7 +707,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// This method accumulates content - it can be called multiple times.
     #[must_use]
     pub fn add_image_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content = crate::interactions_api::image_data_content(data, mime_type);
+        let content = InteractionContent::new_image_data(data, mime_type);
         self.add_content_item(content);
         self
     }
@@ -720,9 +720,8 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         mime_type: impl Into<String>,
         resolution: Resolution,
     ) -> Self {
-        let content = crate::interactions_api::image_data_content_with_resolution(
-            data, mime_type, resolution,
-        );
+        let content =
+            InteractionContent::new_image_data_with_resolution(data, mime_type, resolution);
         self.add_content_item(content);
         self
     }
@@ -779,7 +778,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// This method accumulates content - it can be called multiple times.
     #[must_use]
     pub fn add_image_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content = crate::interactions_api::image_uri_content(uri, mime_type);
+        let content = InteractionContent::new_image_uri(uri, mime_type);
         self.add_content_item(content);
         self
     }
@@ -792,8 +791,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         mime_type: impl Into<String>,
         resolution: Resolution,
     ) -> Self {
-        let content =
-            crate::interactions_api::image_uri_content_with_resolution(uri, mime_type, resolution);
+        let content = InteractionContent::new_image_uri_with_resolution(uri, mime_type, resolution);
         self.add_content_item(content);
         self
     }
@@ -813,7 +811,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// Adds audio from base64-encoded data to the content.
     #[must_use]
     pub fn add_audio_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content = crate::interactions_api::audio_data_content(data, mime_type);
+        let content = InteractionContent::new_audio_data(data, mime_type);
         self.add_content_item(content);
         self
     }
@@ -854,7 +852,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// Adds audio from a URI to the content.
     #[must_use]
     pub fn add_audio_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content = crate::interactions_api::audio_uri_content(uri, mime_type);
+        let content = InteractionContent::new_audio_uri(uri, mime_type);
         self.add_content_item(content);
         self
     }
@@ -892,7 +890,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// Adds video from base64-encoded data to the content.
     #[must_use]
     pub fn add_video_data(mut self, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content = crate::interactions_api::video_data_content(data, mime_type);
+        let content = InteractionContent::new_video_data(data, mime_type);
         self.add_content_item(content);
         self
     }
@@ -905,9 +903,8 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         mime_type: impl Into<String>,
         resolution: Resolution,
     ) -> Self {
-        let content = crate::interactions_api::video_data_content_with_resolution(
-            data, mime_type, resolution,
-        );
+        let content =
+            InteractionContent::new_video_data_with_resolution(data, mime_type, resolution);
         self.add_content_item(content);
         self
     }
@@ -960,7 +957,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// Adds video from a URI to the content.
     #[must_use]
     pub fn add_video_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content = crate::interactions_api::video_uri_content(uri, mime_type);
+        let content = InteractionContent::new_video_uri(uri, mime_type);
         self.add_content_item(content);
         self
     }
@@ -973,8 +970,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         mime_type: impl Into<String>,
         resolution: Resolution,
     ) -> Self {
-        let content =
-            crate::interactions_api::video_uri_content_with_resolution(uri, mime_type, resolution);
+        let content = InteractionContent::new_video_uri_with_resolution(uri, mime_type, resolution);
         self.add_content_item(content);
         self
     }
@@ -998,7 +994,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         data: impl Into<String>,
         mime_type: impl Into<String>,
     ) -> Self {
-        let content = crate::interactions_api::document_data_content(data, mime_type);
+        let content = InteractionContent::new_document_data(data, mime_type);
         self.add_content_item(content);
         self
     }
@@ -1043,7 +1039,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
         uri: impl Into<String>,
         mime_type: impl Into<String>,
     ) -> Self {
-        let content = crate::interactions_api::document_uri_content(uri, mime_type);
+        let content = InteractionContent::new_document_uri(uri, mime_type);
         self.add_content_item(content);
         self
     }
@@ -1079,7 +1075,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// ```
     #[must_use]
     pub fn with_file(mut self, file: &crate::FileMetadata) -> Self {
-        let content = crate::interactions_api::file_uri_content(file);
+        let content = crate::InteractionContent::from_file(file);
         self.add_content_item(content);
         self
     }
@@ -1113,8 +1109,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
     /// ```
     #[must_use]
     pub fn with_file_uri(mut self, uri: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        let content =
-            crate::interactions_api::content_from_uri_and_mime(uri.into(), mime_type.into());
+        let content = crate::InteractionContent::from_uri_and_mime(uri, mime_type);
         self.add_content_item(content);
         self
     }
@@ -1130,7 +1125,7 @@ impl<'a, State: Send + 'a> InteractionBuilder<'a, State> {
                 self.input = Some(InteractionInput::Content(vec![item]));
             }
             Some(InteractionInput::Text(text)) => {
-                let text_item = crate::interactions_api::text_content(std::mem::take(text));
+                let text_item = InteractionContent::new_text(std::mem::take(text));
                 self.input = Some(InteractionInput::Content(vec![text_item, item]));
             }
             Some(InteractionInput::Content(contents)) => {

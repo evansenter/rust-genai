@@ -253,7 +253,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
        .interaction()
        .with_model("gemini-3-flash-preview")
        .with_content(vec![
-           text_content("Describe what's happening in this video."),
+           InteractionContent::new_text("Describe what's happening in this video."),
            video_content,
        ])
        .create()

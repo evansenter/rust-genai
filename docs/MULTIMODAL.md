@@ -69,13 +69,13 @@ let response = client
 ### Method 2: Content Constructors
 
 ```rust,ignore
-use genai_rs::{text_content, image_data_content};
+use genai_rs::InteractionContent;
 
 // Build content vector manually
 let contents = vec![
-    text_content("Compare these images:"),
-    image_data_content(base64_image1, "image/png"),
-    image_data_content(base64_image2, "image/png"),
+    InteractionContent::new_text("Compare these images:"),
+    InteractionContent::new_image_data(base64_image1, "image/png"),
+    InteractionContent::new_image_data(base64_image2, "image/png"),
 ];
 
 let response = client
@@ -364,14 +364,14 @@ let response = client
     .create()
     .await?;
 
-// Content constructor
-use genai_rs::image_data_content_with_resolution;
-
-let content = image_data_content_with_resolution(
-    base64,
-    "image/png",
-    Resolution::High
-);
+// Content constructor with resolution via builder pattern
+let response = client
+    .interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text("Analyze this in detail")
+    .add_image_data_with_resolution(base64, "image/png", Resolution::High)
+    .create()
+    .await?;
 ```
 
 ### When to Use Each
@@ -385,73 +385,62 @@ let content = image_data_content_with_resolution(
 
 ## Content Constructors
 
-All constructors are re-exported from the crate root.
+Use `InteractionContent` methods to construct content programmatically.
 
 ### Text
 
 ```rust,ignore
-use genai_rs::text_content;
+use genai_rs::InteractionContent;
 
-let content = text_content("Analyze the following:");
+let content = InteractionContent::new_text("Analyze the following:");
 ```
 
 ### Images
 
 ```rust,ignore
-use genai_rs::{
-    image_data_content,
-    image_data_content_with_resolution,
-    image_uri_content,
-    image_uri_content_with_resolution,
-};
+use genai_rs::InteractionContent;
 
 // Inline base64
-let content = image_data_content(base64, "image/png");
-let content = image_data_content_with_resolution(base64, "image/png", Resolution::High);
+let content = InteractionContent::new_image_data(base64, "image/png");
 
 // URI reference
-let content = image_uri_content(uri, "image/png");
+let content = InteractionContent::new_image_uri(uri, "image/png");
 ```
 
 ### Audio
 
 ```rust,ignore
-use genai_rs::{audio_data_content, audio_uri_content};
+use genai_rs::InteractionContent;
 
-let content = audio_data_content(base64, "audio/mp3");
-let content = audio_uri_content(uri, "audio/mp3");
+let content = InteractionContent::new_audio_data(base64, "audio/mp3");
+let content = InteractionContent::new_audio_uri(uri, "audio/mp3");
 ```
 
 ### Video
 
 ```rust,ignore
-use genai_rs::{
-    video_data_content,
-    video_data_content_with_resolution,
-    video_uri_content,
-    video_uri_content_with_resolution,
-};
+use genai_rs::InteractionContent;
 
-let content = video_data_content(base64, "video/mp4");
-let content = video_uri_content(uri, "video/mp4");
+let content = InteractionContent::new_video_data(base64, "video/mp4");
+let content = InteractionContent::new_video_uri(uri, "video/mp4");
 ```
 
 ### Documents
 
 ```rust,ignore
-use genai_rs::{document_data_content, document_uri_content};
+use genai_rs::InteractionContent;
 
-let content = document_data_content(base64, "application/pdf");
-let content = document_uri_content(uri, "application/pdf");
+let content = InteractionContent::new_document_data(base64, "application/pdf");
+let content = InteractionContent::new_document_uri(uri, "application/pdf");
 ```
 
 ### From File Metadata
 
 ```rust,ignore
-use genai_rs::file_uri_content;
+use genai_rs::InteractionContent;
 
 let file = client.upload_file("document.pdf").await?;
-let content = file_uri_content(&file);
+let content = InteractionContent::from_file(&file);
 ```
 
 ## Image Generation

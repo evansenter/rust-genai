@@ -26,6 +26,8 @@ This example demonstrates the same customer support agent as `multi_turn_agent_a
 ## Manual Function Calling Pattern
 
 ```rust
+use genai_rs::InteractionContent;
+
 // Build initial request with functions
 let mut response = client
     .interaction()
@@ -49,7 +51,7 @@ for _ in 0..MAX_ITERATIONS {
     let mut results = Vec::new();
     for call in &function_calls {
         let result = execute_function(call.name, &call.args);
-        results.push(function_result_content(
+        results.push(InteractionContent::new_function_result(
             call.name.to_string(),
             call.id.unwrap().to_string(),
             result,

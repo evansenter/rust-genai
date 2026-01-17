@@ -155,7 +155,7 @@ Full control over the function execution loop.
 ```bash
 cargo run --example manual_function_calling
 ```
-**Learn**: Manual loop, `function_result_content()`, custom execution logic.
+**Learn**: Manual loop, `InteractionContent::new_function_result()`, custom execution logic.
 
 #### tool_service
 Dependency injection for functions that need shared state.
