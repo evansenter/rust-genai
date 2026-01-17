@@ -34,9 +34,8 @@
 //!                 print!("{}", t);
 //!             }
 //!         }
-//!         AutoFunctionStreamChunk::ExecutingFunctions(response) => {
-//!             let calls = response.function_calls();
-//!             println!("[Executing: {:?}]", calls.iter().map(|c| &c.name).collect::<Vec<_>>());
+//!         AutoFunctionStreamChunk::ExecutingFunctions { pending_calls, .. } => {
+//!             println!("[Executing: {:?}]", pending_calls.iter().map(|c| &c.name).collect::<Vec<_>>());
 //!         }
 //!         AutoFunctionStreamChunk::FunctionResults(results) => {
 //!             println!("[Got {} results]", results.len());
@@ -55,6 +54,47 @@ use std::time::Duration;
 
 use crate::{Content, InteractionResponse};
 use serde::{Deserialize, Serialize};
+
+/// A function call that is about to be executed.
+///
+/// This represents a function call detected during streaming but not yet executed.
+/// It contains the call metadata (name, ID, args) but not the result, which will
+/// be available in [`FunctionExecutionResult`] after execution completes.
+///
+/// # Example
+///
+/// ```no_run
+/// # use genai_rs::PendingFunctionCall;
+/// # let call: PendingFunctionCall = todo!();
+/// println!("About to execute: {}({})", call.name, call.args);
+/// println!("  Call ID: {}", call.call_id);
+/// ```
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct PendingFunctionCall {
+    /// Name of the function to be called
+    pub name: String,
+    /// The call_id from the API (used to match results)
+    pub call_id: String,
+    /// The arguments to pass to the function
+    pub args: serde_json::Value,
+}
+
+impl PendingFunctionCall {
+    /// Creates a new pending function call.
+    #[must_use]
+    pub fn new(
+        name: impl Into<String>,
+        call_id: impl Into<String>,
+        args: serde_json::Value,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            call_id: call_id.into(),
+            args,
+        }
+    }
+}
 
 /// A chunk from streaming with automatic function calling.
 ///
@@ -82,13 +122,19 @@ pub enum AutoFunctionStreamChunk {
     /// Function calls detected, about to execute.
     ///
     /// This event is yielded when the model requests function calls and
-    /// before the functions are executed. The response contains the function
-    /// calls which can be accessed via [`InteractionResponse::function_calls()`].
+    /// before the functions are executed. The `pending_calls` field contains
+    /// the function calls that are about to be executed.
     ///
-    /// **Note**: In streaming mode, function calls may arrive incrementally via
-    /// `Delta` chunks before this event. The library accumulates these and includes
-    /// them when determining which functions to execute.
-    ExecutingFunctions(InteractionResponse),
+    /// **Note**: In streaming mode, function calls arrive incrementally via
+    /// `Delta` chunks. The `pending_calls` list is built from accumulated deltas
+    /// and will always be populated, even though `response.function_calls()`
+    /// may be empty.
+    ExecutingFunctions {
+        /// The response from the API (may have empty `function_calls()` in streaming mode)
+        response: InteractionResponse,
+        /// The function calls that are about to be executed (always populated)
+        pending_calls: Vec<PendingFunctionCall>,
+    },
 
     /// Function execution completed with results.
     ///
@@ -188,10 +234,18 @@ impl Serialize for AutoFunctionStreamChunk {
                 map.serialize_entry("data", content)?;
                 map.end()
             }
-            Self::ExecutingFunctions(response) => {
+            Self::ExecutingFunctions {
+                response,
+                pending_calls,
+            } => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("chunk_type", "executing_functions")?;
-                map.serialize_entry("data", response)?;
+                // Serialize as nested object with both fields
+                let data = serde_json::json!({
+                    "response": response,
+                    "pending_calls": pending_calls,
+                });
+                map.serialize_entry("data", &data)?;
                 map.end()
             }
             Self::FunctionResults(results) => {
@@ -281,13 +335,34 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                         serde_json::Value::Null
                     }
                 };
-                let response: InteractionResponse = serde_json::from_value(data).map_err(|e| {
+
+                let response = serde_json::from_value(
+                    data.get("response")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null),
+                )
+                .map_err(|e| {
                     serde::de::Error::custom(format!(
-                        "Failed to deserialize AutoFunctionStreamChunk::ExecutingFunctions data: {}",
+                        "Failed to deserialize ExecutingFunctions response: {}",
                         e
                     ))
                 })?;
-                Ok(Self::ExecutingFunctions(response))
+                let pending_calls = serde_json::from_value(
+                    data.get("pending_calls")
+                        .cloned()
+                        .unwrap_or(serde_json::json!([])),
+                )
+                .map_err(|e| {
+                    serde::de::Error::custom(format!(
+                        "Failed to deserialize ExecutingFunctions pending_calls: {}",
+                        e
+                    ))
+                })?;
+
+                Ok(Self::ExecutingFunctions {
+                    response,
+                    pending_calls,
+                })
             }
             "function_results" => {
                 let data = match value.get("data").cloned() {
@@ -814,9 +889,8 @@ impl AutoFunctionResultAccumulator {
                 executions: std::mem::take(&mut self.executions),
                 reached_max_loops: true,
             }),
-            AutoFunctionStreamChunk::Delta(_) | AutoFunctionStreamChunk::ExecutingFunctions(_) => {
-                None
-            }
+            AutoFunctionStreamChunk::Delta(_)
+            | AutoFunctionStreamChunk::ExecutingFunctions { .. } => None,
             // Handle future variants gracefully
             _ => None,
         }
@@ -1376,5 +1450,75 @@ mod tests {
         let deserialized: AutoFunctionStreamEvent =
             serde_json::from_str(&json).expect("Deserialization should succeed");
         assert_eq!(deserialized.event_id.as_deref(), Some(""));
+    }
+
+    #[test]
+    fn test_pending_function_call() {
+        let call = PendingFunctionCall::new("get_weather", "call-123", json!({"city": "Seattle"}));
+
+        assert_eq!(call.name, "get_weather");
+        assert_eq!(call.call_id, "call-123");
+        assert_eq!(call.args, json!({"city": "Seattle"}));
+    }
+
+    #[test]
+    fn test_pending_function_call_serialization_roundtrip() {
+        let call = PendingFunctionCall::new("test_func", "id-456", json!({"key": "value"}));
+
+        let json_str = serde_json::to_string(&call).expect("Serialization should succeed");
+        assert!(json_str.contains("test_func"));
+        assert!(json_str.contains("id-456"));
+
+        let deserialized: PendingFunctionCall =
+            serde_json::from_str(&json_str).expect("Deserialization should succeed");
+        assert_eq!(deserialized, call);
+    }
+
+    #[test]
+    fn test_executing_functions_new_format_roundtrip() {
+        use crate::InteractionStatus;
+
+        let chunk = AutoFunctionStreamChunk::ExecutingFunctions {
+            response: crate::InteractionResponse {
+                id: Some("interaction-new".to_string()),
+                model: Some("gemini-3-flash-preview".to_string()),
+                agent: None,
+                input: vec![],
+                outputs: vec![],
+                status: InteractionStatus::Completed,
+                usage: None,
+                tools: None,
+                grounding_metadata: None,
+                url_context_metadata: None,
+                previous_interaction_id: None,
+                created: None,
+                updated: None,
+            },
+            pending_calls: vec![
+                PendingFunctionCall::new("func1", "call-1", json!({"a": 1})),
+                PendingFunctionCall::new("func2", "call-2", json!({"b": 2})),
+            ],
+        };
+
+        let json_str = serde_json::to_string(&chunk).expect("Serialization should succeed");
+        assert!(json_str.contains("pending_calls"));
+        assert!(json_str.contains("func1"));
+        assert!(json_str.contains("func2"));
+
+        let deserialized: AutoFunctionStreamChunk =
+            serde_json::from_str(&json_str).expect("Deserialization should succeed");
+
+        match deserialized {
+            AutoFunctionStreamChunk::ExecutingFunctions {
+                response,
+                pending_calls,
+            } => {
+                assert_eq!(response.id.as_deref(), Some("interaction-new"));
+                assert_eq!(pending_calls.len(), 2);
+                assert_eq!(pending_calls[0].name, "func1");
+                assert_eq!(pending_calls[1].name, "func2");
+            }
+            _ => panic!("Expected ExecutingFunctions variant"),
+        }
     }
 }

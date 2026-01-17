@@ -19,7 +19,7 @@
 use chrono::{DateTime, TimeZone, Utc};
 use genai_rs::{
     Annotation, AutoFunctionResult, AutoFunctionStreamChunk, Content, FunctionExecutionResult,
-    InteractionResponse, InteractionStatus, ModalityTokens, UsageMetadata,
+    InteractionResponse, InteractionStatus, ModalityTokens, PendingFunctionCall, UsageMetadata,
 };
 use proptest::prelude::*;
 
@@ -90,6 +90,11 @@ fn arb_function_execution_result() -> impl Strategy<Value = FunctionExecutionRes
         .prop_map(|(name, call_id, args, result, duration)| {
             FunctionExecutionResult::new(name, call_id, args, result, duration)
         })
+}
+
+fn arb_pending_function_call() -> impl Strategy<Value = PendingFunctionCall> {
+    (arb_identifier(), arb_identifier(), arb_json_value())
+        .prop_map(|(name, call_id, args)| PendingFunctionCall::new(&name, &call_id, args))
 }
 
 // =============================================================================
@@ -271,7 +276,16 @@ fn arb_auto_function_stream_chunk() -> impl Strategy<Value = AutoFunctionStreamC
         // Delta variant
         arb_interaction_content().prop_map(AutoFunctionStreamChunk::Delta),
         // ExecutingFunctions variant
-        arb_interaction_response().prop_map(AutoFunctionStreamChunk::ExecutingFunctions),
+        (
+            arb_interaction_response(),
+            prop::collection::vec(arb_pending_function_call(), 0..5)
+        )
+            .prop_map(|(response, pending_calls)| {
+                AutoFunctionStreamChunk::ExecutingFunctions {
+                    response,
+                    pending_calls,
+                }
+            }),
         // FunctionResults variant
         prop::collection::vec(arb_function_execution_result(), 0..5)
             .prop_map(AutoFunctionStreamChunk::FunctionResults),

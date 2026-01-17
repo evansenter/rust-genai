@@ -193,8 +193,12 @@ pub enum AutoFunctionStreamChunk {
     /// Incremental content from the model
     Delta(Content),
 
-    /// Function calls detected, about to execute
-    ExecutingFunctions(InteractionResponse),
+    /// Function calls detected, about to execute.
+    /// `pending_calls` contains the validated function calls that will be executed.
+    ExecutingFunctions {
+        response: InteractionResponse,
+        pending_calls: Vec<PendingFunctionCall>,
+    },
 
     /// Function execution completed with results
     FunctionResults(Vec<FunctionExecutionResult>),
@@ -314,8 +318,10 @@ while let Some(result) = stream.next().await {
                 print!("{}", text);
             }
         }
-        AutoFunctionStreamChunk::ExecutingFunctions(response) => {
-            println!("\n[Executing functions...]");
+        AutoFunctionStreamChunk::ExecutingFunctions { pending_calls, .. } => {
+            for call in pending_calls {
+                println!("\n[Executing: {}({})]", call.name, call.args);
+            }
         }
         AutoFunctionStreamChunk::FunctionResults(results) => {
             for r in results {
