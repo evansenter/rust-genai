@@ -243,6 +243,10 @@ client.interaction()
 Since validation happens at runtime, you can conditionally chain methods:
 
 ```rust,ignore
+// Your application tracks conversation state
+let previous_interaction_id: Option<String> = session.last_interaction_id();
+let should_disable_storage: bool = config.privacy_mode;
+
 let mut builder = client.interaction()
     .with_model("gemini-3-flash-preview")
     .with_text("Hello");
@@ -253,7 +257,7 @@ if let Some(prev_id) = previous_interaction_id {
 }
 
 // Conditionally disable storage (only valid if not chaining)
-if !is_chained && should_disable_storage {
+if previous_interaction_id.is_none() && should_disable_storage {
     builder = builder.with_store_disabled();
 }
 
