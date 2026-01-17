@@ -13,7 +13,7 @@
 //! | Server state | Yes | No |
 //! | `previous_interaction_id` | Yes | No |
 //! | Manual history | No | Yes |
-//! | Auto functions | Available | Blocked at compile time |
+//! | Auto functions | Available | Blocked at runtime |
 //!
 //! ## When to Use Stateless
 //!
@@ -415,7 +415,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("1. store: false means NO server-side state");
     println!("2. Must manually build conversation history");
     println!("3. Cannot use previous_interaction_id");
-    println!("4. create_with_auto_functions() is blocked at compile time");
+    println!("4. create_with_auto_functions() returns a runtime error");
     println!("\nFinal history size: {} items", session.history_size());
 
     Ok(())

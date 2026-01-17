@@ -94,8 +94,8 @@ let response = client.interaction()
 - No server-side conversation storage
 - Must manually build and send conversation history
 - Cannot use `previous_interaction_id`
-- `create_with_auto_functions()` is blocked at compile time
-- `with_background(true)` is blocked (requires storage to retrieve results)
+- `create_with_auto_functions()` returns a runtime error from `build()`
+- `with_background(true)` returns a runtime error (requires storage to retrieve results)
 - Must use manual function calling with `create()`
 
 ### When to Use Each
@@ -373,7 +373,7 @@ When using `previous_interaction_id` (stateful mode), some settings are inherite
 
 ### System Instruction
 
-`with_system_instruction()` is available on **all builder states** (FirstTurn, Chained, and StoreDisabled). Set it on each turn where you want it to apply.
+`with_system_instruction()` can be called at any point in builder chaining. Set it on each turn where you want it to apply.
 
 ```rust,ignore
 // First turn
@@ -521,7 +521,7 @@ for call in response.function_calls() {
 
 ### Pattern 1: First Turn vs Subsequent Turns (Match)
 
-The typestate pattern enforces that `with_system_instruction()` is only available on the first turn. Use a match:
+System instructions are NOT inherited across turns via `previousInteractionId`, so you must set them explicitly on each turn if needed:
 
 ```rust,ignore
 struct Agent {

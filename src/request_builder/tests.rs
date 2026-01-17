@@ -230,8 +230,8 @@ fn test_interaction_builder_with_store_disabled() {
         .with_text("Temporary interaction")
         .with_store_disabled();
 
-    // Note: with_store_disabled() transitions to StoreDisabled state
-    // and sets store = Some(false) internally
+    // with_store_disabled() sets store = Some(false)
+    // Invalid combinations are validated at build() time
     assert_eq!(builder.store, Some(false));
 }
 
@@ -335,15 +335,13 @@ fn test_interaction_builder_with_max_function_call_loops() {
     assert_eq!(builder.max_function_call_loops, 1);
 }
 
-// --- Typestate Tests ---
+// --- Builder State Tests ---
 //
-// These tests verify compile-time enforcement of API constraints via typestate.
-// The actual compile-time checks are verified by the fact that this code compiles -
-// invalid combinations won't compile. See ui_tests.rs for compile-fail tests.
+// These tests verify runtime validation of API constraints.
+// Invalid combinations are caught at build time with descriptive errors.
 
 #[test]
-fn test_typestate_first_turn_has_system_instruction() {
-    // FirstTurn builders can set system instruction
+fn test_builder_system_instruction_available() {
     let client = create_test_client();
     let builder = client
         .interaction()
@@ -355,8 +353,8 @@ fn test_typestate_first_turn_has_system_instruction() {
 }
 
 #[test]
-fn test_typestate_chained_preserves_fields() {
-    // When transitioning FirstTurn -> Chained, fields are preserved
+fn test_builder_chained_preserves_fields() {
+    // All fields are preserved when chaining methods
     let client = create_test_client();
     let builder = client
         .interaction()
@@ -365,15 +363,13 @@ fn test_typestate_chained_preserves_fields() {
         .with_system_instruction("Be helpful")
         .with_previous_interaction("prev-123");
 
-    // Fields should be preserved through the transition
     assert_eq!(builder.model.as_deref(), Some("gemini-3-flash-preview"));
     assert!(builder.system_instruction.is_some());
     assert_eq!(builder.previous_interaction_id.as_deref(), Some("prev-123"));
 }
 
 #[test]
-fn test_typestate_store_disabled_sets_store_false() {
-    // StoreDisabled transition sets store = Some(false)
+fn test_builder_store_disabled_sets_store_false() {
     let client = create_test_client();
     let builder = client
         .interaction()
@@ -385,25 +381,53 @@ fn test_typestate_store_disabled_sets_store_false() {
 }
 
 #[test]
-fn test_typestate_store_disabled_clears_background() {
-    // StoreDisabled transition clears background
+fn test_store_disabled_with_background_validation_error() {
+    // store=false + background=true is invalid (background needs storage)
     let client = create_test_client();
-    let first_turn = client
+    let builder = client
         .interaction()
         .with_model("gemini-3-flash-preview")
         .with_text("Hello")
-        .with_background(true);
+        .with_background(true)
+        .with_store_disabled();
 
-    assert_eq!(first_turn.background, Some(true));
-
-    // Transitioning to StoreDisabled clears background
-    let disabled = first_turn.with_store_disabled();
-    assert_eq!(disabled.background, None);
+    // Building should fail with validation error
+    let result = builder.build();
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("Background execution requires storage"),
+        "Expected background+store error, got: {}",
+        err
+    );
 }
 
 #[test]
-fn test_typestate_chained_can_set_background() {
-    // Chained builders can set background (unlike StoreDisabled)
+fn test_store_disabled_with_previous_interaction_validation_error() {
+    // store=false + previous_interaction_id is invalid (chaining needs storage)
+    let client = create_test_client();
+    let builder = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Hello")
+        .with_previous_interaction("prev-123")
+        .with_store_disabled();
+
+    // Building should fail with validation error
+    let result = builder.build();
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("Chained interactions require storage"),
+        "Expected chaining+store error, got: {}",
+        err
+    );
+}
+
+#[test]
+fn test_builder_chained_can_set_background() {
     let client = create_test_client();
     let builder = client
         .interaction()
@@ -416,8 +440,7 @@ fn test_typestate_chained_can_set_background() {
 }
 
 #[test]
-fn test_typestate_first_turn_can_set_background() {
-    // FirstTurn builders can set background
+fn test_builder_can_set_background() {
     let client = create_test_client();
     let builder = client
         .interaction()
@@ -428,19 +451,73 @@ fn test_typestate_first_turn_can_set_background() {
     assert_eq!(builder.background, Some(true));
 }
 
-// NOTE: The following compile-time constraints are enforced by typestate:
+// NOTE: The following constraints are enforced by runtime validation in build():
 //
-// 1. StoreDisabled builders cannot call:
-//    - with_previous_interaction() - requires storage
-//    - with_background(true) - requires storage
-//    - create_with_auto_functions() - requires storage
-//    - create_stream_with_auto_functions() - requires storage
-//
-// 2. Chained builders cannot call:
-//    - with_system_instruction() - inherited from previous
-//    - with_store_disabled() - chained requires storage
-//
-// These are verified by compile-fail tests in tests/ui_tests.rs
+// 1. store=false cannot combine with:
+//    - with_previous_interaction() - chaining requires storage
+//    - with_background(true) - background requires storage
+//    - create_with_auto_functions() - auto-function loop requires storage
+//    - create_stream_with_auto_functions() - auto-function loop requires storage
+
+#[tokio::test]
+async fn test_auto_functions_rejects_store_disabled() {
+    // Auto-function execution requires storage to maintain conversation context
+    let client = create_test_client();
+    let func = FunctionDeclaration::builder("test_func")
+        .description("Test function")
+        .build();
+
+    let result = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Test")
+        .add_function(func)
+        .with_store_disabled() // This should be rejected
+        .create_with_auto_functions()
+        .await;
+
+    // Should fail with validation error, not API error
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("create_with_auto_functions() requires storage"),
+        "Expected auto-functions+store error, got: {}",
+        err
+    );
+}
+
+#[tokio::test]
+async fn test_stream_auto_functions_rejects_store_disabled() {
+    use futures_util::StreamExt;
+
+    // Streaming auto-function execution also requires storage
+    let client = create_test_client();
+    let func = FunctionDeclaration::builder("test_func")
+        .description("Test function")
+        .build();
+
+    let mut stream = client
+        .interaction()
+        .with_model("gemini-3-flash-preview")
+        .with_text("Test")
+        .add_function(func)
+        .with_store_disabled() // This should be rejected
+        .create_stream_with_auto_functions();
+
+    // Should return an error stream immediately
+    let first_item = stream.next().await;
+    assert!(first_item.is_some(), "Stream should have at least one item");
+    let result = first_item.unwrap();
+    assert!(result.is_err(), "First stream item should be an error");
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("create_with_auto_functions() requires storage"),
+        "Expected auto-functions+store error, got: {}",
+        err
+    );
+}
 
 #[tokio::test]
 async fn test_auto_functions_allows_store_true() {
@@ -722,7 +799,7 @@ fn test_with_history_only_produces_turns_input() {
 }
 
 #[test]
-fn test_typestate_chained_preserves_history_and_current_message() {
+fn test_chained_preserves_history_and_current_message() {
     use crate::Turn;
 
     let client = create_test_client();
@@ -735,14 +812,14 @@ fn test_typestate_chained_preserves_history_and_current_message() {
         .with_text("Current message")
         .with_previous_interaction("prev-123");
 
-    // Fields should be preserved through the FirstTurn -> Chained transition
+    // Fields should be preserved when chaining methods
     assert_eq!(builder.history.len(), 2);
     assert_eq!(builder.current_message.as_deref(), Some("Current message"));
     assert_eq!(builder.previous_interaction_id.as_deref(), Some("prev-123"));
 }
 
 #[test]
-fn test_typestate_store_disabled_preserves_history_and_current_message() {
+fn test_store_disabled_preserves_history_and_current_message() {
     use crate::Turn;
 
     let client = create_test_client();
@@ -755,7 +832,7 @@ fn test_typestate_store_disabled_preserves_history_and_current_message() {
         .with_text("Current message")
         .with_store_disabled();
 
-    // Fields should be preserved through the FirstTurn -> StoreDisabled transition
+    // Fields should be preserved when setting store disabled
     assert_eq!(builder.history.len(), 2);
     assert_eq!(builder.current_message.as_deref(), Some("Current message"));
     assert_eq!(builder.store, Some(false));

@@ -9,12 +9,12 @@ This guide covers the `InteractionBuilder` fluent API, including method naming c
 - [Input Methods](#input-methods)
 - [Method Interactions](#method-interactions)
 - [Validation Errors](#validation-errors)
-- [Typestate Pattern](#typestate-pattern)
+- [Storage Constraints](#storage-constraints)
 - [Best Practices](#best-practices)
 
 ## Overview
 
-The `InteractionBuilder` provides a fluent interface for constructing requests to the Gemini API. Methods can be chained in any order (within typestate constraints), and the request is built when you call `create()`, `create_stream()`, or `build()`.
+The `InteractionBuilder` provides a fluent interface for constructing requests to the Gemini API. Methods can be chained in any order, and the request is validated and built when you call `create()`, `create_stream()`, or `build()`.
 
 ```rust,ignore
 let response = client
@@ -216,34 +216,52 @@ client.interaction()
     .build()  // Returns Err!
 ```
 
-## Typestate Pattern
+## Storage Constraints
 
-The builder uses Rust's type system to enforce API constraints at compile time. The `State` parameter tracks builder state:
+Certain combinations of builder methods are invalid because they conflict with storage requirements. The builder validates these constraints at `build()` time:
 
-```text
-                     FirstTurn
-                         │
-        ┌────────────────┴────────────────┐
-        │                                 │
-        ▼                                 ▼
-     Chained                        StoreDisabled
-(via previous_interaction)       (via store_disabled)
-```
+### Invalid Combinations
 
-### State Constraints
-
-| State | Unavailable Methods | Reason |
-|-------|---------------------|--------|
-| `Chained` | `with_store_disabled()` | Chained requires storage |
-| `StoreDisabled` | `with_previous_interaction()` | Requires storage |
-| `StoreDisabled` | `with_background(true)` | Requires storage |
-| `StoreDisabled` | `create_with_auto_functions()` | Requires storage |
+| If You Call | Cannot Also Call | Reason |
+|-------------|------------------|--------|
+| `with_store_disabled()` | `with_previous_interaction()` | Chaining requires storage |
+| `with_store_disabled()` | `with_background(true)` | Background requires storage |
+| `with_store_disabled()` | `create_with_auto_functions()` | Auto-functions require storage |
 
 ```rust,ignore
-// Compile-time error: can't disable store after chaining
+// Runtime error from build(): "Chained interactions require storage..."
 client.interaction()
-    .with_previous_interaction("id-123")  // Now in Chained state
-    .with_store_disabled()  // ERROR: method not available
+    .with_model("gemini-3-flash-preview")
+    .with_text("Hello")
+    .with_previous_interaction("id-123")
+    .with_store_disabled()
+    .build()  // Returns Err!
+```
+
+### Conditional Chaining
+
+Since validation happens at runtime, you can conditionally chain methods:
+
+```rust,ignore
+// Your application tracks conversation state
+let previous_interaction_id: Option<String> = session.last_interaction_id();
+let should_disable_storage: bool = config.privacy_mode;
+
+let mut builder = client.interaction()
+    .with_model("gemini-3-flash-preview")
+    .with_text("Hello");
+
+// Conditionally add previous interaction
+if let Some(prev_id) = previous_interaction_id {
+    builder = builder.with_previous_interaction(prev_id);
+}
+
+// Conditionally disable storage (only valid if not chaining)
+if previous_interaction_id.is_none() && should_disable_storage {
+    builder = builder.with_store_disabled();
+}
+
+let response = builder.create().await?;
 ```
 
 ## Best Practices

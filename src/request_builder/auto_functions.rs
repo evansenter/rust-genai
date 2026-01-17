@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::{InteractionInput, InteractionResponse, StreamChunk};
+use crate::{InteractionInput, InteractionResponse, StreamChunk, UsageMetadata};
 use futures_util::StreamExt;
 use futures_util::stream::BoxStream;
 use serde_json::{Value, json};
@@ -22,7 +22,7 @@ use crate::streaming::{
     AutoFunctionResult, AutoFunctionStreamChunk, AutoFunctionStreamEvent, FunctionExecutionResult,
 };
 
-use super::{CanAutoFunction, InteractionBuilder};
+use super::InteractionBuilder;
 
 /// Default maximum iterations for auto function calling.
 pub(crate) const DEFAULT_MAX_FUNCTION_CALL_LOOPS: usize = 5;
@@ -107,7 +107,7 @@ async fn execute_function(
     }
 }
 
-impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
+impl<'a> InteractionBuilder<'a> {
     /// Creates interaction with automatic function call handling.
     ///
     /// This method implements the auto-function execution loop:
@@ -132,12 +132,10 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     ///
     /// See <https://ai.google.dev/gemini-api/docs/thought-signatures> for more details.
     ///
-    /// # Availability
+    /// # Runtime Validation
     ///
-    /// This method is available on [`super::FirstTurn`] and [`super::Chained`] builders.
-    /// It is NOT available on [`super::StoreDisabled`] builders because auto-function
-    /// calling requires stored interactions to maintain conversation context across
-    /// multiple function execution rounds via `previous_interaction_id`.
+    /// This method requires storage to be enabled. If you've called `with_store_disabled()`,
+    /// this method will return an error with a helpful message explaining why and how to fix it.
     ///
     /// # Example
     /// ```no_run
@@ -245,8 +243,8 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     ///   a partial `AutoFunctionResult`. Use `previous_interaction_id` to continue.
     /// - `max_function_call_loops` is set to 0 (invalid configuration)
     pub async fn create_with_auto_functions(self) -> Result<AutoFunctionResult, GenaiError> {
-        // Note: The `CanAutoFunction` trait bound ensures at compile-time that this method
-        // is not available on `StoreDisabled` builders. No runtime check needed.
+        // Runtime validation: auto-functions require storage
+        self.validate_for_auto_functions()?;
 
         let client = self.client;
         let timeout = self.timeout;
@@ -301,6 +299,11 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
         // Track the last response for returning partial results if max loops is reached
         let mut last_response: Option<InteractionResponse> = None;
 
+        // Accumulate usage across all loop iterations.
+        // The API may report 0 input tokens on the final response, so we track
+        // total usage ourselves for accurate reporting.
+        let mut accumulated_usage = UsageMetadata::default();
+
         // Main auto-function loop (configurable iterations to prevent infinite loops)
         for loop_count in 0..max_loops {
             debug!(
@@ -332,14 +335,24 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                 ));
             }
 
+            // Accumulate usage from this response
+            if let Some(ref usage) = response.usage {
+                accumulated_usage.accumulate(usage);
+            }
+
             // Extract function calls using convenience method
             let function_calls = response.function_calls();
 
             // If no function calls, we're done!
             if function_calls.is_empty() {
                 debug!("No function calls in response, completing auto-function loop");
+                // Create final response with accumulated usage across all API calls
+                let final_response = InteractionResponse {
+                    usage: Some(accumulated_usage),
+                    ..response
+                };
                 return Ok(AutoFunctionResult {
-                    response,
+                    response: final_response,
                     executions: all_executions,
                     reached_max_loops: false,
                 });
@@ -409,8 +422,14 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
             ))
         })?;
 
+        // Create final response with accumulated usage across all API calls
+        let final_response = InteractionResponse {
+            usage: Some(accumulated_usage),
+            ..response
+        };
+
         Ok(AutoFunctionResult {
-            response,
+            response: final_response,
             executions: all_executions,
             reached_max_loops: true,
         })
@@ -529,8 +548,11 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
     pub fn create_stream_with_auto_functions(
         self,
     ) -> BoxStream<'a, Result<AutoFunctionStreamEvent, GenaiError>> {
-        // Note: The `CanAutoFunction` trait bound ensures at compile-time that this method
-        // is not available on `StoreDisabled` builders. No runtime check needed.
+        // Runtime validation: auto-functions require storage
+        // We do this early so errors are returned immediately, not mid-stream
+        if let Err(e) = self.validate_for_auto_functions() {
+            return Box::pin(futures_util::stream::once(async move { Err(e) }));
+        }
 
         let client = self.client;
         let max_loops = self.max_function_call_loops;
@@ -585,6 +607,11 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
 
             // Track the last response for returning partial results if max loops is reached
             let mut last_response: Option<InteractionResponse> = None;
+
+            // Accumulate usage across all loop iterations.
+            // The API may report 0 input tokens on the final response (especially in
+            // streaming), so we track total usage ourselves for accurate reporting.
+            let mut accumulated_usage = UsageMetadata::default();
 
             // Main auto-function streaming loop
             for loop_count in 0..max_loops {
@@ -658,6 +685,11 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                     )
                 })?;
 
+                // Accumulate usage from this response
+                if let Some(ref usage) = response.usage {
+                    accumulated_usage.accumulate(usage);
+                }
+
                 // When store != false (validated at function entry), the API should always
                 // return an interaction ID. Return an error if the API violates this contract,
                 // as continuing would silently lose conversation context.
@@ -684,8 +716,13 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                 // If no function calls, we're done!
                 if !has_function_calls {
                     debug!("No function calls in response, completing auto-function streaming loop");
+                    // Create final response with accumulated usage across all API calls
+                    let final_response = InteractionResponse {
+                        usage: Some(accumulated_usage),
+                        ..response
+                    };
                     yield AutoFunctionStreamEvent::new(
-                        AutoFunctionStreamChunk::Complete(response),
+                        AutoFunctionStreamChunk::Complete(final_response),
                         last_event_id.clone(),
                     );
                     return;
@@ -791,9 +828,15 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                 ))
             })?;
 
+            // Create final response with accumulated usage across all API calls
+            let final_response = InteractionResponse {
+                usage: Some(accumulated_usage),
+                ..response
+            };
+
             // MaxLoopsReached is client-generated (loop limit hit), no API event_id
             yield AutoFunctionStreamEvent::new(
-                AutoFunctionStreamChunk::MaxLoopsReached(response),
+                AutoFunctionStreamChunk::MaxLoopsReached(final_response),
                 None,
             );
         })

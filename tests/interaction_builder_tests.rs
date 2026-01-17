@@ -246,18 +246,18 @@ mod basic {
     }
 
     #[test]
-    fn test_system_instruction_available_on_all_states() {
-        // system_instruction should be available on FirstTurn, Chained, and StoreDisabled states
+    fn test_system_instruction_available_in_all_scenarios() {
+        // system_instruction should be available in all builder configurations
         let client = Client::new("test-api-key".to_string());
 
-        // FirstTurn state
-        let first_turn = client
+        // Basic request
+        let basic = client
             .interaction()
             .with_model(DEFAULT_MODEL)
             .with_text("Hello")
             .with_system_instruction("Focus on Rust");
 
-        let request = first_turn.build().expect("Should build successfully");
+        let request = basic.build().expect("Should build successfully");
         match request.system_instruction {
             Some(InteractionInput::Text(text)) => {
                 assert_eq!(text, "Focus on Rust");
@@ -265,15 +265,15 @@ mod basic {
             _ => panic!("Expected Text system_instruction"),
         }
 
-        // Chained state - system_instruction IS now available
-        let chained = client
+        // With previous interaction (follow-up)
+        let followup = client
             .interaction()
             .with_model(DEFAULT_MODEL)
             .with_text("Continue")
             .with_previous_interaction("prev-id")
             .with_system_instruction("Focus on testing");
 
-        let request = chained.build().expect("Should build successfully");
+        let request = followup.build().expect("Should build successfully");
         match request.system_instruction {
             Some(InteractionInput::Text(text)) => {
                 assert_eq!(text, "Focus on testing");
@@ -281,7 +281,7 @@ mod basic {
             _ => panic!("Expected Text system_instruction"),
         }
 
-        // StoreDisabled state
+        // With store disabled
         let store_disabled = client
             .interaction()
             .with_model(DEFAULT_MODEL)
@@ -299,26 +299,24 @@ mod basic {
     }
 
     #[test]
-    fn test_system_instruction_on_chained_state() {
-        // Verify system_instruction can be set directly on Chained state
-        // (previously this was blocked at compile time)
+    fn test_system_instruction_with_previous_interaction() {
+        // Verify system_instruction can be set alongside previous_interaction
         let client = Client::new("test-api-key".to_string());
 
-        // Set system_instruction AFTER transitioning to Chained state
-        let chained = client
+        let builder = client
             .interaction()
             .with_model(DEFAULT_MODEL)
             .with_text("Continue")
             .with_previous_interaction("prev-id")
             .with_system_instruction("You are a helpful coding assistant");
 
-        let request = chained.build().expect("Should build successfully");
+        let request = builder.build().expect("Should build successfully");
 
         match request.system_instruction {
             Some(InteractionInput::Text(text)) => {
                 assert_eq!(text, "You are a helpful coding assistant");
             }
-            _ => panic!("Expected system_instruction to be set on Chained state"),
+            _ => panic!("Expected system_instruction to be set"),
         }
     }
 

@@ -72,21 +72,12 @@ async fn test_very_long_conversation() {
 
     // Build up context over 10 turns
     for (i, fact) in facts.iter().enumerate() {
-        // Use a helper closure to handle the typestate transition cleanly
-        let result = match &previous_id {
-            None => {
-                // First turn: FirstTurn builder
-                stateful_builder(&client).with_text(*fact).create().await
-            }
-            Some(prev_id) => {
-                // Subsequent turns: Chained builder
-                stateful_builder(&client)
-                    .with_text(*fact)
-                    .with_previous_interaction(prev_id)
-                    .create()
-                    .await
-            }
-        };
+        // Build request, optionally chaining from previous interaction
+        let mut builder = stateful_builder(&client).with_text(*fact);
+        if let Some(prev_id) = &previous_id {
+            builder = builder.with_previous_interaction(prev_id);
+        }
+        let result = builder.create().await;
 
         match result {
             Ok(response) => {

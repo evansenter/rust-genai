@@ -387,6 +387,38 @@ impl UsageMetadata {
             None
         }
     }
+
+    /// Accumulates usage from another `UsageMetadata` into this one.
+    ///
+    /// This is useful for aggregating token counts across multiple API calls,
+    /// such as in auto-function calling loops where each iteration reports
+    /// its own usage.
+    ///
+    /// For each field, if the other has a value:
+    /// - If self has a value, adds the other's value
+    /// - If self has None, takes the other's value
+    ///
+    /// Note: `*_by_modality` fields are not accumulated (would require complex merging).
+    pub(crate) fn accumulate(&mut self, other: &UsageMetadata) {
+        fn add_option(a: &mut Option<u32>, b: Option<u32>) {
+            if let Some(b_val) = b {
+                *a = Some(a.unwrap_or(0).saturating_add(b_val));
+            }
+        }
+
+        add_option(&mut self.total_input_tokens, other.total_input_tokens);
+        add_option(&mut self.total_output_tokens, other.total_output_tokens);
+        add_option(&mut self.total_tokens, other.total_tokens);
+        add_option(&mut self.total_cached_tokens, other.total_cached_tokens);
+        add_option(
+            &mut self.total_reasoning_tokens,
+            other.total_reasoning_tokens,
+        );
+        add_option(&mut self.total_thought_tokens, other.total_thought_tokens);
+        add_option(&mut self.total_tool_use_tokens, other.total_tool_use_tokens);
+        // Note: *_by_modality fields are not accumulated as they would require
+        // complex merging logic. If needed, callers can handle these separately.
+    }
 }
 
 // =============================================================================
@@ -3159,5 +3191,129 @@ mod tests {
             mime_type: Some("audio/future-format"),
         };
         assert_eq!(info.extension(), "wav");
+    }
+
+    #[test]
+    fn test_usage_metadata_accumulate_both_have_values() {
+        let mut usage1 = UsageMetadata {
+            total_input_tokens: Some(100),
+            total_output_tokens: Some(50),
+            total_tokens: Some(150),
+            ..Default::default()
+        };
+        let usage2 = UsageMetadata {
+            total_input_tokens: Some(200),
+            total_output_tokens: Some(75),
+            total_tokens: Some(275),
+            ..Default::default()
+        };
+
+        usage1.accumulate(&usage2);
+
+        assert_eq!(usage1.total_input_tokens, Some(300));
+        assert_eq!(usage1.total_output_tokens, Some(125));
+        assert_eq!(usage1.total_tokens, Some(425));
+    }
+
+    #[test]
+    fn test_usage_metadata_accumulate_self_has_none() {
+        let mut usage1 = UsageMetadata::default();
+        let usage2 = UsageMetadata {
+            total_input_tokens: Some(200),
+            total_output_tokens: Some(75),
+            ..Default::default()
+        };
+
+        usage1.accumulate(&usage2);
+
+        assert_eq!(usage1.total_input_tokens, Some(200));
+        assert_eq!(usage1.total_output_tokens, Some(75));
+    }
+
+    #[test]
+    fn test_usage_metadata_accumulate_other_has_none() {
+        let mut usage1 = UsageMetadata {
+            total_input_tokens: Some(100),
+            total_output_tokens: Some(50),
+            ..Default::default()
+        };
+        let usage2 = UsageMetadata::default();
+
+        usage1.accumulate(&usage2);
+
+        // Values should remain unchanged
+        assert_eq!(usage1.total_input_tokens, Some(100));
+        assert_eq!(usage1.total_output_tokens, Some(50));
+    }
+
+    #[test]
+    fn test_usage_metadata_accumulate_all_fields() {
+        let mut usage1 = UsageMetadata {
+            total_input_tokens: Some(100),
+            total_output_tokens: Some(50),
+            total_tokens: Some(150),
+            total_cached_tokens: Some(20),
+            total_reasoning_tokens: Some(10),
+            total_thought_tokens: Some(5),
+            total_tool_use_tokens: Some(15),
+            ..Default::default()
+        };
+        let usage2 = UsageMetadata {
+            total_input_tokens: Some(200),
+            total_output_tokens: Some(100),
+            total_tokens: Some(300),
+            total_cached_tokens: Some(40),
+            total_reasoning_tokens: Some(20),
+            total_thought_tokens: Some(10),
+            total_tool_use_tokens: Some(30),
+            ..Default::default()
+        };
+
+        usage1.accumulate(&usage2);
+
+        assert_eq!(usage1.total_input_tokens, Some(300));
+        assert_eq!(usage1.total_output_tokens, Some(150));
+        assert_eq!(usage1.total_tokens, Some(450));
+        assert_eq!(usage1.total_cached_tokens, Some(60));
+        assert_eq!(usage1.total_reasoning_tokens, Some(30));
+        assert_eq!(usage1.total_thought_tokens, Some(15));
+        assert_eq!(usage1.total_tool_use_tokens, Some(45));
+    }
+
+    #[test]
+    fn test_usage_metadata_accumulate_zero_values() {
+        let mut usage1 = UsageMetadata {
+            total_input_tokens: Some(0),
+            total_output_tokens: Some(50),
+            ..Default::default()
+        };
+        let usage2 = UsageMetadata {
+            total_input_tokens: Some(100),
+            total_output_tokens: Some(0),
+            ..Default::default()
+        };
+
+        usage1.accumulate(&usage2);
+
+        assert_eq!(usage1.total_input_tokens, Some(100));
+        assert_eq!(usage1.total_output_tokens, Some(50));
+    }
+
+    #[test]
+    fn test_usage_metadata_accumulate_saturating() {
+        // Test that we don't overflow - use saturating_add
+        let mut usage1 = UsageMetadata {
+            total_input_tokens: Some(u32::MAX - 10),
+            ..Default::default()
+        };
+        let usage2 = UsageMetadata {
+            total_input_tokens: Some(100),
+            ..Default::default()
+        };
+
+        usage1.accumulate(&usage2);
+
+        // Should saturate at u32::MAX, not wrap around
+        assert_eq!(usage1.total_input_tokens, Some(u32::MAX));
     }
 }
