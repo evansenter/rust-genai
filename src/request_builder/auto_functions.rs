@@ -20,6 +20,7 @@ use crate::ToolService;
 use crate::function_calling::{CallableFunction, FunctionRegistry, get_global_function_registry};
 use crate::streaming::{
     AutoFunctionResult, AutoFunctionStreamChunk, AutoFunctionStreamEvent, FunctionExecutionResult,
+    PendingFunctionCall,
 };
 
 use super::InteractionBuilder;
@@ -472,8 +473,8 @@ impl<'a> InteractionBuilder<'a> {
     ///                 print!("{}", t);
     ///             }
     ///         }
-    ///         AutoFunctionStreamChunk::ExecutingFunctions(response) => {
-    ///             let names: Vec<_> = response.function_calls().iter().map(|c| c.name).collect();
+    ///         AutoFunctionStreamChunk::ExecutingFunctions { pending_calls, .. } => {
+    ///             let names: Vec<_> = pending_calls.iter().map(|c| &c.name).collect();
     ///             println!("[Executing: {:?}]", names);
     ///         }
     ///         AutoFunctionStreamChunk::FunctionResults(results) => {
@@ -728,19 +729,6 @@ impl<'a> InteractionBuilder<'a> {
                     return;
                 }
 
-                // Signal that we're executing functions (pass the response for inspection)
-                let call_count = if !response_function_calls.is_empty() {
-                    response_function_calls.len()
-                } else {
-                    accumulated_calls.len()
-                };
-                debug!("Executing {} function call(s)", call_count);
-                // ExecutingFunctions is client-generated, no API event_id
-                yield AutoFunctionStreamEvent::new(
-                    AutoFunctionStreamChunk::ExecutingFunctions(response.clone()),
-                    None,
-                );
-
                 // Determine which function calls to execute.
                 // Prefer response.function_calls() if available (finalized data),
                 // fall back to accumulated deltas otherwise.
@@ -759,6 +747,21 @@ impl<'a> InteractionBuilder<'a> {
                     }
                     calls
                 };
+
+                // Signal that we're executing functions with pending call info
+                debug!("Executing {} function call(s)", calls_to_execute.len());
+                let pending_calls: Vec<PendingFunctionCall> = calls_to_execute
+                    .iter()
+                    .map(|(call_id, name, args)| PendingFunctionCall::new(name, call_id, args.clone()))
+                    .collect();
+                // ExecutingFunctions is client-generated, no API event_id
+                yield AutoFunctionStreamEvent::new(
+                    AutoFunctionStreamChunk::ExecutingFunctions {
+                        response: response.clone(),
+                        pending_calls,
+                    },
+                    None,
+                );
 
                 // Build function results for next iteration
                 let mut function_results_content = Vec::new();

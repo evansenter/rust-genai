@@ -662,11 +662,11 @@ pub async fn consume_auto_function_stream(
                             }
                         }
                     }
-                    AutoFunctionStreamChunk::ExecutingFunctions(response) => {
+                    AutoFunctionStreamChunk::ExecutingFunctions { pending_calls, .. } => {
                         result.executing_functions_count += 1;
-                        for call in response.function_calls() {
+                        for call in pending_calls {
                             println!("\n[Executing: {}]", call.name);
-                            result.executed_function_names.push(call.name.to_string());
+                            result.executed_function_names.push(call.name.clone());
                         }
                     }
                     AutoFunctionStreamChunk::FunctionResults(results) => {

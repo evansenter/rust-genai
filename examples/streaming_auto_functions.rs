@@ -135,21 +135,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             stdout().flush()?;
                         }
                     }
-                    AutoFunctionStreamChunk::ExecutingFunctions(response) => {
+                    AutoFunctionStreamChunk::ExecutingFunctions {
+                        response,
+                        pending_calls,
+                    } => {
                         // Notification that functions are about to execute
-                        // Note: In streaming mode, function calls may come via deltas,
-                        // so response.function_calls() may be empty. Check response.status
-                        // to confirm functions are being requested.
+                        // pending_calls contains the validated function calls that will be executed
                         println!("\n--- Executing Functions ---");
                         println!("  Status: {:?}", response.status);
-                        let calls = response.function_calls();
-                        if calls.is_empty() {
-                            println!("  (Function calls received via stream deltas)");
-                        } else {
-                            for call in calls {
-                                function_count += 1;
-                                println!("  [{}] {}({})", function_count, call.name, call.args);
-                            }
+                        for call in pending_calls {
+                            function_count += 1;
+                            println!("  [{}] {}({})", function_count, call.name, call.args);
                         }
                         println!("---------------------------");
                     }
@@ -218,7 +214,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  [RES#2] SSE stream: text deltas → completed\n");
 
     println!("--- Production Considerations ---");
-    println!("• ExecutingFunctions may show empty calls (they arrived via deltas)");
+    println!("• ExecutingFunctions.pending_calls always has the calls that will execute");
     println!("• FunctionResults includes execution timing for performance monitoring");
     println!("• Handle stream errors gracefully - partial responses may have been sent");
     println!("• Use buffering for high-frequency UI updates");

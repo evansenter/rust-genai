@@ -128,7 +128,7 @@ pub use function_calling::{CallableFunction, FunctionError, ToolService};
 pub mod streaming;
 pub use streaming::{
     AutoFunctionResult, AutoFunctionResultAccumulator, AutoFunctionStreamChunk,
-    AutoFunctionStreamEvent, FunctionExecutionResult,
+    AutoFunctionStreamEvent, FunctionExecutionResult, PendingFunctionCall,
 };
 
 // =============================================================================
