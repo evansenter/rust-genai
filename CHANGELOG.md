@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **BREAKING**: `AutoFunctionStreamChunk::ExecutingFunctions` changed from tuple variant to struct variant with `pending_calls` field:
+  ```rust
+  // Before
+  AutoFunctionStreamChunk::ExecutingFunctions(response) => {
+      // response.function_calls() was often empty in streaming mode
+  }
+
+  // After
+  AutoFunctionStreamChunk::ExecutingFunctions { response, pending_calls } => {
+      // pending_calls always contains the validated function calls
+      for call in pending_calls {
+          println!("Executing: {}({})", call.name, call.args);
+      }
+  }
+  ```
+
+### Added
+
+- `PendingFunctionCall` type: Represents a function call about to be executed, with `name`, `call_id`, and `args` fields. Available in `ExecutingFunctions` events before function execution begins.
+
+### Fixed
+
+- `ExecutingFunctions` chunk now provides function call information via `pending_calls` field. Previously, `response.function_calls()` was often empty in streaming mode because function calls arrived via Delta chunks rather than the Complete response.
+
 ## [0.7.1] - 2026-01-17
 
 ### Changed
