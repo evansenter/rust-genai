@@ -84,10 +84,11 @@ fn arb_function_execution_result() -> impl Strategy<Value = FunctionExecutionRes
         arb_identifier(),
         arb_identifier(),
         arb_json_value(),
+        arb_json_value(),
         any::<u64>().prop_map(Duration::from_millis),
     )
-        .prop_map(|(name, call_id, result, duration)| {
-            FunctionExecutionResult::new(name, call_id, result, duration)
+        .prop_map(|(name, call_id, args, result, duration)| {
+            FunctionExecutionResult::new(name, call_id, args, result, duration)
         })
 }
 
@@ -393,6 +394,7 @@ proptest! {
         let result = FunctionExecutionResult::new(
             "test_function",
             "call-123",
+            serde_json::json!({}),
             serde_json::json!({"status": "ok"}),
             Duration::from_millis(millis),
         );
@@ -467,6 +469,7 @@ proptest! {
         let result = FunctionExecutionResult::new(
             name,
             "call-1",
+            serde_json::json!({}),
             serde_json::json!(null),
             Duration::from_millis(1),
         );
@@ -491,6 +494,7 @@ proptest! {
         let result = FunctionExecutionResult::new(
             "big_result_function",
             "call-big",
+            serde_json::json!({}),
             result_value,
             Duration::from_millis(500),
         );

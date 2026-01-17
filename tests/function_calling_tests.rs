@@ -345,6 +345,7 @@ mod basic {
         let success = FunctionExecutionResult::new(
             "get_weather",
             "call-123",
+            json!({"city": "Seattle"}),
             json!({"city": "Seattle", "temp": "65°F"}),
             Duration::from_millis(100),
         );
@@ -359,6 +360,7 @@ mod basic {
         let not_found = FunctionExecutionResult::new(
             "missing_function",
             "call-456",
+            json!({"some": "args"}),
             json!({"error": "Function 'missing_function' is not available or not found."}),
             Duration::from_millis(1),
         );

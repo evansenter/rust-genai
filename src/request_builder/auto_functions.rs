@@ -369,6 +369,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                 all_executions.push(FunctionExecutionResult::new(
                     call.name,
                     &call_id,
+                    call.args.clone(),
                     result.clone(),
                     duration,
                 ));
@@ -746,6 +747,7 @@ impl<'a, State: CanAutoFunction + Send + 'a> InteractionBuilder<'a, State> {
                     execution_results.push(FunctionExecutionResult::new(
                         name.clone(),
                         call_id.clone(),
+                        args.clone(),
                         result.clone(),
                         duration,
                     ));
