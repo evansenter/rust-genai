@@ -521,7 +521,7 @@ for call in response.function_calls() {
 
 ### Pattern 1: First Turn vs Subsequent Turns (Match)
 
-The typestate pattern enforces that `with_system_instruction()` is only available on the first turn. Use a match:
+System instructions are NOT inherited across turns via `previousInteractionId`, so you must set them explicitly on each turn if needed:
 
 ```rust,ignore
 struct Agent {

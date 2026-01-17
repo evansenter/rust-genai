@@ -72,8 +72,8 @@ The `tools` behavior is particularly sharp:
 
 **Recommendation**: Add a dedicated "Multi-Turn Conversations" documentation page specifying exactly what's inherited and what must be resent.
 
-**Our workaround**: We use a typestate pattern to enforce correct usage at compile time, and document the rules extensively.
-- [`src/request_builder/mod.rs`](../src/request_builder/mod.rs) - Typestate enforces tools resending
+**Our workaround**: We document the rules extensively and handle tools resending internally.
+- [`src/request_builder/mod.rs`](../src/request_builder/mod.rs) - Builder handles tools configuration
 - [`docs/MULTI_TURN_FUNCTION_CALLING.md`](./MULTI_TURN_FUNCTION_CALLING.md#inheritance-rules) - Documents inheritance behavior
 
 ---
@@ -90,9 +90,9 @@ The Deep Research agent (`deep-research-pro-preview`) silently fails without `ba
 
 **Recommendation**: Add prominent callouts in the Interactions API reference that agent interactions require `background=true` and `store=true`.
 
-**Our workaround**: We document the requirement prominently and enforce it via typestate.
+**Our workaround**: We document the requirement prominently and validate at runtime.
 - [`docs/AGENTS_AND_BACKGROUND.md`](./AGENTS_AND_BACKGROUND.md) - Documents agent requirements
-- [`src/request_builder/mod.rs`](../src/request_builder/mod.rs) - `with_background()` available after chaining
+- [`src/request_builder/mod.rs`](../src/request_builder/mod.rs) - Runtime validation catches invalid combinations
 
 ---
 
