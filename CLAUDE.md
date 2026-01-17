@@ -262,6 +262,17 @@ When releasing a new version, update these files:
 
 `Cargo.lock` updates automatically—don't edit manually.
 
+### Release Steps
+
+After merging version bump PR:
+
+1. **Tag the release**: `git tag -a vX.Y.Z origin/main -m "Release vX.Y.Z"`
+2. **Push tag**: `git push origin vX.Y.Z`
+3. **Create GitHub release**: `gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."` (copy from CHANGELOG)
+4. **Publish to crates.io**:
+   - `cargo publish -p genai-rs-macros` (wait 30s for index)
+   - `cargo publish -p genai-rs`
+
 ## Logging
 
 See `docs/LOGGING_STRATEGY.md`. Key points:
