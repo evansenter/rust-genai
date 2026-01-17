@@ -16,7 +16,7 @@ When `store: false`, the server keeps no conversation state. You must:
 | Server state | Yes | No |
 | `previous_interaction_id` | Available | Cannot use |
 | History management | Automatic | Manual |
-| Auto functions | Available | Blocked at compile time |
+| Auto functions | Available | Blocked at runtime |
 
 ## When to Use Stateless
 
