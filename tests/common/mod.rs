@@ -980,3 +980,59 @@ pub async fn assert_response_semantic(
         validation_question, response_text
     );
 }
+
+// =============================================================================
+// Function Declaration Builders
+// =============================================================================
+
+/// Creates a standard "get_weather" function declaration for testing.
+///
+/// This is the canonical weather function used across function calling tests.
+/// Returns weather information for a given city.
+#[allow(dead_code)]
+pub fn get_weather_function() -> genai_rs::FunctionDeclaration {
+    use serde_json::json;
+    genai_rs::FunctionDeclaration::builder("get_weather")
+        .description("Get the current weather for a city")
+        .parameter(
+            "city",
+            json!({"type": "string", "description": "City name"}),
+        )
+        .required(vec!["city".to_string()])
+        .build()
+}
+
+/// Creates a standard "get_time" function declaration for testing.
+///
+/// This is the canonical time function used across function calling tests.
+/// Returns the current time in a given timezone.
+#[allow(dead_code)]
+pub fn get_time_function() -> genai_rs::FunctionDeclaration {
+    use serde_json::json;
+    genai_rs::FunctionDeclaration::builder("get_time")
+        .description("Get the current time in a timezone")
+        .parameter(
+            "timezone",
+            json!({"type": "string", "description": "Timezone like PST, EST, JST"}),
+        )
+        .required(vec!["timezone".to_string()])
+        .build()
+}
+
+// =============================================================================
+// Long Conversation Error Detection
+// =============================================================================
+
+/// Checks if an error is a known API limitation for long conversation chains.
+///
+/// Long multi-turn conversations can trigger backend issues including:
+/// - UTF-8 encoding errors
+/// - Spanner database timeouts
+/// - Content truncation errors
+///
+/// Use this to gracefully handle expected failures in long conversation tests.
+#[allow(dead_code)]
+pub fn is_long_conversation_api_error(error: &GenaiError) -> bool {
+    let error_str = format!("{:?}", error);
+    error_str.contains("UTF-8") || error_str.contains("spanner") || error_str.contains("truncated")
+}

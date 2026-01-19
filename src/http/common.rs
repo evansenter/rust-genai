@@ -1,10 +1,6 @@
 /// Represents the API version to target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApiVersion {
-    /// V1 Alpha API version (reserved for future use).
-    /// Kept for API completeness and tested in unit tests.
-    #[allow(dead_code)] // Used in tests, reserved for future API versions
-    V1Alpha,
     /// V1 Beta API version (current)
     V1Beta,
 }
@@ -12,7 +8,6 @@ pub enum ApiVersion {
 impl ApiVersion {
     const fn as_str(self) -> &'static str {
         match self {
-            Self::V1Alpha => "v1alpha",
             Self::V1Beta => "v1beta",
         }
     }
@@ -127,7 +122,6 @@ mod tests {
 
     #[test]
     fn test_api_version_as_str() {
-        assert_eq!(ApiVersion::V1Alpha.as_str(), "v1alpha");
         assert_eq!(ApiVersion::V1Beta.as_str(), "v1beta");
     }
 
@@ -292,14 +286,10 @@ mod tests {
     }
 
     #[test]
-    fn test_endpoint_to_path_with_different_versions() {
+    fn test_endpoint_to_path() {
         let endpoint = Endpoint::CreateInteraction { stream: false };
-
-        let path_v1alpha = endpoint.to_path(ApiVersion::V1Alpha);
-        assert_eq!(path_v1alpha, "/v1alpha/interactions");
-
-        let path_v1beta = endpoint.to_path(ApiVersion::V1Beta);
-        assert_eq!(path_v1beta, "/v1beta/interactions");
+        let path = endpoint.to_path(ApiVersion::V1Beta);
+        assert_eq!(path, "/v1beta/interactions");
     }
 
     #[test]

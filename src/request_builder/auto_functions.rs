@@ -59,6 +59,57 @@ fn build_service_function_map(
         .unwrap_or_default()
 }
 
+/// Auto-discovers functions from the global registry and tool service.
+///
+/// If `request.tools` is already set, this is a no-op. Otherwise, it:
+/// 1. Collects all functions from the global registry (`#[tool]` macro functions)
+/// 2. Filters out any that would be shadowed by service functions (with warning)
+/// 3. Adds declarations from the tool service
+/// 4. Sets `request.tools` if any functions were found
+fn auto_discover_tools(
+    request: &mut crate::request::InteractionRequest,
+    service_functions: &HashMap<String, Arc<dyn CallableFunction>>,
+) {
+    if request.tools.is_some() {
+        return;
+    }
+
+    let function_registry = get_global_function_registry();
+    let mut all_declarations = function_registry.all_declarations();
+
+    // Service functions take precedence over global registry
+    // Filter out global declarations that would be shadowed by service functions
+    let service_names: std::collections::HashSet<&str> =
+        service_functions.keys().map(|s| s.as_str()).collect();
+
+    // Log warnings for shadowed functions and filter them out
+    all_declarations.retain(|decl| {
+        if service_names.contains(decl.name()) {
+            warn!(
+                "Tool service function '{}' shadows global registry function with same name",
+                decl.name()
+            );
+            false
+        } else {
+            true
+        }
+    });
+
+    // Add declarations from tool service
+    for func in service_functions.values() {
+        all_declarations.push(func.declaration());
+    }
+
+    if !all_declarations.is_empty() {
+        request.tools = Some(
+            all_declarations
+                .into_iter()
+                .map(|decl| decl.into_tool())
+                .collect(),
+        );
+    }
+}
+
 /// Executes a function by looking it up in the service map first, then the global registry.
 ///
 /// Returns the function result as JSON. Errors are converted to JSON error objects
@@ -260,42 +311,8 @@ impl<'a> InteractionBuilder<'a> {
         let service_functions = build_service_function_map(&tool_service);
 
         // Auto-discover functions from registry and tool service if not explicitly provided
+        auto_discover_tools(&mut request, &service_functions);
         let function_registry = get_global_function_registry();
-        if request.tools.is_none() {
-            let mut all_declarations = function_registry.all_declarations();
-
-            // Service functions take precedence over global registry
-            // Filter out global declarations that would be shadowed by service functions
-            let service_names: std::collections::HashSet<&str> =
-                service_functions.keys().map(|s| s.as_str()).collect();
-
-            // Log warnings for shadowed functions and filter them out
-            all_declarations.retain(|decl| {
-                if service_names.contains(decl.name()) {
-                    warn!(
-                        "Tool service function '{}' shadows global registry function with same name",
-                        decl.name()
-                    );
-                    false
-                } else {
-                    true
-                }
-            });
-
-            // Add declarations from tool service
-            for func in service_functions.values() {
-                all_declarations.push(func.declaration());
-            }
-
-            if !all_declarations.is_empty() {
-                request.tools = Some(
-                    all_declarations
-                        .into_iter()
-                        .map(|decl| decl.into_tool())
-                        .collect(),
-                );
-            }
-        }
 
         // Track the last response for returning partial results if max loops is reached
         let mut last_response: Option<InteractionResponse> = None;
@@ -567,44 +584,8 @@ impl<'a> InteractionBuilder<'a> {
             let service_functions = build_service_function_map(&tool_service);
 
             // Auto-discover functions from registry and tool service if not explicitly provided
+            auto_discover_tools(&mut request, &service_functions);
             let function_registry = get_global_function_registry();
-            if request.tools.is_none() {
-                let mut all_declarations = function_registry.all_declarations();
-
-                // Service functions take precedence over global registry
-                // Filter out global declarations that would be shadowed by service functions
-                let service_names: std::collections::HashSet<&str> = service_functions
-                    .keys()
-                    .map(|s| s.as_str())
-                    .collect();
-
-                // Log warnings for shadowed functions and filter them out
-                all_declarations.retain(|decl| {
-                    if service_names.contains(decl.name()) {
-                        warn!(
-                            "Tool service function '{}' shadows global registry function with same name",
-                            decl.name()
-                        );
-                        false
-                    } else {
-                        true
-                    }
-                });
-
-                // Add declarations from tool service
-                for func in service_functions.values() {
-                    all_declarations.push(func.declaration());
-                }
-
-                if !all_declarations.is_empty() {
-                    request.tools = Some(
-                        all_declarations
-                            .into_iter()
-                            .map(|decl| decl.into_tool())
-                            .collect(),
-                    );
-                }
-            }
 
             // Track the last response for returning partial results if max loops is reached
             let mut last_response: Option<InteractionResponse> = None;

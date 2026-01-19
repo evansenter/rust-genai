@@ -285,6 +285,21 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
     {
         let value = serde_json::Value::deserialize(deserializer)?;
 
+        // Helper to extract "data" field with consistent warning for missing data
+        fn extract_data_field(value: &serde_json::Value, variant_name: &str) -> serde_json::Value {
+            match value.get("data").cloned() {
+                Some(d) => d,
+                None => {
+                    tracing::warn!(
+                        "AutoFunctionStreamChunk::{} is missing the 'data' field. \
+                         This may indicate a malformed API response.",
+                        variant_name
+                    );
+                    serde_json::Value::Null
+                }
+            }
+        }
+
         let chunk_type = match value.get("chunk_type") {
             Some(serde_json::Value::String(s)) => s.as_str(),
             Some(other) => {
@@ -306,16 +321,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
 
         match chunk_type {
             "delta" => {
-                let data = match value.get("data").cloned() {
-                    Some(d) => d,
-                    None => {
-                        tracing::warn!(
-                            "AutoFunctionStreamChunk::Delta is missing the 'data' field. \
-                             This may indicate a malformed API response."
-                        );
-                        serde_json::Value::Null
-                    }
-                };
+                let data = extract_data_field(&value, "Delta");
                 let content: Content = serde_json::from_value(data).map_err(|e| {
                     serde::de::Error::custom(format!(
                         "Failed to deserialize AutoFunctionStreamChunk::Delta data: {}",
@@ -325,16 +331,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 Ok(Self::Delta(content))
             }
             "executing_functions" => {
-                let data = match value.get("data").cloned() {
-                    Some(d) => d,
-                    None => {
-                        tracing::warn!(
-                            "AutoFunctionStreamChunk::ExecutingFunctions is missing the 'data' field. \
-                             This may indicate a malformed API response."
-                        );
-                        serde_json::Value::Null
-                    }
-                };
+                let data = extract_data_field(&value, "ExecutingFunctions");
 
                 let response = serde_json::from_value(
                     data.get("response")
@@ -365,16 +362,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 })
             }
             "function_results" => {
-                let data = match value.get("data").cloned() {
-                    Some(d) => d,
-                    None => {
-                        tracing::warn!(
-                            "AutoFunctionStreamChunk::FunctionResults is missing the 'data' field. \
-                             This may indicate a malformed API response."
-                        );
-                        serde_json::Value::Null
-                    }
-                };
+                let data = extract_data_field(&value, "FunctionResults");
                 let results: Vec<FunctionExecutionResult> =
                     serde_json::from_value(data).map_err(|e| {
                         serde::de::Error::custom(format!(
@@ -385,16 +373,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 Ok(Self::FunctionResults(results))
             }
             "complete" => {
-                let data = match value.get("data").cloned() {
-                    Some(d) => d,
-                    None => {
-                        tracing::warn!(
-                            "AutoFunctionStreamChunk::Complete is missing the 'data' field. \
-                             This may indicate a malformed API response."
-                        );
-                        serde_json::Value::Null
-                    }
-                };
+                let data = extract_data_field(&value, "Complete");
                 let response: InteractionResponse = serde_json::from_value(data).map_err(|e| {
                     serde::de::Error::custom(format!(
                         "Failed to deserialize AutoFunctionStreamChunk::Complete data: {}",
@@ -404,16 +383,7 @@ impl<'de> Deserialize<'de> for AutoFunctionStreamChunk {
                 Ok(Self::Complete(response))
             }
             "max_loops_reached" => {
-                let data = match value.get("data").cloned() {
-                    Some(d) => d,
-                    None => {
-                        tracing::warn!(
-                            "AutoFunctionStreamChunk::MaxLoopsReached is missing the 'data' field. \
-                             This may indicate a malformed API response."
-                        );
-                        serde_json::Value::Null
-                    }
-                };
+                let data = extract_data_field(&value, "MaxLoopsReached");
                 let response: InteractionResponse = serde_json::from_value(data).map_err(|e| {
                     serde::de::Error::custom(format!(
                         "Failed to deserialize AutoFunctionStreamChunk::MaxLoopsReached data: {}",
