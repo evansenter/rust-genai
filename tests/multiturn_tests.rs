@@ -13,7 +13,10 @@
 
 mod common;
 
-use common::{get_client, interaction_builder, stateful_builder, validate_response_semantically};
+use common::{
+    get_client, interaction_builder, is_long_conversation_api_error, stateful_builder,
+    validate_response_semantically,
+};
 use genai_rs::{Content, FunctionDeclaration, InteractionStatus};
 use serde_json::json;
 
@@ -27,18 +30,6 @@ const MIN_SUCCESSFUL_TURNS: usize = 3;
 
 /// Minimum facts the model should remember out of 10 in the recall test.
 const MIN_REMEMBERED_FACTS: usize = 5;
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-/// Checks if an error is a known API limitation for long conversation chains.
-/// These errors (UTF-8 encoding issues, spanner errors, truncation) can occur
-/// when the conversation context becomes too large.
-fn is_long_conversation_api_error(error: &genai_rs::GenaiError) -> bool {
-    let error_str = format!("{:?}", error);
-    error_str.contains("UTF-8") || error_str.contains("spanner") || error_str.contains("truncated")
-}
 
 // =============================================================================
 // Multi-turn: Very Long Conversations

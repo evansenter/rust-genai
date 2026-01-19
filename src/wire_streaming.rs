@@ -199,6 +199,77 @@ impl StreamChunk {
             _ => None,
         }
     }
+
+    /// Writes the chunk's fields to a serialization map.
+    ///
+    /// This is used internally by both `StreamChunk::Serialize` and `StreamEvent::Serialize`
+    /// to avoid duplicating the match logic.
+    fn write_to_map<M>(&self, map: &mut M) -> Result<(), M::Error>
+    where
+        M: serde::ser::SerializeMap,
+    {
+        match self {
+            Self::Start { interaction } => {
+                map.serialize_entry("chunk_type", "start")?;
+                map.serialize_entry("data", interaction)?;
+            }
+            Self::StatusUpdate {
+                interaction_id,
+                status,
+            } => {
+                map.serialize_entry("chunk_type", "status_update")?;
+                map.serialize_entry(
+                    "data",
+                    &serde_json::json!({
+                        "interaction_id": interaction_id,
+                        "status": status,
+                    }),
+                )?;
+            }
+            Self::ContentStart {
+                index,
+                content_type,
+            } => {
+                map.serialize_entry("chunk_type", "content_start")?;
+                map.serialize_entry(
+                    "data",
+                    &serde_json::json!({
+                        "index": index,
+                        "content_type": content_type,
+                    }),
+                )?;
+            }
+            Self::Delta(content) => {
+                map.serialize_entry("chunk_type", "delta")?;
+                map.serialize_entry("data", content)?;
+            }
+            Self::ContentStop { index } => {
+                map.serialize_entry("chunk_type", "content_stop")?;
+                map.serialize_entry("data", &serde_json::json!({ "index": index }))?;
+            }
+            Self::Complete(response) => {
+                map.serialize_entry("chunk_type", "complete")?;
+                map.serialize_entry("data", response)?;
+            }
+            Self::Error { message, code } => {
+                map.serialize_entry("chunk_type", "error")?;
+                map.serialize_entry(
+                    "data",
+                    &serde_json::json!({
+                        "message": message,
+                        "code": code,
+                    }),
+                )?;
+            }
+            Self::Unknown { chunk_type, data } => {
+                map.serialize_entry("chunk_type", chunk_type)?;
+                if !data.is_null() {
+                    map.serialize_entry("data", data)?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Serialize for StreamChunk {
@@ -208,82 +279,9 @@ impl Serialize for StreamChunk {
     {
         use serde::ser::SerializeMap;
 
-        match self {
-            Self::Start { interaction } => {
-                let mut map = serializer.serialize_map(None)?;
-                map.serialize_entry("chunk_type", "start")?;
-                map.serialize_entry("data", interaction)?;
-                map.end()
-            }
-            Self::StatusUpdate {
-                interaction_id,
-                status,
-            } => {
-                let mut map = serializer.serialize_map(None)?;
-                map.serialize_entry("chunk_type", "status_update")?;
-                map.serialize_entry(
-                    "data",
-                    &serde_json::json!({
-                        "interaction_id": interaction_id,
-                        "status": status,
-                    }),
-                )?;
-                map.end()
-            }
-            Self::ContentStart {
-                index,
-                content_type,
-            } => {
-                let mut map = serializer.serialize_map(None)?;
-                map.serialize_entry("chunk_type", "content_start")?;
-                map.serialize_entry(
-                    "data",
-                    &serde_json::json!({
-                        "index": index,
-                        "content_type": content_type,
-                    }),
-                )?;
-                map.end()
-            }
-            Self::Delta(content) => {
-                let mut map = serializer.serialize_map(None)?;
-                map.serialize_entry("chunk_type", "delta")?;
-                map.serialize_entry("data", content)?;
-                map.end()
-            }
-            Self::ContentStop { index } => {
-                let mut map = serializer.serialize_map(None)?;
-                map.serialize_entry("chunk_type", "content_stop")?;
-                map.serialize_entry("data", &serde_json::json!({ "index": index }))?;
-                map.end()
-            }
-            Self::Complete(response) => {
-                let mut map = serializer.serialize_map(None)?;
-                map.serialize_entry("chunk_type", "complete")?;
-                map.serialize_entry("data", response)?;
-                map.end()
-            }
-            Self::Error { message, code } => {
-                let mut map = serializer.serialize_map(None)?;
-                map.serialize_entry("chunk_type", "error")?;
-                map.serialize_entry(
-                    "data",
-                    &serde_json::json!({
-                        "message": message,
-                        "code": code,
-                    }),
-                )?;
-                map.end()
-            }
-            Self::Unknown { chunk_type, data } => {
-                let mut map = serializer.serialize_map(None)?;
-                map.serialize_entry("chunk_type", chunk_type)?;
-                if !data.is_null() {
-                    map.serialize_entry("data", data)?;
-                }
-                map.end()
-            }
-        }
+        let mut map = serializer.serialize_map(None)?;
+        self.write_to_map(&mut map)?;
+        map.end()
     }
 }
 
@@ -596,72 +594,9 @@ impl Serialize for StreamEvent {
     {
         use serde::ser::SerializeMap;
 
-        // Serialize as a map containing the chunk fields plus event_id
         let mut map = serializer.serialize_map(None)?;
+        self.chunk.write_to_map(&mut map)?;
 
-        // First serialize the chunk's fields (delegate to StreamChunk's logic)
-        match &self.chunk {
-            StreamChunk::Start { interaction } => {
-                map.serialize_entry("chunk_type", "start")?;
-                map.serialize_entry("data", interaction)?;
-            }
-            StreamChunk::StatusUpdate {
-                interaction_id,
-                status,
-            } => {
-                map.serialize_entry("chunk_type", "status_update")?;
-                map.serialize_entry(
-                    "data",
-                    &serde_json::json!({
-                        "interaction_id": interaction_id,
-                        "status": status,
-                    }),
-                )?;
-            }
-            StreamChunk::ContentStart {
-                index,
-                content_type,
-            } => {
-                map.serialize_entry("chunk_type", "content_start")?;
-                map.serialize_entry(
-                    "data",
-                    &serde_json::json!({
-                        "index": index,
-                        "content_type": content_type,
-                    }),
-                )?;
-            }
-            StreamChunk::Delta(content) => {
-                map.serialize_entry("chunk_type", "delta")?;
-                map.serialize_entry("data", content)?;
-            }
-            StreamChunk::ContentStop { index } => {
-                map.serialize_entry("chunk_type", "content_stop")?;
-                map.serialize_entry("data", &serde_json::json!({ "index": index }))?;
-            }
-            StreamChunk::Complete(response) => {
-                map.serialize_entry("chunk_type", "complete")?;
-                map.serialize_entry("data", response)?;
-            }
-            StreamChunk::Error { message, code } => {
-                map.serialize_entry("chunk_type", "error")?;
-                map.serialize_entry(
-                    "data",
-                    &serde_json::json!({
-                        "message": message,
-                        "code": code,
-                    }),
-                )?;
-            }
-            StreamChunk::Unknown { chunk_type, data } => {
-                map.serialize_entry("chunk_type", chunk_type)?;
-                if !data.is_null() {
-                    map.serialize_entry("data", data)?;
-                }
-            }
-        }
-
-        // Add event_id if present
         if let Some(event_id) = &self.event_id {
             map.serialize_entry("event_id", event_id)?;
         }

@@ -30,8 +30,9 @@ mod common;
 
 use common::{
     consume_auto_function_stream, consume_stream, extended_test_timeout, get_client,
-    interaction_builder, retry_on_any_error, stateful_builder, test_timeout,
-    validate_response_semantically, with_timeout,
+    get_time_function, get_weather_function, interaction_builder, is_long_conversation_api_error,
+    retry_on_any_error, stateful_builder, test_timeout, validate_response_semantically,
+    with_timeout,
 };
 use genai_rs::{
     CallableFunction, Content, FunctionDeclaration, FunctionExecutionResult, GenaiError,
@@ -137,36 +138,8 @@ fn get_time(timezone: String) -> String {
 }
 
 // =============================================================================
-// Helper Functions
+// Helper Constants
 // =============================================================================
-
-fn get_weather_function() -> FunctionDeclaration {
-    FunctionDeclaration::builder("get_weather")
-        .description("Get the current weather for a city")
-        .parameter(
-            "city",
-            json!({"type": "string", "description": "City name"}),
-        )
-        .required(vec!["city".to_string()])
-        .build()
-}
-
-fn get_time_function() -> FunctionDeclaration {
-    FunctionDeclaration::builder("get_time")
-        .description("Get the current time in a timezone")
-        .parameter(
-            "timezone",
-            json!({"type": "string", "description": "Timezone like PST, EST, JST"}),
-        )
-        .required(vec!["timezone".to_string()])
-        .build()
-}
-
-/// Checks if an error is a known API limitation for long conversation chains.
-fn is_long_conversation_api_error(error: &GenaiError) -> bool {
-    let error_str = format!("{:?}", error);
-    error_str.contains("UTF-8") || error_str.contains("spanner") || error_str.contains("truncated")
-}
 
 const SYSTEM_INSTRUCTION: &str = "You are a helpful assistant that uses available tools when appropriate. Always respond concisely.";
 
