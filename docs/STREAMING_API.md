@@ -173,6 +173,56 @@ ContentStop     →  Output block 0 complete
 Complete        →  Full response with usage metadata
 ```
 
+### Function Call Event Sequence
+
+When the model decides to call functions, the event sequence is similar but the `Complete` event signals that the client must execute the functions:
+
+```text
+Start           →  Interaction accepted, ID available
+ContentStart    →  Output block 0 starting (type: "function_call")
+Delta           →  FunctionCall { id: "call_1", name: "get_weather", args: {...} }
+Delta           →  FunctionCall { id: "call_2", name: "get_time", args: {...} }
+ContentStop     →  Output block 0 complete
+Complete        →  Full response, status: RequiresAction  ← execute functions now
+```
+
+Key differences from text output:
+
+| Aspect | Text Output | Function Calls |
+|--------|-------------|----------------|
+| Delta content | `Content::Text` | `Content::FunctionCall` |
+| Complete status | `Completed` | `RequiresAction` |
+| Next step | Display to user | Execute functions, send results |
+
+The `RequiresAction` status in the `Complete` event is your signal to:
+1. Extract function calls from `response.outputs`
+2. Execute each function
+3. Send results back via `Content::FunctionResult` in a new interaction
+
+```rust,ignore
+match &event.chunk {
+    StreamChunk::Complete(response) => {
+        match response.status {
+            InteractionStatus::Completed => {
+                // Final text response - display to user
+                println!("{}", response.as_text().unwrap_or_default());
+            }
+            InteractionStatus::RequiresAction => {
+                // Function calls pending - execute them
+                for output in &response.outputs {
+                    if let Content::FunctionCall { id, name, args } = output {
+                        let result = execute_function(name, args).await;
+                        // Send FunctionResult back to continue conversation
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    _ => {}
+}
+```
+
 ### Terminal Events
 
 `Complete` and `Error` are terminal events - no more events will follow:
